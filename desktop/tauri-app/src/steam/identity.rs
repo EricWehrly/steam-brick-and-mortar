@@ -87,20 +87,20 @@ mod tests {
             r#"
             "users"
             {
-                "76561197984589530"
+                "76561197960265728"
                 {
-                    "AccountName"		"hornisyco"
-                    "PersonaName"		"SpiteMonger"
+                    "AccountName"		"johndoe"
+                    "PersonaName"		"John Doe"
                     "MostRecent"		"1"
-                    "Timestamp"		"1783642872"
+                    "Timestamp"		"1700000000"
                 }
             }
             "#,
         )
         .unwrap();
         assert_eq!(identities.len(), 1);
-        assert_eq!(identities[0].steamid64, "76561197984589530");
-        assert_eq!(identities[0].persona_name, "SpiteMonger");
+        assert_eq!(identities[0].steamid64, "76561197960265728");
+        assert_eq!(identities[0].persona_name, "John Doe");
         assert!(identities[0].most_recent);
     }
 

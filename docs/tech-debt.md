@@ -14,6 +14,18 @@
 
 ## Fix Now (Intermission)
 
+## id: personal-data-in-git-history
+**Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
+**Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)
+**Context**: The real Steam persona name "spitemonger" (the account owner's own real identity, surfaced while fixing real-account-data test fixtures in `desktop/tauri-app/src/steam/{identity,keyvalues}.rs`) is baked into six **committed** files under `docs/research/local-steam/` — filenames and contents, including a full real game-library dump (`live-games-response-spitemonger.json`, 836 games). Already pushed to the public remote (`github.com/EricWehrly/steam-brick-and-mortar`).
+
+**Decision (for now)**: track it, don't act yet. Revisit when there's bandwidth for a proper history-scrub pass rather than a quick rename (renaming going forward doesn't remove it from history).
+
+**Done when**:
+- Personal-identifying data (persona name, real library contents) is not reachable in git history, not just absent from the current tree
+
+**Related files**: `docs/research/local-steam/live-appids-spitemonger.json`, `live-games-response-spitemonger.json`, `local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`, `local-steam-coverage-local-steam-spitemonger.{json,md}`
+
 ## id: appid-keyed-cache-split
 **Priority**: High  
 **Effort**: ~1-2 days (cache model refactor + migration + tests)  

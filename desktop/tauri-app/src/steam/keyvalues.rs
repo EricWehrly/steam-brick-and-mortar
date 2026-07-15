@@ -169,9 +169,9 @@ mod tests {
 
     #[test]
     fn parses_flat_pairs() {
-        let kv = parse(r#""AccountName"  "hornisyco" "PersonaName" "SpiteMonger""#).unwrap();
-        assert_eq!(kv.get("AccountName").and_then(|v| v.as_str()), Some("hornisyco"));
-        assert_eq!(kv.get("PersonaName").and_then(|v| v.as_str()), Some("SpiteMonger"));
+        let kv = parse(r#""AccountName"  "johndoe" "PersonaName" "John Doe""#).unwrap();
+        assert_eq!(kv.get("AccountName").and_then(|v| v.as_str()), Some("johndoe"));
+        assert_eq!(kv.get("PersonaName").and_then(|v| v.as_str()), Some("John Doe"));
     }
 
     #[test]
@@ -180,17 +180,17 @@ mod tests {
             r#"
             "users"
             {
-                "76561197984589530"
+                "76561197960265728"
                 {
-                    "AccountName" "hornisyco"
+                    "AccountName" "johndoe"
                     "MostRecent" "1"
                 }
             }
             "#,
         )
         .unwrap();
-        let name = kv.path(&["users", "76561197984589530", "AccountName"]);
-        assert_eq!(name.and_then(|v| v.as_str()), Some("hornisyco"));
+        let name = kv.path(&["users", "76561197960265728", "AccountName"]);
+        assert_eq!(name.and_then(|v| v.as_str()), Some("johndoe"));
     }
 
     #[test]
@@ -231,13 +231,13 @@ mod tests {
         let sample = r#"
             "users"
             {
-                "76561197984589530"
+                "76561197960265728"
                 {
-                    "AccountName"		"hornisyco"
-                    "PersonaName"		"SpiteMonger"
+                    "AccountName"		"johndoe"
+                    "PersonaName"		"John Doe"
                     "RememberPassword"		"1"
                     "MostRecent"		"1"
-                    "Timestamp"		"1783642872"
+                    "Timestamp"		"1700000000"
                 }
             }
         "#;
@@ -245,8 +245,8 @@ mod tests {
         let users = kv.get("users").and_then(|v| v.as_obj()).unwrap();
         assert_eq!(users.len(), 1);
         let (steamid, user) = &users[0];
-        assert_eq!(steamid, "76561197984589530");
-        assert_eq!(user.get("PersonaName").and_then(|v| v.as_str()), Some("SpiteMonger"));
+        assert_eq!(steamid, "76561197960265728");
+        assert_eq!(user.get("PersonaName").and_then(|v| v.as_str()), Some("John Doe"));
         assert_eq!(user.get("MostRecent").and_then(|v| v.as_str()), Some("1"));
     }
 }
