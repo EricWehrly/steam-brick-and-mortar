@@ -56,7 +56,7 @@ describe('computeAvailableDimensions', () => {
     })
 
     it('adds ByUserCollection only when a game has user_collections', () => {
-        expect(computeAvailableDimensions([game({ user_collections: ['Ze Done'] })]).groupModes.has(GroupModes.ByUserCollection)).toBe(true)
+        expect(computeAvailableDimensions([game({ user_collections: [{ id: 'ze-done', name: 'Ze Done' }] })]).groupModes.has(GroupModes.ByUserCollection)).toBe(true)
         expect(computeAvailableDimensions([game({ user_collections: [] })]).groupModes.has(GroupModes.ByUserCollection)).toBe(false)
         expect(computeAvailableDimensions([game({})]).groupModes.has(GroupModes.ByUserCollection)).toBe(false)
     })

@@ -28,6 +28,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
+import type { SteamUserCollectionMembership } from './types/SteamMetadata'
 import { TaxonomyIdResolver } from './TaxonomyIdResolver'
 import { SteamApiClient } from './SteamApiClient'
 import { EventManager } from '../core/EventManager'
@@ -85,8 +86,8 @@ export class LocalSteamDataWriter {
         }
 
         const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
-        const collectionNamesByAppid = await LocalSteamDataWriter.readCollectionNamesByAppid()
-        const appids = [...new Set([...playtimes.map(playtime => playtime.appid), ...collectionNamesByAppid.keys()])]
+        const collectionsByAppid = await LocalSteamDataWriter.readCollectionsByAppid()
+        const appids = [...new Set([...playtimes.map(playtime => playtime.appid), ...collectionsByAppid.keys()])]
         if (appids.length === 0) {
             return new Map()
         }
@@ -105,9 +106,9 @@ export class LocalSteamDataWriter {
 
         const entries = new Map<number, AppDetailsData>()
         for (const item of metadata) {
-            const collectionNames = collectionNamesByAppid.get(item.appid) ?? []
+            const collections = collectionsByAppid.get(item.appid) ?? []
             const existingArtwork = existingEntries.get(item.appid)?.artwork
-            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collectionNames, existingArtwork)
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collections, existingArtwork)
             if (entry) {
                 entries.set(item.appid, entry)
             }
@@ -142,7 +143,7 @@ export class LocalSteamDataWriter {
      */
     public static async buildAppDetailsEntry(
         metadata: LocalAppMetadata,
-        collectionNames: readonly string[] = [],
+        collections: readonly SteamUserCollectionMembership[] = [],
         existingArtwork?: AppDetailsData['artwork']
     ): Promise<AppDetailsData | null> {
         if (!metadata.name) {
@@ -164,7 +165,7 @@ export class LocalSteamDataWriter {
             steamspy_tags: LocalSteamDataWriter.buildWeightedTags(metadata.tags),
             genres: genres.length > 0 ? genres : undefined,
             categories: categories.length > 0 ? categories : undefined,
-            user_collections: collectionNames.length > 0 ? collectionNames : undefined,
+            user_collections: collections.length > 0 ? collections : undefined,
         }
     }
 
@@ -174,7 +175,7 @@ export class LocalSteamDataWriter {
      * are the least-critical field here, so this degrades to "no collections" rather than
      * failing the whole write.
      */
-    private static async readCollectionNamesByAppid(): Promise<Map<number, string[]>> {
+    private static async readCollectionsByAppid(): Promise<Map<number, SteamUserCollectionMembership[]>> {
         let collections: LocalUserCollection[] = []
         try {
             collections = await invoke<LocalUserCollection[]>('read_steam_collections')
@@ -182,18 +183,19 @@ export class LocalSteamDataWriter {
             LocalSteamDataWriter.logger.warn('Failed to read Steam collections, proceeding without them:', error)
         }
 
-        const namesByAppid = new Map<number, string[]>()
+        const collectionsByAppid = new Map<number, SteamUserCollectionMembership[]>()
         for (const collection of collections) {
+            const membership = { id: collection.id, name: collection.name }
             for (const appid of collection.appids) {
-                const names = namesByAppid.get(appid)
-                if (names) {
-                    names.push(collection.name)
+                const memberships = collectionsByAppid.get(appid)
+                if (memberships) {
+                    memberships.push(membership)
                 } else {
-                    namesByAppid.set(appid, [collection.name])
+                    collectionsByAppid.set(appid, [membership])
                 }
             }
         }
-        return namesByAppid
+        return collectionsByAppid
     }
 
     /**

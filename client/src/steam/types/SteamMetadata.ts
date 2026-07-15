@@ -48,9 +48,15 @@ export interface SteamGameMetadata {
     owners?: string
 
     /**
-     * Names of the desktop user's own Steam library collections this appid belongs to (e.g.
-     * "Ze Done", "Meh") - desktop-only, sourced from local-scan (read_steam_collections), never
-     * present on web. See docs/plans/taxonomy-data-event-plan.md.
+     * The desktop user's own Steam library collections this appid belongs to - desktop-only,
+     * never present on web. `id` is the collection's stable identity (group/match by this);
+     * `name` is the user-editable display label and can change independently (renaming a Steam
+     * collection keeps its id).
      */
-    user_collections?: readonly string[]
+    user_collections?: readonly SteamUserCollectionMembership[]
+}
+
+export interface SteamUserCollectionMembership {
+    readonly id: string
+    readonly name: string
 }

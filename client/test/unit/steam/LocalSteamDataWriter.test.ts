@@ -168,9 +168,9 @@ describe('LocalSteamDataWriter', () => {
         it('attaches collection names when provided, omits user_collections otherwise', async () => {
             const withCollections = await LocalSteamDataWriter.buildAppDetailsEntry(
                 { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
-                ['Ze Done', 'Meh']
+                [{ id: 'ze-done', name: 'Ze Done' }, { id: 'meh', name: 'Meh' }]
             )
-            expect(withCollections?.user_collections).toEqual(['Ze Done', 'Meh'])
+            expect(withCollections?.user_collections).toEqual([{ id: 'ze-done', name: 'Ze Done' }, { id: 'meh', name: 'Meh' }])
 
             const withoutCollections = await LocalSteamDataWriter.buildAppDetailsEntry({
                 appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [],
@@ -343,7 +343,7 @@ describe('LocalSteamDataWriter', () => {
 
             const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
 
-            expect(entries.get(400)).toMatchObject({ name: 'Portal', user_collections: ['Ze Done'] })
+            expect(entries.get(400)).toMatchObject({ name: 'Portal', user_collections: [{ id: 'from-tag-Ze Done', name: 'Ze Done' }] })
         })
 
         it('joins collection membership onto matching appids, including appids in multiple collections', async () => {
@@ -372,8 +372,11 @@ describe('LocalSteamDataWriter', () => {
 
             const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
 
-            expect(entries.get(620)?.user_collections).toEqual(['Ze Done', 'Meh'])
-            expect(entries.get(240)?.user_collections).toEqual(['Ze Done'])
+            expect(entries.get(620)?.user_collections).toEqual([
+                { id: 'from-tag-Ze Done', name: 'Ze Done' },
+                { id: 'from-tag-Meh', name: 'Meh' },
+            ])
+            expect(entries.get(240)?.user_collections).toEqual([{ id: 'from-tag-Ze Done', name: 'Ze Done' }])
         })
 
         it('proceeds without collections when read_steam_collections fails', async () => {

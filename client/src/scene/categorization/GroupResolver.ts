@@ -224,23 +224,29 @@ function groupByTagMode(games: SteamGameData[], groupMode: GroupMode, sortMode: 
 /**
  * Desktop-only, user-defined collections (see SteamGameMetadata.user_collections). Same
  * multi-bucket-membership shape as groupByTagMode - a game in two collections appears in both
- * sections - since collection names are arbitrary user text, not a fixed vocabulary.
+ * sections. Grouped by the collection's stable `id`, not its `name` - a Steam collection rename
+ * keeps its id, so this can't accidentally merge two different collections that happen to share
+ * a display name; the (possibly-renamed) `name` is only used for the section label.
  */
 function groupByUserCollectionMode(games: SteamGameData[], groupMode: GroupMode, sortMode: SortMode): Section[] {
-    const groups = new Map<string, SteamGameData[]>()
+    const groups = new Map<string, { name: string; games: SteamGameData[] }>()
 
     for (const game of games) {
-        for (const collectionName of game.user_collections ?? []) {
-            if (!groups.has(collectionName)) groups.set(collectionName, [])
-            groups.get(collectionName)!.push(game)
+        for (const collection of game.user_collections ?? []) {
+            const group = groups.get(collection.id)
+            if (group) {
+                group.games.push(game)
+            } else {
+                groups.set(collection.id, { name: collection.name, games: [game] })
+            }
         }
     }
 
-    return [...groups.keys()]
+    return [...groups.values()]
         .sort((a, b) => {
-            const countDiff = groups.get(b)!.length - groups.get(a)!.length
+            const countDiff = b.games.length - a.games.length
             if (countDiff !== 0) return countDiff
-            return a.localeCompare(b, undefined, { sensitivity: 'base' })
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
         })
-        .map(name => ({ name, games: groups.get(name)!, groupMode, sortMode }))
+        .map(({ name, games }) => ({ name, games, groupMode, sortMode }))
 }
