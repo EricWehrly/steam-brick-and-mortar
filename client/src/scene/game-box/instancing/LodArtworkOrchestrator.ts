@@ -300,6 +300,33 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         LodArtworkOrchestrator.logger.lifecycle(`Soft reset for library reload (generation ${this.generation})`)
     }
 
+    /**
+     * Reconcile for a capacity-compatible library reload where the caller knows exactly which
+     * games are gone (see IGameArtworkPipeline). Only removedGameNames' texture-slot mappings are
+     * cleared; every other game's mapping is left untouched, so prefetchArtwork()'s existing
+     * "already in gameNameToTextureIndex" cache-hit check makes re-fetching them a no-op instead
+     * of a fresh network/decode round trip. The slot allocator is deliberately NOT rewound —
+     * removed games' slots are simply left unused (a small, bounded VRAM cost, not reclaimed here)
+     * rather than reusing indices that other in-flight code might still reference.
+     */
+    public reconcileForLibraryReload(removedGameNames: readonly string[]): void {
+        const highTextureCache = this.renderer.getHighTextureCache()
+        for (const gameName of removedGameNames) {
+            const textureIndex = this.gameNameToTextureIndex.get(gameName)
+            this.gameNameToTextureIndex.delete(gameName)
+            this.prefetchedHighArtworkUrl.delete(gameName)
+            if (textureIndex !== undefined) {
+                highTextureCache?.unregisterGame(textureIndex)
+            }
+        }
+        this.instanceMetadata.clear()
+        this.publishArtworkMetadataReference()
+        this.renderer.clearPlacements()
+        this.allBatchesComplete = false
+        this.atlasFullLogged = false
+        LodArtworkOrchestrator.logger.lifecycle(`Reconciled for library reload: removed ${removedGameNames.length} game(s), kept the rest`)
+    }
+
     /** Factory method - override in debug subclass */
     protected createRenderer(config: LodGameArtworkRendererConfig): LodGameArtworkRenderer {
         return new LodGameArtworkRenderer(config)

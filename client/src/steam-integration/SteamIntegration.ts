@@ -274,7 +274,7 @@ export class SteamIntegration {
      * capture itself (AppDetailsCache can still upgrade it — see applyLibrary).
      */
     private async handleImportLibrary(event: CustomEvent<SteamImportLibraryEvent>): Promise<void> {
-        const { games, displayName, steamId, channel } = event.detail
+        const { games, displayName, steamId, channel, reconcile } = event.detail
 
         if (!games.length) {
             SteamIntegration.logger.warn('ImportLibrary had no games, ignoring')
@@ -293,7 +293,7 @@ export class SteamIntegration {
             provenance: { channel, capturedAt: new Date().toISOString() }
         }
 
-        if (await this.applyLibrary(library)) {
+        if (await this.applyLibrary(library, reconcile)) {
             persistLibrary(library)
             SteamIntegration.logger.info(`Imported library loaded: ${library.games.length} games (${channel})`)
         }
@@ -320,12 +320,17 @@ export class SteamIntegration {
      *
      * Returns whether the render succeeded, so callers only persist a library they could
      * actually show.
+     *
+     * reconcile, when the caller has it (see SteamImportLibraryEvent), lets GameBoxSpawner keep
+     * unchanged games' GPU texture slots instead of a blanket reset - see
+     * docs/plans/desktop-offline-first-plan.md's Tier A/B split.
      */
-    private async applyLibrary(library: Library): Promise<boolean> {
+    private async applyLibrary(library: Library, reconcile?: SteamImportLibraryEvent['reconcile']): Promise<boolean> {
         try {
             if (this.gameLibrary.getState().userData?.games?.length) {
                 this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
-                    incomingGameCount: library.games.length
+                    incomingGameCount: library.games.length,
+                    removedGameNames: reconcile?.removedGameNames
                 })
                 SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
             }

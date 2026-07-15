@@ -78,6 +78,8 @@ export class LocalSteamDataWriter {
      * returned map instead of re-invoking read_local_app_metadata themselves.
      */
     public static async writeLocalAppMetadata(): Promise<Map<number, AppDetailsData>> {
+        // isTauri() here means "can this process read the local Steam install's files" - the
+        // invoke() calls below only exist on desktop.
         if (!isTauri()) {
             return new Map()
         }

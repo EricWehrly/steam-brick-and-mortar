@@ -59,6 +59,15 @@ export interface StorePropsLibraryReloadRequestEvent extends BaseInteractionEven
      * before the network call resolves) — treat undefined as "assume capacity may not fit."
      */
     readonly incomingGameCount?: number
+    /**
+     * Set only when the caller diffed the incoming library against what's currently rendered
+     * (see LocalSteamLibraryLoader.computeLibraryDiff) and knows exactly which games are gone.
+     * When present (even as an empty array — "nothing removed"), GameBoxSpawner can reconcile
+     * instead of a blanket reset: keep unchanged games' GPU texture slots, free only these. When
+     * absent, the caller doesn't have that information and a full soft/hard reset applies as
+     * before — absent is not the same as "nothing removed."
+     */
+    readonly removedGameNames?: readonly string[]
 }
 
 // =============================================================================

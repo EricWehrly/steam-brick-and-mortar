@@ -19,6 +19,8 @@ import { SteamIntegration } from '../../../src/steam-integration/SteamIntegratio
 import { validateLibraryExportPayload } from '../../../src/steam-integration/Library'
 import type { ImportChannel, ImportedGame } from '../../../src/steam-integration/Library'
 import { SteamApiClient, type SteamGame } from '../../../src/steam/SteamApiClient'
+import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import type { StorePropsLibraryReloadRequestEvent } from '../../../src/scene/props/PropsEvents'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamGamesBatchEvent, SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
 
@@ -32,10 +34,11 @@ function importLibrary(
     games: ImportedGame[],
     displayName: string | undefined,
     steamId: string | undefined,
-    channel: ImportChannel
+    channel: ImportChannel,
+    reconcile?: SteamImportLibraryEvent['reconcile']
 ): Promise<void> {
     return integration['handleImportLibrary'](new CustomEvent<SteamImportLibraryEvent>('noop', {
-        detail: { games, displayName, steamId, channel }
+        detail: { games, displayName, steamId, channel, reconcile }
     }))
 }
 
@@ -404,6 +407,45 @@ describe('SteamIntegration manual library import', () => {
         })
 
         it.todo('a successful online profile load (handleLoadLibrary) also persists a Library, and a subsequent handleGameStart re-loads it via applyLibrary — needs the SteamApiClient network mocking pattern from steam-integration.test.ts, not yet wired into this file')
+    })
+
+    describe('reconcile plumbing (Tier B)', () => {
+        it('threads reconcile.removedGameNames through to the LibraryReloadRequest emitted on a second import', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'local-scan')
+
+            const reloadHandler = vi.fn()
+            eventManager.registerEventHandler<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, reloadHandler)
+
+            await importLibrary(
+                integration,
+                [SAMPLE_GAMES[1]],
+                'Test Account',
+                undefined,
+                'local-scan',
+                { removedGameNames: ['Team Fortress 2'] }
+            )
+
+            expect(reloadHandler).toHaveBeenCalledOnce()
+            const detail = (reloadHandler.mock.calls[0][0] as CustomEvent<StorePropsLibraryReloadRequestEvent>).detail
+            expect(detail.removedGameNames).toEqual(['Team Fortress 2'])
+            expect(detail.incomingGameCount).toBe(1)
+        })
+
+        it('leaves removedGameNames undefined on the reload event when the caller had no reconcile info', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+
+            const reloadHandler = vi.fn()
+            eventManager.registerEventHandler<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, reloadHandler)
+
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+
+            const detail = (reloadHandler.mock.calls[0][0] as CustomEvent<StorePropsLibraryReloadRequestEvent>).detail
+            expect(detail.removedGameNames).toBeUndefined()
+        })
     })
 
     describe('Fork A background re-fetch', () => {

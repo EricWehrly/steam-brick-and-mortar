@@ -175,6 +175,22 @@ export class GpuGameBoxRenderer {
         GpuGameBoxRenderer.logger.lifecycle('Soft reset for library reload (capacity retained)')
     }
 
+    /**
+     * Reconcile for a capacity-compatible library reload where the caller knows exactly which
+     * games are gone (see GameBoxSpawner). Unlike resetForLibraryReload(), games not in
+     * removedGameNames keep their prefetched texture slot entirely - prefetchArtwork() already
+     * treats an existing slot mapping as a cache hit, so this is what actually avoids re-fetching
+     * artwork for a library that only gained or lost a few games.
+     */
+    public reconcileForLibraryReload(removedGameNames: readonly string[]): void {
+        this.artworkPrefetchCoordinator.reset()
+        this.lodArtworkRenderer.reconcileForLibraryReload(removedGameNames)
+        this.resolvedArtworkPlacements = 0
+        this.resolvedLabelPlacements = 0
+        this.failedLabelPlacements = 0
+        GpuGameBoxRenderer.logger.lifecycle(`Reconciled for library reload (removed ${removedGameNames.length}, texture slots retained for the rest)`)
+    }
+
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
         EventManager.getInstance().deregisterEventHandler(

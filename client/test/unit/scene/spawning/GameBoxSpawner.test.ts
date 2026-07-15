@@ -41,6 +41,7 @@ const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
 const mockRendererSoftReset = vi.fn()
+const mockRendererReconcile = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
     const { ArtworkPrefetchCoordinator } = await import('../../../../src/scene/spawning/ArtworkPrefetchCoordinator')
@@ -56,6 +57,7 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
                 coordinator.dispose()
             })
             this.resetForLibraryReload = vi.fn(() => mockRendererSoftReset())
+            this.reconcileForLibraryReload = vi.fn((removedGameNames: string[]) => mockRendererReconcile(removedGameNames))
         })
     }
 })
@@ -677,6 +679,37 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             expect(mockRendererDispose).toHaveBeenCalledTimes(1)
             expect(mockRendererSoftReset).not.toHaveBeenCalled()
+        })
+
+        it('reconciles (neither dispose nor blanket soft reset) when the caller knows exactly what was removed', () => {
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: 300,
+                removedGameNames: ['Old Game'],
+            })
+
+            expect(mockRendererReconcile).toHaveBeenCalledWith(['Old Game'])
+            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+            expect(mockRendererDispose).not.toHaveBeenCalled()
+        })
+
+        it('reconciles with an empty removed list when nothing was removed but something was added', () => {
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: 300,
+                removedGameNames: [],
+            })
+
+            expect(mockRendererReconcile).toHaveBeenCalledWith([])
+            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+        })
+
+        it('falls back to full reset (dispose) even with removedGameNames when capacity is incompatible', () => {
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: 5000,
+                removedGameNames: ['Old Game'],
+            })
+
+            expect(mockRendererDispose).toHaveBeenCalledTimes(1)
+            expect(mockRendererReconcile).not.toHaveBeenCalled()
         })
 
         it('does not throw on library reload before the first renderer initialization', () => {

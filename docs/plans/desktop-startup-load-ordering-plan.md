@@ -1,6 +1,8 @@
 # Plan: Desktop Startup Load Ordering
 
-**Status**: Draft — needs sign-off before implementation (see "Open questions" below).
+**Status**: Open questions answered 2026-07-14. Tier B (diff-and-patch reconciliation) **implemented
+this pass** for the local-scan-vs-persisted case — see "Current-state gap analysis" below. Tier 3
+(automatic remote reconciliation) remains deliberately not built, per the answered questions.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
 **Related**: [Desktop Offline-First Plan](desktop-offline-first-plan.md) (Tier A/B reconciliation
 this plan assumes), [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md)
@@ -38,19 +40,18 @@ flowchart TD
     EQUIV -->|no| REPLACE["Replace rendered library with scan result\n(today: full replace when scan completes.\nAct4/optimistic: progressively,\nsee 'Deferred' below)"]
 
     REPLACE --> T3
-    DONE2 --> T3{"Tier 3: remote reachable?\n(NOT YET BUILT - see Open Questions)"}
+    DONE2 --> T3{"Tier 3: remote reachable?\n(NOT YET BUILT - deliberately deferred,\nsee 'Answered questions')"}
     DONE1 --> T3
 
     T3 -->|unreachable| DONE3(["Done"])
-    T3 -->|reachable, same steamId| REFRESH["Upgrade in place - diff and patch\nonly what changed (Round 2 / Tier B,\nNOT YET BUILT)"]
+    T3 -->|reachable, same steamId| REFRESH["Upgrade in place - diff and patch\nonly what changed (Tier B, DONE for\nlocal-scan-vs-persisted; not wired\nto a remote source yet)"]
     T3 -->|reachable, different/no local identity| REPLACE2["Replace with remote library\n(today: this is the explicit\n'Connect Steam' user action, not automatic)"]
 
     style T3 fill:#5b4a22,color:#fff
-    style REFRESH fill:#5b4a22,color:#fff
     style REPLACE2 fill:#5b4a22,color:#fff
 ```
 
-Amber boxes are not implemented today - see "Open questions."
+Amber boxes are not implemented today - see "Answered questions."
 
 ## Current-state gap analysis
 
@@ -61,32 +62,22 @@ Amber boxes are not implemented today - see "Open questions."
 | 2b | Render the demo store when nothing is persisted yet | **Done** — `loadDemoGames()` |
 | 2c | Run local scan when desktop-capable; replace what's rendered if different | **Done, but implicitly sequenced** — `LocalSteamLibraryLoader` is a second, independent `GameEventTypes.Start` listener, not an explicit "after Tier 1/2b" step. It also runs on *every* launch regardless of Tier 1 (that's how second-launch change-detection works, not just a cold-cache fallback) - the "if I can get to local files" framing is slightly different from what's implemented: local scan always runs on desktop, it's the *render replacement* that's now conditional (Tier A). |
 | 2c (replace) | Skip re-render when scan reproduces what's rendered | **Done** — Tier A, `isEquivalentToPersisted()` |
+| 2c (reconcile, differs) | Diff-and-patch instead of full replace when the scan differs | **Done 2026-07-14** — `LocalSteamLibraryLoader.computeLibraryDiff()` produces added/removed/renamed appids; `SteamImportLibraryEvent.reconcile.removedGameNames` carries it through `applyLibrary()` → `StorePropsLibraryReloadRequestEvent.removedGameNames` → `GameBoxSpawner` picks a third reset tier (`GpuGameBoxRenderer.reconcileForLibraryReload`) that only clears the removed/renamed games' texture-slot mappings — every other game's mapping (and its already-decoded artwork) is left untouched, so `prefetchArtwork()`'s existing cache-hit check makes re-resolving them a no-op. Placement positions still fully recompute (cheap, no network/decode cost) — only the artwork layer is patched, not the shelf-layout layer (see the "Deferred" section below for why that's a separate, larger undertaking). |
 | 2c (progressive replace) | Phase the real library in instead of a hard cutover | **Not built** — deferred, see below |
-| 3 | Background remote reconciliation after local render | **Not built for desktop.** Exists for the `online` channel only (`applyLibrary()`'s Fork A), and is explicitly excluded for `local-scan` - that exclusion is *why* desktop doesn't currently do this at all, not an oversight. |
-| 3 (refresh, same identity) | Diff-and-patch instead of full replace | **Not built anywhere** — this is Round 2 / Tier B from the offline-first plan, a prerequisite for Tier 3 (see below) |
+| 3 | Background remote reconciliation after local render | **Not built for desktop.** Exists for the `online` channel only (`applyLibrary()`'s Fork A), and is explicitly excluded for `local-scan` - deliberately deferred, see "Answered questions" below. |
+| 3 (refresh, same identity) | Diff-and-patch instead of full replace | **The mechanism exists (Tier B, above)**, but nothing yet computes a diff against a *remote* fetch — only against the persisted local-scan library. Wiring Tier 3 to reuse it is future work. |
 
-## Open questions (need your call before implementation)
+## Answered questions (2026-07-14)
 
-1. **Should Tier 3 (automatic remote reconciliation) be built for desktop at all, and if so, when?**
-   Fork A used to do something like this and was explicitly disabled for `local-scan` because it
-   fired eagerly and blocking (40s Lambda round-trip, full scene reset, on every launch). A
-   correctly-sequenced Tier 3 would only run *after* a local render already exists, and would need
-   to be non-blocking - but it still needs **Tier B (upgrade-not-replace) built first**, or it
-   reintroduces exactly the "tear down and rebuild an equivalent library" problem Tier A just
-   fixed, just gated on network reachability instead of every launch. Recommend: sequence this
-   after Tier B ships, not before. Confirm you agree, or if desktop should keep remote
-   reconciliation as the explicit "Connect Steam" action indefinitely instead.
-2. **`isTauri()` → a capability-named check.** Only 2 files call it directly
-   (`LocalSteamLibraryLoader.ts`, `LocalSteamDataWriter.ts`), so a rename to something like
-   `canReadDesktopFiles()` is small and mechanical - propose wrapping `isTauri()` in a
-   named function at the call sites (or a thin local helper) rather than renaming the imported
-   Tauri API itself. Low-risk; can be folded into whichever tier's implementation touches those
-   files next, or done standalone first if you'd rather see it in isolation.
-3. **Where does the "is this equivalent" comparison for Tier 3 live?** Tier A's
-   `isEquivalentToPersisted()` (appid set + names) is deliberately coarse. Tier B's diff needs to
-   be richer (per-appid: name changed? artwork changed - and per your earlier ask, *verified
-   reachable* before replacing a working artwork URL). Worth deciding whether Tier B reuses/extends
-   Tier A's comparison or is a separate mechanism before that implementation starts.
+1. **Tier 3 sequencing**: confirmed — Tier B is diff-and-patch, and Tier 3 (automatic remote
+   reconciliation) is not being built yet. It remains sequenced after Tier B, which is now done for
+   the local-scan case; wiring it to a remote fetch is separate, not-yet-scoped work.
+2. **`isTauri()`**: kept as a direct call, not wrapped — a one-line comment was added at each of the
+   2 call sites (`LocalSteamLibraryLoader.ts`, `LocalSteamDataWriter.ts`) explaining the intent
+   ("can this process read the local Steam install's files") rather than introducing a new function
+   for a direct third-party API call.
+3. **Comparison reuse**: `isEquivalentToPersisted()` is now a thin wrapper around
+   `computeLibraryDiff()` — Tier A and Tier B share the same underlying comparison, as requested.
 
 ## Deferred: progressive load / no demo-library rug-pull
 
