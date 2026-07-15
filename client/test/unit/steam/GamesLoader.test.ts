@@ -58,6 +58,20 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
         expect(result.has(999)).toBe(false)
     })
 
+    it('skips unlisted responses instead of caching a name-less shell', async () => {
+        const responses = new Map<number, AppDetailsResponse>([
+            [620, { success: true, appid: 620, retrieved_at: '2026-01-01T00:00:00Z', data: { name: 'Portal 2', type: 'game', is_free: false, artwork: NO_ARTWORK } }],
+            // Lambda's negative-shell response for a delisted/unlisted appid - no `data`, no `name`.
+            [999, { success: false, appid: 999, unlisted: true, retrieved_at: '2026-01-01T00:00:00Z' }],
+        ])
+        fetchBatchMock.mockResolvedValue(responses)
+
+        const result = await loader.fetchAndCacheAppDetails([620, 999])
+
+        expect(result.has(999)).toBe(false)
+        expect(setManyMock.mock.calls[0][0].has(999)).toBe(false)
+    })
+
     it('does not write to AppDetailsCache when nothing resolved', async () => {
         fetchBatchMock.mockResolvedValue(new Map())
 

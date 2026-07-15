@@ -124,9 +124,14 @@ export class GamesLoader {
         const batchResponses = await this.batchClient.fetchBatch(appids, { batchSize: 100 })
         const normalized = new Map<number, AppDetailsData>()
         for (const [appid, response] of batchResponses.entries()) {
-            const rawData = response.success === false && response.unlisted
-                ? (response as unknown as AppDetailsData)
-                : response.data
+            // An unlisted response is a deliberately minimal shell (see the Lambda's steam-api.js
+            // comment) with no name - it exists so a later SteamSpy hydration pass can merge in a
+            // real name, which doesn't happen on this gap-fill path. Caching it as-is produced a
+            // renderable game with name: undefined, which crashes label rendering downstream.
+            // Skip it; the appid stays absent from the cache and gets retried next load, same
+            // "known, not solved" tradeoff as docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker.
+            if (response.success === false && response.unlisted) continue
+            const rawData = response.data
             if (!rawData) continue
             normalized.set(appid, this.normalizeBatchData(rawData))
         }
@@ -197,11 +202,17 @@ export class GamesLoader {
         this.batchClient.fetchBatch(uncachedAppids, { batchSize: 100 })
             .then(async (batchResponses) => {
                 for (const [appid, response] of batchResponses.entries()) {
-                    const rawData = response.success === false && response.unlisted
-                        ? (response as unknown as AppDetailsData)
-                        : response.data
-                    const normalized = this.normalizeBatchData(rawData)
-                    fetchedAppDetails.set(appid, normalized)
+                    // An unlisted response (see fetchAndCacheAppDetails above) has no real
+                    // AppDetailsData to offer - buildEnhancedGame() below already accepts
+                    // undefined and renders correctly via baseGame's own owned-game name, so this
+                    // only affects whether we cache a meaningless shell, not whether it renders.
+                    const isUnlisted = response.success === false && response.unlisted
+                    const normalized = isUnlisted || !response.data
+                        ? undefined
+                        : this.normalizeBatchData(response.data)
+                    if (normalized) {
+                        fetchedAppDetails.set(appid, normalized)
+                    }
 
                     const baseGame = gameByAppid.get(appid)
                     if (!baseGame) continue
