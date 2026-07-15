@@ -49,7 +49,7 @@ vi.mock('../../../src/steam/SteamApiClient', () => ({
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
-import { loadLocalSteamLibrary, buildImportedGames, isEquivalentToPersisted, computeLibraryDiff } from '../../../src/steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, buildImportedGames, computeLibraryDiff } from '../../../src/steam/LocalSteamLibraryLoader'
 import { persistLibrary } from '../../../src/steam-integration/LibraryStore'
 import type { Library } from '../../../src/steam-integration/Library'
 import type { AppDetailsData } from '../../../src/steam/batch/BatchAppDetailsClient'
@@ -72,47 +72,6 @@ describe('LocalSteamLibraryLoader', () => {
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
         EventManager.getInstance().removeAllListeners()
         localStorage.clear()
-    })
-
-    describe('isEquivalentToPersisted', () => {
-        const persisted: Library = {
-            owner: { steamId: '1', displayName: 'A' },
-            games: [
-                { appid: 620, name: 'Portal 2', playtimeForever: 60 },
-                { appid: 240, name: 'Counter-Strike: Source', playtimeForever: 30 },
-            ],
-            provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
-        }
-
-        it('is true for the same appid set and names, regardless of playtime', () => {
-            const games = [
-                { appid: 620, name: 'Portal 2', playtime_forever: 999 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
-            ]
-            expect(isEquivalentToPersisted(games, persisted)).toBe(true)
-        })
-
-        it('is false when nothing is persisted', () => {
-            expect(isEquivalentToPersisted([{ appid: 620, name: 'Portal 2', playtime_forever: 0 }], null)).toBe(false)
-        })
-
-        it('is false when the persisted library came from a different channel', () => {
-            const onlinePersisted: Library = { ...persisted, provenance: { channel: 'online', capturedAt: persisted.provenance.capturedAt } }
-            expect(isEquivalentToPersisted(persisted.games.map(g => ({ appid: g.appid, name: g.name, playtime_forever: 0 })), onlinePersisted)).toBe(false)
-        })
-
-        it('is false when the appid set differs', () => {
-            const games = [{ appid: 620, name: 'Portal 2', playtime_forever: 0 }]
-            expect(isEquivalentToPersisted(games, persisted)).toBe(false)
-        })
-
-        it('is false when a name changed', () => {
-            const games = [
-                { appid: 620, name: 'Portal 2: Renamed', playtime_forever: 0 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
-            ]
-            expect(isEquivalentToPersisted(games, persisted)).toBe(false)
-        })
     })
 
     describe('computeLibraryDiff', () => {
