@@ -14,7 +14,7 @@
  * collection but never launched has no playtime entry, but is still a real candidate. Local
  * resolution (appinfo.vdf, via LocalSteamDataWriter) is attempted for the whole union first;
  * whatever's still missing from AppDetailsCache after that (AppDetailsCache.findMissing) gets a
- * direct network fetch (SteamApiClient.fetchAndCacheAppDetails) as a deliberate, bounded
+ * direct network fetch (SteamApiClient.gamesLoader.fetchAndCacheAppDetails) as a deliberate, bounded
  * gap-fill - not the "assume the Lambda might vanish" startup path, an explicit best-effort
  * extra for appids the local install alone can't name. A fetch failure here just means those
  * appids stay unresolved this run, not a broken startup.
@@ -136,7 +136,7 @@ async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<nu
     }
 
     try {
-        const resolved = await SteamApiClient.getInstance().fetchAndCacheAppDetails(missingAppids)
+        const resolved = await SteamApiClient.getInstance().gamesLoader.fetchAndCacheAppDetails(missingAppids)
         logger.info(`Resolved ${resolved.size}/${missingAppids.length} collection-only appids via network fetch`)
     } catch (error) {
         logger.warn(`Failed to network-resolve ${missingAppids.length} unseen appid(s), proceeding without them:`, error)

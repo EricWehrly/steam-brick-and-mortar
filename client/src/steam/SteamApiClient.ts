@@ -1,7 +1,7 @@
 import { HttpClient } from './http/HttpClient'
 import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
-import { BatchAppDetailsClient, type AppDetailsData } from './batch/BatchAppDetailsClient'
+import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import { BakedCacheLoader } from './cache/BakedCacheLoader'
@@ -11,6 +11,8 @@ import { ArtworkPackSeeder } from '../scene/game-box/instancing/ArtworkPackSeede
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamCacheClearEvent } from '../types/InteractionEvents'
+import { DataManager } from '../core/data/DataManager'
+import { DataDomain, DataKey } from '../core/data/DataTypes'
 
 export interface SteamGame extends SteamGameMetadata {
     appid: number
@@ -65,7 +67,10 @@ export class SteamApiClient {
     private batchClient: BatchAppDetailsClient
     private appDetailsCache: AppDetailsCache
     private bakedCacheLoader: BakedCacheLoader
-    private gamesLoader: GamesLoader
+    /** Public so callers with no other reason to depend on SteamApiClient (e.g.
+     *  LocalSteamLibraryLoader's network gap-fill) can call GamesLoader directly instead of
+     *  going through a same-signature pass-through method on this class. */
+    public readonly gamesLoader: GamesLoader
     // TODO: revisit whether getDemoGames() still needs to await this, or whether the demo list
     // can be built downstream of app-details-cache readiness instead of blocking on it up front.
     private readonly appDetailsCacheReady: Promise<void>
@@ -91,6 +96,10 @@ export class SteamApiClient {
             .then(() => this.bakedCacheLoader.seedIfNeeded())
             .catch(error => {
                 console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
+            })
+            .then(() => {
+                DataManager.getInstance().set(DataKey.AppDetailsCacheSeeded, true, { domain: DataDomain.Cache })
+                EventManager.getInstance().emit(SteamEventTypes.AppDetailsCacheSeeded)
             })
 
         // Same fire-and-forget-but-awaitable shape as appDetailsCacheReady, for the baked F2P
@@ -232,23 +241,6 @@ export class SteamApiClient {
 
     public async enrichFromCache(games: SteamGame[]): Promise<SteamGame[]> {
         return this.gamesLoader.enrichFromCache(games)
-    }
-
-    /**
-     * Resolves once the baked-cache seed attempt has settled (success or failure) - see
-     * appDetailsCacheReady in the constructor. Exposed for callers that read-then-write
-     * AppDetailsCache themselves (LocalSteamDataWriter) and need the seed to have already landed
-     * before they touch the cache - otherwise their own write can race the seed and win,
-     * silently discarding whatever real data the seed would have provided for those appids.
-     */
-    public async waitForAppDetailsCacheSeed(): Promise<void> {
-        await this.appDetailsCacheReady
-    }
-
-    /** See GamesLoader.fetchAndCacheAppDetails - a direct network gap-fill fetch, not the
-     *  progressive/cached load path. */
-    public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {
-        return this.gamesLoader.fetchAndCacheAppDetails(appids)
     }
 
     /**

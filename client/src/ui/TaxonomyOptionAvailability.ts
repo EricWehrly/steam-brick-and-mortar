@@ -30,28 +30,22 @@ function hasAnyTags(game: SteamGameData): boolean {
 }
 
 export function computeAvailableDimensions(games: readonly SteamGameData[]): AvailableDimensions {
-    const groupModes = new Set<GroupMode>([GroupModes.None, GroupModes.ByPlaytime])
-    const sortModes = new Set<SortMode>([SortModes.Alphabetical, SortModes.ByPlaytime])
+    const hasRecency = games.some(game => (game.rtime_last_played ?? 0) > 0)
+    const hasGenres = games.some(game => (game.genres?.length ?? 0) > 0)
+    const hasTags = games.some(hasAnyTags)
+    const hasRating = games.some(game => game.userscore !== undefined)
+    const hasUserCollections = games.some(game => (game.user_collections?.length ?? 0) > 0)
 
-    for (const game of games) {
-        if ((game.rtime_last_played ?? 0) > 0) {
-            groupModes.add(GroupModes.ByRecency)
-            sortModes.add(SortModes.ByLastPlayed)
-        }
-        if (game.genres && game.genres.length > 0) {
-            groupModes.add(GroupModes.ByGenre)
-        }
-        if (hasAnyTags(game)) {
-            groupModes.add(GroupModes.ByTag)
-        }
-        if (game.userscore !== undefined) {
-            groupModes.add(GroupModes.ByRating)
-            sortModes.add(SortModes.ByRating)
-        }
-        if (game.user_collections && game.user_collections.length > 0) {
-            groupModes.add(GroupModes.ByUserCollection)
-        }
-    }
+    const groupModes = new Set<GroupMode>([GroupModes.None, GroupModes.ByPlaytime])
+    if (hasRecency) groupModes.add(GroupModes.ByRecency)
+    if (hasGenres) groupModes.add(GroupModes.ByGenre)
+    if (hasTags) groupModes.add(GroupModes.ByTag)
+    if (hasRating) groupModes.add(GroupModes.ByRating)
+    if (hasUserCollections) groupModes.add(GroupModes.ByUserCollection)
+
+    const sortModes = new Set<SortMode>([SortModes.Alphabetical, SortModes.ByPlaytime])
+    if (hasRecency) sortModes.add(SortModes.ByLastPlayed)
+    if (hasRating) sortModes.add(SortModes.ByRating)
 
     return { groupModes, sortModes }
 }

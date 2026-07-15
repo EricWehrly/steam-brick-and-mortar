@@ -23,22 +23,17 @@ vi.mock('../../../src/steam/TaxonomyIdResolver', () => ({
     },
 }))
 
-const { waitForAppDetailsCacheSeedMock } = vi.hoisted(() => ({
-    waitForAppDetailsCacheSeedMock: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('../../../src/steam/SteamApiClient', () => ({
-    SteamApiClient: {
-        getInstance: () => ({
-            waitForAppDetailsCacheSeed: waitForAppDetailsCacheSeedMock,
-        }),
-    },
-}))
-
 import { LocalSteamDataWriter } from '../../../src/steam/LocalSteamDataWriter'
 import { AppDetailsCache } from '../../../src/steam/cache/AppDetailsCache'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
+import { DataManager } from '../../../src/core/data/DataManager'
+import { DataDomain, DataKey } from '../../../src/core/data/DataTypes'
+
+/** Marks the baked-cache seed as already settled - the default for every test except the one that pins the wait-for-seed race itself. */
+function markAppDetailsCacheSeeded(): void {
+    DataManager.getInstance().set(DataKey.AppDetailsCacheSeeded, true, { domain: DataDomain.Cache })
+}
 
 describe('LocalSteamDataWriter', () => {
     beforeEach(() => {
@@ -47,8 +42,9 @@ describe('LocalSteamDataWriter', () => {
         isTauriMock.mockReset()
         resolveGenresMock.mockReset().mockResolvedValue([])
         resolveCategoriesMock.mockReset().mockResolvedValue([])
-        waitForAppDetailsCacheSeedMock.mockReset().mockResolvedValue(undefined)
         EventManager.getInstance().removeAllListeners()
+        DataManager.getInstance().clear()
+        markAppDetailsCacheSeeded()
     })
 
     describe('buildAppDetailsEntry', () => {
@@ -227,10 +223,8 @@ describe('LocalSteamDataWriter', () => {
             const seedCache = new AppDetailsCache()
             await seedCache.set(620, { type: 'game', name: 'Portal 2', is_free: false, artwork: realArtwork })
 
-            let resolveSeed: () => void = () => {}
-            waitForAppDetailsCacheSeedMock.mockReturnValue(new Promise<void>((resolve) => {
-                resolveSeed = resolve
-            }))
+            // Override the beforeEach default - pretend the seed attempt hasn't settled yet.
+            DataManager.getInstance().clear()
 
             const writePromise = LocalSteamDataWriter.writeLocalAppMetadata()
             let settled = false
@@ -239,7 +233,8 @@ describe('LocalSteamDataWriter', () => {
             await new Promise((resolve) => setTimeout(resolve, 0))
             expect(settled).toBe(false)
 
-            resolveSeed()
+            markAppDetailsCacheSeeded()
+            EventManager.getInstance().emit(SteamEventTypes.AppDetailsCacheSeeded)
             const entries = await writePromise
 
             expect(entries.get(620)?.artwork).toEqual(realArtwork)

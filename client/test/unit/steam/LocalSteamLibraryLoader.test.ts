@@ -41,7 +41,9 @@ const { fetchAndCacheAppDetailsMock } = vi.hoisted(() => ({
 vi.mock('../../../src/steam/SteamApiClient', () => ({
     SteamApiClient: {
         getInstance: () => ({
-            fetchAndCacheAppDetails: fetchAndCacheAppDetailsMock,
+            gamesLoader: {
+                fetchAndCacheAppDetails: fetchAndCacheAppDetailsMock,
+            },
         }),
     },
 }))
