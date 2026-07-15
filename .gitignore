@@ -174,3 +174,6 @@ client/public/artwork-cache/
 # SourceIO Blender addon — committed as zip, extracted directory is gitignored
 blender/addons/SourceIO/
 !blender/addons/SourceIO.zip
+
+# network dumps
+*.har
