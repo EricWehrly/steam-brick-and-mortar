@@ -49,7 +49,9 @@ vi.mock('../../../src/steam/SteamApiClient', () => ({
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
-import { loadLocalSteamLibrary, buildImportedGames } from '../../../src/steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, buildImportedGames, isEquivalentToPersisted } from '../../../src/steam/LocalSteamLibraryLoader'
+import { persistLibrary } from '../../../src/steam-integration/LibraryStore'
+import type { Library } from '../../../src/steam-integration/Library'
 import type { AppDetailsData } from '../../../src/steam/batch/BatchAppDetailsClient'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
@@ -69,6 +71,48 @@ describe('LocalSteamLibraryLoader', () => {
         findMissingMock.mockReset().mockResolvedValue([])
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
         EventManager.getInstance().removeAllListeners()
+        localStorage.clear()
+    })
+
+    describe('isEquivalentToPersisted', () => {
+        const persisted: Library = {
+            owner: { steamId: '1', displayName: 'A' },
+            games: [
+                { appid: 620, name: 'Portal 2', playtimeForever: 60 },
+                { appid: 240, name: 'Counter-Strike: Source', playtimeForever: 30 },
+            ],
+            provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
+        }
+
+        it('is true for the same appid set and names, regardless of playtime', () => {
+            const games = [
+                { appid: 620, name: 'Portal 2', playtime_forever: 999 },
+                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
+            ]
+            expect(isEquivalentToPersisted(games, persisted)).toBe(true)
+        })
+
+        it('is false when nothing is persisted', () => {
+            expect(isEquivalentToPersisted([{ appid: 620, name: 'Portal 2', playtime_forever: 0 }], null)).toBe(false)
+        })
+
+        it('is false when the persisted library came from a different channel', () => {
+            const onlinePersisted: Library = { ...persisted, provenance: { channel: 'online', capturedAt: persisted.provenance.capturedAt } }
+            expect(isEquivalentToPersisted(persisted.games.map(g => ({ appid: g.appid, name: g.name, playtime_forever: 0 })), onlinePersisted)).toBe(false)
+        })
+
+        it('is false when the appid set differs', () => {
+            const games = [{ appid: 620, name: 'Portal 2', playtime_forever: 0 }]
+            expect(isEquivalentToPersisted(games, persisted)).toBe(false)
+        })
+
+        it('is false when a name changed', () => {
+            const games = [
+                { appid: 620, name: 'Portal 2: Renamed', playtime_forever: 0 },
+                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
+            ]
+            expect(isEquivalentToPersisted(games, persisted)).toBe(false)
+        })
     })
 
     describe('buildImportedGames', () => {
@@ -220,6 +264,56 @@ describe('LocalSteamLibraryLoader', () => {
             const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
             expect(event.detail.displayName).toBeUndefined()
             expect(event.detail.steamId).toBeUndefined()
+        })
+
+        it('skips emitting ImportLibrary when the scan reproduces the persisted local-scan library', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_steam_collections') return Promise.resolve([])
+                throw new Error(`unexpected command ${command}`)
+            })
+            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
+            persistLibrary({
+                owner: { steamId: '1', displayName: 'A' },
+                games: [{ appid: 620, name: 'Portal 2', playtimeForever: 999 }],
+                provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
+            })
+
+            const handler = vi.fn()
+            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
+
+            await loadLocalSteamLibrary()
+
+            expect(handler).not.toHaveBeenCalled()
+        })
+
+        it('still emits ImportLibrary when the scan differs from the persisted library', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_steam_collections') return Promise.resolve([])
+                throw new Error(`unexpected command ${command}`)
+            })
+            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
+            persistLibrary({
+                owner: { steamId: '1', displayName: 'A' },
+                games: [{ appid: 999, name: 'Some Other Game', playtimeForever: 0 }],
+                provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
+            })
+
+            const handler = vi.fn()
+            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
+
+            await loadLocalSteamLibrary()
+
+            expect(handler).toHaveBeenCalledTimes(1)
         })
 
         it('does not emit when no candidate appid ends up with a resolved entry', async () => {
