@@ -508,7 +508,7 @@ export class AppSettings {
             autoLoadProfile: true,
             developmentMode: isDev, // Default based on environment
             maxGames: isDev ? 20 : 9999,
-            taxonomyCoverageThreshold: 0.5,
+            taxonomyCoverageThreshold: 0.3,
 
             // Input Settings
             inputProfile: 'mouse-keyboard',

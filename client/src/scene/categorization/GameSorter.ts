@@ -116,20 +116,27 @@ export class GameSorter {
 
     /** First qualifying rank wins - see the class doc comment for the full preference order. */
     private chooseDefaultModes(games: SteamGameData[]): { groupMode: GroupMode; sortMode: SortMode } {
-        if (this.hasQualifyingUserCollectionCoverage(games)) {
+        const coverage = this.getUserCollectionTaxonomyCoverage(games)
+        const threshold = AppSettings.get('taxonomyCoverageThreshold')
+
+        if (coverage >= threshold) {
             return { groupMode: GroupModes.ByUserCollection, sortMode: SortModes.ByLastPlayed }
+        } else {
+            GameSorter.logger.info(`Skipping group by user collections: coverage ${coverage} < threshold ${threshold}`)
         }
+
         if (!SteamIntegration.getInstance().isAnonymous()) {
             return { groupMode: GroupModes.ByRecency, sortMode: SortModes.ByLastPlayed }
         }
+
         return { groupMode: GroupModes.ByGenre, sortMode: SortModes.ByPlaytime }
     }
 
-    private hasQualifyingUserCollectionCoverage(games: SteamGameData[]): boolean {
-        if (games.length === 0) return false
+    // TODO: can we pass 'user_collections' as a param to this method to make it more generic?
+    private getUserCollectionTaxonomyCoverage(games: SteamGameData[]): number {
+        if (games.length === 0) return 0
         const withCollections = games.filter(game => (game.user_collections?.length ?? 0) > 0).length
-        const coverage = withCollections / games.length
-        return coverage >= AppSettings.get('taxonomyCoverageThreshold')
+        return withCollections / games.length
     }
 
     private handleArrangementRequested(detail: ArrangementRequestedEvent): void {

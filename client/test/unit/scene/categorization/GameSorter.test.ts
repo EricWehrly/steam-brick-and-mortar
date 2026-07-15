@@ -241,8 +241,8 @@ describe('GameSorter', () => {
     it('default arrangement is by-user-collection when coverage crosses the configured threshold', () => {
         mockIsAnonymous = false
         mockGames = [
-            { ...makeGame(1, 0, 100), user_collections: ['Ze Done'] } as SteamGameData,
-            { ...makeGame(2, 0, 50), user_collections: ['Meh'] } as SteamGameData,
+            { ...makeGame(1, 0, 100), user_collections: [{ id: 'ze-done', name: 'Ze Done' }] } as SteamGameData,
+            { ...makeGame(2, 0, 50), user_collections: [{ id: 'meh', name: 'Meh' }] } as SteamGameData,
             makeGame(3, 0, 20),
         ]
         new GameSorter()
@@ -256,9 +256,11 @@ describe('GameSorter', () => {
     it('falls back past by-user-collection when coverage is below the configured threshold', () => {
         mockIsAnonymous = false
         mockGames = [
-            { ...makeGame(1, 100, 100), user_collections: ['Ze Done'] } as SteamGameData,
+            { ...makeGame(1, 100, 100), user_collections: [{ id: 'ze-done', name: 'Ze Done' }] } as SteamGameData,
             makeGame(2, 0, 50),
             makeGame(3, 0, 20),
+            makeGame(4, 0, 10),
+            makeGame(5, 0, 5),
         ]
         new GameSorter()
         fireGameDataReady()
