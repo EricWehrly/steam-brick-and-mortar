@@ -155,7 +155,12 @@ cause is actually `LocalSteamLibraryLoader` itself awaiting a full network gap-f
 first render, unrelated to Fork A — now the top-priority next fix. The broader "refresh should
 upgrade, not replace" redesign (applicable to web too) and routing desktop's network calls through
 Tauri's Rust HTTP client instead of the browser's `fetch()` remain scheduled after that — see
-[`desktop-offline-first-plan.md`](../plans/desktop-offline-first-plan.md).
+[`desktop-offline-first-plan.md`](../plans/desktop-offline-first-plan.md). That plan's "sixth
+pass" found the actual second-load bug: two independent `GameEventTypes.Start` listeners
+(persisted-library render and local-scan render) racing rather than a designed sequence — fixed
+for the "nothing changed" case (Tier A), with the full intended startup priority cascade (demo
+store → local scan → future remote reconciliation) laid out in
+[`desktop-startup-load-ordering-plan.md`](../plans/desktop-startup-load-ordering-plan.md).
 
 **Current reality, confirmed by investigation**: "Connect Steam" (the WebView2 cookie-injection
 flow described earlier in this doc) is **fully unbuilt** — no second-window code, no cookie
