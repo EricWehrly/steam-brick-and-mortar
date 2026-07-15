@@ -9,14 +9,14 @@ artwork.** Everything below "Definitive root cause" is preserved as archaeology;
 pass first.
 
 **Next up (re-prioritised by the sixth pass)**: (1) **kill the desktop double-render** — Tier A
-(skip the redundant reload when nothing changed) **done 2026-07-14**; (2) Round 1.5 (don't block
-the first render on the network gap-fill — still valid, but it is a *first*-load latency issue,
-not the second-load breakage); (3) Round 2 / Tier B (upgrade, don't replace, for a library that
-*did* change) and Round 3 (Tauri Rust HTTP client) — both scoped in
-[Desktop Startup Load Ordering](desktop-startup-load-ordering-plan.md), which lays out the full
-priority cascade Tier A is one piece of. CORS/404 log-noise and pre-baking-known-failures are
-follow-ups. `lod-tier-reset-race-condition` fix landed 2026-07-14 but the sixth pass shows the
-reset it guards is itself a *symptom* of the double-render, not the disease.
+(skip the redundant reload when nothing changed) and Tier B (diff-and-patch when it doesn't) **both
+done 2026-07-14**, see [Desktop Startup Load Ordering](desktop-startup-load-ordering-plan.md) for
+the full design; (2) Round 1.5 (don't block the first render on the network gap-fill — still valid,
+but it is a *first*-load latency issue, not the second-load breakage); (3) Round 3 (Tauri Rust HTTP
+client) and wiring Tier B's diff-and-patch mechanism to a remote fetch (Tier 3 in the load-ordering
+plan), neither started. CORS/404 log-noise and pre-baking-known-failures are follow-ups.
+`lod-tier-reset-race-condition` fix landed 2026-07-14 but the sixth pass shows the reset it guards
+is itself a *symptom* of the double-render, not the disease.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
 **Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md), [artwork resolution flow diagram](../diagrams/artwork.md), [Desktop Startup Load Ordering](desktop-startup-load-ordering-plan.md)
 

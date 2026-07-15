@@ -55,6 +55,8 @@ interface LocalUserCollection {
 const logger = Logger.createLogFunctions('LocalSteamLibraryLoader')
 
 export async function loadLocalSteamLibrary(): Promise<void> {
+    // isTauri() here means "can this process read the local Steam install's files" - true for
+    // the desktop app, false for the web build, where none of the invoke() calls below exist.
     if (!isTauri()) {
         return
     }
@@ -90,7 +92,8 @@ export async function loadLocalSteamLibrary(): Promise<void> {
     // ImportLibrary here would tear it down and rebuild an equivalent one for no reason - see
     // docs/plans/desktop-offline-first-plan.md "Definitive root cause (sixth pass)" for the
     // second-load artwork loss this caused.
-    if (isEquivalentToPersisted(games, loadPersistedLibrary())) {
+    const diff = computeLibraryDiff(games, loadPersistedLibrary())
+    if (diff && diff.addedAppids.length === 0 && diff.removedGames.length === 0 && diff.renamedGames.length === 0) {
         logger.info(`Local scan: library unchanged from persisted snapshot (${games.length} games) - skipping re-render`)
         return
     }
@@ -101,6 +104,10 @@ export async function loadLocalSteamLibrary(): Promise<void> {
         displayName,
         steamId: identity?.steamid64,
         channel: 'local-scan',
+        // Only meaningful when there IS a prior local-scan library to reconcile against - see
+        // computeLibraryDiff. Lets SteamIntegration keep unchanged games' GPU texture slots
+        // instead of re-fetching everyone's artwork for a one-game library update.
+        reconcile: diff ? { removedGameNames: [...diff.removedGames.map(g => g.name), ...diff.renamedGames.map(g => g.oldName)] } : undefined,
     })
 
     logger.info(`Local scan: emitting ImportLibrary with ${games.length} games`)
@@ -137,22 +144,50 @@ async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<nu
     }
 }
 
+export interface LibraryDiff {
+    /** Present in the scan, absent from the persisted library entirely. */
+    readonly addedAppids: readonly number[]
+    /** Present in the persisted library, absent from the scan entirely. */
+    readonly removedGames: readonly { readonly appid: number; readonly name: string }[]
+    /** Same appid in both, but the name changed - functionally a remove-then-add for anything
+     *  keyed by game name (the artwork texture-slot map, notably - see
+     *  LodArtworkOrchestrator.reconcileForLibraryReload). */
+    readonly renamedGames: readonly { readonly appid: number; readonly oldName: string; readonly newName: string }[]
+}
+
 /**
- * Coarse "did anything worth re-rendering for change" check - same appid set, same names.
- * Deliberately ignores playtime/lastPlayed (those don't change what's on the shelves, only sort
- * order) - see the plan doc's Tier A/Tier B split. A local-scan-channel-only comparison: a
- * persisted library from a different channel (online, bookmarklet) was never this scan's own
- * output, so there's nothing meaningful to compare against.
+ * Diffs a fresh local scan against the persisted local-scan library (Tier A/B from
+ * docs/plans/desktop-offline-first-plan.md). Deliberately ignores playtime/lastPlayed - those
+ * don't change what's on the shelves, only sort order. Returns null when there's no local-scan
+ * library to diff against (first-ever launch, or the persisted library came from a different
+ * channel) - a null diff means "nothing to reconcile against," not "nothing changed."
  */
-export function isEquivalentToPersisted(games: readonly ImportedGame[], persisted: Library | null): boolean {
+export function computeLibraryDiff(games: readonly ImportedGame[], persisted: Library | null): LibraryDiff | null {
     if (!persisted || persisted.provenance.channel !== 'local-scan') {
-        return false
+        return null
     }
-    if (games.length !== persisted.games.length) {
-        return false
-    }
+
+    const incomingByAppid = new Map(games.map(g => [g.appid, g]))
     const persistedByAppid = new Map(persisted.games.map(g => [g.appid, g]))
-    return games.every(game => persistedByAppid.get(game.appid)?.name === game.name)
+
+    const addedAppids = games.filter(g => !persistedByAppid.has(g.appid)).map(g => g.appid)
+    const removedGames = persisted.games
+        .filter(g => !incomingByAppid.has(g.appid))
+        .map(g => ({ appid: g.appid, name: g.name }))
+    const renamedGames = games.flatMap(g => {
+        const prior = persistedByAppid.get(g.appid)
+        return prior && prior.name !== g.name
+            ? [{ appid: g.appid, oldName: prior.name, newName: g.name }]
+            : []
+    })
+
+    return { addedAppids, removedGames, renamedGames }
+}
+
+/** Convenience wrapper around computeLibraryDiff for callers that only need the yes/no answer. */
+export function isEquivalentToPersisted(games: readonly ImportedGame[], persisted: Library | null): boolean {
+    const diff = computeLibraryDiff(games, persisted)
+    return diff !== null && diff.addedAppids.length === 0 && diff.removedGames.length === 0 && diff.renamedGames.length === 0
 }
 
 /**

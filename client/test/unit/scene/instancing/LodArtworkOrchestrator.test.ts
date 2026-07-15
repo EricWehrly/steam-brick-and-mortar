@@ -420,6 +420,80 @@ describe('LodArtworkOrchestrator', () => {
         })
     })
 
+    describe('reconcileForLibraryReload', () => {
+        function withScene(): THREE.Scene {
+            const mockScene = new THREE.Scene()
+            mockDataManager.get.mockImplementation((key: DataKey) => {
+                if (key === DataKey.MainScene) return mockScene
+                return null
+            })
+            return mockScene
+        }
+
+        function mockArtworkPixels(): ReturnType<typeof vi.fn> {
+            const getPixelsAtSize = vi.fn().mockResolvedValue({
+                pixels: new Uint8ClampedArray(150 * 225 * 4),
+                width: 150,
+                height: 225,
+            })
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+            provider.getArtwork.mockReturnValue({ getPixelsAtSize })
+            return getPixelsAtSize
+        }
+
+        it('keeps a survivor\'s texture slot mapping - a repeat prefetch is a cache hit, no new fetch', async () => {
+            withScene()
+            const getPixelsAtSize = mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            expect(await orchestrator.prefetchArtwork(100, undefined, 'Removed Game')).toBe('prefetched')
+            expect(await orchestrator.prefetchArtwork(200, undefined, 'Kept Game')).toBe('prefetched')
+            // Eager (non-lazy) mode fetches both MID and HIGH tiers per game - 2 games x 2 tiers.
+            const callsBeforeReconcile = getPixelsAtSize.mock.calls.length
+            expect(callsBeforeReconcile).toBe(4)
+
+            orchestrator.reconcileForLibraryReload(['Removed Game'])
+
+            // Survivor still resolves instantly from the existing mapping - no new fetch.
+            expect(await orchestrator.prefetchArtwork(200, undefined, 'Kept Game')).toBe('cached')
+            expect(getPixelsAtSize).toHaveBeenCalledTimes(callsBeforeReconcile)
+            expect(orchestrator.placeInstance(200, 'Kept Game', new THREE.Vector3())).toBeGreaterThanOrEqual(0)
+        })
+
+        it('clears the removed game\'s mapping so it can no longer be placed', async () => {
+            withScene()
+            mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            expect(await orchestrator.prefetchArtwork(100, undefined, 'Removed Game')).toBe('prefetched')
+            orchestrator.reconcileForLibraryReload(['Removed Game'])
+
+            expect(orchestrator.placeInstance(100, 'Removed Game', new THREE.Vector3())).toBe(-1)
+        })
+
+        it('does not rewind slot allocation - a newly-added game gets a fresh slot beyond existing ones', async () => {
+            withScene()
+            mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            await orchestrator.prefetchArtwork(100, undefined, 'Removed Game')
+            await orchestrator.prefetchArtwork(200, undefined, 'Kept Game')
+            orchestrator.reconcileForLibraryReload(['Removed Game'])
+
+            // A brand-new game still prefetches and places successfully after reconcile.
+            expect(await orchestrator.prefetchArtwork(300, undefined, 'New Game')).toBe('prefetched')
+            expect(orchestrator.placeInstance(300, 'New Game', new THREE.Vector3())).toBeGreaterThanOrEqual(0)
+        })
+
+        it('does not throw when a removed game was never actually prefetched', () => {
+            withScene()
+            orchestrator = new LodArtworkOrchestrator()
+            expect(() => orchestrator.reconcileForLibraryReload(['Never Prefetched'])).not.toThrow()
+        })
+    })
+
     describe('Basic API', () => {
         beforeEach(() => {
             mockDataManager.get.mockReturnValue(null)  // No scene

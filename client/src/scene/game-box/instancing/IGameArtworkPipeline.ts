@@ -58,5 +58,13 @@ export interface IGameArtworkPipeline {
      */
     resetForLibraryReload(): void
 
+    /**
+     * Reconcile for a capacity-compatible library reload where the caller knows exactly which
+     * games are gone. Unlike resetForLibraryReload(), games not in removedGameNames keep their
+     * existing texture-slot mapping — no re-fetch, no slot-allocator rewind. Only valid under the
+     * same capacity precondition as resetForLibraryReload().
+     */
+    reconcileForLibraryReload(removedGameNames: readonly string[]): void
+
     dispose(): void
 }

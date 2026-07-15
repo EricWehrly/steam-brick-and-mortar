@@ -83,12 +83,16 @@ export class GameBoxSpawner {
     }
 
     /**
-     * Two reset tiers instead of one blanket dispose+rebuild — see
+     * Three reset tiers instead of one blanket dispose+rebuild — see
      * docs/architecture/label-and-placement-reset-architecture-review.md "Library Reload
-     * Lifecycle". A same-or-smaller incoming library fits the already-allocated GPU texture
-     * capacity, so it gets a soft reset (no disposal, slots rewound for reuse). A larger
-     * library — or an unknown size, e.g. an online reload that hasn't fetched data yet — still
-     * needs the old fullReset() behavior, since a WebGL DataArrayTexture can't grow in place.
+     * Lifecycle" and docs/plans/desktop-startup-load-ordering-plan.md's Tier A/B split. A
+     * same-or-smaller incoming library fits the already-allocated GPU texture capacity, so it
+     * avoids disposal. Within that: if the caller knows exactly which games are gone
+     * (removedGameNames present - see StorePropsLibraryReloadRequestEvent), reconcile instead of
+     * a blanket soft reset - unchanged games keep their texture slots entirely, so only genuinely
+     * new/renamed games re-fetch artwork. A larger library, or an unknown size (e.g. an online
+     * reload that hasn't fetched data yet), still needs the old fullReset() behavior, since a
+     * WebGL DataArrayTexture can't grow in place.
      */
     private resetForLibraryReload(detail: StorePropsLibraryReloadRequestEvent): void {
         const capacityCompatible =
@@ -96,12 +100,18 @@ export class GameBoxSpawner {
             detail.incomingGameCount !== undefined &&
             detail.incomingGameCount <= this.currentTextureCapacity
 
-        if (capacityCompatible) {
+        let resetKind: 'reconcile' | 'soft' | 'full'
+        if (capacityCompatible && detail.removedGameNames !== undefined) {
+            this.renderer?.reconcileForLibraryReload(detail.removedGameNames)
+            resetKind = 'reconcile'
+        } else if (capacityCompatible) {
             this.renderer?.resetForLibraryReload()
+            resetKind = 'soft'
         } else {
             this.renderer?.dispose()
             this.renderer = null
             this.currentTextureCapacity = 0
+            resetKind = 'full'
         }
 
         this.stockStrategy = null
@@ -109,11 +119,7 @@ export class GameBoxSpawner {
         this.layoutDeterminedSinceLastSections = false
         this.clearPlacementState()
 
-        GameBoxSpawner.logger.debug(
-            capacityCompatible
-                ? 'Soft reset (library reload, capacity-compatible)'
-                : 'Full reset (library reload, capacity change or unknown)'
-        )
+        GameBoxSpawner.logger.debug(`Library reload: ${resetKind} reset`)
     }
 
     private clearPlacementState(): void {
