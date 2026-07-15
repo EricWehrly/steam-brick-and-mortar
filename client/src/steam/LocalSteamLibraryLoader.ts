@@ -184,12 +184,6 @@ export function computeLibraryDiff(games: readonly ImportedGame[], persisted: Li
     return { addedAppids, removedGames, renamedGames }
 }
 
-/** Convenience wrapper around computeLibraryDiff for callers that only need the yes/no answer. */
-export function isEquivalentToPersisted(games: readonly ImportedGame[], persisted: Library | null): boolean {
-    const diff = computeLibraryDiff(games, persisted)
-    return diff !== null && diff.addedAppids.length === 0 && diff.removedGames.length === 0 && diff.renamedGames.length === 0
-}
-
 /**
  * Joins the full playtime+collection candidate set against whatever AppDetailsCache now has for
  * each appid (local or network-resolved) - an appid still missing an entry after both resolution
