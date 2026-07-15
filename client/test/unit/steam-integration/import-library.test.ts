@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataManager } from '../../../src/core/data'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
-import { validateLibraryExportPayload } from '../../../src/steam-integration/Library'
+import { validateLibraryExportPayload, computeLibraryDiff, isDiffEmpty } from '../../../src/steam-integration/Library'
 import type { ImportChannel, ImportedGame } from '../../../src/steam-integration/Library'
 import { SteamApiClient, type SteamGame } from '../../../src/steam/SteamApiClient'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
@@ -34,11 +34,10 @@ function importLibrary(
     games: ImportedGame[],
     displayName: string | undefined,
     steamId: string | undefined,
-    channel: ImportChannel,
-    reconcile?: SteamImportLibraryEvent['reconcile']
+    channel: ImportChannel
 ): Promise<void> {
     return integration['handleImportLibrary'](new CustomEvent<SteamImportLibraryEvent>('noop', {
-        detail: { games, displayName, steamId, channel, reconcile }
+        detail: { games, displayName, steamId, channel }
     }))
 }
 
@@ -409,23 +408,21 @@ describe('SteamIntegration manual library import', () => {
         it.todo('a successful online profile load (handleLoadLibrary) also persists a Library, and a subsequent handleGameStart re-loads it via applyLibrary — needs the SteamApiClient network mocking pattern from steam-integration.test.ts, not yet wired into this file')
     })
 
-    describe('reconcile plumbing (Tier B)', () => {
-        it('threads reconcile.removedGameNames through to the LibraryReloadRequest emitted on a second import', async () => {
+    describe('reconcile diffing (Tier B)', () => {
+        // applyLibrary() computes the diff itself against whatever's currently rendered
+        // (this.gameLibrary), not against something the caller passes in - so this now works for
+        // any channel a second import arrives on, not just local-scan. See
+        // docs/plans/startup-reload-review-findings.md F1.
+
+        it('computes removedGameNames against the live rendered library on a second import, for any channel', async () => {
             const integration = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
-            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'local-scan')
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
             const reloadHandler = vi.fn()
             eventManager.registerEventHandler<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, reloadHandler)
 
-            await importLibrary(
-                integration,
-                [SAMPLE_GAMES[1]],
-                'Test Account',
-                undefined,
-                'local-scan',
-                { removedGameNames: ['Team Fortress 2'] }
-            )
+            await importLibrary(integration, [SAMPLE_GAMES[1]], 'Test Account', undefined, 'bookmarklet')
 
             expect(reloadHandler).toHaveBeenCalledOnce()
             const detail = (reloadHandler.mock.calls[0][0] as CustomEvent<StorePropsLibraryReloadRequestEvent>).detail
@@ -433,7 +430,7 @@ describe('SteamIntegration manual library import', () => {
             expect(detail.incomingGameCount).toBe(1)
         })
 
-        it('leaves removedGameNames undefined on the reload event when the caller had no reconcile info', async () => {
+        it('emits an empty removedGameNames array (not undefined) when a second import is identical', async () => {
             const integration = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
             await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
@@ -443,8 +440,60 @@ describe('SteamIntegration manual library import', () => {
 
             await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
+            // GameBoxSpawner treats "removedGameNames present" (even empty) as reconcile-eligible -
+            // capacity-compatible reloads with nothing actually removed should still reconcile,
+            // not fall back to a full dispose+rebuild.
             const detail = (reloadHandler.mock.calls[0][0] as CustomEvent<StorePropsLibraryReloadRequestEvent>).detail
-            expect(detail.removedGameNames).toBeUndefined()
+            expect(detail.removedGameNames).toEqual([])
+        })
+
+        it('does not emit a reload at all on the first import - nothing rendered yet to diff against', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            const reloadHandler = vi.fn()
+            eventManager.registerEventHandler<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, reloadHandler)
+
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+
+            expect(reloadHandler).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('computeLibraryDiff / isDiffEmpty', () => {
+        it('reports no added/removed/renamed games when both sides match', () => {
+            const diff = computeLibraryDiff(
+                [{ appid: 440, name: 'Team Fortress 2' }],
+                [{ appid: 440, name: 'Team Fortress 2' }]
+            )
+            expect(diff).toEqual({ addedAppids: [], removedGames: [], renamedGames: [] })
+            expect(isDiffEmpty(diff)).toBe(true)
+        })
+
+        it('reports an appid present in incoming but not current as added', () => {
+            const diff = computeLibraryDiff(
+                [{ appid: 440, name: 'Team Fortress 2' }, { appid: 620, name: 'Portal 2' }],
+                [{ appid: 440, name: 'Team Fortress 2' }]
+            )
+            expect(diff.addedAppids).toEqual([620])
+            expect(isDiffEmpty(diff)).toBe(false)
+        })
+
+        it('reports an appid present in current but not incoming as removed, with its last-known name', () => {
+            const diff = computeLibraryDiff(
+                [{ appid: 440, name: 'Team Fortress 2' }],
+                [{ appid: 440, name: 'Team Fortress 2' }, { appid: 620, name: 'Portal 2' }]
+            )
+            expect(diff.removedGames).toEqual([{ appid: 620, name: 'Portal 2' }])
+        })
+
+        it('reports a same-appid name change as renamed, not added+removed', () => {
+            const diff = computeLibraryDiff(
+                [{ appid: 440, name: 'Team Fortress 2: Renamed' }],
+                [{ appid: 440, name: 'Team Fortress 2' }]
+            )
+            expect(diff.renamedGames).toEqual([{ appid: 440, oldName: 'Team Fortress 2', newName: 'Team Fortress 2: Renamed' }])
+            expect(diff.addedAppids).toEqual([])
+            expect(diff.removedGames).toEqual([])
         })
     })
 

@@ -188,46 +188,22 @@ describe('HighTextureCache LRU', () => {
         expect(cache.getState(2)).toBe(HighTextureState.LOADED) // C loaded over B
     })
 
-    describe('resetForLibraryReload', () => {
-        it('clears game registrations so a reused slot index re-registers instead of no-op-ing', async () => {
+    describe('unregisterGame', () => {
+        it('clears the game entry so a reused gameIndex re-registers instead of no-op-ing', async () => {
+            // registerGame() already no-ops if the gameIndex is still registered from before -
+            // this is what LodArtworkOrchestrator.reconcileForLibraryReload relies on to avoid a
+            // removed game's HIGH registration leaking into whatever new game reuses its slot.
             cache.registerGame(0, 'Old Game', 'http://test/old.jpg')
             cache.requestHighTexture(0)
             await new Promise(r => setTimeout(r, 10))
             expect(cache.getState(0)).toBe(HighTextureState.LOADED)
-            const oldSlot = cache.getHighSlot(0)
-            expect(oldSlot).toBeGreaterThanOrEqual(0)
 
-            cache.resetForLibraryReload()
+            cache.unregisterGame(0)
 
             expect(cache.getState(0)).toBe(HighTextureState.EMPTY)
-            expect(cache.getHighSlot(0)).toBe(-1)
-
-            // registerGame() already no-ops if the gameIndex is still registered from before —
-            // if reset didn't actually clear the entry, this would still read as LOADED/hit the
-            // old slot instead of triggering a fresh MISS.
             cache.registerGame(0, 'New Game', 'http://test/new.jpg')
             expect(cache.requestHighTexture(0)).toBe(-1)
             expect(cache.getState(0)).toBe(HighTextureState.LOADING)
-        })
-
-        it('frees HIGH slots so new registrations do not require eviction', () => {
-            cache.registerGame(0, 'Game A', 'http://test/A.jpg')
-            cache.registerGame(1, 'Game B', 'http://test/B.jpg')
-            cache.requestHighTexture(0)
-            cache.requestHighTexture(1)
-
-            cache.resetForLibraryReload()
-            onSlotChange.mockClear()
-
-            cache.registerGame(5, 'Game C', 'http://test/C.jpg')
-            cache.registerGame(6, 'Game D', 'http://test/D.jpg')
-
-            // Both should be cache misses (fresh loads triggered by free slots), not evictions
-            // of the old (already-cleared) games A/B.
-            expect(cache.requestHighTexture(5)).toBe(-1)
-            expect(cache.requestHighTexture(6)).toBe(-1)
-            expect(onSlotChange).not.toHaveBeenCalledWith(0, -1)
-            expect(onSlotChange).not.toHaveBeenCalledWith(1, -1)
         })
     })
 })

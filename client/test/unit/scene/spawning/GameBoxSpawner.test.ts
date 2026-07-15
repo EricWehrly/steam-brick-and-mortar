@@ -40,7 +40,6 @@ const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
-const mockRendererSoftReset = vi.fn()
 const mockRendererReconcile = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
@@ -56,7 +55,6 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
                 mockRendererDispose()
                 coordinator.dispose()
             })
-            this.resetForLibraryReload = vi.fn(() => mockRendererSoftReset())
             this.reconcileForLibraryReload = vi.fn((removedGameNames: string[]) => mockRendererReconcile(removedGameNames))
         })
     }
@@ -655,40 +653,42 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockPlaceGame).not.toHaveBeenCalled()
         })
 
-        it('soft-resets (no dispose) when the incoming library fits the already-allocated capacity', () => {
+        it('falls back to a full reset (dispose) when capacity-compatible but the caller has no diff info', () => {
             // beforeEach already established capacity via LibraryManifestReady(totalGames: 500) -> 600 slots.
+            // incomingGameCount alone is no longer enough to reconcile - removedGameNames must be
+            // present too (see SteamIntegration.applyLibrary, the only caller that supplies it).
             eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
                 incomingGameCount: 300,
             })
 
-            expect(mockRendererSoftReset).toHaveBeenCalledTimes(1)
-            expect(mockRendererDispose).not.toHaveBeenCalled()
+            expect(mockRendererDispose).toHaveBeenCalledTimes(1)
+            expect(mockRendererReconcile).not.toHaveBeenCalled()
         })
 
         it('falls back to a full reset (dispose) when the incoming library exceeds capacity', () => {
             eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
                 incomingGameCount: 5000,
+                removedGameNames: ['Old Game'],
             })
 
             expect(mockRendererDispose).toHaveBeenCalledTimes(1)
-            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+            expect(mockRendererReconcile).not.toHaveBeenCalled()
         })
 
         it('falls back to a full reset (dispose) when incomingGameCount is unknown', () => {
             eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
 
             expect(mockRendererDispose).toHaveBeenCalledTimes(1)
-            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+            expect(mockRendererReconcile).not.toHaveBeenCalled()
         })
 
-        it('reconciles (neither dispose nor blanket soft reset) when the caller knows exactly what was removed', () => {
+        it('reconciles (no dispose) when capacity-compatible and the caller knows exactly what was removed', () => {
             eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
                 incomingGameCount: 300,
                 removedGameNames: ['Old Game'],
             })
 
             expect(mockRendererReconcile).toHaveBeenCalledWith(['Old Game'])
-            expect(mockRendererSoftReset).not.toHaveBeenCalled()
             expect(mockRendererDispose).not.toHaveBeenCalled()
         })
 
@@ -699,7 +699,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             })
 
             expect(mockRendererReconcile).toHaveBeenCalledWith([])
-            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+            expect(mockRendererDispose).not.toHaveBeenCalled()
         })
 
         it('falls back to full reset (dispose) even with removedGameNames when capacity is incompatible', () => {

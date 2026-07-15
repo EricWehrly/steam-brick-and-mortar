@@ -164,40 +164,6 @@ describe('LodTextureArrayManager', () => {
         })
     })
 
-    describe('resetSlotAllocation (library reload)', () => {
-        it('rewinds the slot counter for reuse without disposing texture arrays', () => {
-            manager = new LodTextureArrayManager(defaultConfig)
-
-            manager.allocateSlot()
-            manager.allocateSlot()
-            expect(manager.getSlotCount()).toBe(2)
-
-            const highTexture = manager.getTextureArray('high')!
-            const disposeSpy = vi.spyOn(highTexture, 'dispose')
-
-            manager.resetSlotAllocation()
-
-            expect(manager.getSlotCount()).toBe(0)
-            expect(manager.allocateSlot()).toBe(0)
-            expect(disposeSpy).not.toHaveBeenCalled()
-        })
-
-        it('re-logs the atlas-full warning after a reset', () => {
-            const smallConfig: LodTextureArrayManagerConfig = {
-                tiers: [{ name: 'mid', width: 16, height: 16, maxDepth: 1 }]
-            }
-            manager = new LodTextureArrayManager(smallConfig)
-
-            expect(manager.allocateSlot()).toBe(0)
-            expect(manager.allocateSlot()).toBe(-1)
-
-            manager.resetSlotAllocation()
-
-            expect(manager.allocateSlot()).toBe(0)
-            expect(manager.allocateSlot()).toBe(-1)
-        })
-    })
-
     describe('Pixel Data', () => {
         it('should copy pixel data to correct slot', () => {
             const config: LodTextureArrayManagerConfig = {

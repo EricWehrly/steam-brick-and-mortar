@@ -49,9 +49,8 @@ vi.mock('../../../src/steam/SteamApiClient', () => ({
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
-import { loadLocalSteamLibrary, buildImportedGames, computeLibraryDiff } from '../../../src/steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, buildImportedGames } from '../../../src/steam/LocalSteamLibraryLoader'
 import { persistLibrary } from '../../../src/steam-integration/LibraryStore'
-import type { Library } from '../../../src/steam-integration/Library'
 import type { AppDetailsData } from '../../../src/steam/batch/BatchAppDetailsClient'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
@@ -72,61 +71,6 @@ describe('LocalSteamLibraryLoader', () => {
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
         EventManager.getInstance().removeAllListeners()
         localStorage.clear()
-    })
-
-    describe('computeLibraryDiff', () => {
-        const persisted: Library = {
-            owner: { steamId: '1', displayName: 'A' },
-            games: [
-                { appid: 620, name: 'Portal 2', playtimeForever: 60 },
-                { appid: 240, name: 'Counter-Strike: Source', playtimeForever: 30 },
-            ],
-            provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
-        }
-
-        it('returns null when there is no local-scan library to diff against', () => {
-            expect(computeLibraryDiff([{ appid: 620, name: 'Portal 2', playtime_forever: 0 }], null)).toBeNull()
-
-            const onlinePersisted: Library = { ...persisted, provenance: { channel: 'online', capturedAt: persisted.provenance.capturedAt } }
-            expect(computeLibraryDiff([{ appid: 620, name: 'Portal 2', playtime_forever: 0 }], onlinePersisted)).toBeNull()
-        })
-
-        it('reports no added/removed/renamed games when nothing changed', () => {
-            const games = [
-                { appid: 620, name: 'Portal 2', playtime_forever: 999 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
-            ]
-            expect(computeLibraryDiff(games, persisted)).toEqual({ addedAppids: [], removedGames: [], renamedGames: [] })
-        })
-
-        it('reports a newly-present appid as added', () => {
-            const games = [
-                { appid: 620, name: 'Portal 2', playtime_forever: 0 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
-                { appid: 400, name: 'Portal', playtime_forever: 0 },
-            ]
-            const diff = computeLibraryDiff(games, persisted)
-            expect(diff?.addedAppids).toEqual([400])
-            expect(diff?.removedGames).toEqual([])
-        })
-
-        it('reports a no-longer-present appid as removed, with its last-known name', () => {
-            const games = [{ appid: 620, name: 'Portal 2', playtime_forever: 0 }]
-            const diff = computeLibraryDiff(games, persisted)
-            expect(diff?.removedGames).toEqual([{ appid: 240, name: 'Counter-Strike: Source' }])
-            expect(diff?.addedAppids).toEqual([])
-        })
-
-        it('reports a same-appid name change as renamed, not added+removed', () => {
-            const games = [
-                { appid: 620, name: 'Portal 2: Renamed', playtime_forever: 0 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0 },
-            ]
-            const diff = computeLibraryDiff(games, persisted)
-            expect(diff?.renamedGames).toEqual([{ appid: 620, oldName: 'Portal 2', newName: 'Portal 2: Renamed' }])
-            expect(diff?.addedAppids).toEqual([])
-            expect(diff?.removedGames).toEqual([])
-        })
     })
 
     describe('buildImportedGames', () => {
@@ -330,55 +274,6 @@ describe('LocalSteamLibraryLoader', () => {
             expect(handler).toHaveBeenCalledTimes(1)
         })
 
-        it('attaches reconcile.removedGameNames for appids no longer in the scan', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-            persistLibrary({
-                owner: { steamId: '1', displayName: 'A' },
-                games: [
-                    { appid: 620, name: 'Portal 2', playtimeForever: 0 },
-                    { appid: 999, name: 'Uninstalled Game', playtimeForever: 0 },
-                ],
-                provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
-            })
-
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
-
-            const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
-            expect(event.detail.reconcile).toEqual({ removedGameNames: ['Uninstalled Game'] })
-        })
-
-        it('omits reconcile when there is no persisted local-scan library to diff against', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
-
-            const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
-            expect(event.detail.reconcile).toBeUndefined()
-        })
 
         it('does not emit when no candidate appid ends up with a resolved entry', async () => {
             isTauriMock.mockReturnValue(true)

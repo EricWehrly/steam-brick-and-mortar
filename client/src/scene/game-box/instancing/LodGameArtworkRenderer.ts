@@ -497,17 +497,6 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         LodGameArtworkRenderer.logger.debug('Cleared all instance placements (texture slots retained)')
     }
 
-    /**
-     * Soft reset for a capacity-compatible library reload (see LodArtworkOrchestrator). Clears
-     * placements like clearPlacements(), and additionally resets the HIGH texture cache — unlike
-     * a placement-run reset (same games, same slots), a library reload reuses slot indices for
-     * different games, and HighTextureCache.registerGame() no-ops on an already-registered slot.
-     */
-    public resetForLibraryReload(): void {
-        this.clearPlacements()
-        this.highTextureCache?.resetForLibraryReload()
-    }
-
     protected override onPlacementRunReset(): void {
         this.instanceData.clear()
         this.textureIndexToInstance.clear()

@@ -51,18 +51,11 @@ export interface IGameArtworkPipeline {
     ): number
 
     /**
-     * Soft reset for a capacity-compatible library reload: clears slot/placement state and
-     * rewinds texture-slot allocation for reuse, without disposing GPU resources. Callers must
-     * only invoke this when the incoming library fits the already-allocated capacity — a larger
-     * library still needs dispose() + a freshly-sized instance.
-     */
-    resetForLibraryReload(): void
-
-    /**
-     * Reconcile for a capacity-compatible library reload where the caller knows exactly which
-     * games are gone. Unlike resetForLibraryReload(), games not in removedGameNames keep their
-     * existing texture-slot mapping — no re-fetch, no slot-allocator rewind. Only valid under the
-     * same capacity precondition as resetForLibraryReload().
+     * Reconcile for a capacity-compatible library reload: games not in removedGameNames keep
+     * their existing texture-slot mapping (no re-fetch, no slot-allocator rewind), only
+     * removedGameNames' mappings are cleared. Callers must only invoke this when the incoming
+     * library fits the already-allocated capacity — a larger library still needs dispose() + a
+     * freshly-sized instance.
      */
     reconcileForLibraryReload(removedGameNames: readonly string[]): void
 
