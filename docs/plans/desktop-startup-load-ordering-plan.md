@@ -33,11 +33,11 @@ flowchart TD
     DEMO --> T2C{"Tier 2c: canReadDesktopFiles()?\n(today: isTauri())"}
 
     T2C -->|no - web build| DONE1(["Done - persisted or demo library stands"])
-    T2C -->|yes - desktop| SCAN["Run local scan\n(existing: LocalSteamLibraryLoader,\nnow gated by isEquivalentToPersisted)"]
+    T2C -->|yes - desktop| SCAN["Run local scan\n(existing: LocalSteamLibraryLoader,\nemits ImportLibrary unless the scan\nreproduces the persisted library exactly)"]
 
-    SCAN --> EQUIV{"Scan result equivalent\nto what's already rendered?"}
+    SCAN --> EQUIV{"Scan result equivalent\nto what's already rendered?\n(computeLibraryDiff, Library.ts)"}
     EQUIV -->|yes| DONE2(["Done - no re-render (Tier A, done)"])
-    EQUIV -->|no| REPLACE["Replace rendered library with scan result\n(today: full replace when scan completes.\nAct4/optimistic: progressively,\nsee 'Deferred' below)"]
+    EQUIV -->|no| REPLACE["Reconcile: patch only what changed\n(Tier B, done) - applyLibrary() diffs\nagainst live gameLibrary state"]
 
     REPLACE --> T3
     DONE2 --> T3{"Tier 3: remote reachable?\n(NOT YET BUILT - deliberately deferred,\nsee 'Answered questions')"}
@@ -61,11 +61,11 @@ Amber boxes are not implemented today - see "Answered questions."
 | 2a | Hydrate `AppDetailsCache` from the baked gzip bundle | **Done** — `BakedCacheLoader.seedIfNeeded()`, awaited via `waitForAppDetailsCacheSeed()` |
 | 2b | Render the demo store when nothing is persisted yet | **Done** — `loadDemoGames()` |
 | 2c | Run local scan when desktop-capable; replace what's rendered if different | **Done, but implicitly sequenced** — `LocalSteamLibraryLoader` is a second, independent `GameEventTypes.Start` listener, not an explicit "after Tier 1/2b" step. It also runs on *every* launch regardless of Tier 1 (that's how second-launch change-detection works, not just a cold-cache fallback) - the "if I can get to local files" framing is slightly different from what's implemented: local scan always runs on desktop, it's the *render replacement* that's now conditional (Tier A). |
-| 2c (replace) | Skip re-render when scan reproduces what's rendered | **Done** — Tier A, `isEquivalentToPersisted()` |
-| 2c (reconcile, differs) | Diff-and-patch instead of full replace when the scan differs | **Done 2026-07-14** — `LocalSteamLibraryLoader.computeLibraryDiff()` produces added/removed/renamed appids; `SteamImportLibraryEvent.reconcile.removedGameNames` carries it through `applyLibrary()` → `StorePropsLibraryReloadRequestEvent.removedGameNames` → `GameBoxSpawner` picks a third reset tier (`GpuGameBoxRenderer.reconcileForLibraryReload`) that only clears the removed/renamed games' texture-slot mappings — every other game's mapping (and its already-decoded artwork) is left untouched, so `prefetchArtwork()`'s existing cache-hit check makes re-resolving them a no-op. Placement positions still fully recompute (cheap, no network/decode cost) — only the artwork layer is patched, not the shelf-layout layer (see the "Deferred" section below for why that's a separate, larger undertaking). |
+| 2c (replace) | Skip re-render when scan reproduces what's rendered | **Done** — Tier A, `computeLibraryDiff()`/`isDiffEmpty()` in `Library.ts`, called from the loader's own skip-check against `loadPersistedLibrary()` |
+| 2c (reconcile, differs) | Diff-and-patch instead of full replace when the scan differs | **Done 2026-07-14, simplified 2026-07-15** — after a self-review pass (`startup-reload-review-findings.md` F1) the diff moved out of the loader entirely: `SteamIntegration.applyLibrary()` diffs the incoming library against *live* `gameLibrary` state (via the same `computeLibraryDiff()`) and passes `removedGameNames` straight to `StorePropsLibraryReloadRequestEvent` — no `SteamImportLibraryEvent.reconcile` field, no cross-layer plumbing. `GameBoxSpawner` picks a reconcile reset tier (`GpuGameBoxRenderer.reconcileForLibraryReload`) that only clears the removed/renamed games' texture-slot mappings — every other game's mapping (and its already-decoded artwork) is left untouched, so `prefetchArtwork()`'s existing cache-hit check makes re-resolving them a no-op. This also means bookmarklet/file re-imports get the same reconcile benefit for free, not just local-scan. Placement positions still fully recompute (cheap, no network/decode cost) — only the artwork layer is patched, not the shelf-layout layer (see the "Deferred" section below for why that's a separate, larger undertaking). |
 | 2c (progressive replace) | Phase the real library in instead of a hard cutover | **Not built** — deferred, see below |
 | 3 | Background remote reconciliation after local render | **Not built for desktop.** Exists for the `online` channel only (`applyLibrary()`'s Fork A), and is explicitly excluded for `local-scan` - deliberately deferred, see "Answered questions" below. |
-| 3 (refresh, same identity) | Diff-and-patch instead of full replace | **The mechanism exists (Tier B, above)**, but nothing yet computes a diff against a *remote* fetch — only against the persisted local-scan library. Wiring Tier 3 to reuse it is future work. |
+| 3 (refresh, same identity) | Diff-and-patch instead of full replace | **The mechanism exists (Tier B, above)**, but nothing yet computes a diff against a *remote* fetch — only against the persisted local-scan library. Wiring Tier 3 to reuse it is future work. **Prerequisite when built**: `reconcileForLibraryReload` doesn't reclaim removed games' texture slots, which is harmless today (one reconcile per fresh-process launch) but leaks the atlas across *repeated in-session* reconciles — Tier 3's periodic refresh is exactly that. Needs slot reclamation / compaction on reconcile before shipping. See [Startup & Reload Review Findings](startup-reload-review-findings.md) F6. |
 
 ## Answered questions (2026-07-14)
 
@@ -76,8 +76,13 @@ Amber boxes are not implemented today - see "Answered questions."
    2 call sites (`LocalSteamLibraryLoader.ts`, `LocalSteamDataWriter.ts`) explaining the intent
    ("can this process read the local Steam install's files") rather than introducing a new function
    for a direct third-party API call.
-3. **Comparison reuse**: `isEquivalentToPersisted()` is now a thin wrapper around
-   `computeLibraryDiff()` — Tier A and Tier B share the same underlying comparison, as requested.
+3. **Comparison reuse**: taken further than originally proposed after the F1 self-review pass —
+   `computeLibraryDiff()`/`isDiffEmpty()` moved to `Library.ts`, generalized to a minimal
+   `{appid, name}` shape so `ImportedGame`/`LibraryGame`/`SteamGame` all satisfy it structurally.
+   Tier A (the loader's own skip-check) and Tier B (`applyLibrary`'s reconcile diff) call the exact
+   same function against different inputs; the bespoke `isEquivalentToPersisted()` wrapper that
+   originally satisfied this answer was itself found to be dead code once `computeLibraryDiff` had
+   real production callers, and was deleted (F2).
 
 ## Deferred: progressive load / no demo-library rug-pull
 

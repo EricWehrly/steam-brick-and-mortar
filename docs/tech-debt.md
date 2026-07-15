@@ -387,37 +387,49 @@ construction, so capacity *growth* genuinely needs a new array — see
 `docs/architecture/label-and-placement-reset-architecture-review.md`'s new "Library Reload Reset"
 section for the full reasoning and the planned two-tier design).
 
-**Fix implemented** (supersedes an earlier `isDisposed`-guard prototype built by a background
-agent in an unmerged worktree — that prototype fixed the symptom but not the unnecessary-dispose
-root cause, and was superseded rather than merged):
-1. `GameBoxSpawner.resetForLibraryReload()` now distinguishes **capacity-compatible** reloads (new
-   library fits the already-allocated arrays — same/similar-size relaunch, future Round 2
-   "upgrade" patches) from **capacity-incompatible** ones (needs bigger arrays — e.g. demo store →
-   a real library), via a new `incomingGameCount` field on `StorePropsLibraryReloadRequestEvent`
-   compared against a tracked `currentTextureCapacity`. Unknown count (an online reload that
-   hasn't fetched yet) conservatively falls back to the old behavior.
-2. Capacity-compatible path: `GpuGameBoxRenderer.resetForLibraryReload()` →
-   `LodArtworkOrchestrator.resetForLibraryReload()`. Nothing is disposed.
-   `LodTextureArrayManager.resetSlotAllocation()` rewinds the slot counter (mirrors
-   `LabelTextureArrayManager`'s existing placement-run rewind). `LodArtworkOrchestrator` clears its
-   slot/placement maps and bumps a `generation` counter; `HighTextureCache.resetForLibraryReload()`
-   clears its game registrations too (its `registerGame()` already no-ops on a still-registered
-   slot index, which would otherwise leak the previous library's HIGH registration into a reused
-   slot).
-3. The three async write sites that can straddle a reset (`fetchAndCachePixels`,
-   `fetchAndPlaceArtwork`'s two texture writes) capture `generation` on entry and compare before
-   writing into a slot; a stale generation drops the write instead of landing in a slot reassigned
-   to a different game.
-4. Capacity-incompatible path: unchanged, still `fullReset()` (dispose + rebuild at the new
-   capacity).
+**Fix implemented, then simplified further after a self-review pass**
+(`docs/plans/startup-reload-review-findings.md` F1/F3; supersedes an earlier `isDisposed`-guard
+prototype built by a background agent in an unmerged worktree, and an intermediate
+soft-reset-plus-`generation`-counter design that shipped first and was then deleted once its only
+remaining caller turned out to be redundant):
+1. `GameBoxSpawner.resetForLibraryReload()` reconciles instead of disposing when the reload is
+   **capacity-compatible** (incoming library fits the already-allocated arrays — via
+   `incomingGameCount` on `StorePropsLibraryReloadRequestEvent` compared against a tracked
+   `currentTextureCapacity`) **and** the caller supplied `removedGameNames` (which appid names are
+   actually gone/renamed). `SteamIntegration.applyLibrary()` is the only caller that does — it
+   diffs the incoming library against `this.gameLibrary`'s current state via
+   `computeLibraryDiff()` (`Library.ts`), computed against *live rendered state*, not something a
+   caller upstream has to compute and thread through. Any other case (capacity-incompatible, or no
+   diff info at all — an online reload that hasn't fetched data yet) falls back to disposing and
+   rebuilding at the new capacity, same as before this debt item existed.
+2. Reconcile path: `GpuGameBoxRenderer.reconcileForLibraryReload()` →
+   `LodArtworkOrchestrator.reconcileForLibraryReload()`. Nothing is disposed, and — unlike the
+   deleted soft-reset design — nothing is rewound either. Only the removed/renamed games' entries
+   are cleared from `gameNameToTextureIndex`/`prefetchedHighArtworkUrl`, plus
+   `HighTextureCache.unregisterGame()` for their HIGH-tier registration (its `registerGame()`
+   already no-ops on a still-registered slot index, which would otherwise leak the previous
+   library's HIGH registration into a reused slot). Every other game's mapping is untouched, so
+   `prefetchArtwork()`'s existing "already mapped" check makes re-resolving it a no-op — the
+   practical win over the old soft-reset design: a relaunch that only gained/lost one game no
+   longer re-fetches artwork for the other 1,000+.
+3. No `generation` counter. It existed to guard against a late-resolving fetch writing into a slot
+   the soft reset had just reassigned to a different game — reconcile never reassigns a *kept*
+   game's slot, so that race doesn't exist anymore. (A removed game's own in-flight fetch can still
+   resolve after reconcile and silently re-populate its own now-deleted map entry — harmless, since
+   nothing places a game that's absent from the new library; tracked as an accepted edge case in
+   the review findings, not re-guarded against.)
+4. Capacity-incompatible / no-diff-info path: unchanged from the original fix — dispose + rebuild
+   at the new capacity.
 
 **Done when**:
 - [x] `GameBoxSpawner` no longer disposes/rebuilds the artwork pipeline for a same-capacity reload
-- [x] Unit coverage: `LodArtworkOrchestrator.test.ts` (slot reuse + mid-flight-reset stale-write
-  drop), `LodTextureArrayManager.test.ts` (slot rewind), `HighTextureCache.test.ts` (registration
-  clear + slot freeing), `GameBoxSpawner.test.ts` (capacity-compatible vs incompatible vs unknown
-  routing)
-- [x] Demo store → real library (capacity-incompatible) transition still works via `fullReset()`,
+  with known diff info
+- [x] Unit coverage: `LodArtworkOrchestrator.test.ts` (reconcile keeps survivors' slots, clears
+  removed games'), `HighTextureCache.test.ts` (`unregisterGame` clears a slot for reuse),
+  `GameBoxSpawner.test.ts` (reconcile vs full-reset routing, including the "capacity-compatible but
+  no diff info" case), `import-library.test.ts` (`computeLibraryDiff`/`isDiffEmpty`, and
+  `applyLibrary` computing `removedGameNames` against live state for any import channel)
+- [x] Demo store → real library (capacity-incompatible) transition still works via the dispose path,
   unchanged behavior (existing tests for this path still pass unmodified)
 - [ ] Manually verified against a real relaunch-with-persisted-library on the desktop app (no
   `Unknown tier: mid` errors, no stale artwork bleed between libraries) — open

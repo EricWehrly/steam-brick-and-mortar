@@ -162,20 +162,6 @@ export class GpuGameBoxRenderer {
     }
 
     /**
-     * Soft reset for a capacity-compatible library reload (see GameBoxSpawner). Clears
-     * library-bound state without disposing GPU resources — only valid when the caller has
-     * already confirmed the incoming library fits the currently-allocated texture capacity.
-     */
-    public resetForLibraryReload(): void {
-        this.artworkPrefetchCoordinator.reset()
-        this.lodArtworkRenderer.resetForLibraryReload()
-        this.resolvedArtworkPlacements = 0
-        this.resolvedLabelPlacements = 0
-        this.failedLabelPlacements = 0
-        GpuGameBoxRenderer.logger.lifecycle('Soft reset for library reload (capacity retained)')
-    }
-
-    /**
      * Reconcile for a capacity-compatible library reload where the caller knows exactly which
      * games are gone (see GameBoxSpawner). Unlike resetForLibraryReload(), games not in
      * removedGameNames keep their prefetched texture slot entirely - prefetchArtwork() already

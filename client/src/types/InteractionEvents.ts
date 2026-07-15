@@ -278,17 +278,6 @@ export interface SteamImportLibraryEvent extends BaseInteractionEvent {
     readonly steamId?: string
     /** How this library was captured — see Library.ts for why this is real metadata. */
     readonly channel: ImportChannel
-    /**
-     * Set only when the caller diffed this library against a prior one it can reconcile against
-     * (see LocalSteamLibraryLoader.computeLibraryDiff) — lets SteamIntegration keep unchanged
-     * games' GPU texture slots on reload instead of re-fetching everyone's artwork. Omitted
-     * (not just empty) when there's no prior library to diff against.
-     */
-    readonly reconcile?: {
-        /** Game names (not appids — see LodArtworkOrchestrator's texture-slot map) no longer in
-         *  this library, whose texture-slot mapping should be freed rather than kept alive. */
-        readonly removedGameNames: readonly string[]
-    }
 }
 
 /**

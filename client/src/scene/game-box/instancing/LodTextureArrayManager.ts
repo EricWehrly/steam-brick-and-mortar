@@ -99,16 +99,6 @@ export class LodTextureArrayManager {
     }
 
     /**
-     * Rewind slot allocation for reuse by a new library, without disposing the underlying
-     * GPU texture arrays. Only valid when the new library fits the already-allocated capacity —
-     * callers own that capacity check (see GameBoxSpawner's library-reload reset split).
-     */
-    public resetSlotAllocation(): void {
-        this.nextSlotIndex = 0
-        this.atlasFullLogged = false
-    }
-    
-    /**
      * Copy pixel data into a specific tier and slot.
      */
     public setSlotPixels(

@@ -175,13 +175,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private atlasFullLogged: boolean = false
     private inFlightArtworkCount: number = 0
 
-    // Bumped on resetForLibraryReload(). In-flight fetches capture this on entry and check it
-    // before writing into a texture slot — a stale generation means the slot has since been
-    // reassigned to a different library's game, so the write is dropped instead of bleeding into
-    // the wrong instance. See docs/architecture/label-and-placement-reset-architecture-review.md
-    // "Library Reload Lifecycle".
-    private generation: number = 0
-
     private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
     private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
 
@@ -278,26 +271,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.publishArtworkMetadataReference()
         this.renderer.clearPlacements()
         LodArtworkOrchestrator.logger.debug('Cleared instance placements; texture slots retained')
-    }
-
-    /**
-     * Soft reset for a capacity-compatible library reload (see IGameArtworkPipeline). Unlike
-     * handlePlacementRunResetRequested (same games, new positions), this clears the
-     * game-name → texture-slot mapping too and rewinds slot allocation, since the incoming
-     * library's games are different from the outgoing one. Nothing is disposed — the caller has
-     * already confirmed the incoming library fits the existing texture capacity.
-     */
-    public resetForLibraryReload(): void {
-        this.generation++
-        this.gameNameToTextureIndex.clear()
-        this.prefetchedHighArtworkUrl.clear()
-        this.instanceMetadata.clear()
-        this.publishArtworkMetadataReference()
-        this.renderer.resetForLibraryReload()
-        this.textureManager.resetSlotAllocation()
-        this.allBatchesComplete = false
-        this.atlasFullLogged = false
-        LodArtworkOrchestrator.logger.lifecycle(`Soft reset for library reload (generation ${this.generation})`)
     }
 
     /**
@@ -415,7 +388,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return 'skipped'
         }
 
-        const generation = this.generation
         this.inFlightArtworkCount++
         try {
             const textureIndex = this.textureManager.allocateSlot()
@@ -428,12 +400,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             }
 
             const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkHints)
-            await this.fetchAndCachePixels(artwork, textureIndex, generation)
-
-            if (generation !== this.generation) {
-                LodArtworkOrchestrator.logger.debug(`Prefetch for "${gameName}" resolved after a library reload — discarding stale result`)
-                return 'error'
-            }
+            await this.fetchAndCachePixels(artwork, textureIndex)
 
             this.gameNameToTextureIndex.set(gameName, textureIndex)
             this.prefetchedHighArtworkUrl.set(gameName, this.resolveHighArtworkUrl(appid, artworkHints))
@@ -458,14 +425,12 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     private async fetchAndCachePixels(
         artwork: GameArtwork,
-        textureIndex: number,
-        generation: number
+        textureIndex: number
     ): Promise<void> {
         const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
         const midWidth = midConfig?.textureWidth ?? 150
         const midHeight = midConfig?.textureHeight ?? 225
         const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
-        if (generation !== this.generation) return
         this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
 
         if (!this.lazyHighTextures) {
@@ -473,7 +438,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
             const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
             const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
-            if (generation !== this.generation) return
             this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
         }
 
@@ -534,10 +498,9 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return { success: false, instanceIndex: -1 }
         }
 
-        const generation = this.generation
         this.inFlightArtworkCount++
         try {
-            return await this.fetchAndPlaceArtwork(position, gameName, artworkHints, appid, rotation, generation)
+            return await this.fetchAndPlaceArtwork(position, gameName, artworkHints, appid, rotation)
         } finally {
             this.inFlightArtworkCount--
             if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
@@ -551,8 +514,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         gameName: string,
         artworkHints: { library?: string; header?: string } | undefined,
         appid: number | undefined,
-        rotation: THREE.Quaternion | undefined,
-        generation: number
+        rotation: THREE.Quaternion | undefined
     ): Promise<{ success: boolean; instanceIndex: number }> {
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
@@ -578,9 +540,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const midHeight = midConfig?.textureHeight ?? 225
 
             const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
-            if (generation !== this.generation) {
-                return { success: false, instanceIndex: -1 }
-            }
             this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
 
             // For non-lazy mode, also load HIGH
@@ -590,9 +549,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
 
                 const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
-                if (generation !== this.generation) {
-                    return { success: false, instanceIndex: -1 }
-                }
                 this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
             }
 

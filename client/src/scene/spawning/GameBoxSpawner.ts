@@ -83,16 +83,16 @@ export class GameBoxSpawner {
     }
 
     /**
-     * Three reset tiers instead of one blanket dispose+rebuild — see
+     * Two reset tiers instead of one blanket dispose+rebuild — see
      * docs/architecture/label-and-placement-reset-architecture-review.md "Library Reload
      * Lifecycle" and docs/plans/desktop-startup-load-ordering-plan.md's Tier A/B split. A
-     * same-or-smaller incoming library fits the already-allocated GPU texture capacity, so it
-     * avoids disposal. Within that: if the caller knows exactly which games are gone
-     * (removedGameNames present - see StorePropsLibraryReloadRequestEvent), reconcile instead of
-     * a blanket soft reset - unchanged games keep their texture slots entirely, so only genuinely
-     * new/renamed games re-fetch artwork. A larger library, or an unknown size (e.g. an online
-     * reload that hasn't fetched data yet), still needs the old fullReset() behavior, since a
-     * WebGL DataArrayTexture can't grow in place.
+     * same-or-smaller incoming library (fits the already-allocated GPU texture capacity) and a
+     * known diff (removedGameNames present - see StorePropsLibraryReloadRequestEvent, always set
+     * by SteamIntegration.applyLibrary when something's already rendered) reconciles: unchanged
+     * games keep their texture slots entirely, only genuinely new/removed/renamed games touch the
+     * artwork pipeline. A larger library, or an unknown size (e.g. an online reload that hasn't
+     * fetched data yet), still needs a full dispose+rebuild, since a WebGL DataArrayTexture can't
+     * grow in place.
      */
     private resetForLibraryReload(detail: StorePropsLibraryReloadRequestEvent): void {
         const capacityCompatible =
@@ -100,18 +100,13 @@ export class GameBoxSpawner {
             detail.incomingGameCount !== undefined &&
             detail.incomingGameCount <= this.currentTextureCapacity
 
-        let resetKind: 'reconcile' | 'soft' | 'full'
-        if (capacityCompatible && detail.removedGameNames !== undefined) {
-            this.renderer?.reconcileForLibraryReload(detail.removedGameNames)
-            resetKind = 'reconcile'
-        } else if (capacityCompatible) {
-            this.renderer?.resetForLibraryReload()
-            resetKind = 'soft'
+        const removedGameNames = detail.removedGameNames
+        if (capacityCompatible && removedGameNames !== undefined) {
+            this.renderer?.reconcileForLibraryReload(removedGameNames)
         } else {
             this.renderer?.dispose()
             this.renderer = null
             this.currentTextureCapacity = 0
-            resetKind = 'full'
         }
 
         this.stockStrategy = null
@@ -119,7 +114,7 @@ export class GameBoxSpawner {
         this.layoutDeterminedSinceLastSections = false
         this.clearPlacementState()
 
-        GameBoxSpawner.logger.debug(`Library reload: ${resetKind} reset`)
+        GameBoxSpawner.logger.debug(`Library reload: ${capacityCompatible && removedGameNames !== undefined ? 'reconcile' : 'full'} reset`)
     }
 
     private clearPlacementState(): void {

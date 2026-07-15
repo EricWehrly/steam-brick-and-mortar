@@ -15,6 +15,7 @@ import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { Library, LibraryGame } from './Library'
+import { computeLibraryDiff } from './Library'
 import { persistLibrary, loadPersistedLibrary, clearPersistedLibrary } from './LibraryStore'
 import { ManualLibraryImportGateway } from './ManualLibraryImportGateway'
 import { BatchEmitter } from '../steam/BatchEmitter'
@@ -274,7 +275,7 @@ export class SteamIntegration {
      * capture itself (AppDetailsCache can still upgrade it — see applyLibrary).
      */
     private async handleImportLibrary(event: CustomEvent<SteamImportLibraryEvent>): Promise<void> {
-        const { games, displayName, steamId, channel, reconcile } = event.detail
+        const { games, displayName, steamId, channel } = event.detail
 
         if (!games.length) {
             SteamIntegration.logger.warn('ImportLibrary had no games, ignoring')
@@ -293,7 +294,7 @@ export class SteamIntegration {
             provenance: { channel, capturedAt: new Date().toISOString() }
         }
 
-        if (await this.applyLibrary(library, reconcile)) {
+        if (await this.applyLibrary(library)) {
             persistLibrary(library)
             SteamIntegration.logger.info(`Imported library loaded: ${library.games.length} games (${channel})`)
         }
@@ -321,16 +322,19 @@ export class SteamIntegration {
      * Returns whether the render succeeded, so callers only persist a library they could
      * actually show.
      *
-     * reconcile, when the caller has it (see SteamImportLibraryEvent), lets GameBoxSpawner keep
-     * unchanged games' GPU texture slots instead of a blanket reset - see
-     * docs/plans/desktop-offline-first-plan.md's Tier A/B split.
+     * The diff against whatever's currently rendered (this.gameLibrary, not the incoming
+     * library's own provenance) lets GameBoxSpawner reconcile instead of a blanket reset - keep
+     * unchanged games' GPU texture slots, only clear the ones that are actually gone or renamed.
+     * See docs/plans/desktop-offline-first-plan.md's Tier A/B split.
      */
-    private async applyLibrary(library: Library, reconcile?: SteamImportLibraryEvent['reconcile']): Promise<boolean> {
+    private async applyLibrary(library: Library): Promise<boolean> {
         try {
-            if (this.gameLibrary.getState().userData?.games?.length) {
+            const currentGames = this.gameLibrary.getState().userData?.games
+            if (currentGames?.length) {
+                const diff = computeLibraryDiff(library.games, currentGames)
                 this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
                     incomingGameCount: library.games.length,
-                    removedGameNames: reconcile?.removedGameNames
+                    removedGameNames: [...diff.removedGames.map(g => g.name), ...diff.renamedGames.map(g => g.oldName)]
                 })
                 SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
             }

@@ -159,3 +159,55 @@ export function validateLibraryExportPayload(payload: unknown): { games: Importe
     const steamId = typeof payload.steam_id === 'string' ? payload.steam_id.trim() || null : null
     return { games, displayName, steamId }
 }
+
+/**
+ * The minimal shape diffing needs — ImportedGame, LibraryGame, and SteamGame all satisfy this
+ * structurally, so computeLibraryDiff works directly against whichever shape a caller already
+ * has (a fresh local scan, a persisted Library, or the currently-rendered game list) with no
+ * conversion step.
+ */
+export interface DiffableGame {
+    readonly appid: number
+    readonly name: string
+}
+
+export interface LibraryDiff {
+    /** Present in incoming, absent from current entirely. */
+    readonly addedAppids: readonly number[]
+    /** Present in current, absent from incoming entirely. */
+    readonly removedGames: readonly { readonly appid: number; readonly name: string }[]
+    /** Same appid in both, but the name changed - functionally a remove-then-add for anything
+     *  keyed by game name (the artwork texture-slot map, notably - see
+     *  LodArtworkOrchestrator.reconcileForLibraryReload). */
+    readonly renamedGames: readonly { readonly appid: number; readonly oldName: string; readonly newName: string }[]
+}
+
+/**
+ * Diffs two game lists by appid + name. Channel-agnostic and null-free on purpose - callers
+ * decide what "nothing to compare against" means for their own situation (e.g.
+ * LocalSteamLibraryLoader only calls this when a persisted library exists AND came from its own
+ * channel; SteamIntegration.applyLibrary only calls this when something is already rendered).
+ * Deliberately ignores playtime/lastPlayed - those don't change what's on the shelves, only sort
+ * order.
+ */
+export function computeLibraryDiff(incoming: readonly DiffableGame[], current: readonly DiffableGame[]): LibraryDiff {
+    const incomingByAppid = new Map(incoming.map(g => [g.appid, g]))
+    const currentByAppid = new Map(current.map(g => [g.appid, g]))
+
+    const addedAppids = incoming.filter(g => !currentByAppid.has(g.appid)).map(g => g.appid)
+    const removedGames = current
+        .filter(g => !incomingByAppid.has(g.appid))
+        .map(g => ({ appid: g.appid, name: g.name }))
+    const renamedGames = incoming.flatMap(g => {
+        const prior = currentByAppid.get(g.appid)
+        return prior && prior.name !== g.name
+            ? [{ appid: g.appid, oldName: prior.name, newName: g.name }]
+            : []
+    })
+
+    return { addedAppids, removedGames, renamedGames }
+}
+
+export function isDiffEmpty(diff: LibraryDiff): boolean {
+    return diff.addedAppids.length === 0 && diff.removedGames.length === 0 && diff.renamedGames.length === 0
+}
