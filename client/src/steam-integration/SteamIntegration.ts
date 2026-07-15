@@ -325,7 +325,6 @@ export class SteamIntegration {
      * The diff against whatever's currently rendered (this.gameLibrary, not the incoming
      * library's own provenance) lets GameBoxSpawner reconcile instead of a blanket reset - keep
      * unchanged games' GPU texture slots, only clear the ones that are actually gone or renamed.
-     * See docs/plans/desktop-offline-first-plan.md's Tier A/B split.
      */
     private async applyLibrary(library: Library): Promise<boolean> {
         try {
