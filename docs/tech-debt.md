@@ -434,6 +434,15 @@ remaining caller turned out to be redundant):
 - [ ] Manually verified against a real relaunch-with-persisted-library on the desktop app (no
   `Unknown tier: mid` errors, no stale artwork bleed between libraries) — open
 
+**Residual risk, not re-opening this item**: the same `Unknown tier: mid` symptom is still latently
+reachable through the surviving **full** reset path (capacity growth, e.g. demo → real library) —
+in-flight prefetches from the outgoing library can resolve after `dispose()` clears the tier map.
+Harmless-but-noisy (old orchestrator is unreferenced, nothing corrupts), and it usually settles
+before the ~3.5s scan completes on first launch, which is why it hasn't been observed. Recorded as
+`docs/plans/startup-reload-review-findings.md` F5. Closed permanently (not just avoided) if/when
+[Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) removes the full-reset
+dispose path entirely.
+
 **Related files**:
 - `client/src/scene/spawning/GameBoxSpawner.ts`
 - `client/src/scene/spawning/ArtworkPrefetchCoordinator.ts`
@@ -443,6 +452,37 @@ remaining caller turned out to be redundant):
 - `client/src/scene/props/PropsEvents.ts` (`StorePropsEventTypes.LibraryReloadRequest`)
 - `docs/architecture/label-and-placement-reset-architecture-review.md`
 - `docs/plans/desktop-offline-first-plan.md`
+
+## id: reconcile-slot-leak-on-repeated-reload
+**Priority**: Low — gated on Tier 3, not yet built
+**Effort**: Bundled into [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md); not worth scoping standalone
+**Context**: `LodArtworkOrchestrator.reconcileForLibraryReload()` deliberately doesn't rewind the
+slot allocator or reclaim a removed game's texture slot — it's cleared from the name→slot map, but
+the underlying slot index is never returned to the pool. Today that's fine: desktop reconciles
+exactly **once** per launch (the startup local scan) and each launch is a fresh process, so the
+leak is bounded to one reconcile's worth of removed slots before the process ends. It stops being
+bounded once Tier 3 (periodic in-session remote refresh — see
+[Desktop Startup Load Ordering](../plans/desktop-startup-load-ordering-plan.md)'s Tier 3 row) lands:
+repeated in-session reconciles would monotonically consume the atlas (`maxTextures = totalGames +
+100`) until exhaustion. Recorded during the startup/reload self-review as
+`docs/plans/startup-reload-review-findings.md` F6.
+
+**Decision (for now)**: not urgent — no caller reconciles more than once per process today. Do not
+build Tier 3 without first landing slot reclamation (either standalone or, preferably, as part of
+Idempotent Library Scene Sync's diff step, since that feature needs the same reclamation logic
+regardless).
+
+**Done when**:
+- Reconcile releases a removed game's texture slot back to the allocator for reuse (analogous to
+  the existing `compactMidTier` compaction pass)
+- A test simulating N repeated in-session reconciles with overlapping removed/added games shows
+  bounded atlas usage, not monotonic growth
+
+**Related files**:
+- `client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts`
+- `client/src/scene/game-box/instancing/HighTextureCache.ts`
+- `docs/features/idempotent-library-scene-sync.md`
+- `docs/plans/desktop-startup-load-ordering-plan.md`
 
 ## id: cors-blocked-local-scan-artwork
 **Priority**: Medium — flagged as the next thing to fix after the offline-first plan's rounds are scheduled

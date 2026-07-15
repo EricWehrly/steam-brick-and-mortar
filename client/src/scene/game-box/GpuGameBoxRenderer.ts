@@ -163,10 +163,12 @@ export class GpuGameBoxRenderer {
 
     /**
      * Reconcile for a capacity-compatible library reload where the caller knows exactly which
-     * games are gone (see GameBoxSpawner). Unlike resetForLibraryReload(), games not in
-     * removedGameNames keep their prefetched texture slot entirely - prefetchArtwork() already
-     * treats an existing slot mapping as a cache hit, so this is what actually avoids re-fetching
-     * artwork for a library that only gained or lost a few games.
+     * games are gone (see GameBoxSpawner). Games not in removedGameNames keep their prefetched
+     * texture slot entirely - prefetchArtwork() already treats an existing slot mapping as a
+     * cache hit, so this is what actually avoids re-fetching artwork for a library that only
+     * gained or lost a few games. Capacity-incompatible reloads go through GameBoxSpawner's
+     * dispose+rebuild branch instead (see docs/features/idempotent-library-scene-sync.md for
+     * the plan to fold that branch into this one).
      */
     public reconcileForLibraryReload(removedGameNames: readonly string[]): void {
         this.artworkPrefetchCoordinator.reset()
