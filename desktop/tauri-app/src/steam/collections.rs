@@ -47,8 +47,10 @@ pub fn parse_collections(raw: &str) -> Result<Vec<UserCollection>, String> {
             continue;
         };
         // Malformed/unexpected shapes are skipped rather than failing the whole file — one
-        // odd entry (this namespace also holds unrelated data, e.g. "showcases.*") shouldn't
-        // block every other collection from loading.
+        // odd entry shouldn't block every other collection from loading. "showcases.*" keys in
+        // particular are deliberately skipped by the prefix check above: they're Steam's own
+        // Library-tab panel UI state (which panel is pinned/expanded/sorted-how), not user data,
+        // and there's no shelf-app equivalent for that concept.
         let Ok(collection) = serde_json::from_str::<CollectionValue>(&value_str) else {
             continue;
         };
