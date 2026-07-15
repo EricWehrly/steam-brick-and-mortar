@@ -123,13 +123,16 @@ export class GameArtworkRequest implements GameArtwork {
         }
         
         // All URLs failed - categorize and record
-        this.failureReason = this.categorizeError(lastError?.message ?? 'Unknown error', triedUrls)
+        const rawErrorMessage = lastError?.message ?? 'Unknown error'
+        this.failureReason = this.categorizeError(rawErrorMessage, triedUrls)
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
         this.setArtworkSelection('label')
 
+        // rawError= is included because reason= can't discriminate CORS from 404 on Chromium
+        // (both surface as an identical TypeError) - see categorizeError().
         GameArtworkRequest.logger.warn(
             `Artwork resolution failed for appId ${this.appId} (${this.gameName}). ` +
-            `reason=${this.failureReason}; tried=${triedUrls.join(' -> ')}`
+            `reason=${this.failureReason}; rawError=${rawErrorMessage}; tried=${triedUrls.join(' -> ')}`
         )
 
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
@@ -141,6 +144,7 @@ export class GameArtworkRequest implements GameArtwork {
         type: string,
         route: CdnArtworkType | 'other'
     ): void {
+        const alreadyResolved = this.resolvedUrl === url
         this.resolvedUrl = url
         this.cachedPixels = result
 
@@ -148,9 +152,11 @@ export class GameArtworkRequest implements GameArtwork {
             this.provider.recordSuccess(this.appId, this.format, url, type)
         }
 
-        if (route === 'capsule' || route === 'header') {
-            GameArtworkRequest.logger.debug(
-                `Artwork fallback selected for appId ${this.appId} (${this.gameName}): route=${route}; url=${url}`
+        // First-time resolution only (getPixelsAtSize can re-enter per LOD size), so a session's
+        // resolved count is directly comparable against the failed count and placement totals.
+        if (!alreadyResolved) {
+            GameArtworkRequest.logger.info(
+                `Artwork resolved for appId ${this.appId} (${this.gameName}): route=${route}; url=${url}`
             )
         }
 
