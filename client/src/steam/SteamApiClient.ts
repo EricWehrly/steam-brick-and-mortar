@@ -234,6 +234,17 @@ export class SteamApiClient {
         return this.gamesLoader.enrichFromCache(games)
     }
 
+    /**
+     * Resolves once the baked-cache seed attempt has settled (success or failure) - see
+     * appDetailsCacheReady in the constructor. Exposed for callers that read-then-write
+     * AppDetailsCache themselves (LocalSteamDataWriter) and need the seed to have already landed
+     * before they touch the cache - otherwise their own write can race the seed and win,
+     * silently discarding whatever real data the seed would have provided for those appids.
+     */
+    public async waitForAppDetailsCacheSeed(): Promise<void> {
+        await this.appDetailsCacheReady
+    }
+
     /** See GamesLoader.fetchAndCacheAppDetails - a direct network gap-fill fetch, not the
      *  progressive/cached load path. */
     public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {

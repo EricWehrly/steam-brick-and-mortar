@@ -23,6 +23,18 @@ vi.mock('../../../src/steam/TaxonomyIdResolver', () => ({
     },
 }))
 
+const { waitForAppDetailsCacheSeedMock } = vi.hoisted(() => ({
+    waitForAppDetailsCacheSeedMock: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../../../src/steam/SteamApiClient', () => ({
+    SteamApiClient: {
+        getInstance: () => ({
+            waitForAppDetailsCacheSeed: waitForAppDetailsCacheSeedMock,
+        }),
+    },
+}))
+
 import { LocalSteamDataWriter } from '../../../src/steam/LocalSteamDataWriter'
 import { AppDetailsCache } from '../../../src/steam/cache/AppDetailsCache'
 import { EventManager } from '../../../src/core/EventManager'
@@ -35,6 +47,7 @@ describe('LocalSteamDataWriter', () => {
         isTauriMock.mockReset()
         resolveGenresMock.mockReset().mockResolvedValue([])
         resolveCategoriesMock.mockReset().mockResolvedValue([])
+        waitForAppDetailsCacheSeedMock.mockReset().mockResolvedValue(undefined)
         EventManager.getInstance().removeAllListeners()
     })
 
@@ -182,6 +195,54 @@ describe('LocalSteamDataWriter', () => {
             })
             const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
             expect(entries.size).toBe(0)
+        })
+
+        it('waits for the baked-cache seed to settle before reading/writing AppDetailsCache', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            // Seed the cache with real artwork, but hold the "seed ready" signal open - if the
+            // write doesn't actually wait for it, it would read/write before this resolves and
+            // never see the seeded entry (the exact race this fix closes).
+            const realArtwork = {
+                header: 'https://cdn.example.com/620/header.jpg',
+                capsule: null,
+                capsule_v5: null,
+                background: null,
+                background_raw: null,
+            }
+            const seedCache = new AppDetailsCache()
+            await seedCache.set(620, { type: 'game', name: 'Portal 2', is_free: false, artwork: realArtwork })
+
+            let resolveSeed: () => void = () => {}
+            waitForAppDetailsCacheSeedMock.mockReturnValue(new Promise<void>((resolve) => {
+                resolveSeed = resolve
+            }))
+
+            const writePromise = LocalSteamDataWriter.writeLocalAppMetadata()
+            let settled = false
+            writePromise.then(() => { settled = true })
+
+            await new Promise((resolve) => setTimeout(resolve, 0))
+            expect(settled).toBe(false)
+
+            resolveSeed()
+            const entries = await writePromise
+
+            expect(entries.get(620)?.artwork).toEqual(realArtwork)
         })
 
         it('writes resolved entries into AppDetailsCache, skipping nameless appids', async () => {
