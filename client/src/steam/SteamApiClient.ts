@@ -11,8 +11,6 @@ import { ArtworkPackSeeder } from '../scene/game-box/instancing/ArtworkPackSeede
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamCacheClearEvent } from '../types/InteractionEvents'
-import { DataManager } from '../core/data/DataManager'
-import { DataDomain, DataKey } from '../core/data/DataTypes'
 
 export interface SteamGame extends SteamGameMetadata {
     appid: number
@@ -65,7 +63,6 @@ export class SteamApiClient {
     private cache: CacheManager
     private rateLimiter: RateLimiter
     private batchClient: BatchAppDetailsClient
-    private appDetailsCache: AppDetailsCache
     private bakedCacheLoader: BakedCacheLoader
     /** Public so callers with no other reason to depend on SteamApiClient (e.g.
      *  LocalSteamLibraryLoader's network gap-fill) can call GamesLoader directly instead of
@@ -86,20 +83,15 @@ export class SteamApiClient {
         this.cache = new CacheManager({ cachePrefix: 'steam_api_', cacheDuration: Infinity })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
         this.batchClient = new BatchAppDetailsClient(apiBaseUrl)
-        this.appDetailsCache = new AppDetailsCache()
-        this.bakedCacheLoader = new BakedCacheLoader(this.appDetailsCache)
+        this.bakedCacheLoader = new BakedCacheLoader()
 
-        // Initialize app details cache, then seed it from the baked release bundles.
-        // Fire-and-forget for scene startup in general (never blocks); callers that need the
-        // seeded cache (e.g. the anonymous store's demo game list) await appDetailsCacheReady.
-        this.appDetailsCacheReady = this.appDetailsCache.init()
-            .then(() => this.bakedCacheLoader.seedIfNeeded())
+        // Seed AppDetailsCache from the baked release bundle. Fire-and-forget for scene startup
+        // in general (never blocks); callers that need the seeded cache (e.g. the anonymous
+        // store's demo game list) await appDetailsCacheReady. No readiness event needed here -
+        // AppDetailsCache.mergeMany makes any other writer racing this seed safe by construction.
+        this.appDetailsCacheReady = this.bakedCacheLoader.seedIfNeeded()
             .catch(error => {
                 console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
-            })
-            .then(() => {
-                DataManager.getInstance().set(DataKey.AppDetailsCacheSeeded, true, { domain: DataDomain.Cache })
-                EventManager.getInstance().emit(SteamEventTypes.AppDetailsCacheSeeded)
             })
 
         // Same fire-and-forget-but-awaitable shape as appDetailsCacheReady, for the baked F2P
@@ -113,7 +105,6 @@ export class SteamApiClient {
         eventManager.registerEventHandler<SteamCacheClearEvent>(SteamEventTypes.CacheClear, this.handleCacheClear.bind(this))
 
         this.gamesLoader = new GamesLoader(
-            this.appDetailsCache,
             this.cache,
             this.batchClient
         )
@@ -272,7 +263,7 @@ export class SteamApiClient {
      */
     public async clearCache(): Promise<void> {
         this.cache.clear()
-        await this.appDetailsCache.clear()
+        await AppDetailsCache.clear()
     }
 
     /**

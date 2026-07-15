@@ -26,18 +26,13 @@ const BAKED_CACHE_BUNDLE_PATH = '/steam-cache/app-details.json.gz'
 
 export class BakedCacheLoader {
     private static readonly logger = Logger.createLogFunctions(BakedCacheLoader.name)
-    private readonly appDetailsCache: AppDetailsCache
-
-    constructor(appDetailsCache: AppDetailsCache) {
-        this.appDetailsCache = appDetailsCache
-    }
 
     /**
      * Seed the cache from the baked bundle, unless IndexedDB already has data.
      * Fire-and-forget from the caller - never blocks scene startup.
      */
     async seedIfNeeded(): Promise<void> {
-        const stats = await this.appDetailsCache.getStats()
+        const stats = await AppDetailsCache.getStats()
         if (stats.count > 0) {
             BakedCacheLoader.logger.debug(`Skipping baked cache: IndexedDB already has ${stats.count} entries`)
             return
@@ -52,7 +47,7 @@ export class BakedCacheLoader {
         const dataMap = new Map<number, AppDetailsData>(
             Object.values(bundle.games).map(entry => [entry.appid, entry.data])
         )
-        await this.appDetailsCache.setMany(dataMap)
+        await AppDetailsCache.setMany(dataMap)
         BakedCacheLoader.logger.info(`Seeded ${dataMap.size} games from baked cache bundle`)
     }
 

@@ -12,7 +12,14 @@ import { SteamEventTypes } from '../../types/InteractionEvents'
 export interface AppDetailsData extends SteamGameMetadata {
     name: string;
     type: string;
-    is_free: boolean;
+    /**
+     * Absent means "unknown," not "not free" - a writer that hasn't actually determined pricing
+     * (e.g. local-scan, which has no price data at all) must omit this rather than default it to
+     * false, so AppDetailsCache.mergeMany doesn't treat a guess as real data. Readers already
+     * treat "not exactly true" as "don't show in the free/demo store," which is correct for both
+     * "known false" and "unknown."
+     */
+    is_free?: boolean;
     artwork: {
         header: string | null;
         capsule: string | null;

@@ -79,8 +79,7 @@ export async function loadLocalSteamLibrary(): Promise<void> {
     await LocalSteamDataWriter.writeLocalAppMetadata()
     await resolveRemainingAppidsFromNetwork(candidateAppids)
 
-    const appDetailsCache = new AppDetailsCache()
-    const resolvedEntries = await appDetailsCache.getMany([...candidateAppids])
+    const resolvedEntries = await AppDetailsCache.getMany([...candidateAppids])
     const playtimesByAppid = new Map(playtimes.map(playtime => [playtime.appid, playtime]))
     const games = buildImportedGames(candidateAppids, playtimesByAppid, resolvedEntries)
     if (games.length === 0) {
@@ -129,8 +128,7 @@ async function readCollectionAppids(): Promise<number[]> {
  * the rest of the library from rendering.
  */
 async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<number>): Promise<void> {
-    const appDetailsCache = new AppDetailsCache()
-    const missingAppids = await appDetailsCache.findMissing([...candidateAppids])
+    const missingAppids = await AppDetailsCache.findMissing([...candidateAppids])
     if (missingAppids.length === 0) {
         return
     }

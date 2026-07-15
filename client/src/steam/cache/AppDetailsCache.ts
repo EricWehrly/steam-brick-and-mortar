@@ -1,19 +1,12 @@
 /**
- * Client-side cache for Steam app details (categories, genres, artwork URLs, etc.)
- * 
- * Stores the metadata from batch-appdetails endpoint locally to avoid repeated
- * Lambda calls. Uses IndexedDB for persistence across sessions.
+ * Client-side cache for Steam app details (categories, genres, artwork URLs, etc.), backed by
+ * IndexedDB for persistence across sessions. Static facade over a single IndexedDbCache instance
+ * - there is exactly one of these, not one per caller (see mergeMany's doc comment for why that
+ * matters beyond tidiness).
  */
 
 import type { AppDetailsData } from '../batch/BatchAppDetailsClient'
-import { Logger } from '../../utils/Logger'
-
-interface CachedAppDetails {
-    appid: number
-    data: AppDetailsData
-    cached_at: number
-    schema_version?: number
-}
+import { IndexedDbCache, type IndexedDbCacheResult } from './IndexedDbCache'
 
 /**
  * Result of a cache lookup for app details.
@@ -24,192 +17,43 @@ export interface AppDetailsCacheResult extends AppDetailsData {
 }
 
 export class AppDetailsCache {
-    private static readonly DB_NAME = 'steam-app-details-cache'
-    private static readonly DB_VERSION = 1
-    private static readonly STORE_NAME = 'appdetails'
-    
     // Increment this when the required payload changes (e.g. adding steamspy tags)
     // Entries with missing or older schema versions will be treated as cache misses
     public static readonly CURRENT_SCHEMA_VERSION = 2
-    
-    private db: IDBDatabase | null = null
-    private initPromise: Promise<void> | null = null
-    private logger: ReturnType<typeof Logger.createLogFunctions>
 
-    constructor() {
-        this.logger = Logger.createLogFunctions('AppDetailsCache')
-    }
+    private static store = AppDetailsCache.createStore()
 
-    /**
-     * Initialize IndexedDB connection
-     */
-    async init(): Promise<void> {
-        if (this.db) return
-        if (this.initPromise) return this.initPromise
-
-        this.initPromise = new Promise((resolve, reject) => {
-            const request = indexedDB.open(AppDetailsCache.DB_NAME, AppDetailsCache.DB_VERSION)
-
-            request.onerror = () => {
-                this.logger.error('❌ [AppDetailsCache] Failed to open IndexedDB:', request.error)
-                this.initPromise = null
-                reject(request.error)
-            }
-
-            request.onsuccess = () => {
-                const db = request.result
-                
-                // Verify the object store exists before marking as ready
-                if (!db.objectStoreNames.contains(AppDetailsCache.STORE_NAME)) {
-                    this.logger.error('❌ [AppDetailsCache] Object store missing - database schema not upgraded')
-                    db.close()
-                    this.initPromise = null
-                    reject(new Error('Database schema not initialized'))
-                    return
-                }
-                
-                this.db = db
-                this.logger.debug('✅ [AppDetailsCache] IndexedDB initialized')
-                resolve()
-            }
-
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result
-                
-                if (!db.objectStoreNames.contains(AppDetailsCache.STORE_NAME)) {
-                    const store = db.createObjectStore(AppDetailsCache.STORE_NAME, { keyPath: 'appid' })
-                    store.createIndex('cached_at', 'cached_at', { unique: false })
-                    this.logger.debug('📦 [AppDetailsCache] Created object store')
-                }
-            }
-        })
-
-        return this.initPromise
-    }
-
-    /**
-     * Get cached app details for a single game.
-     * Returns stale entries too, marked with isStale=true.
-     */
-    async get(appid: number): Promise<AppDetailsCacheResult | null> {
-        await this.init()
-        if (!this.db) return null
-
-        return new Promise((resolve) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readonly')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-            const request = store.get(appid)
-
-            request.onsuccess = () => {
-                const cached = request.result as CachedAppDetails | undefined
-                if (!cached) {
-                    resolve(null)
-                    return
-                }
-
-                const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
-                resolve({
-                    ...cached.data,
-                    isStale
-                } as AppDetailsCacheResult)
-            }
-
-            request.onerror = () => {
-                this.logger.error(`❌ [AppDetailsCache] Failed to get appid ${appid}:`, request.error)
-                resolve(null)
-            }
+    private static createStore(): IndexedDbCache<AppDetailsData> {
+        return new IndexedDbCache<AppDetailsData>({
+            dbName: 'steam-app-details-cache',
+            storeName: 'appdetails',
+            keyPath: 'appid',
+            dbVersion: 1,
+            currentSchemaVersion: AppDetailsCache.CURRENT_SCHEMA_VERSION,
         })
     }
 
-    /**
-     * Get cached app details for multiple games.
-     * Returns stale entries too, marked with isStale=true.
-     */
-    async getMany(appids: number[]): Promise<Map<number, AppDetailsCacheResult>> {
-        await this.init()
-        const results = new Map<number, AppDetailsCacheResult>()
-
-        if (!this.db) return results
-
-        return new Promise((resolve) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readonly')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-
-            let completed = 0
-            const total = appids.length
-            let staleCount = 0
-
-            if (total === 0) {
-                resolve(results)
-                return
-            }
-
-            for (const appid of appids) {
-                const request = store.get(appid)
-
-                request.onsuccess = () => {
-                    const cached = request.result as CachedAppDetails | undefined
-
-                    if (cached) {
-                        const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
-                        if (isStale) {
-                            staleCount++
-                        }
-                        const result: AppDetailsCacheResult = {
-                            ...cached.data,
-                            isStale
-                        }
-                        results.set(appid, result)
-                    }
-
-                    completed++
-                    if (completed === total) {
-                        if (results.size > 0 && results.size < total) {
-                            this.logger.info(`📋 [AppDetailsCache] Cache: ${results.size}/${total} games (${staleCount} stale)`)
-                        }
-                        resolve(results)
-                    }
-                }
-
-                request.onerror = () => {
-                    completed++
-                    if (completed === total) {
-                        resolve(results)
-                    }
-                }
-            }
-        })
+    /** For testing - forces the next call to open a fresh IndexedDB connection, so a per-test
+     *  mock (see test/mocks/indexeddb.mock.ts) doesn't get bypassed by an already-open handle
+     *  left over from a previous test. */
+    public static resetForTesting(): void {
+        AppDetailsCache.store = AppDetailsCache.createStore()
     }
 
-    /**
-     * Get every cached entry. Full-store scan: fine at our current cache size (a few thousand
-     * entries). Callers filter/interpret the results - this class only deals in storage.
-     */
-    async getAllEntries(): Promise<Map<number, AppDetailsCacheResult>> {
-        await this.init()
-        const results = new Map<number, AppDetailsCacheResult>()
+    static async get(appid: number): Promise<AppDetailsCacheResult | null> {
+        const result = await AppDetailsCache.store.get(appid)
+        return result ? AppDetailsCache.toCacheResult(result) : null
+    }
 
-        if (!this.db) return results
+    static async getMany(appids: number[]): Promise<Map<number, AppDetailsCacheResult>> {
+        const results = await AppDetailsCache.store.getMany(appids)
+        return AppDetailsCache.toCacheResultMap(results)
+    }
 
-        return new Promise((resolve) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readonly')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-            const request = store.getAll()
-
-            request.onsuccess = () => {
-                const all = request.result as CachedAppDetails[]
-                for (const cached of all) {
-                    const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
-                    results.set(cached.appid, { ...cached.data, isStale })
-                }
-                resolve(results)
-            }
-
-            request.onerror = () => {
-                this.logger.error('❌ [AppDetailsCache] Failed to scan all entries:', request.error)
-                resolve(results)
-            }
-        })
+    /** Full-store scan: fine at current cache size (a few thousand entries). Callers filter/interpret the results. */
+    static async getAllEntries(): Promise<Map<number, AppDetailsCacheResult>> {
+        const results = await AppDetailsCache.store.getAllEntries()
+        return AppDetailsCache.toCacheResultMap(results)
     }
 
     /**
@@ -218,151 +62,167 @@ export class AppDetailsCache {
      * collection-referenced appids that need a network gap-fill fetch, but generic enough for
      * any other caller with the same "what haven't we seen yet" question.
      */
-    async findMissing(appids: number[]): Promise<number[]> {
-        const cached = await this.getMany(appids)
+    static async findMissing(appids: number[]): Promise<number[]> {
+        const cached = await AppDetailsCache.getMany(appids)
         return appids.filter(appid => !cached.has(appid))
     }
 
-    /**
-     * Store app details for a single game
-     */
-    async set(appid: number, data: AppDetailsData): Promise<void> {
-        await this.init()
-        if (!this.db) return
+    static async set(appid: number, data: AppDetailsData): Promise<void> {
+        return AppDetailsCache.store.set(appid, data)
+    }
 
-        const cached: CachedAppDetails = {
-            appid,
-            data,
-            cached_at: Date.now(),
-            schema_version: AppDetailsCache.CURRENT_SCHEMA_VERSION
+    /** Unconditional overwrite - use this for a source that's always authoritative (a real
+     *  network fetch). For a source that might be racing another writer over the same appids
+     *  (e.g. local-scan vs. the baked-cache seed), use mergeMany instead. */
+    static async setMany(dataMap: Map<number, AppDetailsData>): Promise<void> {
+        return AppDetailsCache.store.setMany(dataMap)
+    }
+
+    /**
+     * Merges incoming data into whatever's already cached, per appid, per field - instead of one
+     * writer's data blindly overwriting another's. This is what lets the baked-cache seed and
+     * local-scan's disk read both write into this cache with no ordering requirement between
+     * them: whichever lands first, lands safely, and the other only ever improves the record.
+     * (Previously this was handled by making callers await a readiness event before writing -
+     * see the git history around SteamEventTypes.AppDetailsCacheSeeded. That's gone; this method
+     * is the actual fix, not a event-ordering workaround.)
+     *
+     * `sourceTimestamp` is the caller's own notion of "when was this batch of data captured" -
+     * not necessarily "now." A field from `dataMap` wins over the existing cached value when it's
+     * meaningful (see isFieldMeaningful) AND either the existing field isn't meaningful or this
+     * source is at least as new as the cached record's own timestamp. The merged record's stored
+     * cached_at becomes whichever of the two timestamps is newer, so a *third* future merge can
+     * still compare correctly against "the newest contribution actually in this record" - not
+     * just "whenever a merge last touched it."
+     */
+    static async mergeMany(dataMap: Map<number, AppDetailsData>, sourceTimestamp: number): Promise<void> {
+        if (dataMap.size === 0) return
+
+        const existing = await AppDetailsCache.store.getMany([...dataMap.keys()])
+        const merged = new Map<number, { data: AppDetailsData; cachedAt: number }>()
+
+        for (const [appid, incoming] of dataMap.entries()) {
+            const existingResult = existing.get(appid)
+            if (!existingResult) {
+                merged.set(appid, { data: incoming, cachedAt: sourceTimestamp })
+                continue
+            }
+
+            const incomingIsAtLeastAsNew = sourceTimestamp >= existingResult.cachedAt
+            merged.set(appid, {
+                data: mergeAppDetails(incoming, existingResult.data, incomingIsAtLeastAsNew),
+                cachedAt: Math.max(sourceTimestamp, existingResult.cachedAt),
+            })
         }
 
-        return new Promise((resolve, _reject) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readwrite')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-            const request = store.put(cached)
-
-            request.onsuccess = () => {
-                resolve()
-            }
-
-            request.onerror = () => {
-                this.logger.error(`❌ [AppDetailsCache] Failed to cache appid ${appid}:`, request.error)
-                _reject(request.error)
-            }
-        })
+        await AppDetailsCache.store.setManyWithTimestamps(merged)
     }
 
-    /**
-     * Store app details for multiple games
-     */
-    async setMany(dataMap: Map<number, AppDetailsData>): Promise<void> {
-        await this.init()
-        if (!this.db || dataMap.size === 0) return
-
-        return new Promise((resolve) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readwrite')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-
-            let completed = 0
-            const total = dataMap.size
-            const now = Date.now()
-
-            for (const [appid, data] of dataMap.entries()) {
-                const cached: CachedAppDetails = {
-                    appid,
-                    data,
-                    cached_at: now,
-                    schema_version: AppDetailsCache.CURRENT_SCHEMA_VERSION
-                }
-
-                const request = store.put(cached)
-
-                request.onsuccess = () => {
-                    completed++
-                    if (completed === total) {
-                        resolve()
-                    }
-                }
-
-                request.onerror = () => {
-                    completed++
-                    if (completed === total) {
-                        resolve()
-                    }
-                }
-            }
-        })
+    static async clear(): Promise<void> {
+        return AppDetailsCache.store.clear()
     }
 
-    /**
-     * Clear all cached app details
-     */
-    async clear(): Promise<void> {
-        await this.init()
-        if (!this.db) return
-
-        return new Promise((resolve, _reject) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readwrite')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-            const request = store.clear()
-
-            request.onsuccess = () => {
-                this.logger.info('🗑️ [AppDetailsCache] Cleared all cached app details')
-                resolve()
-            }
-
-            request.onerror = () => {
-                this.logger.error('❌ [AppDetailsCache] Failed to clear cache:', request.error)
-                _reject(request.error)
-            }
-        })
+    static async getStats(): Promise<{ count: number; oldestEntry: number | null; newestEntry: number | null }> {
+        return AppDetailsCache.store.getStats()
     }
 
-    /**
-     * Get cache statistics
-     */
-    async getStats(): Promise<{ count: number; oldestEntry: number | null; newestEntry: number | null }> {
-        await this.init()
-        if (!this.db) return { count: 0, oldestEntry: null, newestEntry: null }
+    private static toCacheResult(result: IndexedDbCacheResult<AppDetailsData>): AppDetailsCacheResult {
+        return { ...result.data, isStale: result.isStale }
+    }
 
-        return new Promise((resolve) => {
-            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readonly')
-            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
-            const countRequest = store.count()
+    private static toCacheResultMap(
+        results: Map<number, IndexedDbCacheResult<AppDetailsData>>
+    ): Map<number, AppDetailsCacheResult> {
+        const out = new Map<number, AppDetailsCacheResult>()
+        for (const [appid, result] of results.entries()) {
+            out.set(appid, AppDetailsCache.toCacheResult(result))
+        }
+        return out
+    }
+}
 
-            countRequest.onsuccess = () => {
-                const count = countRequest.result
+// ─── Merge rules ──────────────────────────────────────────────────────────────
+//
+// Per-field, not a blind deep-merge: several fields have legitimately meaningful falsy/zero
+// values that a naive "is it truthy" check would wrongly treat as absent (is_free's real value
+// can be false; positive/negative/userscore's real value can be 0). "Meaningful" is judged per
+// field's own shape, not generically inferred.
 
-                if (count === 0) {
-                    resolve({ count: 0, oldestEntry: null, newestEntry: null })
-                    return
-                }
+const isNonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.length > 0
+const isNonEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length > 0
+const isNonEmptyRecord = (value: unknown): boolean =>
+    typeof value === 'object' && value !== null && Object.keys(value).length > 0
+const isDefined = (value: unknown): boolean => value !== undefined && value !== null
 
-                const index = store.index('cached_at')
-                const oldestRequest = index.openCursor(null, 'next')
-                const newestRequest = index.openCursor(null, 'prev')
+/**
+ * Picks incoming over existing when incoming is meaningful and (incoming is at least as new, or
+ * existing isn't meaningful either); otherwise keeps existing; falls back to `undefined` only
+ * when neither side has anything. `isMeaningful` takes `unknown` (not `T`) deliberately - it's a
+ * plain presence/shape check, not a real type guard, so it stays trivially assignable regardless
+ * of what T is inferred as at each call site.
+ */
+function preferField<T>(
+    incoming: T | null | undefined,
+    existing: T | null | undefined,
+    incomingIsAtLeastAsNew: boolean,
+    isMeaningful: (value: unknown) => boolean
+): T | undefined {
+    const incomingMeaningful = isMeaningful(incoming)
+    const existingMeaningful = isMeaningful(existing)
 
-                let oldest: number | null = null
-                let newest: number | null = null
+    if (incomingMeaningful && (incomingIsAtLeastAsNew || !existingMeaningful)) {
+        return incoming as T
+    }
+    if (existingMeaningful) {
+        return existing as T
+    }
+    return undefined
+}
 
-                oldestRequest.onsuccess = () => {
-                    if (oldestRequest.result) {
-                        oldest = (oldestRequest.result.value as CachedAppDetails).cached_at
-                    }
+function mergeAppDetails(
+    incoming: AppDetailsData,
+    existing: AppDetailsData,
+    incomingIsAtLeastAsNew: boolean
+): AppDetailsData {
+    const prefer = <T>(a: T | null | undefined, b: T | null | undefined, isMeaningful: (v: unknown) => boolean) =>
+        preferField(a, b, incomingIsAtLeastAsNew, isMeaningful)
 
-                    newestRequest.onsuccess = () => {
-                        if (newestRequest.result) {
-                            newest = (newestRequest.result.value as CachedAppDetails).cached_at
-                        }
-                        resolve({ count, oldestEntry: oldest, newestEntry: newest })
-                    }
-                }
-            }
-
-            countRequest.onerror = () => {
-                resolve({ count: 0, oldestEntry: null, newestEntry: null })
-            }
-        })
+    return {
+        ...existing,
+        ...incoming,
+        // name/type are required on the interface; both writers already guard against writing an
+        // entry with no name at all, so an empty string here should be unreachable in practice -
+        // the fallback only exists so this satisfies the non-optional field types.
+        name: prefer(incoming.name, existing.name, isNonEmptyString) ?? '',
+        type: prefer(incoming.type, existing.type, isNonEmptyString) ?? '',
+        is_free: prefer(incoming.is_free, existing.is_free, isDefined),
+        artwork: {
+            header: prefer(incoming.artwork.header, existing.artwork.header, isDefined) ?? null,
+            capsule: prefer(incoming.artwork.capsule, existing.artwork.capsule, isDefined) ?? null,
+            capsule_v5: prefer(incoming.artwork.capsule_v5, existing.artwork.capsule_v5, isDefined) ?? null,
+            background: prefer(incoming.artwork.background, existing.artwork.background, isDefined) ?? null,
+            background_raw: prefer(incoming.artwork.background_raw, existing.artwork.background_raw, isDefined) ?? null,
+        },
+        developers: prefer(incoming.developers, existing.developers, isNonEmptyArray),
+        publishers: prefer(incoming.publishers, existing.publishers, isNonEmptyArray),
+        genres: prefer(incoming.genres, existing.genres, isNonEmptyArray),
+        categories: prefer(incoming.categories, existing.categories, isNonEmptyArray),
+        user_collections: prefer(incoming.user_collections, existing.user_collections, isNonEmptyArray),
+        steamspy_tags: prefer(incoming.steamspy_tags, existing.steamspy_tags, isNonEmptyRecord),
+        steamspy_top_tags: prefer(incoming.steamspy_top_tags, existing.steamspy_top_tags, isNonEmptyArray),
+        owners: prefer(incoming.owners, existing.owners, isNonEmptyString),
+        short_description: prefer(incoming.short_description, existing.short_description, isNonEmptyString),
+        full_data: prefer(incoming.full_data, existing.full_data, isDefined),
+        undesirable_for_demo: prefer(incoming.undesirable_for_demo, existing.undesirable_for_demo, isDefined),
+        release_date: prefer(incoming.release_date, existing.release_date, isDefined),
+        metacritic: prefer(incoming.metacritic, existing.metacritic, isDefined),
+        // positive/negative/userscore: 0 is treated as a meaningful, real value (not "never
+        // fetched") - this assumes no writer ever uses 0 as a placeholder default for these the
+        // way LocalSteamDataWriter used to for is_free. True as of writing (only network/SteamSpy
+        // hydration paths set these, and they set real values or omit the field entirely) - worth
+        // re-checking if a future writer starts producing these fields too.
+        positive: prefer(incoming.positive, existing.positive, isDefined),
+        negative: prefer(incoming.negative, existing.negative, isDefined),
+        userscore: prefer(incoming.userscore, existing.userscore, isDefined),
     }
 }
