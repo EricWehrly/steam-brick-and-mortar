@@ -25,11 +25,12 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes, SteamEventTypes, type SteamImportLibraryEvent } from '../types/InteractionEvents'
-import type { ImportedGame } from '../steam-integration/Library'
+import type { ImportedGame, Library } from '../steam-integration/Library'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import { LocalSteamDataWriter } from './LocalSteamDataWriter'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import { SteamApiClient } from './SteamApiClient'
+import { loadPersistedLibrary } from '../steam-integration/LibraryStore'
 import { Logger } from '../utils/Logger'
 
 interface SteamIdentity {
@@ -84,6 +85,16 @@ export async function loadLocalSteamLibrary(): Promise<void> {
         return
     }
 
+    // handleGameStart() already rendered the persisted snapshot from last launch (fast path,
+    // runs before this async scan finishes). If this scan reproduces that same library, emitting
+    // ImportLibrary here would tear it down and rebuild an equivalent one for no reason - see
+    // docs/plans/desktop-offline-first-plan.md "Definitive root cause (sixth pass)" for the
+    // second-load artwork loss this caused.
+    if (isEquivalentToPersisted(games, loadPersistedLibrary())) {
+        logger.info(`Local scan: library unchanged from persisted snapshot (${games.length} games) - skipping re-render`)
+        return
+    }
+
     const displayName = identity?.persona_name?.trim() || undefined
     EventManager.getInstance().emit<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, {
         games,
@@ -124,6 +135,24 @@ async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<nu
     } catch (error) {
         logger.warn(`Failed to network-resolve ${missingAppids.length} unseen appid(s), proceeding without them:`, error)
     }
+}
+
+/**
+ * Coarse "did anything worth re-rendering for change" check - same appid set, same names.
+ * Deliberately ignores playtime/lastPlayed (those don't change what's on the shelves, only sort
+ * order) - see the plan doc's Tier A/Tier B split. A local-scan-channel-only comparison: a
+ * persisted library from a different channel (online, bookmarklet) was never this scan's own
+ * output, so there's nothing meaningful to compare against.
+ */
+export function isEquivalentToPersisted(games: readonly ImportedGame[], persisted: Library | null): boolean {
+    if (!persisted || persisted.provenance.channel !== 'local-scan') {
+        return false
+    }
+    if (games.length !== persisted.games.length) {
+        return false
+    }
+    const persistedByAppid = new Map(persisted.games.map(g => [g.appid, g]))
+    return games.every(game => persistedByAppid.get(game.appid)?.name === game.name)
 }
 
 /**

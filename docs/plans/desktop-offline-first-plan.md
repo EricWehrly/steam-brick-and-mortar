@@ -1,12 +1,106 @@
 # Plan: Desktop Offline-First (Refresh Behavior & Transport)
 
-**Status**: Round 1 done. `lod-tier-reset-race-condition` fix implemented (2026-07-14, see
-"Fourth pass" below) — code + tests in, real-relaunch manual verification still open. **Next up**:
-(1) Round 1.5 (don't block the first render on the network gap-fill); (2) Round 2 (upgrade not
-replace); (3) Round 3 (Tauri Rust HTTP client). The CORS/404 log-noise and pre-baking-known-failures
-items are follow-ups, not blocking any of the above.
+**Status**: See **"Definitive root cause (sixth pass)"** immediately below — a log with per-appid
+success/failure instrumentation finally isolated the real second-load bug, and it is **not** any
+of the things the earlier chronological passes chased. The one-line version: **on desktop, every
+launch after the first renders the same library twice — once from the persisted snapshot, once
+from the fresh local-scan — and the second render's teardown-and-rebuild is what strips the
+artwork.** Everything below "Definitive root cause" is preserved as archaeology; read the sixth
+pass first.
+
+**Next up (re-prioritised by the sixth pass)**: (1) **kill the desktop double-render** (Round 2
+"reconcile, don't replace", pulled to the front — this is THE second-load fix); (2) Round 1.5
+(don't block the first render on the network gap-fill — still valid, but it is a *first*-load
+latency issue, not the second-load breakage); (3) Round 3 (Tauri Rust HTTP client). CORS/404
+log-noise and pre-baking-known-failures are follow-ups. `lod-tier-reset-race-condition` fix landed
+2026-07-14 but the sixth pass shows the reset it guards is itself a *symptom* of the double-render,
+not the disease.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
-**Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md)
+**Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md), [artwork resolution flow diagram](../diagrams/artwork.md)
+
+## Definitive root cause (sixth pass, 2026-07-14) — the desktop double-render
+
+A log captured with new per-appid `GameArtworkRequest` success/failure instrumentation settled it
+with numbers instead of theory. Library size: 1485 games.
+
+**Artwork fetching is not the problem, and the constructed CDN URL is fine on desktop:**
+- **1423 unique appids resolved artwork successfully** via the constructed
+  `library_600x900.jpg` URL — the same `deriveArtworkFromAppId()` path the web client uses,
+  unchanged, working. `deriveArtworkFromAppId` did not regress; this lays that question to rest.
+- Only **80 distinct appids failed**, and **65 of them are appids ≥3,000,000** (brand-new / demo /
+  unreleased titles) and **126 of the failure lines name a Demo / Server / Playtest / Beta**. These
+  are titles that genuinely have no `library_600x900.jpg` on Steam's CDN — a real but ~5% minority
+  that would fail identically on web. The "1000+ CORS errors" are overwhelmingly **404s wearing a
+  CORS costume** for art that does not exist, not a systemic desktop CORS block. (Chromium throws
+  an identical `TypeError` for a true CORS block and a headerless 404 — see
+  `GameArtworkRequest.categorizeError`'s own note — so the console's "blocked by CORS policy" text
+  is not diagnostic here.)
+
+**The catastrophe is placement, not fetching:**
+- `Placement complete: placed=587, artwork=75, labels=512` — of 1485 games, only 587 placed and
+  only **75 got artwork**, despite 1423 successful resolutions.
+- **1410 `no prefetched texture` warnings** — artwork was prefetched, then the slot mapping was
+  gone by the time placement asked for it, so each fell back to a label; the 512 label cap then
+  exhausted, leaving ~900 games rendering as nothing.
+
+**The mechanism — the same library is rendered twice on second launch** (timeline from the log):
+```
+18:43:58.570  SteamIntegration    Auto-load: persisted library (local-scan, 1485 games)   ← RENDER #1
+18:43:58.803  GameBoxSpawner      Placement run sections=6, games=1485                     ← places 1485
+18:44:00.556  LocalSteamDataWriter Wrote 1331 locally-sourced AppDetailsCache entries       ← local scan works
+18:44:01.910  LocalSteamLibraryLoader Resolved 0/57 collection-only appids via network
+18:44:02.139  SteamIntegration    Emitted LibraryReloadRequest before library load          ← RESET
+18:44:02.141  LocalSteamLibraryLoader Local scan: emitting ImportLibrary with 1485 games    ← RENDER #2
+18:44:02.377  GameBoxSpawner      Placement run sections=6, games=1485                     ← places 1485 AGAIN
+```
+Two independent things both fire on `GameEventTypes.Start`:
+1. `SteamIntegration.handleGameStart()` → `loadPersistedLibrary()` → `applyLibrary()` renders the
+   persisted snapshot (fast, ~200ms) — **RENDER #1**.
+2. `LocalSteamLibraryLoader.loadLocalSteamLibrary()` runs the fresh scan (~3.5s), then emits
+   `ImportLibrary` → `handleImportLibrary()` → `applyLibrary()`, which sees a library already
+   loaded and emits `LibraryReloadRequest` (teardown) before re-placing all 1485 — **RENDER #2**.
+
+The persisted snapshot **is** the previous launch's local-scan result (`handleImportLibrary`
+persists it; both carry `channel: 'local-scan'`, both 1485 games). So on second launch we render a
+library, then ~3.5s later throw it away and render a byte-for-byte-equivalent library, and the
+teardown+re-prefetch race in RENDER #2 is what produces the 1410 misses. **First launch has no
+persisted snapshot, so RENDER #1 is skipped and only the single local-scan render happens — which
+is exactly why first launch works and every launch after it doesn't.**
+
+### What this means for the earlier fixes (honest reassessment)
+- **Artwork preservation** (don't stomp `NO_LOCAL_ARTWORK` over real artwork) and **seed ordering**
+  (`waitForAppDetailsCacheSeed`): both real correctness fixes, but the box artwork is fetched from
+  the *constructed* CDN URL via `deriveArtworkFromAppId`, **not** from the cache entry's `artwork`
+  field (that only feeds the header *fallback*). So neither could have moved the reported symptom.
+  Keep them; stop expecting them to fix second-load.
+- **`lod-tier-reset-race-condition` generation-guard**: guards the reset — but the reset itself is
+  RENDER #2's teardown, which should not be happening at all. Correct guard, wrong layer to solve
+  the disease at.
+- The new **`GameArtworkRequest` success/failure logging was decisive** — "1423 resolved vs 75
+  placed" is invisible without it. Worth keeping (trimmed).
+
+### The fix: reconcile instead of re-rendering an identical library
+Two tiers, smaller-first, both building the same "is the incoming library equivalent to what's
+already rendered?" primitive:
+
+- **Tier A — skip the redundant reload (near-term, mergeable, fixes the reported bug).** In
+  `applyLibrary()` / `handleImportLibrary()`, before emitting `LibraryReloadRequest`, compare the
+  incoming library against the currently-rendered one (same owner + same appid set, and arguably
+  same names). If equivalent, **skip the teardown and re-render entirely** — RENDER #2 never
+  happens. Local-scan's `AppDetailsCache` writes (freshness for *next* launch) already happened
+  upstream in `LocalSteamDataWriter`, so nothing is lost by not re-rendering. This kills the
+  double-render for the overwhelmingly common "nothing changed since last launch" case.
+- **Tier B — Round 2 "upgrade, don't replace" for the genuinely-changed case.** When the incoming
+  library differs (bought/removed games, updated names, and — per the user — artwork URLs verified
+  reachable before replacing), diff per-appid and patch only what changed: add new boxes, update
+  changed ones, leave the rest untouched, no `LibraryReloadRequest`. Applies to web too (Connect
+  Steam / manual refresh). Larger; builds directly on Tier A's comparison primitive.
+
+Open design question for implementation: whether Tier A lives in `SteamIntegration` (skip the emit)
+or is better expressed as `LocalSteamLibraryLoader` not emitting `ImportLibrary` at all when the
+persisted snapshot it would reproduce is already loaded. The former is channel-agnostic (also helps
+a bookmarklet re-import of an unchanged library); the latter is desktop-scoped and arguably cleaner
+ownership. Decide before implementing.
 
 ## Why this doc exists
 
