@@ -105,8 +105,33 @@ entry then proving a repeat write doesn't wipe it.
 **Files**: `client/src/steam/LocalSteamDataWriter.ts`, `client/src/steam/cache/BakedCacheLoader.ts`
 (race partner, not modified), `client/src/steam/LocalSteamLibraryLoader.ts` (why a stomped entry
 never recovers)
-**Not yet done**: manual verification against a real second-launch desktop session - unit tests
-prove the mechanism, not the end-to-end symptom the user reported.
+
+**Follow-up (same day)**: the fix above only helps if the seed has *already landed* by the time
+local-scan reads-then-writes - it was still a race, just now non-destructive if the write went
+first. A retest with a real library still showed the same symptom (1178 CORS-blocked artwork
+fetches, ~785 label-capacity failures across 48k log lines). Traced further: `SteamApiClient`
+(and its fire-and-forget baked-cache seed) is constructed synchronously during app bootstrap,
+well before `GameEventTypes.Start` - but local-scan's write is *also* gated on
+`GameEventTypes.Start`, and the seed's own work (fetch + decompress + parse + potentially
+thousands of IndexedDB writes) has no guarantee of finishing before local-scan's own Rust-side
+reads do. Fixed by adding `SteamApiClient.waitForAppDetailsCacheSeed()` and awaiting it inside
+`writeLocalAppMetadata()` right before the cache read/write step (not the whole function - the
+local Rust reads proceed without waiting, only the AppDetailsCache touch is gated). This makes
+the ordering deterministic instead of lucky, so the artwork-preservation fix above now reliably
+sees the seed's real data instead of racing it. Also settles why this was desktop-only: web never
+calls `LocalSteamDataWriter` at all (`isTauri()` no-ops it), so web has no code path that ever
+overwrites `AppDetailsCache.artwork` with a placeholder in the first place - it was never a
+web-vs-desktop CORS difference, just a write path that only exists on desktop.
+**Tests**: new `LocalSteamDataWriter.test.ts` case proving the write doesn't settle until the
+seed-ready promise resolves.
+**Files**: `client/src/steam/SteamApiClient.ts` (new `waitForAppDetailsCacheSeed()`),
+`client/src/steam/LocalSteamDataWriter.ts`
+**Still open**: the CORS-blocked CDN fetch itself (`cors-blocked-local-scan-artwork`) is a
+separate, structural problem - the browser can't reliably `fetch()` Steam's CDN cross-origin
+regardless of whether the URL is guessed or real. Neither fix above touches that; it needs Round 3
+(Tauri Rust HTTP client) or an accepted-placeholder interim fix. See
+`docs/plans/desktop-offline-first-plan.md`.
+**Not yet done**: manual verification against a real relaunch on the actual desktop app.
 
 ### Uncached profile first load creates "cursed room"
 **Status**: 🟢 Fixed

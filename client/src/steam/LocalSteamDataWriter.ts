@@ -29,6 +29,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import { TaxonomyIdResolver } from './TaxonomyIdResolver'
+import { SteamApiClient } from './SteamApiClient'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, type TaxonomyDataReadyEvent } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
@@ -89,6 +90,13 @@ export class LocalSteamDataWriter {
         }
 
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
+
+        // Wait for the baked-cache seed to have already landed (or failed) before touching
+        // AppDetailsCache ourselves. Both this write and the seed start around app startup with
+        // no ordering guarantee between them; without this wait, this write can land first and
+        // "win" the race, so existingArtwork below sees nothing to preserve even though the seed
+        // was about to provide real data for the same appids a moment later.
+        await SteamApiClient.getInstance().waitForAppDetailsCacheSeed()
 
         const cache = new AppDetailsCache()
         const existingEntries = await cache.getMany(appids)
