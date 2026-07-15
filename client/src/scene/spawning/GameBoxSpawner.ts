@@ -83,16 +83,12 @@ export class GameBoxSpawner {
     }
 
     /**
-     * Two reset tiers instead of one blanket dispose+rebuild — see
-     * docs/architecture/label-and-placement-reset-architecture-review.md "Library Reload
-     * Lifecycle" and docs/plans/desktop-startup-load-ordering-plan.md's Tier A/B split. A
-     * same-or-smaller incoming library (fits the already-allocated GPU texture capacity) and a
-     * known diff (removedGameNames present - see StorePropsLibraryReloadRequestEvent, always set
-     * by SteamIntegration.applyLibrary when something's already rendered) reconciles: unchanged
-     * games keep their texture slots entirely, only genuinely new/removed/renamed games touch the
-     * artwork pipeline. A larger library, or an unknown size (e.g. an online reload that hasn't
-     * fetched data yet), still needs a full dispose+rebuild, since a WebGL DataArrayTexture can't
-     * grow in place.
+     * A same-or-smaller incoming library (fits the already-allocated GPU texture capacity) with a
+     * known diff (removedGameNames present - always set by SteamIntegration.applyLibrary when
+     * something's already rendered) reconciles: unchanged games keep their texture slots entirely,
+     * only genuinely new/removed/renamed games touch the artwork pipeline. A larger library, or an
+     * unknown size (e.g. an online reload that hasn't fetched data yet), needs a full
+     * dispose+rebuild, since a WebGL DataArrayTexture can't grow in place.
      */
     private resetForLibraryReload(detail: StorePropsLibraryReloadRequestEvent): void {
         const capacityCompatible =

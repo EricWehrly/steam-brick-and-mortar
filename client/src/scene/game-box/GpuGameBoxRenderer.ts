@@ -167,8 +167,7 @@ export class GpuGameBoxRenderer {
      * texture slot entirely - prefetchArtwork() already treats an existing slot mapping as a
      * cache hit, so this is what actually avoids re-fetching artwork for a library that only
      * gained or lost a few games. Capacity-incompatible reloads go through GameBoxSpawner's
-     * dispose+rebuild branch instead (see docs/features/idempotent-library-scene-sync.md for
-     * the plan to fold that branch into this one).
+     * dispose+rebuild branch instead.
      */
     public reconcileForLibraryReload(removedGameNames: readonly string[]): void {
         this.artworkPrefetchCoordinator.reset()
