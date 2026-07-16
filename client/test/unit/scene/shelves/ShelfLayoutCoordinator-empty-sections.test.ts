@@ -8,9 +8,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EventManager } from '../../../../src/core/EventManager'
 import { ShelfLayoutCoordinator } from '../../../../src/scene/shelves/ShelfLayoutCoordinator'
-import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
+import { DataDomain, DataManager } from '../../../../src/core/data'
+import { GameEventTypes, StorePropsEventTypes, UIEventTypes, type ShelfReadyEvent } from '../../../../src/types/InteractionEvents'
+import type { SectionsReadyEvent, ArrangementRequestedEvent } from '../../../../src/types/EnvironmentEvents'
 import { GroupModes, SortModes } from '../../../../src/types/LayoutTypes'
+import type { SteamGame } from '../../../../src/steam'
 
 describe('ShelfLayoutCoordinator – empty sections', () => {
     let eventManager: EventManager
@@ -127,6 +130,60 @@ describe('ShelfLayoutCoordinator – empty sections', () => {
         expect(section0Shelves.length).toBeGreaterThan(0)
         expect(section1Shelves).toHaveLength(0) // Empty section
         expect(section2Shelves.length).toBeGreaterThan(0)
+    })
+})
+
+describe('ShelfLayoutCoordinator - ArrangementRequested ordering (production bootstrap order)', () => {
+    let eventManager: EventManager
+
+    beforeEach(() => {
+        eventManager = EventManager.getInstance()
+        eventManager.removeAllListeners()
+        DataManager.getInstance().clear()
+
+        const anyCoord = ShelfLayoutCoordinator as any
+        anyCoord.instance = null
+
+        // Matches real bootstrap: SceneCoordinator constructs GameSorter first; ShelfLayoutCoordinator
+        // is only constructed later, via StorePropsCoordinator's separate activation. EventTarget
+        // dispatches to listeners in registration order, so this ordering is what actually matters -
+        // constructing ShelfLayoutCoordinator first (as the other describe block above does) would
+        // mask the regression this test exists to catch.
+        new GameSorter()
+        ShelfLayoutCoordinator.getInstance('arc')
+    })
+
+    afterEach(() => {
+        eventManager.removeAllListeners()
+        DataManager.getInstance().clear()
+        const anyCoord = ShelfLayoutCoordinator as any
+        anyCoord.instance = null
+    })
+
+    it('still has shelves after ArrangementRequested when GameSorter is constructed first', () => {
+        const games: SteamGame[] = Array.from({ length: 6 }, (_, i) => ({
+            appid: i + 1,
+            name: `Game ${i + 1}`,
+            playtime_forever: 0,
+            img_icon_url: '',
+            img_logo_url: '',
+            artwork: { icon: '', logo: '', header: '', library: '' },
+        }))
+        DataManager.getInstance().set('steam.games', games as any, { domain: DataDomain.SteamIntegration })
+
+        const shelfReady: ShelfReadyEvent[] = []
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (e: CustomEvent<ShelfReadyEvent>) => { shelfReady.push(e.detail) }
+        )
+
+        eventManager.emit<ArrangementRequestedEvent>(UIEventTypes.ArrangementRequested, {
+            groupMode: GroupModes.None,
+            sortMode: SortModes.ByPlaytime,
+        })
+
+        expect(shelfReady.length).toBeGreaterThan(0)
+        expect((ShelfLayoutCoordinator.getInstance() as any).totalShelves).toBeGreaterThan(0)
     })
 })
 
