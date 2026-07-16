@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AppDetailsData, AppDetailsResponse } from '../../../src/steam/batch/BatchAppDetailsClient'
 
-const { setManyMock } = vi.hoisted(() => ({
+const { setManyMock, getManyMock } = vi.hoisted(() => ({
     setManyMock: vi.fn(),
+    getManyMock: vi.fn(),
 }))
 
 vi.mock('../../../src/steam/cache/AppDetailsCache', () => ({
-    AppDetailsCache: { setMany: setManyMock },
+    AppDetailsCache: { setMany: setManyMock, getMany: getManyMock },
 }))
 
 import { GamesLoader } from '../../../src/steam/GamesLoader'
+import type { SteamGame } from '../../../src/steam/SteamApiClient'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
     header: null, capsule: null, capsule_v5: null, background: null, background_raw: null,
@@ -86,5 +88,28 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
 
         expect(result.size).toBe(0)
         expect(setManyMock).not.toHaveBeenCalled()
+    })
+})
+
+describe('GamesLoader.enrichFromCache', () => {
+    let loader: GamesLoader
+
+    beforeEach(() => {
+        getManyMock.mockReset()
+        loader = new GamesLoader({} as any, {} as any)
+    })
+
+    it('carries user_collections from the cached AppDetails onto the enriched game', async () => {
+        getManyMock.mockResolvedValue(new Map([
+            [620, {
+                name: 'Portal 2', type: 'game', artwork: NO_ARTWORK,
+                user_collections: [{ id: 'from-tag-Ze Done', name: 'Ze Done' }],
+            }],
+        ]))
+        const games = [{ appid: 620, name: 'Portal 2' } as SteamGame]
+
+        const [enriched] = await loader.enrichFromCache(games)
+
+        expect(enriched.user_collections).toEqual([{ id: 'from-tag-Ze Done', name: 'Ze Done' }])
     })
 })
