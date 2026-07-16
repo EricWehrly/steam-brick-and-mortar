@@ -47,12 +47,6 @@ interface LocalAppPlaytime {
     playtime_minutes: number | null
 }
 
-interface LocalUserCollection {
-    id: string
-    name: string
-    appids: number[]
-}
-
 const logger = Logger.createLogFunctions('LocalSteamLibraryLoader')
 
 export async function loadLocalSteamLibrary(): Promise<void> {
@@ -70,14 +64,16 @@ export async function loadLocalSteamLibrary(): Promise<void> {
     }
 
     const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
-    const collectionAppids = await readCollectionAppids()
-    const candidateAppids = new Set<number>([...playtimes.map(playtime => playtime.appid), ...collectionAppids])
+    const collectionsByAppid = await LocalSteamDataWriter.readCollectionsByAppid()
+    const candidateAppids = new Set<number>([...playtimes.map(playtime => playtime.appid), ...collectionsByAppid.keys()])
     if (candidateAppids.size === 0) {
         return
     }
 
     await LocalSteamDataWriter.writeLocalAppMetadata()
     await resolveRemainingAppidsFromNetwork(candidateAppids)
+    // Covers collection members writeLocalAppMetadata's own pass can't - see its docs.
+    await LocalSteamDataWriter.mergeCollectionsForAppids(candidateAppids, collectionsByAppid)
 
     const resolvedEntries = await AppDetailsCache.getMany([...candidateAppids])
     const playtimesByAppid = new Map(playtimes.map(playtime => [playtime.appid, playtime]))
@@ -109,16 +105,6 @@ export async function loadLocalSteamLibrary(): Promise<void> {
     })
 
     logger.info(`Local scan: emitting ImportLibrary with ${games.length} games`)
-}
-
-async function readCollectionAppids(): Promise<number[]> {
-    try {
-        const collections = await invoke<LocalUserCollection[]>('read_steam_collections')
-        return collections.flatMap(collection => collection.appids)
-    } catch (error) {
-        logger.debug('Failed to read Steam collections, proceeding without them:', error)
-        return []
-    }
 }
 
 /**

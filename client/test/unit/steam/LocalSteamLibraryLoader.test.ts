@@ -10,15 +10,25 @@ vi.mock('@tauri-apps/api/core', () => ({
     isTauri: isTauriMock,
 }))
 
-const { writeLocalAppMetadataMock } = vi.hoisted(() => ({
+const { writeLocalAppMetadataMock, mergeCollectionsForAppidsMock } = vi.hoisted(() => ({
     writeLocalAppMetadataMock: vi.fn(),
+    mergeCollectionsForAppidsMock: vi.fn(),
 }))
 
-vi.mock('../../../src/steam/LocalSteamDataWriter', () => ({
-    LocalSteamDataWriter: {
-        writeLocalAppMetadata: writeLocalAppMetadataMock,
-    },
-}))
+// readCollectionsByAppid is kept real (not mocked) - it just calls the already-mocked `invoke`,
+// and LocalSteamLibraryLoader now depends on its actual Map-building behavior, not just a stub.
+vi.mock('../../../src/steam/LocalSteamDataWriter', async (importOriginal) => {
+    // Class methods are non-enumerable, so {...actual.LocalSteamDataWriter} silently drops them -
+    // reference readCollectionsByAppid explicitly instead of trying to spread the class.
+    const actual = await importOriginal<typeof import('../../../src/steam/LocalSteamDataWriter')>()
+    return {
+        LocalSteamDataWriter: {
+            writeLocalAppMetadata: writeLocalAppMetadataMock,
+            mergeCollectionsForAppids: mergeCollectionsForAppidsMock,
+            readCollectionsByAppid: actual.LocalSteamDataWriter.readCollectionsByAppid,
+        },
+    }
+})
 
 const { getManyMock, findMissingMock } = vi.hoisted(() => ({
     getManyMock: vi.fn(),
@@ -66,6 +76,7 @@ describe('LocalSteamLibraryLoader', () => {
         invokeMock.mockReset()
         isTauriMock.mockReset()
         writeLocalAppMetadataMock.mockReset().mockResolvedValue(new Map())
+        mergeCollectionsForAppidsMock.mockReset().mockResolvedValue(undefined)
         getManyMock.mockReset().mockResolvedValue(new Map())
         findMissingMock.mockReset().mockResolvedValue([])
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
@@ -149,6 +160,14 @@ describe('LocalSteamLibraryLoader', () => {
 
             expect(findMissingMock).toHaveBeenCalledWith(expect.arrayContaining([620, 400]))
             expect(fetchAndCacheAppDetailsMock).toHaveBeenCalledWith([400])
+
+            // 400 has no local appinfo.vdf entry (resolved via network gap-fill instead), so it
+            // would never get user_collections from writeLocalAppMetadata's own pass alone - the
+            // backfill must run with the full candidate set and real collection membership.
+            expect(mergeCollectionsForAppidsMock).toHaveBeenCalledWith(
+                new Set([620, 400]),
+                new Map([[620, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]], [400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
+            )
 
             expect(handler).toHaveBeenCalledTimes(1)
             const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>

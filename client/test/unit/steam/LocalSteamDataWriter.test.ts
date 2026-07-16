@@ -361,5 +361,79 @@ describe('LocalSteamDataWriter', () => {
 
             expect(handler).not.toHaveBeenCalled()
         })
+
+        it('leaves a collection member with no read_local_app_metadata entry unresolved - this is the gap mergeCollectionsForAppids exists to backfill', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') return Promise.resolve([])
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([{ id: 'from-tag-Ze Done', name: 'Ze Done', appids: [400] }])
+                }
+                // appinfo.vdf has nothing cached for 400 - never viewed in the Steam client.
+                if (command === 'read_local_app_metadata') return Promise.resolve([])
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(entries.has(400)).toBe(false)
+        })
+    })
+
+    describe('mergeCollectionsForAppids', () => {
+        it('backfills user_collections onto an appid that already has some cache entry but is missing it', async () => {
+            // Simulates 400 having been resolved via LocalSteamLibraryLoader's network gap-fill,
+            // which has no concept of collections.
+            await AppDetailsCache.set(400, { type: 'game', name: 'Portal', artwork: { header: null, capsule: null, capsule_v5: null, background: null, background_raw: null } })
+
+            await LocalSteamDataWriter.mergeCollectionsForAppids(
+                new Set([400]),
+                new Map([[400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
+            )
+
+            const cached = await AppDetailsCache.get(400)
+            expect(cached?.name).toBe('Portal')
+            expect(cached?.user_collections).toEqual([{ id: 'from-tag-Ze Done', name: 'Ze Done' }])
+        })
+
+        it('skips an appid with no cache entry at all - refuses to create a nameless shell record', async () => {
+            await LocalSteamDataWriter.mergeCollectionsForAppids(
+                new Set([400]),
+                new Map([[400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
+            )
+
+            expect(await AppDetailsCache.get(400)).toBeNull()
+        })
+
+        it('does not re-merge an appid that already has user_collections set', async () => {
+            await AppDetailsCache.set(400, {
+                type: 'game', name: 'Portal',
+                artwork: { header: null, capsule: null, capsule_v5: null, background: null, background_raw: null },
+                user_collections: [{ id: 'already-there', name: 'Already There' }],
+            })
+
+            await LocalSteamDataWriter.mergeCollectionsForAppids(
+                new Set([400]),
+                new Map([[400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
+            )
+
+            expect((await AppDetailsCache.get(400))?.user_collections).toEqual([{ id: 'already-there', name: 'Already There' }])
+        })
+
+        it('ignores appids outside the candidate set even if they have collection membership', async () => {
+            await AppDetailsCache.set(400, { type: 'game', name: 'Portal', artwork: { header: null, capsule: null, capsule_v5: null, background: null, background_raw: null } })
+
+            await LocalSteamDataWriter.mergeCollectionsForAppids(
+                new Set([620]),
+                new Map([[400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
+            )
+
+            expect((await AppDetailsCache.get(400))?.user_collections).toBeUndefined()
+        })
+
+        it('no-ops when collectionsByAppid is empty', async () => {
+            await LocalSteamDataWriter.mergeCollectionsForAppids(new Set([400]), new Map())
+            expect(await AppDetailsCache.get(400)).toBeNull()
+        })
     })
 })
