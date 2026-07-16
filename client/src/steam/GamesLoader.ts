@@ -365,7 +365,8 @@ export class GamesLoader {
             positive: appDetails?.positive,
             negative: appDetails?.negative,
             userscore: appDetails?.userscore,
-            owners: appDetails?.owners
+            owners: appDetails?.owners,
+            user_collections: appDetails?.user_collections
         }
     }
 }
