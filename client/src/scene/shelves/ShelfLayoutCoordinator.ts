@@ -56,10 +56,13 @@ export class ShelfLayoutCoordinator {
             GameEventTypes.SectionsReady,
             (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
         )
-        EventManager.getInstance().registerEventHandler(
-            UIEventTypes.ArrangementRequested,
-            () => this.clearRunState()
-        )
+        // Deliberately no standalone ArrangementRequested -> clearRunState() listener here.
+        // GameSorter handles that same event and always synchronously follows up with
+        // SectionsReady, which already clears at the top of handleSectionsReady below - a second,
+        // bare clear registered on ArrangementRequested itself races it whenever this class is
+        // constructed after GameSorter (EventTarget dispatches to listeners in registration
+        // order), wiping what handleSectionsReady just populated. LayoutRequested's clear is safe
+        // to keep standalone: nothing re-populates synchronously in response to it.
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.LayoutRequested,
             () => this.clearRunState()
