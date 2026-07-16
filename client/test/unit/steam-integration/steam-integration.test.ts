@@ -6,6 +6,7 @@ import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamLoadLibraryEvent } from '../../../src/types/InteractionEvents'
+import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -148,6 +149,53 @@ describe('SteamIntegration Unit Tests', () => {
             expect(steamIntegration.steamClient.resolveVanityUrl).toHaveBeenCalledWith('testuser', false)
             // @ts-expect-error - Accessing private member for testing
             expect(steamIntegration.steamClient.getUserGames).toHaveBeenCalledWith('76561198000000000', false)
+        })
+
+        test('emits no LibraryReloadRequest on a first load - nothing rendered yet to diff against', async () => {
+            const mockUserGames = {
+                steamid: '76561198000000000', vanity_url: 'testuser', game_count: 1,
+                games: [{ appid: 440, name: 'Team Fortress 2', playtime_forever: 1000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: '', library: '' } }],
+                retrieved_at: '2023-01-01T00:00:00Z'
+            }
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.loadGamesProgressively = vi.fn().mockResolvedValue([])
+
+            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                detail: { userInput: 'testuser', forceUpdate: false } as SteamLoadLibraryEvent
+            }))
+
+            const emitSpy = steamIntegration['eventManager'].emit as ReturnType<typeof vi.fn>
+            expect(emitSpy).not.toHaveBeenCalledWith(StorePropsEventTypes.LibraryReloadRequest, expect.anything())
+        })
+
+        test('diffs the freshly-fetched ownership list against what is currently rendered before resetting - a background refresh confirming the same library reconciles instead of forcing a blind teardown', async () => {
+            const existingGame = { appid: 440, name: 'Team Fortress 2', playtime_forever: 1000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: '', library: '' } }
+            // Simulate a library already rendered (e.g. local-scan's fast render) before Fork A's
+            // background refresh confirms the same games from the online API.
+            steamIntegration['gameLibrary'].setUserData({
+                steamid: '76561198000000000', vanity_url: 'testuser', game_count: 1,
+                games: [existingGame], retrieved_at: '2023-01-01T00:00:00Z'
+            })
+
+            const mockUserGames = {
+                steamid: '76561198000000000', vanity_url: 'testuser', game_count: 1,
+                games: [existingGame], retrieved_at: '2023-01-01T00:00:00Z'
+            }
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.loadGamesProgressively = vi.fn().mockResolvedValue([])
+
+            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                detail: { userInput: 'testuser', forceUpdate: false } as SteamLoadLibraryEvent
+            }))
+
+            const emitSpy = steamIntegration['eventManager'].emit as ReturnType<typeof vi.fn>
+            const reloadCall = emitSpy.mock.calls.find(call => call[0] === StorePropsEventTypes.LibraryReloadRequest)
+            expect(reloadCall).toBeDefined()
+            expect(reloadCall![1]).toEqual({ incomingGameCount: 1, removedGameNames: [] })
         })
 
         test('should gracefully surface errors during loading without crashing', async () => {

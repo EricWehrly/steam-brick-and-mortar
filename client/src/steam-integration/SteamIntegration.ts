@@ -157,8 +157,23 @@ export class SteamIntegration {
         const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
         userGames.steamid = steamId
         userGames.vanity_url = userGames.vanity_url ?? vanityUrl
+
+        // Diffed against whatever's currently rendered, same as applyLibrary's own reconcile
+        // step - so a same-or-similar library (e.g. Fork A's background refresh confirming what
+        // local-scan already rendered) patches instead of forcing a blanket teardown just because
+        // the incoming size wasn't known yet.
+        const currentGames = this.gameLibrary.getState().userData?.games
+        if (currentGames?.length) {
+            const diff = computeLibraryDiff(userGames.games, currentGames)
+            this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: userGames.games.length,
+                removedGameNames: [...diff.removedGames.map(g => g.name), ...diff.renamedGames.map(g => g.oldName)]
+            })
+            SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
+        }
+
         this.gameLibrary.setUserData(userGames)
-        
+
         await this.steamClient.loadGamesProgressively(userGames, {
             maxGames: AppSettings.get('maxGames'),
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
@@ -307,17 +322,15 @@ export class SteamIntegration {
      * channel (Library's whole point — see docs/plans/library-source-convergence-plan.md).
      *
      * Fork A: if the library has a steamId, a background re-fetch is kicked off (gated by
-     * autoLoadProfile) to replace this snapshot with live data once it lands - except for the
-     * 'local-scan' channel, which skips it. Local-scan already has real filesystem-sourced data
-     * for this run; auto-firing Fork A here meant every desktop launch immediately triggered a
-     * full online re-fetch (a 40+ second, 3-Lambda-batch wait observed in testing) *and* emitted
-     * its own LibraryReloadRequest reset on top of the one already emitted below, tearing down a
-     * scene that had just finished rendering from local data - not the "fast, offline" story
-     * this channel exists for. "Connect Steam" remains the explicit, user-initiated way to get
-     * full online completeness; this exclusion doesn't change that flow at all, only whether
-     * local-scan additionally triggers it automatically. Revisit once a real "upgrade, don't
-     * replace" refresh mechanism exists (compare fetched vs. rendered data, patch only what
-     * changed) - tracked as a roadmap item, not solved here.
+     * autoLoadProfile) to replace this snapshot with live data once it lands - for every channel
+     * alike, including 'local-scan'. This used to be excluded for local-scan specifically,
+     * because handleLoadLibrary's own pre-fetch reset was an unconditional full teardown (no
+     * diff, since the incoming size wasn't known yet) - firing it on every desktop launch tore
+     * down a scene that had just finished rendering from local data. The actual fix wasn't a
+     * channel exclusion: loadGamesForUser now diffs the freshly-fetched ownership list against
+     * whatever's currently rendered (same computeLibraryDiff this method uses below) before
+     * resetting, so a same-or-similar library reconciles instead of a blanket teardown - true for
+     * any channel's background refresh, not just local-scan's.
      *
      * Returns whether the render succeeded, so callers only persist a library they could
      * actually show.
@@ -365,7 +378,7 @@ export class SteamIntegration {
             this.storeSteamDataAndEmitEvent(library.owner.displayName ?? 'imported-library')
             await this.emitGamesInBatches(enrichedGames)
 
-            if (library.owner.steamId && library.provenance.channel !== 'local-scan' && AppSettings.get('autoLoadProfile')) {
+            if (library.owner.steamId && AppSettings.get('autoLoadProfile')) {
                 SteamIntegration.logger.info(`Background re-fetch for steamId ${library.owner.steamId}`)
                 this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
                     userInput: library.owner.steamId
@@ -422,14 +435,8 @@ export class SteamIntegration {
         }
 
         try {
-            // If a store is already loaded, clear it before the new user's data arrives.
-            // incomingGameCount is omitted — the new library hasn't been fetched yet at this
-            // point, so GameBoxSpawner conservatively treats capacity as unknown.
-            if (this.gameLibrary.getState().userData?.games?.length) {
-                this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
-                SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
-            }
-
+            // loadGamesForUser emits its own diff-based LibraryReloadRequest once the ownership
+            // list is fetched, before this reassigns this.gameLibrary's user data.
             await this.loadGamesForUser(targetInput, forceUpdate)
             this.storeSteamDataAndEmitEvent(targetInput)
 
