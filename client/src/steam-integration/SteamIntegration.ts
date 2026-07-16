@@ -154,15 +154,24 @@ export class SteamIntegration {
 
         const { steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, ignoreCache)
 
+        // A bare steamId input (e.g. Fork A's background refresh, which only ever knows the
+        // steamId - see applyLibrary) resolves to the "steamid:<id>" placeholder here, not a real
+        // vanity URL/display name. Preferring whatever's already rendered for this same steamId
+        // (a real persona name from local-scan, a resolved vanity from an earlier online load)
+        // over that placeholder keeps a background refresh from silently blanking a display name
+        // that was already known good.
+        const currentUserData = this.gameLibrary.getState().userData
+        const preservedVanityUrl = currentUserData?.steamid === steamId ? currentUserData.vanity_url : undefined
+
         const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
         userGames.steamid = steamId
-        userGames.vanity_url = userGames.vanity_url ?? vanityUrl
+        userGames.vanity_url = userGames.vanity_url ?? preservedVanityUrl ?? vanityUrl
 
         // Diffed against whatever's currently rendered, same as applyLibrary's own reconcile
         // step - so a same-or-similar library (e.g. Fork A's background refresh confirming what
         // local-scan already rendered) patches instead of forcing a blanket teardown just because
         // the incoming size wasn't known yet.
-        const currentGames = this.gameLibrary.getState().userData?.games
+        const currentGames = currentUserData?.games
         if (currentGames?.length) {
             const diff = computeLibraryDiff(userGames.games, currentGames)
             this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {

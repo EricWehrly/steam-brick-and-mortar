@@ -7,6 +7,7 @@ import { SteamIntegration } from '../../../src/steam-integration/SteamIntegratio
 import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamLoadLibraryEvent } from '../../../src/types/InteractionEvents'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import { ValidationUtils } from '../../../src/utils'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -196,6 +197,35 @@ describe('SteamIntegration Unit Tests', () => {
             const reloadCall = emitSpy.mock.calls.find(call => call[0] === StorePropsEventTypes.LibraryReloadRequest)
             expect(reloadCall).toBeDefined()
             expect(reloadCall![1]).toEqual({ incomingGameCount: 1, removedGameNames: [] })
+        })
+
+        test('a background refresh keyed by a bare steamId (Fork A) preserves the already-known display name instead of blanking it', async () => {
+            // Fork A only ever knows the steamId, not the display name (see applyLibrary) - a
+            // bare steamId resolves to a "steamid:<id>" placeholder vanity URL, not a real one.
+            vi.mocked(ValidationUtils.parseSteamUserInput).mockReturnValueOnce({ type: 'steamid', value: '76561198000000000' })
+
+            // A real display name is already rendered - e.g. local-scan's persona name, or an
+            // earlier successful vanity resolution.
+            steamIntegration['gameLibrary'].setUserData({
+                steamid: '76561198000000000', vanity_url: 'realvanityname', game_count: 0,
+                games: [], retrieved_at: '2023-01-01T00:00:00Z'
+            })
+
+            const mockUserGames = {
+                steamid: '76561198000000000', game_count: 0, games: [], retrieved_at: '2023-01-01T00:00:00Z'
+                // Note: no vanity_url in the response - the games-by-steamid endpoint doesn't resolve one.
+            }
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
+            // @ts-expect-error - Accessing private member for testing
+            steamIntegration.steamClient.loadGamesProgressively = vi.fn().mockResolvedValue([])
+
+            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                detail: { userInput: '76561198000000000', forceUpdate: false } as SteamLoadLibraryEvent
+            }))
+
+            const state = steamIntegration['getGameLibraryState']()
+            expect(state.userData?.vanity_url).toBe('realvanityname')
         })
 
         test('should gracefully surface errors during loading without crashing', async () => {
