@@ -155,12 +155,57 @@ export class LocalSteamDataWriter {
     }
 
     /**
+     * Backfills user_collections for candidate appids that writeLocalAppMetadata's own pass
+     * never covers: a collection member with no locally-cached appinfo.vdf entry gets its name
+     * resolved only via LocalSteamLibraryLoader's network gap-fill, which has no concept of
+     * collections - so it would otherwise never get this field written on any relaunch. Only
+     * merges into appids that already have *some* cache entry (from local metadata or the
+     * network gap-fill) - an appid with no entry at all has no safe name to merge alongside, and
+     * would create a nameless shell record if written anyway. Call after both
+     * writeLocalAppMetadata and the network gap-fill have run, so "already has some entry" is a
+     * meaningful check.
+     */
+    public static async mergeCollectionsForAppids(
+        candidateAppids: ReadonlySet<number>,
+        collectionsByAppid: ReadonlyMap<number, readonly SteamUserCollectionMembership[]>
+    ): Promise<void> {
+        if (collectionsByAppid.size === 0) {
+            return
+        }
+
+        const relevantAppids = [...candidateAppids].filter(appid => collectionsByAppid.has(appid))
+        if (relevantAppids.length === 0) {
+            return
+        }
+
+        const existing = await AppDetailsCache.getMany(relevantAppids)
+        const entries = new Map<number, AppDetailsData>()
+        for (const appid of relevantAppids) {
+            const current = existing.get(appid)
+            if (!current) {
+                continue
+            }
+            if (current.user_collections && current.user_collections.length > 0) {
+                continue
+            }
+            entries.set(appid, { ...current, user_collections: collectionsByAppid.get(appid) })
+        }
+
+        if (entries.size === 0) {
+            return
+        }
+
+        await AppDetailsCache.mergeMany(entries, Date.now())
+        LocalSteamDataWriter.logger.info(`Backfilled user_collections for ${entries.size} appid(s) resolved outside local appinfo.vdf`)
+    }
+
+    /**
      * A collections-read failure (no collections file, unusual multi-account edge case in
      * active_userdata_dir()) shouldn't block writing name/tags/genres/categories - collections
      * are the least-critical field here, so this degrades to "no collections" rather than
      * failing the whole write.
      */
-    private static async readCollectionsByAppid(): Promise<Map<number, SteamUserCollectionMembership[]>> {
+    public static async readCollectionsByAppid(): Promise<Map<number, SteamUserCollectionMembership[]>> {
         let collections: LocalUserCollection[] = []
         try {
             collections = await invoke<LocalUserCollection[]>('read_steam_collections')
