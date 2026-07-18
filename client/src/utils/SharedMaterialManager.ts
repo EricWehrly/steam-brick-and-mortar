@@ -30,7 +30,7 @@ import {
     WALL_WOOD_DIFFUSE_OPTIONS,
     WALL_WOOD_NORMAL_OPTIONS,
 } from './materials/presets/woodTextureProfiles'
-import { WALL_DRYWALL_DIFFUSE_OPTIONS, WALL_DRYWALL_NORMAL_OPTIONS } from './materials/presets/wallDrywallTextureProfiles'
+import { WALL_DRYWALL_DIFFUSE_OPTIONS, WALL_DRYWALL_NORMAL_OPTIONS, WALL_DRYWALL_REPEAT } from './materials/presets/wallDrywallTextureProfiles'
 
 
 
@@ -261,9 +261,10 @@ export class SharedMaterialManager {
             worker.generate('wall_drywall', { ...WALL_DRYWALL_DIFFUSE_OPTIONS }),
             worker.generate('wall_drywall_normal', { ...WALL_DRYWALL_NORMAL_OPTIONS }),
         ])
-        // repeat(4, 3): tuning value -- adjust once seen at real wall scale.
-        const diffuse = this.bitmapToTexture(d, 4, 3)
-        const normal  = this.bitmapToTexture(n, 4, 3)
+        // Physical-scale repeat (see WALL_DRYWALL_REPEAT doc comment) -- sized from the
+        // store's actual wall dimensions so the pattern doesn't stretch.
+        const diffuse = this.bitmapToTexture(d, WALL_DRYWALL_REPEAT.x, WALL_DRYWALL_REPEAT.y)
+        const normal  = this.bitmapToTexture(n, WALL_DRYWALL_REPEAT.x, WALL_DRYWALL_REPEAT.y)
 
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.WallPaint,

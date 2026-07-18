@@ -15,7 +15,7 @@ describe('wall-drywall', () => {
             }
         })
 
-        it('has meaningful brightness variation (mottle keeps it from reading flat)', () => {
+        it('has meaningful brightness variation (keeps it from reading flat)', () => {
             const data = new Uint8ClampedArray(width * height * 4)
             paintWallDrywall(data, width, height)
 

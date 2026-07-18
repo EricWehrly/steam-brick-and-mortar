@@ -2,12 +2,22 @@
 
 **Parent:** [`procedural-textures-project-plan.md`](procedural-textures-project-plan.md) (Phase 1)
 **Pipeline/tooling:** [`procedural-materials-pipeline-plan.md`](procedural-materials-pipeline-plan.md) · bake harness `materials/scripts/mm-bake.ps1` · library `materials/README.md`
-**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07** — `wall-drywall.ts`
-painter (mottled-mustard albedo + subtle orange-peel normal) registered as a worker type,
-wired into `SharedMaterialManager` as `MaterialType.WallPaint`, and set as the default wall
-material in `RoomManager` (replacing `WallWood`, which is retained for the paneling variant).
-Owner has not yet visually judged the look in-app. WS2 (Material Maker authoring), WS3
-(sourced), and WS4 (recolor + selector UI) not started.
+**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07, one tuning pass done**
+— `wall-drywall.ts` painter registered as a worker type, wired into `SharedMaterialManager` as
+`MaterialType.WallPaint`, set as `RoomManager`'s default wall material (`WallWood` retained for
+the paneling variant). First-look feedback: too "rivulet"-like (not bump-like) and visibly
+stretched on the long walls. Root-caused to two issues, both fixed:
+1. **Tiling was hardcoded** (`repeat(4, 3)`) regardless of actual wall size — on the 22m back
+   wall that's a ~4.7:1 tile stretch. Now computed from the store's real dimensions
+   (`WALL_DRYWALL_REPEAT` in the presets file, ~5.4x1, tuned for near-square tiles on both the
+   22m and 16m wall groups since they share one material instance).
+2. **The normal map only combined two noise octaves at a narrow frequency spread**, which
+   doesn't break up Perlin noise's natural "flow" character. Reworked to match the popcorn
+   ceiling's proven 3-band structure (base/5x/15x spread) — same technique, much finer
+   (`bumpDensity` 40 vs popcorn's 14) and much lower amplitude (`strength` 4 vs popcorn's 20)
+   for a subtle, solid-from-a-distance read.
+Owner has not yet re-judged the look in-app after this pass. WS2 (Material Maker authoring),
+WS3 (sourced), and WS4 (recolor + selector UI) not started.
 
 ---
 

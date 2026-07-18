@@ -2,66 +2,66 @@ import { octaveNoise, hexToRgb } from '../noise-utils'
 
 export interface WallDrywallOptions {
     color?: string
-    mottleScale?: number
-    mottleIntensity?: number
-    peelDensity?: number
-    peelHeight?: number
+    bumpDensity?: number
+    bumpHeight?: number
+    detailScale?: number
 }
 
 export interface WallDrywallNormalOptions {
-    peelDensity?: number
+    bumpDensity?: number
     detailScale?: number
     strength?: number
 }
 
 /**
- * Painted drywall diffuse texture — mustard base with a low-frequency "mottle"
- * (broad, soft tonal patches, like uneven roller/sponge paint coverage) plus a
- * very fine, subtle orange-peel micro-texture. Same seamless fractional-noise
- * approach as ceiling-popcorn; the mottle term is what keeps flat paint from
- * reading as a dead, uniform box.
+ * Painted drywall diffuse texture. Same layered-noise structure as the popcorn
+ * ceiling (ceiling-popcorn.ts) -- three noise bands spread across a wide frequency
+ * range (base, detailScale x, detailScale*3 x) is what breaks up classic Perlin
+ * noise's tendency to look like flowing streaks/rivulets rather than small round
+ * bumps; a single or narrow-spread band (the previous version of this file) does
+ * not have enough of that. Retuned from the ceiling for a much finer, subtler
+ * "orange peel" read: higher bumpDensity (smaller bumps) and much lower bumpHeight
+ * / color-shift amplitude, so the wall reads as solid/flat from normal viewing
+ * distance and only shows texture up close.
  */
 export function paintWallDrywall(data: Uint8ClampedArray, width: number, height: number, opts: WallDrywallOptions = {}): void {
     const color = opts.color ?? '#C4A052'
-    const mottleScale = opts.mottleScale ?? 3
-    const mottleIntensity = opts.mottleIntensity ?? 18
-    const peelDensity = opts.peelDensity ?? 48
-    const peelHeight = opts.peelHeight ?? 0.5
+    const bumpDensity = opts.bumpDensity ?? 40
+    const bumpHeight = opts.bumpHeight ?? 0.35
+    const detailScale = opts.detailScale ?? 5
     const rgb = hexToRgb(color)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4
-            const mx = (x / width) * mottleScale
-            const my = (y / height) * mottleScale
-            const mottle = octaveNoise(mx, my, 3, 0.5, 1)
-
-            const px = (x / width) * peelDensity
-            const py = (y / height) * peelDensity
-            const peel = octaveNoise(px, py, 2, 0.5, 1) * peelHeight
-
-            const shade = mottle * mottleIntensity + peel * 6
-            data[i]     = Math.max(0, Math.min(255, rgb.r + shade))
-            data[i + 1] = Math.max(0, Math.min(255, rgb.g + shade * 0.92))
-            data[i + 2] = Math.max(0, Math.min(255, rgb.b + shade * 0.75))
+            const nx = (x / width) * bumpDensity
+            const ny = (y / height) * bumpDensity
+            const bump1 = octaveNoise(nx, ny, 3, 0.5, 1) * 0.6 + 0.4
+            const bump2 = octaveNoise(nx * detailScale, ny * detailScale, 2, 0.4, 1) * 0.4
+            const bump3 = octaveNoise(nx * detailScale * 3, ny * detailScale * 3, 1, 0.3, 1) * 0.15
+            const h = Math.max(0, Math.min(1, (bump1 + bump2 + bump3) * bumpHeight))
+            const warm = bump1 * 9
+            data[i]     = Math.max(0, Math.min(255, rgb.r + h * 42 + warm))
+            data[i + 1] = Math.max(0, Math.min(255, rgb.g + h * 36 + warm * 0.8))
+            data[i + 2] = Math.max(0, Math.min(255, rgb.b + h * 24))
             data[i + 3] = 255
         }
     }
 }
 
 /**
- * Normal map for painted drywall — fine, shallow orange-peel bumps only
- * (no mottle contribution; mottle is a paint-color effect, not a height one).
- * Deliberately subtler than the popcorn ceiling normal.
+ * Normal map for painted drywall -- same seamless coordinates as the diffuse, and
+ * the same two-band structure as the popcorn ceiling's normal map, just at a much
+ * lower strength (subtle orange peel, not popcorn-scale bumps).
  */
 export function paintWallDrywallNormal(data: Uint8ClampedArray, width: number, height: number, opts: WallDrywallNormalOptions = {}): void {
-    const peelDensity = opts.peelDensity ?? 48
-    const detailScale = opts.detailScale ?? 2
+    const bumpDensity = opts.bumpDensity ?? 40
+    const detailScale = opts.detailScale ?? 5
     const strength = opts.strength ?? 4
     const heightAt = (px: number, py: number): number => {
-        const nx = (px / width) * peelDensity
-        const ny = (py / height) * peelDensity
-        return octaveNoise(nx, ny, 2, 0.5, 1) * 0.5
-             + octaveNoise(nx * detailScale, ny * detailScale, 2, 0.4, 1) * 0.3
+        const nx = (px / width) * bumpDensity
+        const ny = (py / height) * bumpDensity
+        return octaveNoise(nx, ny, 3, 0.5, 1) * 0.6
+             + octaveNoise(nx * detailScale, ny * detailScale, 2, 0.4, 1) * 0.4
     }
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
