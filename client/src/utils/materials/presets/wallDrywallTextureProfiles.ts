@@ -3,10 +3,10 @@ export const WALL_DRYWALL_DIFFUSE_OPTIONS = {
     height: 512,
     color: '#C4A052',
     seed: 1337,
-    cellsCoarse: 10,
-    cellsFine: 24,
-    radiusCoarse: 0.55,
-    radiusFine: 0.5,
+    cellsCoarse: 60,
+    cellsFine: 140,
+    radiusCoarse: 0.4,
+    radiusFine: 0.35,
     bumpHeight: 1,
 } as const
 
@@ -14,11 +14,11 @@ export const WALL_DRYWALL_NORMAL_OPTIONS = {
     width: 512,
     height: 512,
     seed: 1337,
-    cellsCoarse: 10,
-    cellsFine: 24,
-    radiusCoarse: 0.55,
-    radiusFine: 0.5,
-    strength: 10,
+    cellsCoarse: 60,
+    cellsFine: 140,
+    radiusCoarse: 0.4,
+    radiusFine: 0.35,
+    strength: 2.5,
 } as const
 
 /**

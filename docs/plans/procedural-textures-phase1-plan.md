@@ -24,7 +24,22 @@ runtime to fit the library, so the Pass-1 static repeat fix was wrong in princip
   every resize), targeting a fixed real-world tile size (`RoomConstants.WALL_TEXTURE_TILE_METERS`).
   The presets-file `WALL_DRYWALL_REPEAT` is now just the cold-start default before the first
   live update, not the source of truth.
-Owner has not yet re-judged the look in-app after Pass 2. WS2 (Material Maker authoring), WS3
+
+**Pass 3** (owner shared a side-by-side against a real drywall reference photo): the Pass-2
+Worley implementation was the right primitive but wildly wrong *scale* — bumps came out as
+large, widely-spaced craters with strong directional shadow crescents (more like a dimpled
+golf-ball surface than orange peel), because `cellsCoarse`/`cellsFine` (10/24) were tuned
+against the wall's physical tile size (~3.5m) without checking what real-world bump size that
+implied (~15cm — comically large). Built a throwaway rendering harness
+(`test/unit/wall-preview.test.ts`, deleted after use, not committed) using the `canvas` package
+already in `devDependencies` to paint + Lambertian-shade candidate parameter sets to PNG and
+inspect them directly via the Read tool, closing the visual-feedback loop without a round-trip
+through the running app. Rescaled `cellsCoarse`/`cellsFine` 10/24 → 60/140 (~1-2cm real-world
+bump size) and normal `strength` 10 → 2.5; rendered output now matches the reference photo's
+fine, low-contrast, mostly-uniform stipple character. Both the painter's own defaults and the
+preset file were updated together (previously only the preset changed, leaving the painter's
+internal fallback defaults -- what the unit tests exercise -- silently stale).
+Owner has not yet re-judged the look in-app after Pass 3. WS2 (Material Maker authoring), WS3
 (sourced), and WS4 (recolor + selector UI) not started.
 
 ---

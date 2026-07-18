@@ -87,10 +87,10 @@ function combinedBumps(u: number, v: number, opts: BumpFieldOptions): number {
 export function paintWallDrywall(data: Uint8ClampedArray, width: number, height: number, opts: WallDrywallOptions = {}): void {
     const color = opts.color ?? '#C4A052'
     const seed = opts.seed ?? 1337
-    const cellsCoarse = opts.cellsCoarse ?? 10
-    const cellsFine = opts.cellsFine ?? 24
-    const radiusCoarse = opts.radiusCoarse ?? 0.55
-    const radiusFine = opts.radiusFine ?? 0.5
+    const cellsCoarse = opts.cellsCoarse ?? 60
+    const cellsFine = opts.cellsFine ?? 140
+    const radiusCoarse = opts.radiusCoarse ?? 0.4
+    const radiusFine = opts.radiusFine ?? 0.35
     const bumpHeight = opts.bumpHeight ?? 1
     const rgb = hexToRgb(color)
     const fieldOpts: BumpFieldOptions = { cellsCoarse, cellsFine, radiusCoarse, radiusFine, seed }
@@ -111,11 +111,11 @@ export function paintWallDrywall(data: Uint8ClampedArray, width: number, height:
  *  align), derived via finite differences. `strength` controls prominence only. */
 export function paintWallDrywallNormal(data: Uint8ClampedArray, width: number, height: number, opts: WallDrywallNormalOptions = {}): void {
     const seed = opts.seed ?? 1337
-    const cellsCoarse = opts.cellsCoarse ?? 10
-    const cellsFine = opts.cellsFine ?? 24
-    const radiusCoarse = opts.radiusCoarse ?? 0.55
-    const radiusFine = opts.radiusFine ?? 0.5
-    const strength = opts.strength ?? 10
+    const cellsCoarse = opts.cellsCoarse ?? 60
+    const cellsFine = opts.cellsFine ?? 140
+    const radiusCoarse = opts.radiusCoarse ?? 0.4
+    const radiusFine = opts.radiusFine ?? 0.35
+    const strength = opts.strength ?? 2.5
     const fieldOpts: BumpFieldOptions = { cellsCoarse, cellsFine, radiusCoarse, radiusFine, seed }
     const heightAt = (px: number, py: number): number => combinedBumps(px / width, py / height, fieldOpts)
     for (let y = 0; y < height; y++) {
