@@ -2,22 +2,30 @@
 
 **Parent:** [`procedural-textures-project-plan.md`](procedural-textures-project-plan.md) (Phase 1)
 **Pipeline/tooling:** [`procedural-materials-pipeline-plan.md`](procedural-materials-pipeline-plan.md) · bake harness `materials/scripts/mm-bake.ps1` · library `materials/README.md`
-**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07, one tuning pass done**
+**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07, two tuning passes done**
 — `wall-drywall.ts` painter registered as a worker type, wired into `SharedMaterialManager` as
 `MaterialType.WallPaint`, set as `RoomManager`'s default wall material (`WallWood` retained for
-the paneling variant). First-look feedback: too "rivulet"-like (not bump-like) and visibly
-stretched on the long walls. Root-caused to two issues, both fixed:
-1. **Tiling was hardcoded** (`repeat(4, 3)`) regardless of actual wall size — on the 22m back
-   wall that's a ~4.7:1 tile stretch. Now computed from the store's real dimensions
-   (`WALL_DRYWALL_REPEAT` in the presets file, ~5.4x1, tuned for near-square tiles on both the
-   22m and 16m wall groups since they share one material instance).
-2. **The normal map only combined two noise octaves at a narrow frequency spread**, which
-   doesn't break up Perlin noise's natural "flow" character. Reworked to match the popcorn
-   ceiling's proven 3-band structure (base/5x/15x spread) — same technique, much finer
-   (`bumpDensity` 40 vs popcorn's 14) and much lower amplitude (`strength` 4 vs popcorn's 20)
-   for a subtle, solid-from-a-distance read.
-Owner has not yet re-judged the look in-app after this pass. WS2 (Material Maker authoring),
-WS3 (sourced), and WS4 (recolor + selector UI) not started.
+the paneling variant).
+
+**Pass 1** fixed a hardcoded `repeat(4,3)` (severe stretching on the store's actual ~22m/16m
+walls) and reworked the normal map to match the popcorn ceiling's 3-band noise structure.
+
+**Pass 2** (owner feedback: still reads as "waves," not discrete bumps; room resizes at
+runtime to fit the library, so the Pass-1 static repeat fix was wrong in principle):
+- **Algorithm swap: Perlin fBm → Worley/cellular noise.** Layered Perlin noise is
+  *structurally* smooth/continuous no matter how it's retuned — it cannot produce discrete
+  bumps, only waves at different frequencies. Worley noise (height as a function of distance
+  to scattered feature points, standard technique for stucco/orange-peel — confirmed via web
+  reference check) is a different primitive that reads as separate bumps by construction. Two
+  scale layers (coarse + fine) give varying bump sizes; a radius-clamped falloff leaves ~26%
+  of the surface (measured) genuinely flat between bumps, not just low-amplitude everywhere.
+- **Tiling is now dynamic, not a static constant.** `RoomManager.ensureWalls()` recomputes
+  wall-texture repeat from the *actual* room dimensions every time it runs (which includes
+  every resize), targeting a fixed real-world tile size (`RoomConstants.WALL_TEXTURE_TILE_METERS`).
+  The presets-file `WALL_DRYWALL_REPEAT` is now just the cold-start default before the first
+  live update, not the source of truth.
+Owner has not yet re-judged the look in-app after Pass 2. WS2 (Material Maker authoring), WS3
+(sourced), and WS4 (recolor + selector UI) not started.
 
 ---
 

@@ -21,8 +21,12 @@ export class RoomConstants {
     static readonly STORE_BACK_CLEARANCE = 2
     static readonly STORE_FRONT_OFFSET = 1.0
     static readonly DEFAULT_ROOM_WIDTH = 22
-    static readonly DEFAULT_ROOM_DEPTH = 16  
+    static readonly DEFAULT_ROOM_DEPTH = 16
     static readonly DEFAULT_ROOM_HEIGHT = 3.5
+    /** Target real-world size (meters) of one wall-texture tile -- keeps tiles roughly
+     *  square regardless of room size, so patterns don't stretch when the room resizes
+     *  to fit the library/shelf count. Tune to taste (smaller = more visible repeats). */
+    static readonly WALL_TEXTURE_TILE_METERS = 3.5
 }
 
 export interface RoomDimensions {
@@ -308,7 +312,24 @@ export class RoomManager {
         const wallMaterial = this.materialManager.getMaterial(MaterialType.WallPaint)
         const glassMaterial = this.materialManager.getMaterial(MaterialType.Glass)
         const halfHeight = dimensions.height / 2
-        
+
+        // The room resizes to fit the library/shelf count, so wall-texture repeat can't be a
+        // fixed constant -- recompute from real dimensions every time. Back/front walls use
+        // dimensions.width, left/right use dimensions.depth, but all three share ONE material
+        // instance (see below), so this uses their average as a compromise that keeps tiles
+        // roughly square on both wall groups rather than exactly matching either.
+        const tileMeters = RoomConstants.WALL_TEXTURE_TILE_METERS
+        const wallRepeatY = dimensions.height / tileMeters
+        const wallRepeatX = (dimensions.width + dimensions.depth) / 2 / tileMeters
+        if (wallMaterial.map) {
+            wallMaterial.map.repeat.set(wallRepeatX, wallRepeatY)
+            wallMaterial.map.needsUpdate = true
+        }
+        if (wallMaterial.normalMap) {
+            wallMaterial.normalMap.repeat.set(wallRepeatX, wallRepeatY)
+            wallMaterial.normalMap.needsUpdate = true
+        }
+
         // Back wall
         if (this.walls.back) {
             this.walls.back.geometry.dispose()
