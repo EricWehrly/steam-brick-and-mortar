@@ -31,6 +31,7 @@ import {
     WALL_WOOD_NORMAL_OPTIONS,
 } from './materials/presets/woodTextureProfiles'
 import { WALL_DRYWALL_DIFFUSE_OPTIONS, WALL_DRYWALL_NORMAL_OPTIONS, WALL_DRYWALL_REPEAT } from './materials/presets/wallDrywallTextureProfiles'
+import { WALL_BRICK_DIFFUSE_OPTIONS, WALL_BRICK_NORMAL_OPTIONS } from './materials/presets/wallBrickTextureProfiles'
 
 
 
@@ -43,6 +44,7 @@ export enum MaterialType {
     Ceiling         = 'ceiling',
     WallWood        = 'wallWood',
     WallPaint       = 'wallPaint',
+    WallBrick       = 'wallBrick',
     Glass           = 'glass'
 }
 
@@ -118,6 +120,7 @@ export class SharedMaterialManager {
                 this.prewarmCeiling(worker),
                 this.prewarmWallWood(worker),
                 this.prewarmWallPaint(worker),
+                this.prewarmWallBrick(worker),
             ])
 
             SharedMaterialManager.logger.debug(
@@ -233,24 +236,48 @@ export class SharedMaterialManager {
 
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
         const [d, n] = await Promise.all([
-            worker.generate('wood_planks', { ...WALL_WOOD_DIFFUSE_OPTIONS }),
-            worker.generate('wood_normal', { ...WALL_WOOD_NORMAL_OPTIONS }),
+            worker.generate('wood_paneling', { ...WALL_WOOD_DIFFUSE_OPTIONS }),
+            worker.generate('wood_paneling_normal', { ...WALL_WOOD_NORMAL_OPTIONS }),
         ])
         // Texture Y = plank bands. Rotated 90deg so planks run vertically on wall.
-        // repeat(1, 12): 1 tile per ceiling height, 12 tiles across wall width (~0.55m per plank width).
-        const diffuse = this.bitmapToTexture(d, 1, 12)
-        const normal  = this.bitmapToTexture(n, 1, 12)
+        // repeat(1, 4): visually verified against the domain-warped grain's natural scale
+        // (the old wood_planks/wood_normal painters used repeat(1, 12), tuned for a
+        // completely different, much higher raw sine frequency -- not applicable here).
+        const diffuse = this.bitmapToTexture(d, 1, 4)
+        const normal  = this.bitmapToTexture(n, 1, 4)
         diffuse.rotation = Math.PI / 2
         normal.rotation  = Math.PI / 2
         diffuse.center.set(0.5, 0.5)
         normal.center.set(0.5, 0.5)
-        
+
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.WallWood,
                 new THREE.MeshStandardMaterial({
                     map: diffuse,
                     normalMap: normal,
                     roughness: 0.8, metalness: 0.1,
+                })),
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
+        )
+    }
+
+    private async prewarmWallBrick(worker: ProceduralTextureWorker): Promise<void> {
+        const [d, n] = await Promise.all([
+            worker.generate('wall_brick', { ...WALL_BRICK_DIFFUSE_OPTIONS }),
+            worker.generate('wall_brick_normal', { ...WALL_BRICK_NORMAL_OPTIONS }),
+        ])
+        // repeat(3, 3): not yet dimension-aware (WallBrick isn't wired to a wall in
+        // RoomManager yet -- generated for availability, per the "generate once, wire in
+        // later" ask). Revisit alongside WALL_DRYWALL_REPEAT's approach if/when it's wired.
+        const diffuse = this.bitmapToTexture(d, 3, 3)
+        const normal  = this.bitmapToTexture(n, 3, 3)
+
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.WallBrick,
+                new THREE.MeshStandardMaterial({
+                    map: diffuse,
+                    normalMap: normal,
+                    roughness: 0.85, metalness: 0.0,
                 })),
             { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
@@ -358,6 +385,7 @@ export class SharedMaterialManager {
             case MaterialType.Ceiling:
             case MaterialType.WallWood:
             case MaterialType.WallPaint:
+            case MaterialType.WallBrick:
                 SharedMaterialManager.logger.debug(
                     `getMaterial(${type}) called before prewarm() — returning flat-color fallback (prewarm not yet complete)`
                 )
@@ -378,6 +406,7 @@ export class SharedMaterialManager {
             [MaterialType.Ceiling]:    0xF5F5DC,
             [MaterialType.WallWood]:   0x8B4513,
             [MaterialType.WallPaint]:  0xC4A052,
+            [MaterialType.WallBrick]:  0x963C2E,
         }
         return new THREE.MeshStandardMaterial({
             color:     FALLBACK_COLORS[type] ?? 0x888888,

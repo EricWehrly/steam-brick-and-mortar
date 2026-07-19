@@ -68,10 +68,60 @@ standard practice for exactly this problem. Changes:
   (measured ~7.3-7.7 range regardless of canvas size, not a small-canvas aliasing artifact), so
   the old threshold no longer matched the intended design.
 
-Owner has not yet re-judged the look in-app after Pass 4. WS2 (Material Maker authoring), WS3
-(sourced), and WS4 (recolor + selector UI) not started. **If another pass is needed, consider
-promoting the throwaway preview harness to a real `materials/scripts/` tool** — it's been
-rebuilt from scratch twice now and has clearly earned its keep for this kind of iteration.
+Owner accepted the Pass 4 drywall result ("Yup, this is great. I'll take it.").
+
+**Fast-follow: wood paneling rework + new brick option, landed 2026-07-07.** Before building
+anything, audited the existing wood painters (`wood-planks.ts`, `wood-enhanced.ts`,
+`wood-normal.ts`) since the owner flagged the original wall wood as a naive first attempt. They
+were the same class of problem just diagnosed for drywall: `wood-planks.ts`'s grain is a plain
+`Math.sin(y * frequency)` (perfectly straight, perfectly periodic bands), and `wood-normal.ts`
+is even thinner -- a fixed `sin(x)` ripple with **no noise input at all**, i.e. a perfectly
+uniform corrugation, which alone would make any wood read as mechanically ridged. Verified via
+web reference check that "domain warping" (perturb the phase fed into a periodic band function
+with noise, so bands flow/waver instead of running straight -- see iquilezles.org/articles/warp)
+is the standard technique for wood/marble grain, notably the *opposite* lesson from drywall:
+there, "flowing" was the defect (Perlin fBm) and discreteness was the fix (Worley); for wood,
+flowing IS the goal, just organically warped rather than perfectly periodic.
+
+- **New painter `wood-paneling.ts`** (diffuse + normal): domain-warped grain bands (mostly
+  warped across X so bands stay coherent along a plank's length) + fine capillary streak detail
+  + per-plank tonal variation, replacing the old plank structure's flat sine. The normal map
+  derives real relief from the *same* grain field plus an actual V-groove depth dip at each
+  plank boundary (previously: color-only edge darkening, zero real depth). Rendered via the
+  `canvas`-based preview harness (rebuilt again, deleted after use) at production scale --
+  first attempt showed a corduroy-tight, over-regular pattern (`ringFrequency` copied without
+  checking real-world implied grain-line spacing, same mistake class as drywall Pass 3); tuned
+  down 3 iterations against self-judgment (no owner-supplied wood reference this round) to a
+  setting with genuine cathedral/wave character. Rewired `MaterialType.WallWood`'s prewarm to
+  the new painter (repeat recalibrated `1x12` → `1x4` to match the new grain's natural scale --
+  the old value was tuned for the retired painter's unrelated frequency). Two color presets:
+  honey oak (default) and walnut (`WOOD_PANELING_WALNUT_DIFFUSE_OPTIONS`, not yet wired to a
+  selector). `wood-enhanced.ts`/`wood-planks.ts`/`wood-normal.ts` deliberately left untouched --
+  MDF veneer (shelves) still uses `wood-enhanced.ts` and wasn't in scope; a shared-file edit
+  risked an unreviewed regression there.
+- **New painter `wall-brick.ts`** (diffuse + normal), a new `MaterialType.WallBrick`: running-bond
+  grid (industry-standard brick pattern -- alternating courses offset by half a brick, not a
+  plain aligned grid) with **independently adjustable `brickColor`/`mortarColor`** (per owner's
+  request -- generated once with defaults now; live in-scene color control deferred to WS4's
+  selector/picker work), per-brick random color variation (hashed by row/column), and a normal
+  map where mortar joints are a genuine recessed height dip (not just a darker color) -- the
+  actual dimensional cue that reads as "brick" under angled light. This one worked well on the
+  first real render, no iteration needed. Not wired as a wall default (drywall stays default);
+  generated and available via `getMaterial(MaterialType.WallBrick)`, consistent with "generate
+  once, wire in the picker later." Repeat (`3x3`) is a placeholder, not dimension-aware like
+  drywall's `WALL_DRYWALL_REPEAT` -- revisit if/when this is actually wired to a wall.
+- 13 new unit tests across both painters (fills alpha, brightness variation, color-range
+  sanity, tiling tolerance, plank/mortar edge detection); three initial assertions were
+  close-miss failures from guessed thresholds/sample points, fixed by measuring real output
+  rather than re-guessing (same discipline as the drywall passes) -- e.g. sampling the exact
+  center of a groove/mortar dip reads near-flat (a V-shaped dip has ~zero derivative at its
+  deepest point), the real signal is on the slope just to either side.
+
+Owner has not yet re-judged wood/brick in-app. **The preview harness has now been rebuilt from
+scratch three times across drywall/wood/brick -- promoting it to a real `materials/scripts/`
+tool is worth doing before the next material.** WS2 (Material Maker authoring), WS3 (sourced),
+and WS4 (recolor + selector UI, which both brick's color params and the wood presets are
+waiting on) not started.
 
 ---
 

@@ -18,6 +18,8 @@ import { paintCarpetEnhanced, type CarpetEnhancedOptions } from './painters/carp
 import { paintCeilingPopcorn, paintCeilingPopcornNormal, type CeilingPopcornOptions, type CeilingPopcornNormalOptions } from './painters/ceiling-popcorn'
 import { paintCeilingEnhanced, type CeilingEnhancedOptions } from './painters/ceiling-enhanced'
 import { paintWallDrywall, paintWallDrywallNormal, type WallDrywallOptions, type WallDrywallNormalOptions } from './painters/wall-drywall'
+import { paintWoodPaneling, paintWoodPanelingNormal, type WoodPanelingOptions, type WoodPanelingNormalOptions } from './painters/wood-paneling'
+import { paintWallBrick, paintWallBrickNormal, type WallBrickOptions, type WallBrickNormalOptions } from './painters/wall-brick'
 
 // Worker global scope
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope
@@ -38,6 +40,10 @@ export type ProceduralTextureType =
     | 'ceiling_enhanced'
     | 'wall_drywall'
     | 'wall_drywall_normal'
+    | 'wood_paneling'
+    | 'wood_paneling_normal'
+    | 'wall_brick'
+    | 'wall_brick_normal'
 
 export interface GenerateTextureMessage {
     type: 'GENERATE'
@@ -107,6 +113,18 @@ async function handleGenerate(msg: GenerateTextureMessage): Promise<void> {
             break
         case 'wall_drywall_normal':
             paintWallDrywallNormal(data, width, height, options as WallDrywallNormalOptions)
+            break
+        case 'wood_paneling':
+            paintWoodPaneling(data, width, height, options as WoodPanelingOptions)
+            break
+        case 'wood_paneling_normal':
+            paintWoodPanelingNormal(data, width, height, options as WoodPanelingNormalOptions)
+            break
+        case 'wall_brick':
+            paintWallBrick(data, width, height, options as WallBrickOptions)
+            break
+        case 'wall_brick_normal':
+            paintWallBrickNormal(data, width, height, options as WallBrickNormalOptions)
             break
         default:
             ctx.postMessage({
