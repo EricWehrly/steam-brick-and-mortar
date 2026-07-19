@@ -2,7 +2,7 @@
 
 **Parent:** [`procedural-textures-project-plan.md`](procedural-textures-project-plan.md) (Phase 1)
 **Pipeline/tooling:** [`procedural-materials-pipeline-plan.md`](procedural-materials-pipeline-plan.md) · bake harness `materials/scripts/mm-bake.ps1` · library `materials/README.md`
-**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07, two tuning passes done**
+**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07, four tuning passes done**
 — `wall-drywall.ts` painter registered as a worker type, wired into `SharedMaterialManager` as
 `MaterialType.WallPaint`, set as `RoomManager`'s default wall material (`WallWood` retained for
 the paneling variant).
@@ -39,8 +39,39 @@ bump size) and normal `strength` 10 → 2.5; rendered output now matches the ref
 fine, low-contrast, mostly-uniform stipple character. Both the painter's own defaults and the
 preset file were updated together (previously only the preset changed, leaving the painter's
 internal fallback defaults -- what the unit tests exercise -- silently stale).
-Owner has not yet re-judged the look in-app after Pass 3. WS2 (Material Maker authoring), WS3
-(sourced), and WS4 (recolor + selector UI) not started.
+
+**Pass 4** (owner shared a side-by-side against the reference photo again + direct question
+"do you really think this compares?" — answer at the time was honestly no): Pass 3's render was
+a real improvement in *shape* over Pass 2 but still noticeably too **regular** -- a raw two-layer
+Worley field gives every bump the same height on a fixed lattice, which reads as a repeating
+mechanical pattern rather than organic roughness; the reference photo's grain is irregular, with
+quiet patches and barely-there grains mixed with more visible ones, no discernible pattern. Owner
+suggested modulating the Worley field through a Perlin layer for variation, which matches
+standard practice for exactly this problem. Changes:
+- **Per-bump random prominence** — each Worley feature point now gets an independent random
+  height scale (`minProminence` to 1, hashed per-cell, no stored array), so individual bumps
+  vary in size/visibility rather than all reading identically.
+- **Regional Perlin modulation** — a broad, low-frequency `octaveNoise` layer multiplies the
+  combined bump field, creating soft patches where the texture reads quieter or busier overall
+  (`modulationScale`/`modulationMin`), directly addressing "too uniform."
+- **Lower ceiling, not just more variation** — per the owner's specific note that "the biggest
+  in the range needs to be quite smaller than the larger divets," cut albedo shade amplitude
+  (13 vs Pass 3's 22) and normal `strength` (1.4 vs 2.5) on top of the variation changes, so even
+  the most prominent bumps read subtler than before.
+- **Resolution 512 → 1024** for the diffuse/normal presets -- headroom needed to push
+  `cellsFine` higher (90/220 vs Pass 3's 60/140) without aliasing at the higher density.
+- Rebuilt the same throwaway `canvas`-based preview harness (again deleted after use) to render
+  both the full tile and a crop approximating actual VR standing-distance viewing scale before
+  reporting back, rather than asking the owner to re-screenshot another guess.
+- One test threshold (`paintWallDrywall` brightness-variation minimum) had to drop from 10 to 4
+  -- the new variation/modulation design is *deliberately* lower-amplitude by construction
+  (measured ~7.3-7.7 range regardless of canvas size, not a small-canvas aliasing artifact), so
+  the old threshold no longer matched the intended design.
+
+Owner has not yet re-judged the look in-app after Pass 4. WS2 (Material Maker authoring), WS3
+(sourced), and WS4 (recolor + selector UI) not started. **If another pass is needed, consider
+promoting the throwaway preview harness to a real `materials/scripts/` tool** — it's been
+rebuilt from scratch twice now and has clearly earned its keep for this kind of iteration.
 
 ---
 

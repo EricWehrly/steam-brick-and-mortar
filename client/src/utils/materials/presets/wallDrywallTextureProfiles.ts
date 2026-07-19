@@ -1,24 +1,32 @@
+// 1024 (not 512) -- headroom to push cellsFine higher without aliasing (at 512px, 220 fine
+// cells is only ~2.3px/cell, right at the noise floor; 1024px gives ~4.7px/cell).
 export const WALL_DRYWALL_DIFFUSE_OPTIONS = {
-    width: 512,
-    height: 512,
+    width: 1024,
+    height: 1024,
     color: '#C4A052',
     seed: 1337,
-    cellsCoarse: 60,
-    cellsFine: 140,
+    cellsCoarse: 90,
+    cellsFine: 220,
     radiusCoarse: 0.4,
     radiusFine: 0.35,
+    minProminence: 0.15,
+    modulationScale: 3,
+    modulationMin: 0.25,
     bumpHeight: 1,
 } as const
 
 export const WALL_DRYWALL_NORMAL_OPTIONS = {
-    width: 512,
-    height: 512,
+    width: 1024,
+    height: 1024,
     seed: 1337,
-    cellsCoarse: 60,
-    cellsFine: 140,
+    cellsCoarse: 90,
+    cellsFine: 220,
     radiusCoarse: 0.4,
     radiusFine: 0.35,
-    strength: 2.5,
+    minProminence: 0.15,
+    modulationScale: 3,
+    modulationMin: 0.25,
+    strength: 1.4,
 } as const
 
 /**
