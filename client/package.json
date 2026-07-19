@@ -22,7 +22,8 @@
     "type-check": "tsc --noEmit",
     "validate": "yarn type-check && yarn test && yarn lint",
     "test:visual": "playwright test --config playwright.config.ts",
-    "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright"
+    "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright",
+    "preview:materials": "vitest run --config test/vitest.preview.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
