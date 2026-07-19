@@ -117,11 +117,29 @@ flowing IS the goal, just organically warped rather than perfectly periodic.
   center of a groove/mortar dip reads near-flat (a V-shaped dip has ~zero derivative at its
   deepest point), the real signal is on the slope just to either side.
 
-Owner has not yet re-judged wood/brick in-app. **The preview harness has now been rebuilt from
-scratch three times across drywall/wood/brick -- promoting it to a real `materials/scripts/`
-tool is worth doing before the next material.** WS2 (Material Maker authoring), WS3 (sourced),
-and WS4 (recolor + selector UI, which both brick's color params and the wood presets are
-waiting on) not started.
+**Preview harness promoted to a permanent tool** (2026-07-07): `yarn preview:materials`
+(`client/scripts/render-material-previews.ts` + a dedicated `vitest.preview.config.ts`,
+matching the project's existing per-concern config pattern) renders every registered wall
+material to `test-results/material-previews/` in one run. Rebuilt from scratch three times
+across the drywall/wood/brick passes before earning this.
+
+**Brick fix, 2026-07-07** (owner: "bricks that were half one color and then suddenly half the
+other," + requested face pockmarks and mortar texture): using the new preview tool, confirmed a
+real bug -- `paintWallBrick`'s fine-noise frequency (`x*0.12`) was under one full cycle per
+~64px brick, producing a slow light-to-dark gradient sweep across each face rather than fine
+grain (exactly what "half and half" describes). Also found and fixed a second bug in the normal
+map: `octaveNoise(..., seed)` was passing `seed` into the function's `scale` parameter (it has
+no seed parameter at all -- the codebase convention, used correctly elsewhere, is to offset a
+coordinate by the seed instead). Fixed the frequency, added sparse randomly-scattered pockmarks
+to brick faces (density-gated per sub-cell, varying size, both diffuse darkening and real
+normal-map divots), and gave mortar its own independent bump texture (previously exactly
+flat -- `face` zeroed out all height contribution in the mortar region, so "recessed but flat
+plane" was the best it could read as). Two existing tests broke as a direct, expected
+consequence of adding pockmarks (a fixed single-pixel sample can now legitimately land on one);
+fixed by averaging across multiple known-safe sample points instead of trusting one pixel.
+
+WS2 (Material Maker authoring), WS3 (sourced), and WS4 (recolor + selector UI, which both
+brick's color params and the wood presets are waiting on) not started.
 
 ---
 
