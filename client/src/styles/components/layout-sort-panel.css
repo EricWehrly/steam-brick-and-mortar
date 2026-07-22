@@ -4,7 +4,7 @@
  */
 
 .layout-sort-panel {
-    --panel-expanded-max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    /* --panel-expanded-max-width comes from the shared .ui-right-rail-panel class */
     --panel-expanded-max-height: 240px;
     padding: 0;
     display: flex;
@@ -27,9 +27,15 @@
 .layout-sort-controls {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--panel-space-12);
+    gap: var(--panel-space-6) var(--panel-space-12);
     padding: var(--panel-space-6) var(--panel-space-12);
+    /* Pinned to the fully-expanded width rather than the collapse animation's current width, so
+       the wrap breakpoints are decided once against the end state - not recomputed every frame
+       as the panel grows, which reflowed rows mid-transition. The collapse/expand reveal still
+       animates via the ancestor's max-width + overflow:hidden clip. */
+    width: var(--panel-expanded-max-width);
 }
 
 .layout-sort-control-group {
