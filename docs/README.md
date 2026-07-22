@@ -5,13 +5,16 @@ This directory is structured specifically as a knowledge base and entrypoint for
 ## Current status
 **Act 2: Ready for Friends** — see [`acts/act2-ready-for-friends.md`](acts/act2-ready-for-friends.md).
 
-Active in-flight thread: **library population alternatives** — manual import (bookmarklet/file)
-now converges onto the same unified `Library` shape as the online path (both halves built and
-live-verified 2026-07-11; see [`plans/library-source-convergence-plan.md`](plans/library-source-convergence-plan.md)),
-closing out the ownership-traffic-avoidance work from
-[`archive/manual-library-export-feasibility.md`](archive/manual-library-export-feasibility.md).
-Next up: the desktop app's local Steam-files reading path (see
-[`features/desktop-app.md`](features/desktop-app.md)).
+Active in-flight thread: **post-merge cleanup after the desktop local data pipeline** (PR 141,
+merged 2026-07-21 — desktop reads local Steam files instead of only the online API; see
+[`features/desktop-app.md`](features/desktop-app.md)). `SteamIntegration`'s startup flow was
+rewritten as a single-source waterfall (persisted cache → local disk → online fetch → demo,
+exactly one branch per launch, no automatic background re-fetch), and its three loading strategies
+were split into standalone modules (`docs/tech-debt.md#id-steam-integration-loading-strategy-split`).
+Next up: `autoLoadProfile` isn't wired to that waterfall yet
+(`docs/tech-debt.md#id-autoloadprofile-not-wired-to-startup-waterfall`, high priority), and the
+desktop offline-first plan's Round 1.5 (`LocalSteamLibraryLoader` blocking first render on a full
+network gap-fill) is still open — see the "Also In Act 2" list in the act doc above.
 
 ## Where to start
 1. Read the current act doc above — goals, feature list, completion criteria.
@@ -42,8 +45,8 @@ import { ... }
 
 ### 🎭 acts/
 **The primary planning layer.** Each act is a development phase with named goals, gated feature sets, and completion criteria.
-- `act1-intermission-technical-stewardship.md` — current phase: debt paydown, metrics, UI normalization
-- `act2-ready-for-friends.md` — next phase: hosting, infrastructure, VR
+- `act1-intermission-technical-stewardship.md` — completed: debt paydown, metrics, UI normalization
+- `act2-ready-for-friends.md` — current phase: hosting, infrastructure, VR
 - `act3-ready-for-everyone.md` — public release: compliance, scaling
 - `act4-encore-someday-maybe.md` — unscheduled ideas and stretch goals
 
