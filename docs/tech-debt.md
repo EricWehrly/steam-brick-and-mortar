@@ -111,41 +111,7 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 
 ## id: steam-integration-loading-strategy-split
-**Status**: Resolved 2026-07-22
-**Context**: `SteamIntegration` was the single hinge point for every way a library can get loaded
-(online profile, anonymous demo, manual import) and remained the sole owner of
-`storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation - correct per
-[[user-games-cache-entanglement]] and "Survey before you extend" (see `.github/lessons-learned.md`),
-since that shared substrate genuinely is one class's responsibility. But the three loading
-strategies (`handleLoadLibrary`, `loadDemoGames`, `handleImportLibrary`) were still interleaved in
-the same file as that substrate, `handleGameStart`'s auto-load branching, and cache-clear handling.
-This entry's own trigger fired as predicted: `SteamIntegration.ts` crossed 500 lines while being
-actively edited during the desktop-local-data-pipeline work (PR 141), which is what prompted this
-extraction.
-
-**Resolution**: extracted `OnlineLibraryLoader`, `DemoLibraryLoader`, and `ImportLibraryHandler`
-(`client/src/steam-integration/`) as plain exported functions taking a `deps` object, each
-independently unit-tested - matching the shape of the sibling `LocalSteamLibraryLoader.loadLocalSteamLibrary()`
-already in the codebase, rather than as classes. (A first pass built these as instantiated,
-constructor-injected classes; a design review raised three points - no shared interface across the
-three, no need for instance state, and overlap with `ManualLibraryImportGateway` - and the plain-function
-form above is the result.) `applyLibrary` turned out to no longer belong to any one strategy - by the
-time of this extraction it had become the single render path shared by cache-restore, local-scan,
-*and* import (via the Library convergence work), so it stayed on `SteamIntegration` as genuine
-substrate alongside `storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation, rather
-than moving with `ImportLibraryHandler` as the entry originally assumed. Each strategy calls into
-that substrate via callbacks passed in its `deps` object (`onLoaded`, `emitGamesInBatches`,
-`applyLibrary`, etc.) rather than reaching for it directly - satisfies "substrate has one clear
-owner the strategies call into, not the other way around" without the strategies depending on
-`SteamIntegration` itself. `SteamIntegration.ts` dropped from ~510 lines to ~365.
-
-**Related files**:
-- `client/src/steam-integration/SteamIntegration.ts`
-- `client/src/steam-integration/OnlineLibraryLoader.ts`
-- `client/src/steam-integration/DemoLibraryLoader.ts`
-- `client/src/steam-integration/ImportLibraryHandler.ts`
-- `client/src/steam-integration/LibraryStore.ts`
-- `client/src/steam-integration/ManualLibraryImportGateway.ts`
+**Status**: ✅ Resolved 2026-07-22 — split into `OnlineLibraryLoader`/`DemoLibraryLoader`/`ImportLibraryHandler` (plain functions, not classes, matching `LocalSteamLibraryLoader`'s shape); `applyLibrary` stayed on `SteamIntegration` as shared substrate. `SteamIntegration.ts` dropped ~510 → ~365 lines.
 
 ## id: autoloadprofile-not-wired-to-startup-waterfall
 **Priority**: High
@@ -491,6 +457,15 @@ path itself is unchanged (still correct when capacity actually needs to grow) - 
 the misleading log level. Closed permanently (not just quieted) if/when
 [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) removes the full-reset
 dispose path entirely.
+
+**Update 2026-07-22**: the "every desktop launch instead of a rare edge case" frequency claim above
+is stale. Fork A (the background refresh that had lost its `local-scan` exclusion) is gone
+entirely now, replaced by `SteamIntegration`'s single-source startup waterfall - there's no
+automatic re-fetch to trigger the full-dispose path on a normal relaunch anymore. It's reachable
+only for a genuine capacity-incompatible transition (e.g. demo → real library, or an online fetch
+landing on top of an existing library), back to being the rare case it was originally scoped for.
+The `disposed`-flag log-level fix above is still correct and still worth having regardless. Manual
+relaunch verification (last "Done when" box) remains open.
 
 **Related files**:
 - `client/src/scene/spawning/GameBoxSpawner.ts`
