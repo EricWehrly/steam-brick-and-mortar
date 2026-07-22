@@ -155,7 +155,7 @@ export class GameArtworkRequest implements GameArtwork {
         // First-time resolution only (getPixelsAtSize can re-enter per LOD size), so a session's
         // resolved count is directly comparable against the failed count and placement totals.
         if (!alreadyResolved) {
-            GameArtworkRequest.logger.info(
+            GameArtworkRequest.logger.debug(
                 `Artwork resolved for appId ${this.appId} (${this.gameName}): route=${route}; url=${url}`
             )
         }
