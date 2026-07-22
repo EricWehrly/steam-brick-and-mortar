@@ -48,11 +48,13 @@ export interface ImportedGame {
  * future format mismatch shows up as "this came from X" instead of a mystery.
  *
  * `local-scan` is a fourth, slightly different case: not an untrusted user-initiated import at
- * all, but the desktop app's own repeated (every-launch) read of the local Steam install (see
- * docs/plans/desktop-local-data-pipeline-plan.md). It's grouped here rather than given a
- * separate LibraryChannel/event pair because it produces the exact same trusted
- * ImportedGame[]-shaped payload and goes through the exact same applyLibrary()/persistLibrary()
- * path - a discriminating value on an existing type, not a new mechanism for the same job.
+ * all, but the desktop app's own read of the local Steam install (see
+ * docs/plans/desktop-local-data-pipeline-plan.md) - one branch of SteamIntegration.handleGameStart's
+ * startup waterfall (cache -> local disk -> online -> demo), not a run-every-launch background
+ * check. It's grouped here rather than given a separate LibraryChannel/event pair because it
+ * produces the exact same trusted LibraryGame[]-shaped payload and goes through the exact same
+ * applyLibrary()/persistLibrary() path - a discriminating value on an existing type, not a new
+ * mechanism for the same job.
  */
 export type ImportChannel = 'bookmarklet' | 'file' | 'local-scan'
 

@@ -32,6 +32,7 @@ export class LodTextureArrayManager {
     private tiers: Map<string, TierState> = new Map()
     private nextSlotIndex: number = 0
     private atlasFullLogged: boolean = false
+    private disposed: boolean = false
     
     constructor(config: LodTextureArrayManagerConfig) {
         this.initializeTextureArrays(config.tiers)
@@ -107,7 +108,16 @@ export class LodTextureArrayManager {
         pixelData: Uint8ClampedArray,
         expectedWidth?: number,
         expectedHeight?: number
-    ): boolean {        
+    ): boolean {
+        if (this.disposed) {
+            // Expected: an in-flight prefetch (fetch + decode) can resolve after a full
+            // dispose+rebuild started elsewhere - see docs/tech-debt.md#id-lod-tier-reset-race-condition.
+            // The old orchestrator is unreferenced and nothing corrupts; this would otherwise log
+            // as a misleading "Unknown tier" error for a disposed instance, not an actually-unknown one.
+            LodTextureArrayManager.logger.debug(`Ignoring setSlotPixels(${tierName}) after dispose`)
+            return false
+        }
+
         const tier = this.tiers.get(tierName)
         if (!tier) {
             LodTextureArrayManager.logger.error(`Unknown tier: ${tierName}`)
@@ -216,13 +226,14 @@ export class LodTextureArrayManager {
     
     public dispose(): void {
         const dataManager = DataManager.getInstance()
-        
+
         for (const [name, tier] of this.tiers) {
             tier.array.dispose()
             dataManager.removeMemoryConsumption(`LOD/${name}`)
         }
-        
+
         this.tiers.clear()
+        this.disposed = true
         LodTextureArrayManager.logger.lifecycle('Disposed')
     }
 }

@@ -56,11 +56,7 @@ vi.mock('../../../src/steam/SteamApiClient', () => ({
     },
 }))
 
-import { EventManager } from '../../../src/core/EventManager'
-import { SteamEventTypes } from '../../../src/types/InteractionEvents'
-import type { SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
-import { loadLocalSteamLibrary, buildImportedGames } from '../../../src/steam/LocalSteamLibraryLoader'
-import { persistLibrary } from '../../../src/steam-integration/LibraryStore'
+import { loadLocalSteamLibrary, buildLibraryGames } from '../../../src/steam/LocalSteamLibraryLoader'
 import type { AppDetailsData } from '../../../src/steam/batch/BatchAppDetailsClient'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
@@ -80,11 +76,9 @@ describe('LocalSteamLibraryLoader', () => {
         getManyMock.mockReset().mockResolvedValue(new Map())
         findMissingMock.mockReset().mockResolvedValue([])
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
-        EventManager.getInstance().removeAllListeners()
-        localStorage.clear()
     })
 
-    describe('buildImportedGames', () => {
+    describe('buildLibraryGames', () => {
         it('joins the candidate set against resolved entries, defaulting playtime for collection-only appids', () => {
             const candidateAppids = new Set([620, 240])
             const playtimesByAppid = new Map([[620, { appid: 620, last_played: 1000, playtime_minutes: 60 }]])
@@ -93,29 +87,30 @@ describe('LocalSteamLibraryLoader', () => {
                 [240, makeEntry('Counter-Strike: Source')],
             ])
 
-            const games = buildImportedGames(candidateAppids, playtimesByAppid, entries)
+            const games = buildLibraryGames(candidateAppids, playtimesByAppid, entries)
 
             expect(games).toEqual([
-                { appid: 620, name: 'Portal 2', playtime_forever: 60, rtime_last_played: 1000 },
-                { appid: 240, name: 'Counter-Strike: Source', playtime_forever: 0, rtime_last_played: undefined },
+                { appid: 620, name: 'Portal 2', playtimeForever: 60, lastPlayed: 1000 },
+                { appid: 240, name: 'Counter-Strike: Source', playtimeForever: 0, lastPlayed: undefined },
             ])
         })
 
         it('drops candidate appids with no resolved entry', () => {
-            const games = buildImportedGames(new Set([999]), new Map(), new Map())
+            const games = buildLibraryGames(new Set([999]), new Map(), new Map())
             expect(games).toEqual([])
         })
     })
 
     describe('loadLocalSteamLibrary', () => {
-        it('no-ops on the web build without calling invoke', async () => {
+        it('returns a null library on the web build without calling invoke', async () => {
             isTauriMock.mockReturnValue(false)
-            await loadLocalSteamLibrary()
+            const result = await loadLocalSteamLibrary()
+            expect(result.library).toBeNull()
             expect(invokeMock).not.toHaveBeenCalled()
             expect(writeLocalAppMetadataMock).not.toHaveBeenCalled()
         })
 
-        it('no-ops when neither playtime nor collections yield any candidate appid', async () => {
+        it('returns a null library (with steamId if known) when neither playtime nor collections yield any candidate appid', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string) => {
                 if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
@@ -124,13 +119,11 @@ describe('LocalSteamLibraryLoader', () => {
                 throw new Error(`unexpected command ${command}`)
             })
 
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
+            const result = await loadLocalSteamLibrary()
 
             expect(writeLocalAppMetadataMock).not.toHaveBeenCalled()
-            expect(handler).not.toHaveBeenCalled()
+            expect(result.library).toBeNull()
+            expect(result.steamId).toBe('1')
         })
 
         it('includes a collection-only appid (no playtime) once network-resolved', async () => {
@@ -153,10 +146,7 @@ describe('LocalSteamLibraryLoader', () => {
                 [400, makeEntry('Portal')],
             ]))
 
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
+            const result = await loadLocalSteamLibrary()
 
             expect(findMissingMock).toHaveBeenCalledWith(expect.arrayContaining([620, 400]))
             expect(fetchAndCacheAppDetailsMock).toHaveBeenCalledWith([400])
@@ -169,11 +159,12 @@ describe('LocalSteamLibraryLoader', () => {
                 new Map([[620, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]], [400, [{ id: 'from-tag-Ze Done', name: 'Ze Done' }]]])
             )
 
-            expect(handler).toHaveBeenCalledTimes(1)
-            const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
-            const gamesByAppid = new Map(event.detail.games.map(g => [g.appid, g]))
-            expect(gamesByAppid.get(620)).toMatchObject({ name: 'Portal 2', playtime_forever: 60 })
-            expect(gamesByAppid.get(400)).toMatchObject({ name: 'Portal', playtime_forever: 0 })
+            expect(result.library).not.toBeNull()
+            const gamesByAppid = new Map(result.library!.games.map(g => [g.appid, g]))
+            expect(gamesByAppid.get(620)).toMatchObject({ name: 'Portal 2', playtimeForever: 60 })
+            expect(gamesByAppid.get(400)).toMatchObject({ name: 'Portal', playtimeForever: 0 })
+            expect(result.library!.provenance.channel).toBe('local-scan')
+            expect(result.library!.owner).toEqual({ steamId: '1', displayName: 'CoolGamer' })
         })
 
         it('skips the network fetch entirely when nothing is missing from AppDetailsCache', async () => {
@@ -210,17 +201,13 @@ describe('LocalSteamLibraryLoader', () => {
             fetchAndCacheAppDetailsMock.mockRejectedValue(new Error('Lambda unreachable'))
             getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
 
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, handler)
+            const result = await loadLocalSteamLibrary()
 
-            await loadLocalSteamLibrary()
-
-            expect(handler).toHaveBeenCalledTimes(1)
-            const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
-            expect(event.detail.games.map(g => g.appid)).toEqual([620])
+            expect(result.library).not.toBeNull()
+            expect(result.library!.games.map(g => g.appid)).toEqual([620])
         })
 
-        it('proceeds without identity when read_steam_identity fails, omitting displayName/steamId', async () => {
+        it('omits displayName/steamId when read_steam_identity fails', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string) => {
                 if (command === 'read_steam_identity') return Promise.reject(new Error('no identity'))
@@ -232,69 +219,14 @@ describe('LocalSteamLibraryLoader', () => {
             })
             getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
 
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, handler)
+            const result = await loadLocalSteamLibrary()
 
-            await loadLocalSteamLibrary()
-
-            expect(handler).toHaveBeenCalledTimes(1)
-            const event = handler.mock.calls[0][0] as CustomEvent<SteamImportLibraryEvent>
-            expect(event.detail.displayName).toBeUndefined()
-            expect(event.detail.steamId).toBeUndefined()
+            expect(result.library).not.toBeNull()
+            expect(result.library!.owner.displayName).toBeUndefined()
+            expect(result.library!.owner.steamId).toBeUndefined()
         })
 
-        it('skips emitting ImportLibrary when the scan reproduces the persisted local-scan library', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-            persistLibrary({
-                owner: { steamId: '1', displayName: 'A' },
-                games: [{ appid: 620, name: 'Portal 2', playtimeForever: 999 }],
-                provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
-            })
-
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
-
-            expect(handler).not.toHaveBeenCalled()
-        })
-
-        it('still emits ImportLibrary when the scan differs from the persisted library', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-            persistLibrary({
-                owner: { steamId: '1', displayName: 'A' },
-                games: [{ appid: 999, name: 'Some Other Game', playtimeForever: 0 }],
-                provenance: { channel: 'local-scan', capturedAt: '2026-01-01T00:00:00Z' },
-            })
-
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
-
-            await loadLocalSteamLibrary()
-
-            expect(handler).toHaveBeenCalledTimes(1)
-        })
-
-
-        it('does not emit when no candidate appid ends up with a resolved entry', async () => {
+        it('returns a null library when no candidate appid ends up with a resolved entry', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string) => {
                 if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
@@ -306,12 +238,10 @@ describe('LocalSteamLibraryLoader', () => {
             })
             getManyMock.mockResolvedValue(new Map())
 
-            const handler = vi.fn()
-            EventManager.getInstance().registerEventHandler(SteamEventTypes.ImportLibrary, handler)
+            const result = await loadLocalSteamLibrary()
 
-            await loadLocalSteamLibrary()
-
-            expect(handler).not.toHaveBeenCalled()
+            expect(result.library).toBeNull()
+            expect(result.steamId).toBe('1')
         })
     })
 })

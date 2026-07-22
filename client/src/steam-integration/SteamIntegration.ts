@@ -14,7 +14,7 @@ import { deriveArtworkFromAppId } from '../steam/utils/ArtworkUrls'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
-import type { Library, LibraryGame } from './Library'
+import type { Library, LibraryDiff, LibraryGame } from './Library'
 import { computeLibraryDiff } from './Library'
 import { persistLibrary, loadPersistedLibrary, clearPersistedLibrary } from './LibraryStore'
 import { ManualLibraryImportGateway } from './ManualLibraryImportGateway'
@@ -35,7 +35,7 @@ import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import '../scene/batch/BatchCoordinator'
-import '../steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary } from '../steam/LocalSteamLibraryLoader'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
 
@@ -147,19 +147,19 @@ export class SteamIntegration {
         return trimmed && !trimmed.toLowerCase().startsWith('steamid:') ? trimmed : undefined
     }
 
-    private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
+    private async loadGamesForUser(userInput: string, ignoreCache = false, background = false): Promise<GameLibraryState> {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
-        
+
         SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${ignoreCache ? ', ignoring cache' : ''})`);
 
         const { steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, ignoreCache)
 
-        // A bare steamId input (e.g. Fork A's background refresh, which only ever knows the
-        // steamId - see applyLibrary) resolves to the "steamid:<id>" placeholder here, not a real
+        // A bare steamId input (e.g. a future delayed network-freshness pass, which would only
+        // ever know the steamId) resolves to the "steamid:<id>" placeholder here, not a real
         // vanity URL/display name. Preferring whatever's already rendered for this same steamId
         // (a real persona name from local-scan, a resolved vanity from an earlier online load)
-        // over that placeholder keeps a background refresh from silently blanking a display name
-        // that was already known good.
+        // over that placeholder keeps such a background refresh from silently blanking a display
+        // name that was already known good.
         const currentUserData = this.gameLibrary.getState().userData
         const preservedVanityUrl = currentUserData?.steamid === steamId ? currentUserData.vanity_url : undefined
 
@@ -167,10 +167,9 @@ export class SteamIntegration {
         userGames.steamid = steamId
         userGames.vanity_url = userGames.vanity_url ?? preservedVanityUrl ?? vanityUrl
 
-        // Diffed against whatever's currently rendered, same as applyLibrary's own reconcile
-        // step - so a same-or-similar library (e.g. Fork A's background refresh confirming what
-        // local-scan already rendered) patches instead of forcing a blanket teardown just because
-        // the incoming size wasn't known yet.
+        // Diffed against whatever's currently rendered, same as applyLibrary's own reconcile step
+        // - so a same-or-similar library patches instead of forcing a blanket teardown just
+        // because the incoming size wasn't known yet.
         const currentGames = currentUserData?.games
         if (currentGames?.length) {
             const diff = computeLibraryDiff(userGames.games, currentGames)
@@ -183,8 +182,14 @@ export class SteamIntegration {
 
         this.gameLibrary.setUserData(userGames)
 
+        // background is unused today (no automatic re-fetch fires anymore - see handleGameStart)
+        // but reserved for a future explicitly-delayed network-freshness pass, which should always
+        // want the complete, authoritative library. AppSettings' maxGames dev-mode cap (20, vs.
+        // 9999 in production) exists for fast manual iteration on the "type a profile in the UI"
+        // path, not a completeness pass meant to replace an already-rendered snapshot with the
+        // full truth. Omitting it lets GamesLoader's own uncapped default apply.
         await this.steamClient.loadGamesProgressively(userGames, {
-            maxGames: AppSettings.get('maxGames'),
+            ...(background ? {} : { maxGames: AppSettings.get('maxGames') }),
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
         })
         
@@ -245,18 +250,37 @@ export class SteamIntegration {
         }
     }
 
+    /**
+     * Startup waterfall - exactly one source is chosen, no other source runs alongside it.
+     * Priority order: cache (any channel's persisted Library) -> local disk (desktop only) ->
+     * online fetch (only reachable if local disk resolved an identity but no games) -> demo.
+     * A deliberate, explicitly-delayed background network-freshness pass is separate, future
+     * work - not an automatic follow-up to whichever of these renders.
+     */
     private async handleGameStart(): Promise<void> {
-        const library = loadPersistedLibrary()
-
-        if (library) {
-            SteamIntegration.logger.info(
-                `Auto-load: persisted library (${library.provenance.channel}, ${library.games.length} games)`
-            )
-            await this.applyLibrary(library)
+        const cached = loadPersistedLibrary()
+        if (cached) {
+            SteamIntegration.logger.info(`Loading library from source: cache (${cached.provenance.channel}, ${cached.games.length} games)`)
+            await this.applyLibrary(cached)
             return
         }
 
-        SteamIntegration.logger.info('No persisted library - loading anonymous store')
+        const scan = await loadLocalSteamLibrary()
+        if (scan.library) {
+            SteamIntegration.logger.info(`Loading library from source: local-scan (${scan.library.games.length} games)`)
+            if (await this.applyLibrary(scan.library)) {
+                persistLibrary(scan.library)
+            }
+            return
+        }
+
+        if (scan.steamId) {
+            SteamIntegration.logger.info(`Loading library from source: online (steamId ${scan.steamId})`)
+            await this.loadOnlineLibrary(scan.steamId)
+            return
+        }
+
+        SteamIntegration.logger.info('Loading library from source: demo')
         await this.loadDemoGames()
     }
 
@@ -330,16 +354,9 @@ export class SteamIntegration {
      * freshly-captured import and a persisted Library restored on startup, regardless of
      * channel (Library's whole point — see docs/plans/library-source-convergence-plan.md).
      *
-     * Fork A: if the library has a steamId, a background re-fetch is kicked off (gated by
-     * autoLoadProfile) to replace this snapshot with live data once it lands - for every channel
-     * alike, including 'local-scan'. This used to be excluded for local-scan specifically,
-     * because handleLoadLibrary's own pre-fetch reset was an unconditional full teardown (no
-     * diff, since the incoming size wasn't known yet) - firing it on every desktop launch tore
-     * down a scene that had just finished rendering from local data. The actual fix wasn't a
-     * channel exclusion: loadGamesForUser now diffs the freshly-fetched ownership list against
-     * whatever's currently rendered (same computeLibraryDiff this method uses below) before
-     * resetting, so a same-or-similar library reconciles instead of a blanket teardown - true for
-     * any channel's background refresh, not just local-scan's.
+     * No automatic background re-fetch after this - handleGameStart picks exactly one source at
+     * startup (cache → local disk → online → demo) and stops. A deliberate, explicitly-delayed
+     * network freshness pass is separate, future work - not an automatic follow-up to every render.
      *
      * Returns whether the render succeeded, so callers only persist a library they could
      * actually show.
@@ -387,13 +404,6 @@ export class SteamIntegration {
             this.storeSteamDataAndEmitEvent(library.owner.displayName ?? 'imported-library')
             await this.emitGamesInBatches(enrichedGames)
 
-            if (library.owner.steamId && AppSettings.get('autoLoadProfile')) {
-                SteamIntegration.logger.info(`Background re-fetch for steamId ${library.owner.steamId}`)
-                this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
-                    userInput: library.owner.steamId
-                })
-            }
-
             return true
         } catch (error) {
             SteamIntegration.logger.error('Failed to apply library:', error)
@@ -425,17 +435,9 @@ export class SteamIntegration {
         await emitter.flush()
     }
 
+    /** Thin event wrapper - see loadOnlineLibrary for the actual work. */
     private async handleLoadLibrary(event: CustomEvent<SteamLoadLibraryEvent>): Promise<void> {
-        // TD: caching-staleness-heuristic
-        // 1. Determine if we should force an update based on staleness of cached data
-        // 2. Or, if this is a manual "Refresh Cache Now" request from the UI panel (to be built)
-        // 3. Determine the userInput (either passed from event, or use this.steamId if reloading)
-
-        // TD: background-refresh-and-update
-        // After we load the cached data, we need a mechanism to fetch updated game data 
-        // in the background and gracefully inject any new games into the scene.
-
-        const { userInput, forceUpdate } = event.detail
+        const { userInput, forceUpdate, background } = event.detail
         const targetInput = userInput || this.steamId
 
         if (!targetInput) {
@@ -443,15 +445,32 @@ export class SteamIntegration {
             return
         }
 
+        await this.loadOnlineLibrary(targetInput, forceUpdate, background)
+    }
+
+    /**
+     * Resolves and renders a library from Steam's online API - called both by handleLoadLibrary
+     * (UI panel actions, cache-clear-panel) and directly by handleGameStart's startup waterfall
+     * (the "do I have a steamId to fetch content from web" branch), which needs the result
+     * without a fire-and-forget event round-trip.
+     *
+     * TD: caching-staleness-heuristic
+     * 1. Determine if we should force an update based on staleness of cached data
+     * 2. Or, if this is a manual "Refresh Cache Now" request from the UI panel (to be built)
+     * 3. Determine the userInput (either passed from event, or use this.steamId if reloading)
+     *
+     * TD: background-refresh-and-update
+     * After we load the cached data, we need a mechanism to fetch updated game data
+     * in the background and gracefully inject any new games into the scene.
+     */
+    private async loadOnlineLibrary(userInput: string, forceUpdate?: boolean, background?: boolean): Promise<void> {
         try {
             // loadGamesForUser emits its own diff-based LibraryReloadRequest once the ownership
             // list is fetched, before this reassigns this.gameLibrary's user data.
-            await this.loadGamesForUser(targetInput, forceUpdate)
-            this.storeSteamDataAndEmitEvent(targetInput)
+            await this.loadGamesForUser(userInput, forceUpdate, background)
+            this.storeSteamDataAndEmitEvent(userInput)
 
-            // Snapshot for a fast render on the next reload (applyLibrary) — Fork A's
-            // background re-fetch (gated on this same steamId + autoLoadProfile) is what keeps
-            // it fresh from there, so this doesn't need to be re-persisted more eagerly.
+            // Snapshot for a fast render on the next reload (applyLibrary).
             const userData = this.gameLibrary.getState().userData
             if (userData?.steamid) {
                 persistLibrary({

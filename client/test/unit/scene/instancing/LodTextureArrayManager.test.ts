@@ -220,6 +220,18 @@ describe('LodTextureArrayManager', () => {
             expect(success).toBe(false)
         })
 
+        it('should log a late post-dispose write at debug, not error - an in-flight prefetch racing a full reset, not an unknown-tier bug', () => {
+            manager = new LodTextureArrayManager(defaultConfig)
+            manager.dispose()
+
+            const errorSpy = vi.spyOn(LodTextureArrayManager.logger, 'error')
+            const pixels = new Uint8ClampedArray(150 * 225 * 4)
+            const success = manager.setSlotPixels('mid', 0, pixels)
+
+            expect(success).toBe(false)
+            expect(errorSpy).not.toHaveBeenCalled()
+        })
+
         it('should mark slot as pending update', () => {
             const config: LodTextureArrayManagerConfig = {
                 tiers: [{ name: 'test', width: 2, height: 2, maxDepth: 4 }]
