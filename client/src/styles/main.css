@@ -34,7 +34,7 @@
     --ui-stack-gap: 12px;
     --ui-wing-rail: 110px;
     --ui-left-rail: var(--ui-wing-rail);
-    --ui-right-rail: clamp(240px, 24vw, 360px);
+    --ui-right-rail: clamp(240px, 24vw, 480px);
     --ui-right-reserved: var(--ui-wing-rail);
     --ui-center-max-width: calc(
         100vw

@@ -64,7 +64,7 @@ export class LightingControlsPanel {
     private createPanel(): HTMLElement {
         const panel = document.createElement('div')
         panel.id = 'lighting-controls-panel'
-        panel.className = 'ui-panel lighting-controls-panel horizontally-collapsible horizontally-collapsed'
+        panel.className = 'ui-panel ui-right-rail-panel lighting-controls-panel horizontally-collapsible horizontally-collapsed'
         panel.innerHTML = renderTemplate(lightingControlsPanelTemplate, {
             debugIndicatorEnabled: this.debugIndicatorEnabled,
             exposureValue: this.appSettings.getSetting('toneMappingExposure').toFixed(2)

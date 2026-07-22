@@ -1,12 +1,11 @@
 .lighting-controls-panel {
-    --panel-expanded-max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    /* --panel-expanded-max-width comes from the shared .ui-right-rail-panel class */
     --panel-expanded-max-height: min(80dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
     position: relative;
     top: auto;
     right: auto;
     transform: none;
-    width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
-    /* Increased from 55dvh — give the panel more room to expand vertically */
+    width: var(--panel-expanded-max-width);
     max-height: min(80dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
     min-height: auto;
     flex: 0 0 auto;

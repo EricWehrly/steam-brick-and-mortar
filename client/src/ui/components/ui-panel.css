@@ -62,6 +62,12 @@
     user-select: none;
 }
 
+/* Shared expanded-width cap for panels docked in the right-hand rail (layout/sort, lighting) -
+   keeps them from growing past the rail reserved for the wing controls next to them. */
+.ui-right-rail-panel {
+    --panel-expanded-max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+}
+
 /**
  * Horizontal collapse variant: collapses the panel to a narrow sidebar, hiding label content
  * Useful for toggleable side panels and similar UI elements
