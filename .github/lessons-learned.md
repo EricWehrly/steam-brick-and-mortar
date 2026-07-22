@@ -4,6 +4,62 @@ Captured insights from development that should inform future work.
 
 ---
 
+## Recognize Serial Patching and Surface the Structural Option, Don't Just Take the Next Small Step
+
+**Date**: 2026-07-16
+**Context**: Desktop startup was racing three independent triggers on `GameEventTypes.Start`
+(persisted-library restore, local-scan, and "Fork A" — an automatic background online re-fetch
+that fired after *any* successful render). A single real-desktop playtest surfaced a chain of
+runtime bugs — dropped collection data, a shelf-wipe race, a dev-only game-count cap silently
+truncating a "complete" background fetch, and finally local-scan's own successful, more-complete
+result getting silently overwritten by Fork A's own follow-up fetch, which happened to know about
+fewer games. See `docs/plans/desktop-startup-load-ordering-plan.md` and
+`docs/tech-debt.md#id-lod-tier-reset-race-condition` for the fuller technical trail.
+**Scope**: Any codebase where a session-long debugging chain produces more than one attempted fix
+for what's arguably the same underlying defect — not specific to this project.
+
+### Issue
+
+Fork A's local-scan interaction was patched three separate times in one session before landing on
+the actual fix: first by excluding local-scan from Fork A outright, then by replacing that
+exclusion with a smarter diff-based reset (solving a narrower "blind teardown" symptom while
+leaving the trigger itself intact), then by *reinstating* the original exclusion as a third patch
+once the diff-based version turned out to let a worse online result overwrite local-scan's better
+one. Each of these was individually reasonable and each was proposed as the next small, low-risk
+step — but the pattern (three attempts at the same seam, each fixing a symptom the previous one
+exposed) was itself the signal that the trigger's existence, not its precise condition, was the
+actual defect. The eventual fix wasn't a fourth condition tweak — it was removing Fork A entirely
+and replacing the whole startup sequence with an explicit single-source waterfall.
+
+This wasn't a case of failing to consider the bigger fix. The project's own planning instructions
+(get sign-off before big structural changes, prefer the smaller reversible step) were being
+followed correctly in isolation at each step. The failure was narrower: **the structural
+alternative was never explicitly named and offered as a choice** once the second patch to the same
+seam landed — the small-step default kept winning by never being weighed against anything. The
+user, not the assistant, is supposed to make the altitude call between "ship-safe minimal patch"
+and "root fix" — but that call can't be made if only the minimal option is ever put on the table.
+
+### Solution
+
+Treat a *second* fix to the same underlying seam within one session as a trigger, not just another
+task: before writing the second patch, stop and name the structural alternative explicitly — what
+it would cost, what it would remove, and why the current patch is fixing a symptom rather than the
+cause — then ask which altitude the user wants. This is compatible with (not a violation of) a
+"prefer small changes, get sign-off on big ones" default: the point isn't to unilaterally take the
+bigger swing, it's to make sure the bigger swing is actually *offered* as a choice instead of
+staying invisible because the smaller one technically also "worked." A PR intended to merge clean
+is a different bar than "the immediate symptom stopped reproducing," and that difference needs to
+be surfaced explicitly, not assumed away by defaulting to the smaller step every time.
+
+Concrete trigger to watch for: the same file/event/seam getting a second substantive change in one
+session that addresses a variant of the same problem the first change was already meant to solve.
+That's the moment to pause and ask "is there a structural fix here I haven't named yet?" rather
+than writing patch number three.
+
+### Reference
+
+See global `planning.md` → "Repeated-patch trigger" (added directly in response to this).
+
 ## Survey Existing Implementations Before Adding a New One
 
 **Date**: 2026-07-10
