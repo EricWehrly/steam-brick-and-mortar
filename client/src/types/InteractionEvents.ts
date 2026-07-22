@@ -32,14 +32,6 @@ export interface SteamLoadLibraryEvent extends BaseInteractionEvent {
     userInput?: string
     /** If true, ignore local db and re-fetch from network */
     forceUpdate?: boolean
-    /**
-     * True for Fork A's own silent background refresh (see SteamIntegration.applyLibrary) - whose
-     * whole purpose is getting the complete, authoritative library, not a fast interactive dev
-     * preview. Bypasses AppSettings.maxGames' dev-mode cap (20, vs. 9999 in production), which
-     * exists for fast manual iteration on the "type a profile in the UI" path, not for a
-     * completeness pass that's meant to replace an already-rendered snapshot with the full truth.
-     */
-    background?: boolean
 }
 
 export interface SteamCacheStatsEvent extends BaseInteractionEvent {
