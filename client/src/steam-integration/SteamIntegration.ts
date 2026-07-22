@@ -7,17 +7,19 @@
  * - Steam data transformation
  * - Cache management
  */
-// TD: steam-integration-loading-strategy-split
 
 import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
 import { deriveArtworkFromAppId } from '../steam/utils/ArtworkUrls'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
-import type { Library, LibraryDiff, LibraryGame } from './Library'
+import type { Library } from './Library'
 import { computeLibraryDiff } from './Library'
 import { persistLibrary, loadPersistedLibrary, clearPersistedLibrary } from './LibraryStore'
 import { ManualLibraryImportGateway } from './ManualLibraryImportGateway'
+import { loadOnlineLibrary, resolveDisplayName, type OnlineLibraryLoaderDeps } from './OnlineLibraryLoader'
+import { loadDemoLibrary } from './DemoLibraryLoader'
+import { handleImportLibrary } from './ImportLibraryHandler'
 import { BatchEmitter } from '../steam/BatchEmitter'
 import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
 import type { SteamGameData } from '../scene'
@@ -31,9 +33,7 @@ import type {
     SteamImportLibraryEvent,
 } from '../types/InteractionEvents'
 import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
-import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
-import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import '../scene/batch/BatchCoordinator'
 import { loadLocalSteamLibrary } from '../steam/LocalSteamLibraryLoader'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
@@ -103,7 +103,7 @@ export class SteamIntegration {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         this.steamId = gameLibraryState.userData?.steamid
-        const displayName = SteamIntegration.resolveDisplayName(gameLibraryState.userData?.vanity_url)
+        const displayName = resolveDisplayName(gameLibraryState.userData?.vanity_url)
 
         SteamIntegration.logger.debug(`Storing ${games.length} games in DataManager`)
 
@@ -138,75 +138,6 @@ export class SteamIntegration {
     /** Returns true when no user identity has been established (anonymous/demo browse). */
     public isAnonymous(): boolean {
         return !DataManager.getInstance().get<string>('steam.userInput')
-    }
-
-    /** A real vanity name, never the internal "steamid:<id>" placeholder used when there's
-     *  no vanity — that placeholder should never surface as a display name. */
-    private static resolveDisplayName(vanityUrl: string | undefined): string | undefined {
-        const trimmed = vanityUrl?.trim()
-        return trimmed && !trimmed.toLowerCase().startsWith('steamid:') ? trimmed : undefined
-    }
-
-    private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
-        const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
-
-        SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${ignoreCache ? ', ignoring cache' : ''})`);
-
-        const { steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, ignoreCache)
-
-        // A bare steamId input (e.g. the startup waterfall's online-fetch branch, which only
-        // knows the steamId) resolves to the "steamid:<id>" placeholder here, not a real vanity
-        // URL/display name. Preferring whatever's already rendered for this same steamId (a real
-        // persona name from local-scan, a resolved vanity from an earlier online load) over that
-        // placeholder keeps this from silently blanking a display name that was already known good.
-        const currentUserData = this.gameLibrary.getState().userData
-        const preservedVanityUrl = currentUserData?.steamid === steamId ? currentUserData.vanity_url : undefined
-
-        const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
-        userGames.steamid = steamId
-        userGames.vanity_url = userGames.vanity_url ?? preservedVanityUrl ?? vanityUrl
-
-        // Diffed against whatever's currently rendered, same as applyLibrary's own reconcile step
-        // - so a same-or-similar library patches instead of forcing a blanket teardown just
-        // because the incoming size wasn't known yet.
-        const currentGames = currentUserData?.games
-        if (currentGames?.length) {
-            const diff = computeLibraryDiff(userGames.games, currentGames)
-            this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
-                incomingGameCount: userGames.games.length,
-                removedGameNames: [...diff.removedGames.map(g => g.name), ...diff.renamedGames.map(g => g.oldName)]
-            })
-            SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
-        }
-
-        this.gameLibrary.setUserData(userGames)
-
-        await this.steamClient.loadGamesProgressively(userGames, {
-            maxGames: AppSettings.get('maxGames'),
-            sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
-        })
-
-        SteamIntegration.logger.debug(`Progressive loading complete for ${userGames.game_count} games`)
-
-        return this.gameLibrary.getState()
-    }
-
-    private async getSteamIdAndVanityUrl(parsedInput: { type: "steamid" | "customurl"; value: string }, ignoreCache: boolean): Promise<{ steamId: string; vanityUrl: string }> {
-        let steamId: string
-        let vanityUrl: string
-        if (parsedInput.type === 'steamid') {
-            // Direct steamID - no resolution needed
-            steamId = parsedInput.value
-            vanityUrl = `steamid:${steamId}` // Use a placeholder since we don't know the actual custom URL
-        } else {
-            // Custom URL - resolve to get steamID
-            const resolveResponse = await this.steamClient.resolveVanityUrl(parsedInput.value, ignoreCache)
-            steamId = resolveResponse.steamid
-            vanityUrl = resolveResponse.vanity_url
-        }
-
-        // Validate we have a steamID before proceeding
-        return { steamId, vanityUrl }
     }
 
     private getGameLibraryState(): GameLibraryState {
@@ -269,7 +200,7 @@ export class SteamIntegration {
 
         if (scan.steamId) {
             SteamIntegration.logger.info(`Loading library from source: online (steamId ${scan.steamId})`)
-            await this.loadOnlineLibrary(scan.steamId)
+            await loadOnlineLibrary(scan.steamId, undefined, this.onlineLoaderDeps())
             return
         }
 
@@ -277,68 +208,32 @@ export class SteamIntegration {
         await this.loadDemoGames()
     }
 
-    /**
-     * Load the anonymous store from whatever the release's baked appdetails cache actually
-     * contains (is_free === true, undesirable_for_demo unset - see
-     * GamesLoader.getDemoGames()) - no hand-maintained game list, no network calls, no
-     * separate runtime check for artwork quality. Awaits the baked-cache seed so a cold cache
-     * still gets the full set. See docs/plans/f2p-artwork-bake-plan.md.
-     */
-    private async loadDemoGames(): Promise<void> {
-        try {
-            const games = await this.steamClient.getDemoGames()
-
-            const demoUser: SteamUser = {
-                steamid: '',
-                vanity_url: '',
-                game_count: games.length,
-                retrieved_at: new Date().toISOString(),
-                games
-            }
-
-            // Register games in gameLibrary so they're available for storeSteamDataAndEmitEvent().
-            // vanity_url/steamid are empty strings (not undefined) so the UI can access them
-            // without crashes, but isAnonymous() returns true because steam.userInput is not set.
-            this.gameLibrary.setUserData(demoUser)
-
-            this.storeSteamDataAndEmitEvent(null)
-            await this.emitGamesInBatches(games)
-
-            SteamIntegration.logger.info(`Demo store loaded: ${games.length} games`)
-        } catch (error) {
-            SteamIntegration.logger.error('Failed to load demo games:', error)
+    /** Wires the substrate callbacks OnlineLibraryLoader renders through - see its own docs. */
+    private onlineLoaderDeps(): OnlineLibraryLoaderDeps {
+        return {
+            steamClient: this.steamClient,
+            gameLibrary: this.gameLibrary,
+            onLoaded: (userInput) => this.storeSteamDataAndEmitEvent(userInput),
+            onFailureFallback: () => this.loadDemoGames(),
+            isAnonymous: () => this.isAnonymous(),
         }
     }
 
-    /**
-     * Load a library captured offline (manual export bookmarklet, or a previously-saved
-     * export file) — no Steam API network calls, artwork derived from appid, name from the
-     * capture itself (AppDetailsCache can still upgrade it — see applyLibrary).
-     */
+    /** Thin wrapper - see DemoLibraryLoader for the actual work. */
+    private async loadDemoGames(): Promise<void> {
+        return loadDemoLibrary({
+            steamClient: this.steamClient,
+            gameLibrary: this.gameLibrary,
+            onLoaded: () => this.storeSteamDataAndEmitEvent(null),
+            emitGamesInBatches: (games) => this.emitGamesInBatches(games),
+        })
+    }
+
+    /** Thin wrapper - see ImportLibraryHandler for the actual work. */
     private async handleImportLibrary(event: CustomEvent<SteamImportLibraryEvent>): Promise<void> {
-        const { games, displayName, steamId, channel } = event.detail
-
-        if (!games.length) {
-            SteamIntegration.logger.warn('ImportLibrary had no games, ignoring')
-            return
-        }
-
-        const library: Library = {
-            owner: { steamId, displayName },
-            games: games.map((g): LibraryGame => ({
-                appid: g.appid,
-                name: g.name,
-                playtimeForever: g.playtime_forever,
-                lastPlayed: g.rtime_last_played,
-                playtimeDisconnected: g.playtime_disconnected
-            })),
-            provenance: { channel, capturedAt: new Date().toISOString() }
-        }
-
-        if (await this.applyLibrary(library)) {
-            persistLibrary(library)
-            SteamIntegration.logger.info(`Imported library loaded: ${library.games.length} games (${channel})`)
-        }
+        return handleImportLibrary(event, {
+            applyLibrary: (library) => this.applyLibrary(library),
+        })
     }
 
     /**
@@ -428,7 +323,12 @@ export class SteamIntegration {
         await emitter.flush()
     }
 
-    /** Thin event wrapper - see loadOnlineLibrary for the actual work. */
+    /**
+     * Thin event wrapper - see OnlineLibraryLoader for the actual work. Stays on SteamIntegration
+     * (rather than moving into OnlineLibraryLoader) because it needs this.steamId, the
+     * currently-known session identity, as a fallback for a reload with no explicit userInput
+     * (e.g. the cache-clear panel's "reload").
+     */
     private async handleLoadLibrary(event: CustomEvent<SteamLoadLibraryEvent>): Promise<void> {
         const { userInput, forceUpdate } = event.detail
         const targetInput = userInput || this.steamId
@@ -438,59 +338,7 @@ export class SteamIntegration {
             return
         }
 
-        await this.loadOnlineLibrary(targetInput, forceUpdate)
-    }
-
-    /**
-     * Resolves and renders a library from Steam's online API - called both by handleLoadLibrary
-     * (UI panel actions, cache-clear-panel) and directly by handleGameStart's startup waterfall
-     * (the "do I have a steamId to fetch content from web" branch), which needs the result
-     * without a fire-and-forget event round-trip.
-     *
-     * TD: caching-staleness-heuristic
-     * 1. Determine if we should force an update based on staleness of cached data
-     * 2. Or, if this is a manual "Refresh Cache Now" request from the UI panel (to be built)
-     * 3. Determine the userInput (either passed from event, or use this.steamId if reloading)
-     *
-     * TD: background-refresh-and-update
-     * After we load the cached data, we need a mechanism to fetch updated game data
-     * in the background and gracefully inject any new games into the scene.
-     */
-    private async loadOnlineLibrary(userInput: string, forceUpdate?: boolean): Promise<void> {
-        try {
-            // loadGamesForUser emits its own diff-based LibraryReloadRequest once the ownership
-            // list is fetched, before this reassigns this.gameLibrary's user data.
-            await this.loadGamesForUser(userInput, forceUpdate)
-            this.storeSteamDataAndEmitEvent(userInput)
-
-            // Snapshot for a fast render on the next reload (applyLibrary).
-            const userData = this.gameLibrary.getState().userData
-            if (userData?.steamid) {
-                persistLibrary({
-                    owner: {
-                        steamId: userData.steamid,
-                        displayName: SteamIntegration.resolveDisplayName(userData.vanity_url)
-                    },
-                    games: userData.games.map((g): LibraryGame => ({
-                        appid: g.appid,
-                        name: g.name,
-                        playtimeForever: g.playtime_forever,
-                        lastPlayed: g.rtime_last_played
-                    })),
-                    provenance: { channel: 'online', capturedAt: new Date().toISOString() }
-                })
-            }
-
-            SteamIntegration.logger.info(forceUpdate ? 'Library load (forced update) completed' : 'Library load completed')
-        } catch (error) {
-            SteamIntegration.logger.error('Library load failed:', error)
-            // Nothing loaded yet (a startup auto-load, not a user retrying over an existing
-            // session) — fall back to the demo store so DataLoaded still fires and the Steam
-            // UI panel becomes visible instead of staying hidden with no recovery path.
-            if (this.isAnonymous()) {
-                await this.loadDemoGames()
-            }
-        }
+        await loadOnlineLibrary(targetInput, forceUpdate, this.onlineLoaderDeps())
     }
 
     /**

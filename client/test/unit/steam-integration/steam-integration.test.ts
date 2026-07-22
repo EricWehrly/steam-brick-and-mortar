@@ -10,14 +10,20 @@ import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import { ValidationUtils } from '../../../src/utils'
 import { AppSettings } from '../../../src/core/AppSettings'
 
-// Mock the EventManager
+// Mock the EventManager - memoized so every caller (SteamIntegration, and now OnlineLibraryLoader/
+// DemoLibraryLoader, which each independently call EventManager.getInstance()) shares the same
+// fake instance, matching the real singleton's behavior.
+const { mockEventManagerInstance } = vi.hoisted(() => ({
+    mockEventManagerInstance: {
+        emit: vi.fn(),
+        registerEventHandler: vi.fn(),
+        deregisterEventHandler: vi.fn()
+    }
+}))
+
 vi.mock('../../../src/core/EventManager', () => ({
     EventManager: {
-        getInstance: vi.fn(() => ({
-            emit: vi.fn(),
-            registerEventHandler: vi.fn(),
-            deregisterEventHandler: vi.fn()
-        }))
+        getInstance: vi.fn(() => mockEventManagerInstance)
     },
     EventSource: {
         System: 'system'
@@ -260,17 +266,13 @@ describe('SteamIntegration Unit Tests', () => {
             const mockError = new Error('API Error')
             // @ts-expect-error - Accessing private member for testing
             steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockRejectedValue(mockError)
-            
-            // Watch for error logging
-            // @ts-expect-error - Accessing protected static member
-            const loggerSpy = vi.spyOn(SteamIntegration.logger, 'error').mockImplementation(() => {})
 
-            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+            // A rejected resolve/fetch is caught internally (by OnlineLibraryLoader, not
+            // SteamIntegration itself) and falls through to the demo-store fallback rather than
+            // throwing - this is the actual "doesn't crash" behavior the test title cares about.
+            await expect(steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
                 detail: { userInput: 'testuser', forceUpdate: false } as SteamLoadLibraryEvent
-            }))
-            
-            expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('Library load failed'), mockError)
-            loggerSpy.mockRestore()
+            }))).resolves.toBeUndefined()
         })
     })
 })

@@ -111,26 +111,41 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 
 ## id: steam-integration-loading-strategy-split
-**Priority**: Medium  
-**Effort**: ~1-2 days (extraction + tests, no behavior change intended)  
-**Context**: `SteamIntegration` is the single hinge point for every way a library can get loaded (online profile, anonymous demo, manual import) and remains the sole owner of `storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation - correct per [[user-games-cache-entanglement]] and "Survey before you extend" (see `.github/lessons-learned.md`), since that shared substrate genuinely is one class's responsibility. But the three loading strategies (`handleLoadLibrary`, `loadDemoGames`, `handleImportLibrary`/`applyImportedLibrary`) are still interleaved in the same file as that substrate, `handleGameStart`'s auto-load branching, and cache-clear handling. A partial extraction already split out `LibrarySourceStore` (pure persistence I/O) and `ManualLibraryImportGateway` (the bookmarklet wire protocol) during the manual-import feature work; this entry is for what's left.
+**Status**: Resolved 2026-07-22
+**Context**: `SteamIntegration` was the single hinge point for every way a library can get loaded
+(online profile, anonymous demo, manual import) and remained the sole owner of
+`storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation - correct per
+[[user-games-cache-entanglement]] and "Survey before you extend" (see `.github/lessons-learned.md`),
+since that shared substrate genuinely is one class's responsibility. But the three loading
+strategies (`handleLoadLibrary`, `loadDemoGames`, `handleImportLibrary`) were still interleaved in
+the same file as that substrate, `handleGameStart`'s auto-load branching, and cache-clear handling.
+This entry's own trigger fired as predicted: `SteamIntegration.ts` crossed 500 lines while being
+actively edited during the desktop-local-data-pipeline work (PR 141), which is what prompted this
+extraction.
 
-**Decision (for now)**:
-- Do not refactor further in the current pass - the three strategies are coupled tightly enough to the shared substrate (each ends by calling `storeSteamDataAndEmitEvent`/`emitGamesInBatches`) that splitting them out needs its own dedicated design pass, not a bolt-on.
-- Revisit when adding a fourth loading strategy, or when `SteamIntegration.ts` next crosses roughly 500 lines while being actively edited - at that point, re-run the actual test (enumerate member functions, list the domains they represent, find what's outside the class's current intended scope) rather than treating line count alone as the verdict. See `.github/lessons-learned.md` "Survey Existing Implementations Before Adding a New One."
-
-**Done when**:
-- Each loading strategy (online, demo, import) is extractable/testable independent of the other two
-- The shared substrate (data storage, batch emission, cache-clear handling) has one clear owner that the strategies call into, not the other way around
-- `SteamIntegration.ts`'s member-function list reads as one coherent domain (session/library orchestration), not three
+**Resolution**: extracted `OnlineLibraryLoader`, `DemoLibraryLoader`, and `ImportLibraryHandler`
+(`client/src/steam-integration/`) as plain exported functions taking a `deps` object, each
+independently unit-tested - matching the shape of the sibling `LocalSteamLibraryLoader.loadLocalSteamLibrary()`
+already in the codebase, rather than as classes. (A first pass built these as instantiated,
+constructor-injected classes; a design review raised three points - no shared interface across the
+three, no need for instance state, and overlap with `ManualLibraryImportGateway` - and the plain-function
+form above is the result.) `applyLibrary` turned out to no longer belong to any one strategy - by the
+time of this extraction it had become the single render path shared by cache-restore, local-scan,
+*and* import (via the Library convergence work), so it stayed on `SteamIntegration` as genuine
+substrate alongside `storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation, rather
+than moving with `ImportLibraryHandler` as the entry originally assumed. Each strategy calls into
+that substrate via callbacks passed in its `deps` object (`onLoaded`, `emitGamesInBatches`,
+`applyLibrary`, etc.) rather than reaching for it directly - satisfies "substrate has one clear
+owner the strategies call into, not the other way around" without the strategies depending on
+`SteamIntegration` itself. `SteamIntegration.ts` dropped from ~510 lines to ~365.
 
 **Related files**:
 - `client/src/steam-integration/SteamIntegration.ts`
-- `client/src/steam-integration/LibrarySourceStore.ts`
+- `client/src/steam-integration/OnlineLibraryLoader.ts`
+- `client/src/steam-integration/DemoLibraryLoader.ts`
+- `client/src/steam-integration/ImportLibraryHandler.ts`
+- `client/src/steam-integration/LibraryStore.ts`
 - `client/src/steam-integration/ManualLibraryImportGateway.ts`
-
-**Source tag**:
-- `// TD: steam-integration-loading-strategy-split` in `client/src/steam-integration/SteamIntegration.ts`
 
 ## id: appsettings-default-vs-override-persistence
 **Priority**: Medium  
