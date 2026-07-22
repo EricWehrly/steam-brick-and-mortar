@@ -147,6 +147,22 @@ owner the strategies call into, not the other way around" without the strategies
 - `client/src/steam-integration/LibraryStore.ts`
 - `client/src/steam-integration/ManualLibraryImportGateway.ts`
 
+## id: autoloadprofile-not-wired-to-startup-waterfall
+**Priority**: High
+**Effort**: ~2-4 hours (small in isolation, but touches the same seam as [[steam-integration-loading-strategy-split]] - re-run the survey step before editing, don't just drop a check in)
+**Context**: `autoLoadProfile` is a real, user-facing `AppSettings` toggle ("Auto-load last used Steam profile" in `GameSettingsPanel`/`game-settings-panel.html`) that persists correctly and defaults to `true`, but nothing in `SteamIntegration`'s startup waterfall (`handleGameStart`) reads it. The waterfall (persisted cache → local disk scan → online fetch → demo) runs unconditionally regardless of the toggle's value - so turning it off currently does nothing.
+
+**Decision (for now)**: track it, don't fix inline. Surfaced during Act 2 post-merge cleanup (the same session that resolved [[steam-integration-loading-strategy-split]]) as a known gap rather than something to patch on top of that already-reworked seam in the same pass.
+
+**Done when**:
+- `handleGameStart` honors `autoLoadProfile === false` by skipping straight past the cache/local-disk/online branches (falling through to demo, or an explicit idle/"choose a profile" state - product call, not yet made) instead of always auto-loading
+- A manual "load my profile" action (existing `LoadLibrary` event path) still works when auto-load is off
+
+**Related files**:
+- `client/src/steam-integration/SteamIntegration.ts`
+- `client/src/core/AppSettings.ts`
+- `client/src/ui/pause/panels/GameSettingsPanel.ts`
+
 ## id: appsettings-default-vs-override-persistence
 **Priority**: Medium  
 **Effort**: ~1-2 hours  

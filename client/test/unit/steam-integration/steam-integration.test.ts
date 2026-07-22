@@ -5,10 +5,13 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
-import type { SteamLoadLibraryEvent } from '../../../src/types/InteractionEvents'
+import type { SteamLoadLibraryEvent, SteamCacheClearEvent } from '../../../src/types/InteractionEvents'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import { ValidationUtils } from '../../../src/utils'
 import { AppSettings } from '../../../src/core/AppSettings'
+import { EventSource } from '../../../src/core/EventManager'
+import { DataManager, DataDomain } from '../../../src/core/data'
+import { persistLibrary, loadPersistedLibrary } from '../../../src/steam-integration/LibraryStore'
 
 // Mock the EventManager - memoized so every caller (SteamIntegration, and now OnlineLibraryLoader/
 // DemoLibraryLoader, which each independently call EventManager.getInstance()) shares the same
@@ -71,10 +74,43 @@ describe('SteamIntegration Unit Tests', () => {
     })
 
     describe('Cache Management', () => {
-        test('should trigger cache clear', () => {
-            // Method is private/removed or event-driven now
-            // Just verifying the test suite passes structurally
-            expect(true).toBe(true) 
+        beforeEach(() => {
+            DataManager.getInstance().clear()
+            localStorage.clear()
+        })
+
+        function emitCacheClear(scope: 'all' | 'identity'): void {
+            steamIntegration['handleClearCache'](new CustomEvent(SteamEventTypes.CacheClear, {
+                detail: { scope, source: EventSource.System } as SteamCacheClearEvent
+            }))
+        }
+
+        test("scope 'all' clears the in-memory game library, the userInput marker, and the persisted library", () => {
+            DataManager.getInstance().set('steam.userInput', 'testuser', { domain: DataDomain.SteamIntegration })
+            steamIntegration['gameLibrary'].setUserData({
+                steamid: '76561198000000000', vanity_url: 'x', game_count: 0, games: [], retrieved_at: '2026-01-01T00:00:00Z'
+            })
+            persistLibrary({ owner: { steamId: '76561198000000000' }, games: [{ appid: 1, name: 'Game 1', playtimeForever: 0 }], provenance: { channel: 'online', capturedAt: '2026-01-01T00:00:00Z' } })
+
+            emitCacheClear('all')
+
+            expect(steamIntegration['gameLibrary'].getState().userData).toBeNull()
+            expect(DataManager.getInstance().get('steam.userInput')).toBeUndefined()
+            expect(loadPersistedLibrary()).toBeNull()
+        })
+
+        test("scope 'identity' clears the userInput marker and persisted library but leaves the in-memory game library alone, since a reload always follows", () => {
+            DataManager.getInstance().set('steam.userInput', 'testuser', { domain: DataDomain.SteamIntegration })
+            steamIntegration['gameLibrary'].setUserData({
+                steamid: '76561198000000000', vanity_url: 'x', game_count: 0, games: [], retrieved_at: '2026-01-01T00:00:00Z'
+            })
+            persistLibrary({ owner: { steamId: '76561198000000000' }, games: [{ appid: 1, name: 'Game 1', playtimeForever: 0 }], provenance: { channel: 'online', capturedAt: '2026-01-01T00:00:00Z' } })
+
+            emitCacheClear('identity')
+
+            expect(steamIntegration['gameLibrary'].getState().userData).not.toBeNull()
+            expect(DataManager.getInstance().get('steam.userInput')).toBeUndefined()
+            expect(loadPersistedLibrary()).toBeNull()
         })
 
         test('should initialize without errors', () => {
