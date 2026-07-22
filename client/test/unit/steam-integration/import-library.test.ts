@@ -497,36 +497,18 @@ describe('SteamIntegration manual library import', () => {
         })
     })
 
-    describe('Fork A background re-fetch', () => {
-        // local-scan used to be excluded here (a channel special-case) - it isn't anymore. The
-        // real problem that exclusion worked around was handleLoadLibrary's pre-fetch reset being
-        // an unconditional full teardown; that's now a diff against live state instead (see
-        // loadGamesForUser and steam-integration.test.ts's reconcile-vs-teardown coverage), so
-        // every channel with a steamId gets the same background refresh treatment.
-        it.each(['local-scan', 'bookmarklet', 'file'] as const)(
-            'auto-refreshes for the %s channel when a steamId is present',
-            async (channel) => {
-                const integration = SteamIntegration.getInstance()
-                const eventManager = EventManager.getInstance()
-                const loadLibraryHandler = vi.fn()
-                eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
+    // Fork A (automatic background re-fetch after any render) is gone - handleGameStart's
+    // startup waterfall picks exactly one source and stops; a deliberate, explicitly-delayed
+    // network-freshness pass is separate, future work, not an automatic follow-up to a render.
+    it('applyLibrary no longer triggers any automatic background re-fetch, for any channel', async () => {
+        const integration = SteamIntegration.getInstance()
+        const eventManager = EventManager.getInstance()
+        const loadLibraryHandler = vi.fn()
+        eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
 
-                await importLibrary(integration, SAMPLE_GAMES, 'Test Account', '76561198000000000', channel)
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', '76561198000000000', 'bookmarklet')
 
-                expect(loadLibraryHandler).toHaveBeenCalledOnce()
-            }
-        )
-
-        it('never auto-refreshes any channel when there is no steamId at all', async () => {
-            const integration = SteamIntegration.getInstance()
-            const eventManager = EventManager.getInstance()
-            const loadLibraryHandler = vi.fn()
-            eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
-
-            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'file')
-
-            expect(loadLibraryHandler).not.toHaveBeenCalled()
-        })
+        expect(loadLibraryHandler).not.toHaveBeenCalled()
     })
 })
 

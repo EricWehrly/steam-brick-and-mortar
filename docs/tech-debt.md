@@ -446,12 +446,18 @@ remaining caller turned out to be redundant):
 - [ ] Manually verified against a real relaunch-with-persisted-library on the desktop app (no
   `Unknown tier: mid` errors, no stale artwork bleed between libraries) — open
 
-**Residual risk, not re-opening this item**: the same `Unknown tier: mid` symptom is still latently
+**Residual risk, quieted 2026-07-16**: the same `Unknown tier: mid` symptom is still latently
 reachable through the surviving **full** reset path (capacity growth, e.g. demo → real library) —
 in-flight prefetches from the outgoing library can resolve after `dispose()` clears the tier map.
-Harmless-but-noisy (old orchestrator is unreferenced, nothing corrupts), and it usually settles
-before the ~3.5s scan completes on first launch, which is why it hasn't been observed. Recorded as
-`docs/plans/startup-reload-review-findings.md` F5. Closed permanently (not just avoided) if/when
+"Usually settles before the ~3.5s scan completes on first launch" stopped holding once
+`SteamIntegration`'s Fork A background refresh lost its `local-scan` exclusion (see the diff-based
+Fork A reset work the same day) - that full-dispose path became reachable on every desktop launch
+instead of a rare edge case, and the noisy `ERROR Unknown tier: mid` log came back at volume.
+`LodTextureArrayManager` now tracks its own `disposed` flag, set in `dispose()`; `setSlotPixels()`
+checks it first and logs at `debug` instead of `error` for a post-dispose write, since this was
+never really an "unknown tier" - it's an expected disposed-instance race. The full-reset dispose
+path itself is unchanged (still correct when capacity actually needs to grow) - this only fixes
+the misleading log level. Closed permanently (not just quieted) if/when
 [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) removes the full-reset
 dispose path entirely.
 

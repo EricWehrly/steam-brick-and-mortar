@@ -8,6 +8,7 @@ import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../..
 import type { SteamLoadLibraryEvent } from '../../../src/types/InteractionEvents'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import { ValidationUtils } from '../../../src/utils'
+import { AppSettings } from '../../../src/core/AppSettings'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -226,6 +227,63 @@ describe('SteamIntegration Unit Tests', () => {
 
             const state = steamIntegration['getGameLibraryState']()
             expect(state.userData?.vanity_url).toBe('realvanityname')
+        })
+
+        test('a background refresh (Fork A) omits the maxGames cap even when dev mode sets it low', async () => {
+            AppSettings.getInstance().setSetting('maxGames', 20)
+            try {
+                const mockUserGames = {
+                    steamid: '76561198000000000', vanity_url: 'testuser', game_count: 25,
+                    games: Array.from({ length: 25 }, (_, i) => ({
+                        appid: i + 1, name: `Game ${i + 1}`, playtime_forever: 0,
+                        img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: '', library: '' },
+                    })),
+                    retrieved_at: '2023-01-01T00:00:00Z'
+                }
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockResolvedValue({ steamid: '76561198000000000', vanity_url: 'testuser', resolved_at: '2023-01-01T00:00:00Z' })
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
+                const loadGamesProgressivelyMock = vi.fn().mockResolvedValue([])
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.loadGamesProgressively = loadGamesProgressivelyMock
+
+                await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                    detail: { userInput: 'testuser', background: true } as SteamLoadLibraryEvent
+                }))
+
+                expect(loadGamesProgressivelyMock).toHaveBeenCalledOnce()
+                const options = loadGamesProgressivelyMock.mock.calls[0][1]
+                expect(options.maxGames).toBeUndefined()
+            } finally {
+                AppSettings.dispose()
+            }
+        })
+
+        test('a non-background refresh still respects the maxGames cap (the interactive "type a profile" dev-iteration path)', async () => {
+            AppSettings.getInstance().setSetting('maxGames', 20)
+            try {
+                const mockUserGames = {
+                    steamid: '76561198000000000', vanity_url: 'testuser', game_count: 25, games: [], retrieved_at: '2023-01-01T00:00:00Z'
+                }
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockResolvedValue({ steamid: '76561198000000000', vanity_url: 'testuser', resolved_at: '2023-01-01T00:00:00Z' })
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
+                const loadGamesProgressivelyMock = vi.fn().mockResolvedValue([])
+                // @ts-expect-error - Accessing private member for testing
+                steamIntegration.steamClient.loadGamesProgressively = loadGamesProgressivelyMock
+
+                await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                    detail: { userInput: 'testuser' } as SteamLoadLibraryEvent
+                }))
+
+                expect(loadGamesProgressivelyMock).toHaveBeenCalledOnce()
+                const options = loadGamesProgressivelyMock.mock.calls[0][1]
+                expect(options.maxGames).toBe(20)
+            } finally {
+                AppSettings.dispose()
+            }
         })
 
         test('should gracefully surface errors during loading without crashing', async () => {

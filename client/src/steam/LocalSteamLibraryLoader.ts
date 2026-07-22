@@ -1,11 +1,9 @@
 /**
- * Builds a renderable library from local Steam data (identity + playtime + collections, joined
- * against LocalSteamDataWriter's resolved names/taxonomy) and drives it through the existing
- * SteamIntegration import pipeline - SteamEventTypes.ImportLibrary -> handleImportLibrary ->
- * applyLibrary() - the same BatchEmitter-streamed, persistLibrary()-backed path bookmarklet/file
- * imports already use. See docs/plans/desktop-local-data-pipeline-plan.md tasks 7/8: this is the
- * "startup pipeline" work, deliberately reusing existing infrastructure rather than building a
- * parallel one (ImportChannel gained a 'local-scan' variant for this - see Library.ts).
+ * Builds a renderable Library from local Steam data (identity + playtime + collections, joined
+ * against LocalSteamDataWriter's resolved names/taxonomy). Returns it directly rather than
+ * emitting an event - called as one deliberate branch of SteamIntegration's startup waterfall
+ * (cache -> local disk -> online -> demo, exactly one branch taken - see handleGameStart), not a
+ * parallel/independent trigger. See docs/plans/desktop-local-data-pipeline-plan.md tasks 7/8.
  *
  * The sole owner of triggering LocalSteamDataWriter's write. No-ops entirely on the web build
  * (isTauri() is false there).
@@ -18,20 +16,14 @@
  * gap-fill - not the "assume the Lambda might vanish" startup path, an explicit best-effort
  * extra for appids the local install alone can't name. A fetch failure here just means those
  * appids stay unresolved this run, not a broken startup.
- *
- * Self-registers on GameEventTypes.Start, imported for its side effect from SteamIntegration.ts.
  */
 
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { EventManager } from '../core/EventManager'
-import { GameEventTypes, SteamEventTypes, type SteamImportLibraryEvent } from '../types/InteractionEvents'
-import type { ImportedGame } from '../steam-integration/Library'
-import { computeLibraryDiff, isDiffEmpty } from '../steam-integration/Library'
+import type { Library, LibraryGame } from '../steam-integration/Library'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import { LocalSteamDataWriter } from './LocalSteamDataWriter'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import { SteamApiClient } from './SteamApiClient'
-import { loadPersistedLibrary } from '../steam-integration/LibraryStore'
 import { Logger } from '../utils/Logger'
 
 interface SteamIdentity {
@@ -49,11 +41,22 @@ interface LocalAppPlaytime {
 
 const logger = Logger.createLogFunctions('LocalSteamLibraryLoader')
 
-export async function loadLocalSteamLibrary(): Promise<void> {
+export interface LocalScanResult {
+    readonly library: Library | null
+    /**
+     * Present even when `library` is null - e.g. a valid local identity read but zero locally
+     * resolvable games (a sparse/new install). Lets the caller fall through to an online fetch
+     * using this same identity instead of going straight to the demo store.
+     */
+    readonly steamId?: string
+}
+
+/** library is null when this isn't the desktop app, or when nothing local resolved to a renderable game. */
+export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
     // isTauri() here means "can this process read the local Steam install's files" - true for
     // the desktop app, false for the web build, where none of the invoke() calls below exist.
     if (!isTauri()) {
-        return
+        return { library: null }
     }
 
     let identity: SteamIdentity | undefined
@@ -67,7 +70,7 @@ export async function loadLocalSteamLibrary(): Promise<void> {
     const collectionsByAppid = await LocalSteamDataWriter.readCollectionsByAppid()
     const candidateAppids = new Set<number>([...playtimes.map(playtime => playtime.appid), ...collectionsByAppid.keys()])
     if (candidateAppids.size === 0) {
-        return
+        return { library: null, steamId: identity?.steamid64 }
     }
 
     await LocalSteamDataWriter.writeLocalAppMetadata()
@@ -77,34 +80,19 @@ export async function loadLocalSteamLibrary(): Promise<void> {
 
     const resolvedEntries = await AppDetailsCache.getMany([...candidateAppids])
     const playtimesByAppid = new Map(playtimes.map(playtime => [playtime.appid, playtime]))
-    const games = buildImportedGames(candidateAppids, playtimesByAppid, resolvedEntries)
+    const games = buildLibraryGames(candidateAppids, playtimesByAppid, resolvedEntries)
     if (games.length === 0) {
         logger.debug('Local scan found candidate appids but none resolved to a name - nothing to render')
-        return
+        return { library: null, steamId: identity?.steamid64 }
     }
 
-    // handleGameStart() already rendered the persisted snapshot from last launch (fast path,
-    // runs before this async scan finishes). If this scan reproduces that same library, emitting
-    // ImportLibrary here would tear it down and rebuild an equivalent one for no reason - see
-    // docs/plans/desktop-offline-first-plan.md "Definitive root cause (sixth pass)" for the
-    // second-load artwork loss this caused. Only compared against a persisted library that came
-    // from this same channel - a bookmarklet/file/online snapshot was never this scan's own
-    // output, so there's nothing meaningful to compare against.
-    const persisted = loadPersistedLibrary()
-    if (persisted?.provenance.channel === 'local-scan' && isDiffEmpty(computeLibraryDiff(games, persisted.games))) {
-        logger.info(`Local scan: library unchanged from persisted snapshot (${games.length} games) - skipping re-render`)
-        return
+    return {
+        library: {
+            owner: { steamId: identity?.steamid64, displayName: identity?.persona_name?.trim() || undefined },
+            games,
+            provenance: { channel: 'local-scan', capturedAt: new Date().toISOString() },
+        },
     }
-
-    const displayName = identity?.persona_name?.trim() || undefined
-    EventManager.getInstance().emit<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, {
-        games,
-        displayName,
-        steamId: identity?.steamid64,
-        channel: 'local-scan',
-    })
-
-    logger.info(`Local scan: emitting ImportLibrary with ${games.length} games`)
 }
 
 /**
@@ -132,12 +120,12 @@ async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<nu
  * each appid (local or network-resolved) - an appid still missing an entry after both resolution
  * attempts has nothing renderable to show.
  */
-export function buildImportedGames(
+export function buildLibraryGames(
     candidateAppids: ReadonlySet<number>,
     playtimesByAppid: ReadonlyMap<number, LocalAppPlaytime>,
     entries: ReadonlyMap<number, AppDetailsData>
-): ImportedGame[] {
-    const games: ImportedGame[] = []
+): LibraryGame[] {
+    const games: LibraryGame[] = []
     for (const appid of candidateAppids) {
         const entry = entries.get(appid)
         if (!entry) {
@@ -147,15 +135,9 @@ export function buildImportedGames(
         games.push({
             appid,
             name: entry.name,
-            playtime_forever: playtime?.playtime_minutes ?? 0,
-            rtime_last_played: playtime?.last_played ?? undefined,
+            playtimeForever: playtime?.playtime_minutes ?? 0,
+            lastPlayed: playtime?.last_played ?? undefined,
         })
     }
     return games
 }
-
-export function initializeLocalSteamLibraryLoaderOnStart(): void {
-    void loadLocalSteamLibrary()
-}
-
-EventManager.getInstance().registerEventHandler(GameEventTypes.Start, initializeLocalSteamLibraryLoaderOnStart)

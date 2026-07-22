@@ -48,6 +48,14 @@ export class GamesLoader {
         const { maxGames = 9999, sortFn } = options
         const BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
 
+        if (steamUser.games.length > maxGames) {
+            this.logger.warn(
+                `Truncating ${steamUser.games.length} owned games down to maxGames=${maxGames} - ` +
+                `AppSettings.maxGames defaults to 20 in dev mode. Not appropriate for a background ` +
+                `completeness refresh that's meant to replace an already-rendered snapshot.`
+            )
+        }
+
         const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
         const appids = sortedGames.map(g => g.appid)
 
