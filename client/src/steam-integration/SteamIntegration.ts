@@ -147,19 +147,18 @@ export class SteamIntegration {
         return trimmed && !trimmed.toLowerCase().startsWith('steamid:') ? trimmed : undefined
     }
 
-    private async loadGamesForUser(userInput: string, ignoreCache = false, background = false): Promise<GameLibraryState> {
+    private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
 
         SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${ignoreCache ? ', ignoring cache' : ''})`);
 
         const { steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, ignoreCache)
 
-        // A bare steamId input (e.g. a future delayed network-freshness pass, which would only
-        // ever know the steamId) resolves to the "steamid:<id>" placeholder here, not a real
-        // vanity URL/display name. Preferring whatever's already rendered for this same steamId
-        // (a real persona name from local-scan, a resolved vanity from an earlier online load)
-        // over that placeholder keeps such a background refresh from silently blanking a display
-        // name that was already known good.
+        // A bare steamId input (e.g. the startup waterfall's online-fetch branch, which only
+        // knows the steamId) resolves to the "steamid:<id>" placeholder here, not a real vanity
+        // URL/display name. Preferring whatever's already rendered for this same steamId (a real
+        // persona name from local-scan, a resolved vanity from an earlier online load) over that
+        // placeholder keeps this from silently blanking a display name that was already known good.
         const currentUserData = this.gameLibrary.getState().userData
         const preservedVanityUrl = currentUserData?.steamid === steamId ? currentUserData.vanity_url : undefined
 
@@ -182,17 +181,11 @@ export class SteamIntegration {
 
         this.gameLibrary.setUserData(userGames)
 
-        // background is unused today (no automatic re-fetch fires anymore - see handleGameStart)
-        // but reserved for a future explicitly-delayed network-freshness pass, which should always
-        // want the complete, authoritative library. AppSettings' maxGames dev-mode cap (20, vs.
-        // 9999 in production) exists for fast manual iteration on the "type a profile in the UI"
-        // path, not a completeness pass meant to replace an already-rendered snapshot with the
-        // full truth. Omitting it lets GamesLoader's own uncapped default apply.
         await this.steamClient.loadGamesProgressively(userGames, {
-            ...(background ? {} : { maxGames: AppSettings.get('maxGames') }),
+            maxGames: AppSettings.get('maxGames'),
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
         })
-        
+
         SteamIntegration.logger.debug(`Progressive loading complete for ${userGames.game_count} games`)
 
         return this.gameLibrary.getState()
@@ -437,7 +430,7 @@ export class SteamIntegration {
 
     /** Thin event wrapper - see loadOnlineLibrary for the actual work. */
     private async handleLoadLibrary(event: CustomEvent<SteamLoadLibraryEvent>): Promise<void> {
-        const { userInput, forceUpdate, background } = event.detail
+        const { userInput, forceUpdate } = event.detail
         const targetInput = userInput || this.steamId
 
         if (!targetInput) {
@@ -445,7 +438,7 @@ export class SteamIntegration {
             return
         }
 
-        await this.loadOnlineLibrary(targetInput, forceUpdate, background)
+        await this.loadOnlineLibrary(targetInput, forceUpdate)
     }
 
     /**
@@ -463,11 +456,11 @@ export class SteamIntegration {
      * After we load the cached data, we need a mechanism to fetch updated game data
      * in the background and gracefully inject any new games into the scene.
      */
-    private async loadOnlineLibrary(userInput: string, forceUpdate?: boolean, background?: boolean): Promise<void> {
+    private async loadOnlineLibrary(userInput: string, forceUpdate?: boolean): Promise<void> {
         try {
             // loadGamesForUser emits its own diff-based LibraryReloadRequest once the ownership
             // list is fetched, before this reassigns this.gameLibrary's user data.
-            await this.loadGamesForUser(userInput, forceUpdate, background)
+            await this.loadGamesForUser(userInput, forceUpdate)
             this.storeSteamDataAndEmitEvent(userInput)
 
             // Snapshot for a fast render on the next reload (applyLibrary).

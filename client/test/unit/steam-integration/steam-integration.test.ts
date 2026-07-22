@@ -172,10 +172,10 @@ describe('SteamIntegration Unit Tests', () => {
             expect(emitSpy).not.toHaveBeenCalledWith(StorePropsEventTypes.LibraryReloadRequest, expect.anything())
         })
 
-        test('diffs the freshly-fetched ownership list against what is currently rendered before resetting - a background refresh confirming the same library reconciles instead of forcing a blind teardown', async () => {
+        test('diffs the freshly-fetched ownership list against what is currently rendered before resetting - a reload confirming the same library reconciles instead of forcing a blind teardown', async () => {
             const existingGame = { appid: 440, name: 'Team Fortress 2', playtime_forever: 1000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: '', library: '' } }
-            // Simulate a library already rendered (e.g. local-scan's fast render) before Fork A's
-            // background refresh confirms the same games from the online API.
+            // Simulate a library already rendered (e.g. local-scan's fast render) before an online
+            // reload confirms the same games from the online API.
             steamIntegration['gameLibrary'].setUserData({
                 steamid: '76561198000000000', vanity_url: 'testuser', game_count: 1,
                 games: [existingGame], retrieved_at: '2023-01-01T00:00:00Z'
@@ -200,9 +200,9 @@ describe('SteamIntegration Unit Tests', () => {
             expect(reloadCall![1]).toEqual({ incomingGameCount: 1, removedGameNames: [] })
         })
 
-        test('a background refresh keyed by a bare steamId (Fork A) preserves the already-known display name instead of blanking it', async () => {
-            // Fork A only ever knows the steamId, not the display name (see applyLibrary) - a
-            // bare steamId resolves to a "steamid:<id>" placeholder vanity URL, not a real one.
+        test('a reload keyed by a bare steamId preserves the already-known display name instead of blanking it', async () => {
+            // A bare steamId (no vanity URL known) resolves to a "steamid:<id>" placeholder
+            // vanity URL, not a real one.
             vi.mocked(ValidationUtils.parseSteamUserInput).mockReturnValueOnce({ type: 'steamid', value: '76561198000000000' })
 
             // A real display name is already rendered - e.g. local-scan's persona name, or an
@@ -229,38 +229,7 @@ describe('SteamIntegration Unit Tests', () => {
             expect(state.userData?.vanity_url).toBe('realvanityname')
         })
 
-        test('a background refresh (Fork A) omits the maxGames cap even when dev mode sets it low', async () => {
-            AppSettings.getInstance().setSetting('maxGames', 20)
-            try {
-                const mockUserGames = {
-                    steamid: '76561198000000000', vanity_url: 'testuser', game_count: 25,
-                    games: Array.from({ length: 25 }, (_, i) => ({
-                        appid: i + 1, name: `Game ${i + 1}`, playtime_forever: 0,
-                        img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: '', library: '' },
-                    })),
-                    retrieved_at: '2023-01-01T00:00:00Z'
-                }
-                // @ts-expect-error - Accessing private member for testing
-                steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockResolvedValue({ steamid: '76561198000000000', vanity_url: 'testuser', resolved_at: '2023-01-01T00:00:00Z' })
-                // @ts-expect-error - Accessing private member for testing
-                steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
-                const loadGamesProgressivelyMock = vi.fn().mockResolvedValue([])
-                // @ts-expect-error - Accessing private member for testing
-                steamIntegration.steamClient.loadGamesProgressively = loadGamesProgressivelyMock
-
-                await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
-                    detail: { userInput: 'testuser', background: true } as SteamLoadLibraryEvent
-                }))
-
-                expect(loadGamesProgressivelyMock).toHaveBeenCalledOnce()
-                const options = loadGamesProgressivelyMock.mock.calls[0][1]
-                expect(options.maxGames).toBeUndefined()
-            } finally {
-                AppSettings.dispose()
-            }
-        })
-
-        test('a non-background refresh still respects the maxGames cap (the interactive "type a profile" dev-iteration path)', async () => {
+        test('respects the maxGames cap (the interactive "type a profile" dev-iteration path)', async () => {
             AppSettings.getInstance().setSetting('maxGames', 20)
             try {
                 const mockUserGames = {
