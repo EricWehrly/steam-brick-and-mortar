@@ -88,6 +88,13 @@ fixtures go**: named anchor zones (entrance, counter, concessions wall, aisle en
 no-overlap with shelves, per-room/per-layout rules, and liminal-band awareness (fixtures in projected
 rows must go cheap-shaded/shadow-off). Design this once; both clutter docs consume it.
 
+**Deferred (2026-07-23)**: no shared system is being designed yet — building placers per prop type
+first (mirroring `UserPropPlacer`'s existing self-contained shelf-cap placement) and revisiting
+sharing once two or more real ones exist to compare. See
+[Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md) for the code
+grounding and the revisit trigger. First concrete placer: [Wall Poster Placement
+Plan](../plans/wall-poster-placement-plan.md), for [Wall Art & Framed Posters](wall-art-framed-posters.md).
+
 ## Acceptance Criteria
 
 - A concessions zone (candy rack + drink cooler + popcorn) renders as fabricated geometry, no

@@ -233,6 +233,12 @@ user point us at *any* folder of glTF/GLB models (e.g. `Documents/store-props`);
 - [Room Variants](room-variants.md) / [Layout Variations](layout-variations.md) / [Liminal Mode](liminal-mode.md)
   — clutter placement must compose with room geometry, layout, and the liminal near/projected band
   (props in projected rows must go cheap-shaded / shadow-off too).
+- **Deferred (2026-07-23)**: no shared system is being designed yet — building placers per prop
+  type first (mirroring `UserPropPlacer`'s existing self-contained shelf-cap placement) and
+  revisiting sharing once two or more real ones exist to compare. See
+  [Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md) for the code
+  grounding and the revisit trigger. First concrete placer: [Wall Poster Placement
+  Plan](../plans/wall-poster-placement-plan.md), for [Wall Art & Framed Posters](wall-art-framed-posters.md).
 
 ## Proposed Spikes (cheap, concrete, testable)
 
