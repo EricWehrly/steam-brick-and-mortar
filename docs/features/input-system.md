@@ -1,52 +1,113 @@
 # Feature: Input System
 
 **Act**: 2 (Gate 1)
-**Status**: In Progress (InputManager exists handling keys/mouse/movement; IInputSource abstraction, gamepad support, and VR routing are the remaining work)
+**Status**: In Progress — **substantially more built than this doc previously described** (rewritten
+2026-07-22 from a direct code survey; see "Current state" below for the corrected picture)
 **Priority**: High
 
 ## Goal
 
-A unified input abstraction layer that cleanly supports mouse/keyboard today, adds gamepad support as the intermediate step (overlaps heavily with VR controller inputs), and then extends to VR controllers for Gate 2 — with remappable inputs as a stretch goal.
+A unified input abstraction layer that cleanly supports mouse/keyboard today, adds gamepad support
+as the intermediate step (overlaps heavily with VR controller inputs), and then extends to VR
+controllers for Gate 2 — with remappable inputs as a stretch goal.
 
-## Context
+## Current state (2026-07-22 code survey — read this before starting)
 
-The project currently has no centralized input abstraction. Mouse/keyboard controls are wired ad hoc, and typing in input fields triggers camera movement (active tech debt). The path through Act 2 is sequenced deliberately:
+The abstraction and gamepad support already exist. The real remaining work is narrower than
+"build gamepad support" — it's fixing a live focus/pause bug, finishing two half-wired camera
+controls, and the VR routing itself.
 
-1. **Mouse/keyboard + focus management** — fix the existing ad-hoc controls, add proper UI focus handling so typing doesn't move the camera
-2. **Gamepad support** — standard gamepad API; triggers, buttons, and axes map naturally onto both navigation and what VR controllers will need
-3. **VR controller input** — route WebXR controller events through the same abstraction as gamepad; this is the Gate 2 deliverable
-4. **Remappable inputs** — stretch goal; gives the input layer a clean shape to refactor toward and is probably achievable once the abstraction exists
+- **`InputManager`** (`client/src/input/InputManager.ts`) — composition-based coordinator, not a
+  monolith: wraps `InputStateTracker`, `InputEventAdapter`, `InputProfileService`,
+  `InputActionResolver`, `CameraInputApplier` (`:29-33`). Handles keyboard+mouse (WASD/arrows,
+  Space/C, mouse-drag look), sprint (Shift), and gamepad already. `startListening()`/
+  `stopListening()` exist (`:56-79`) and toggle document-level listeners.
+- **Binding abstraction already exists**, just not under the `IInputSource` name this doc used to
+  invent: `InputProfile.ts` defines an `InputBinding` union (keyboard-button, mouse-button,
+  mouse-axis, gamepad-button, gamepad-axis, touch-gesture, xr-component) and
+  `BUILTIN_INPUT_PROFILES` for `MouseKeyboard`, `GamepadStandard`, `Touch`, and `VR`
+  (`InputProfile.ts:146-245`). `InputActionResolver.ts` + `BindingResolver.ts` resolve any binding
+  type into a normalized action value. **Do not build a parallel `IInputSource`
+  class hierarchy** — extend this existing shape instead (per the project's "survey before you
+  extend" rule).
+- **Gamepad support is done, not planned**: `DeviceDetector.ts` polls `navigator.getGamepads()`
+  (`:71-101`) and listens for `gamepadconnected`/`gamepaddisconnected`; `InputActionResolver.ts:35-38`
+  also polls per frame. `InputProfile.ts:203-221` has stick/look/button bindings for a standard
+  gamepad. `ControlsPanel.ts` even has a live gamepad-capture remap UI already
+  (`pollGamepadCapture`, `:310`) — remappable inputs (the doc's "stretch goal") is partially built
+  for gamepad specifically.
+- **VR profile bindings are defined but not consumed** — `InputProfile.ts:233-244` has a `VR`
+  profile, but nothing routes actual WebXR controller events through `InputActionResolver` yet.
+  `WebXRCoordinator.ts:100` has an explicit guard comment: "we should ABSOLUTELY NOT update the
+  camera in VR this way (from keybinds rather than headset data)," and mouse-drag look is
+  deliberately disabled there (`:103`) — VR input routing is a real, not-yet-started Gate 2 task,
+  not a small wiring gap.
+- **`WebXRCoordinator`** (`client/src/webxr/WebXRCoordinator.ts`) owns more than XR session
+  lifecycle: it constructs `InputManager` itself (`:32,50-55`) and drives camera
+  movement/rotation every frame via `RenderLoopRegistry` (`:72,78-80,98-105`). It also exposes its
+  own `pauseInput()`/`resumeInput()` (`:110-119`) — this is the "wider input surface" a since-deleted
+  tech-debt entry used to reference (that entry no longer exists in `docs/tech-debt.md`; this doc's
+  old citation to it was dead — removed).
+
+### A live bug, not just missing polish
+
+`InputEventAdapter.ts:16-20` and `InputStateTracker.ts:40-48` attach keydown/keyup listeners at
+`document` level with **no focus/target check** — typing anywhere leaks into `keysPressed`. The
+only existing mitigation anywhere is `GameLibraryBinderUI.ts:421`'s `e.stopPropagation()` on one
+search input. Worse: `PauseMenuManager.pauseInput()`/`resumeInput()` (`PauseMenuManager.ts:309-321`)
+fire `callbacks.onPauseInput?.()`/`onResumeInput?.()`, but `SystemUICoordinator.ts:68` constructs
+`PauseMenuManager` with **empty callbacks** (`new PauseMenuManager({}, {}, ...)`) — so opening the
+pause menu today does **not** actually suspend camera movement, despite `WebXRCoordinator`'s
+internal `inputPaused` flag existing and looking like it should. This is the highest-priority item
+below, not a "nice to have someday."
+
+### Two dead/half-wired camera controls
+
+- `RollLeft`/`RollRight` actions are defined (`InputActions.ts:10-11,52-53`) and bound to Q/E
+  (`InputProfile.ts:191-196`), but `CameraInputApplier.ts` — the only place input gets applied to
+  the camera — never reads them (`:15-38` only applies translate X/Y/Z and yaw). The binding is
+  live but has zero effect.
+- `InputStateTracker.getProgressiveSpeed()` (acceleration ramp, `:59-72`) exists but has **zero
+  callers** anywhere in the codebase.
+- No camera-reset hotkey/action exists at all (confirmed via full-codebase search).
 
 ## Acceptance Criteria
 
 **Gate 1 (before sharing):**
 - All navigation and menu interaction accessible via keyboard/mouse without focus bleed into the scene
-- Gamepad controller navigation works for basic movement and game selection
+- Gamepad controller navigation works for basic movement and game selection — **already true**, verify with a test rather than building it
 - Input method detection and seamless switching between keyboard and gamepad
-- Camera roll toggle, movement acceleration, configurable speeds
+- Camera roll toggle, movement acceleration, configurable speeds — bindings/state exist, application doesn't; wire or remove
 
 **Gate 2 (Act 2 complete):**
-- VR controller input routed through the same abstraction layer as gamepad
+- VR controller input routed through the same abstraction layer as gamepad (via the already-defined `VR` `InputProfile`)
 - Raycast-based interaction for game boxes and UI via VR controller
 - All core interactions (navigate, select, open detail panel, open menu) work in headset
 
 **Stretch:**
-- Remappable inputs — user can reassign any action to any input; persisted in settings
+- Remappable inputs — user can reassign any action to any input; persisted in settings. Gamepad remap capture already exists in `ControlsPanel.ts`; extending to keyboard/mouse bindings is the remaining work, not starting from zero.
 
-## Stories / Tasks
+## Stories / Tasks (priority order)
 
-- **`InputManager`** — centralized input coordinator; `disableSceneControls()` / `enableSceneControls()`; input context stack so UI panels suppress scene controls
-- **Focus management** — `onFocus`/`onBlur` hooks for all UI panels (Binder, Steam UI, Pause Menu); WASD/mouse disabled when UI has focus
-- **Gamepad support** — standard Gamepad API polling; map axes/buttons to actions; support for navigation, selection, menu
-- **Input abstraction layer** — `IInputSource` interface; `KeyboardMouseInputSource`, `GamepadInputSource`, `XRControllerInputSource`; action mapping table
-- **VR controller routing** — WebXR controller events mapped through abstraction layer; depends on VR Support feature
-- **Camera/movement controls** — roll toggle (Q/E), configurable speed/acceleration, camera reset hotkey + menu button
-- **Keyboard accessibility** — Tab/Shift+Tab through all menus, Enter/Space activation, Escape to dismiss; number keys for tab switching
-- **Remappable inputs** (stretch) — remapping UI, persist to settings
+1. **Fix the pause-menu input-leak bug** — wire real `onPauseInput`/`onResumeInput` callbacks into `SystemUICoordinator.ts:68`'s `PauseMenuManager` construction so opening the pause menu actually calls `WebXRCoordinator.pauseInput()`/`resumeInput()`. This is a correctness bug with an already-built fix path (the methods exist, they're just never called), not new design.
+2. **Focus management** — add a real `onFocus`/`onBlur` (or equivalent) suppression path so `InputEventAdapter`/`InputStateTracker`'s document-level keydown/keyup listeners don't fire while a UI panel (Binder, Steam UI, Pause Menu, any text input) has focus. Generalize the one-off `stopPropagation()` pattern in `GameLibraryBinderUI.ts:421` into something every panel gets, rather than each panel re-solving it. A context *stack* (not `InputManager`'s current flat `isListeningToEvents` boolean) is needed if more than one suppressor can be active at once — check whether that's actually a real scenario before building a stack for a boolean's worth of need.
+3. **Wire or remove `RollLeft`/`RollRight`** — `CameraInputApplier.ts` needs to apply the already-bound Q/E roll actions, or the dead binding should be removed. Small either way; don't leave it half-wired.
+4. **Wire or remove `getProgressiveSpeed()`** — same call: either give `CameraInputApplier` a caller for the existing acceleration-ramp logic, or delete the dead code.
+5. **Camera reset hotkey** — doesn't exist yet; add an action + binding + `CameraInputApplier` handling.
+6. **Test the existing gamepad path** — acceptance criteria already claim this works; add coverage rather than (re)implementing it.
+7. **VR controller routing** (Gate 2) — route real WebXR controller events through `InputActionResolver` using the already-defined `VR` `InputProfile`; replace `WebXRCoordinator`'s keybind-driven camera update for XR sessions per its own guard comment. Depends on VR Support feature.
+8. **Remappable inputs** (stretch) — extend `ControlsPanel.ts`'s existing gamepad-capture remap UI to keyboard/mouse bindings; persist to settings.
 
 ## Notes / Open Questions
 
-- `WebXRCoordinator` currently owns a wider input/control surface than XR session concerns; tech debt entry exists to review and potentially split into a dedicated `InputManager` — that review is a prerequisite or parallel task here
-- The gamepad → VR controller progression means gamepad infrastructure directly accelerates VR input; do not skip it
-- Remappable inputs is a stretch goal but gives the abstraction a clean target shape — designing toward it even if not implementing it is worthwhile
-- See tech-debt.md: "Centralized Input Management System" for the existing detailed task breakdown
+- The previous version of this doc cited a `docs/tech-debt.md` "Centralized Input Management
+  System" entry and an `IInputSource` design that don't exist in the codebase — both removed in
+  this rewrite. If either gets (re)designed, add it back deliberately rather than assuming it was
+  already decided.
+- The gamepad → VR controller progression means gamepad infrastructure directly accelerates VR
+  input — confirmed true, `InputActionResolver`'s binding-agnostic resolution is exactly the
+  reason.
+- `WebXRCoordinator` owning camera-movement/rotation *and* `InputManager` construction is worth a
+  second look once VR routing (task 7) actually lands — splitting XR-session-lifecycle concerns
+  from input-application concerns may become clearer with a second real caller (VR) to compare
+  against, rather than speculating now with only one.
