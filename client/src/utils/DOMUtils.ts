@@ -114,6 +114,19 @@ export class DOMUtils {
     static getInputValue(input: HTMLInputElement | null): string {
         return input?.value?.trim() || ''
     }
+
+    /**
+     * Check whether a target is a text-editable control (input, textarea, contenteditable)
+     */
+    static isEditableElement(target: EventTarget | null): boolean {
+        if (!(target instanceof HTMLElement)) {
+            return false
+        }
+
+        return target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.contentEditable === 'true'
+    }
 }
 
 /**

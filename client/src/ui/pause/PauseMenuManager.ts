@@ -24,6 +24,7 @@ import { SteamEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
+import { DOMUtils } from '../../utils/DOMUtils'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -539,12 +540,7 @@ export class PauseMenuManager {
     }
 
     private isInputFocused(): boolean {
-        const activeElement = document.activeElement
-        if (!activeElement) return false
-        
-        return activeElement.tagName === 'INPUT' ||
-               activeElement.tagName === 'TEXTAREA' ||
-               (activeElement as HTMLElement).contentEditable === 'true'
+        return DOMUtils.isEditableElement(document.activeElement)
     }
 
     dispose(): void {

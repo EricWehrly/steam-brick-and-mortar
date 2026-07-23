@@ -1,5 +1,6 @@
 import type { InputCallbacks, InputKey, InputState, MovementOptions } from './InputContracts'
 import { KEY_CODE_TO_INPUT_KEY } from './InputContracts'
+import { DOMUtils } from '../utils/DOMUtils'
 
 export class InputStateTracker {
     private inputState: InputState = {
@@ -38,6 +39,10 @@ export class InputStateTracker {
     }
 
     handleKeyDown = (event: KeyboardEvent): void => {
+        if (DOMUtils.isEditableElement(event.target)) {
+            return
+        }
+
         this.keysPressed.add(event.code)
         this.updateTrackedKeyState(event.code, this.setKeyPressed)
     }
