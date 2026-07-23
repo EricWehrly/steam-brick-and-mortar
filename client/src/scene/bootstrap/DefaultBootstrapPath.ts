@@ -6,6 +6,7 @@ import { type StorePropsSetupRequestEvent, StorePropsEventTypes } from '../../ty
 import { StorePropsCoordinator } from '../props/StorePropsCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { UserPropPlacer } from '../props/UserPropPlacer'
+import { WallPosterPlacer } from '../props/wall-art/WallPosterPlacer'
 import { DataManager } from '../../core/data'
 
 export class DefaultBootstrapPath implements BootstrapPath {
@@ -17,6 +18,7 @@ export class DefaultBootstrapPath implements BootstrapPath {
         StorePropsCoordinator.getInstance()
         GameBoxSpawner.getInstance()
         this.constructUserPropPlacer()
+        this.constructWallPosterPlacer()
 
         // 🏪 Props (room, shelves, games — the heavy stuff)
         tracker.milestone(StartupPhase.WorldBuild, 'Building store')
@@ -32,6 +34,15 @@ export class DefaultBootstrapPath implements BootstrapPath {
         const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
         if (!scene) return
         UserPropPlacer.getInstance(scene)
+    }
+
+    // Same ordering requirement as constructUserPropPlacer above: must be registered before
+    // requestPropsSetup() so its RoomEventTypes.Resized listener is in place before RoomManager
+    // fires it (downstream of the shelf-layout wave that setup request triggers).
+    private constructWallPosterPlacer(): void {
+        const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
+        if (!scene) return
+        WallPosterPlacer.getInstance(scene)
     }
 
     private requestPropsSetup(eventManager: EventManager): void {

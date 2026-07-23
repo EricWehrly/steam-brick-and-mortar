@@ -1,6 +1,8 @@
 # Plan: Wall Poster Placement
 
-**Status**: Draft — awaiting sign-off before implementation
+**Status**: Implemented, then revised (2026-07-23) after a real-machine visual check surfaced
+letterboxing at the original size/aspect — see the updated Spacing and Frame-footprint sections
+below for the numbers actually shipped.
 **Feature**: [Wall Art & Framed Posters](../features/wall-art-framed-posters.md)
 **Not** an instance of a shared placement system — see [Placement Commonality — Deferred
 Survey](placement-anchor-system-plan.md) for why that's deferred. This placer is self-contained,
@@ -24,31 +26,41 @@ placement, other walls, and any cross-prop-type sharing are explicitly out of sc
 
 ### Spacing
 
-**Rule**: 4 poster-widths of gap between adjacent posters, where "poster width" is the frame's
-*outer* width (image + molding), per instruction. So pitch (center-to-center) =
-`FRAME_OUTER_WIDTH * 5`. With `FRAME_OUTER_WIDTH = 0.9m`, pitch = 4.5m — wide enough that even the
-default 22m-wide room (`RoomConstants.DEFAULT_ROOM_WIDTH`) only fits a handful, which is the point.
+**Rule (revised)**: 3 poster-widths of gap between adjacent posters (originally 4, revised
+alongside the 3x size bump below), where "poster width" is the frame's *outer* width (image +
+molding), per instruction. So pitch (center-to-center) = `FRAME_OUTER_WIDTH * 4`. With
+`FRAME_OUTER_WIDTH = 2.7m`, pitch = 10.8m — a 22m-wide room (`RoomConstants.DEFAULT_ROOM_WIDTH`)
+fits 2, which is the point (bigger, bolder, still not busy).
 
-### Frame footprint — fixed outer size, not image-aspect-driven
+### Frame footprint — fixed outer width, aspect-preset outer height
 
-Screenshots are landscape (~16:10, confirmed against this machine's real captures — see the
-feature doc). If frame size followed image aspect, the spacing pitch would vary per poster and the
-wall would look uneven. Instead the frame's **outer** footprint is fixed regardless of image
-aspect, and the image is contain-fit (letterboxed, never cropped or stretched) inside a fixed inner
-aperture, matted like a real framed print:
+Original version fixed *both* outer dimensions (one aperture aspect for every poster), sized for
+the local screenshots' ~16:10 captures. Real-machine viewing showed visible letterboxing ("black
+bars" top/bottom) because the fixed aperture aspect (~1.38) didn't actually match the real capture
+aspect (1.6). Revised: outer **width** stays fixed (it's the spacing pitch unit, per Spacing
+above), but outer **height** is picked from a small set of aspect-ratio presets, nearest to each
+image's real aspect — see `PosterFrameBuilder.ts`'s `POSTER_SIZE_PRESETS`/`pickPosterSizePreset`.
+Currently: `widescreen` (16:10, matches local screenshots exactly) and `standard` (4:3, a fallback
+for anything else). The border is a **fraction** of each dimension (not a flat meters value), so
+the inner aperture always keeps the outer footprint's own aspect exactly — the only remaining
+letterbox source is the (usually small) gap between an image's real aspect and its nearest preset,
+which for the current real screenshots (2560×1600, 1280×800 — both exactly 16:10) is zero.
+
+Also revised: posters are now **3x** the original size, per instruction ("in scene at maybe 3x
+their current size").
 
 ```
-FRAME_OUTER_WIDTH_METERS  = 0.9   // the pitch unit
-FRAME_OUTER_HEIGHT_METERS = 0.68  // fixed outer aspect ~4:3, independent of image aspect
-FRAME_BORDER_METERS       = 0.05  // molding bar width
-FRAME_DEPTH_METERS        = 0.04  // molding extrusion depth
-WALL_STANDOFF_METERS      = 0.02  // gap off the wall face, avoids z-fighting (same idea as
+FRAME_OUTER_WIDTH_METERS = 2.7    // the pitch unit (was 0.9)
+BORDER_FRACTION          = 0.06   // fraction of each dimension, not a flat meters value
+FRAME_DEPTH_METERS       = 0.12   // molding extrusion depth (was 0.04)
+WALL_STANDOFF_METERS     = 0.02   // gap off the wall face, avoids z-fighting (same idea as
                                    // SceneSignManager's SIGN_DEPTH/2 offset for the block-letter sign)
 ```
 
-Inner aperture = `(0.9 - 2*0.05) x (0.68 - 2*0.05)` = `0.8 x 0.58`. The image is scaled to fit
-inside that box preserving its own aspect ratio; a dark mat-board plane (`0x161616`) fills the
-aperture behind it, so any letterboxed margin reads as a mat border, not a gap to the wall.
+Per preset, outer height = `FRAME_OUTER_WIDTH_METERS / preset.aspect` (e.g. widescreen →
+2.7/1.6 = 1.6875m), and both border and aperture dimensions derive from that per-preset height, not
+a shared constant. A dark mat-board plane (`0x161616`) still fills the aperture behind the image,
+so any residual letterboxed margin reads as a mat border, not a gap to the wall.
 
 ### Frame geometry — four boxes, not an extruded profile
 
@@ -102,7 +114,7 @@ testable order (chronological, oldest capture first) rather than array order fro
 
 ```
 availableWidth = wallWidth - 2 * CORNER_MARGIN_METERS   // CORNER_MARGIN_METERS = FRAME_OUTER_WIDTH_METERS
-pitch          = FRAME_OUTER_WIDTH_METERS * 5
+pitch          = FRAME_OUTER_WIDTH_METERS * 4           // 3-width gap + the poster itself
 slotCount      = floor((availableWidth - FRAME_OUTER_WIDTH_METERS) / pitch) + 1   // 0 if availableWidth < frame width
 slots[i]       = centered around wall-local x = 0, spaced by `pitch`
 ```
@@ -111,11 +123,19 @@ Pure function of `wallWidth` alone — no THREE/scene dependency, so it's unit-t
 mocking. If there are fewer selected screenshots than slots, the extra slots are simply left empty
 (no stretching, no duplicating) — matches "get a few on the wall, build from there."
 
-### Height
+### Height (revised)
 
-Fixed eye-level center height, `POSTER_CENTER_HEIGHT_METERS = 1.6` (matches the camera's own
-default eye height set in `RoomManager.buildRoom`), same for every poster on the wall regardless of
-room height.
+Originally a fixed center height. Revised (per instruction, "hang them a little higher... a
+consistent distance from the bottom") to anchor by **floor clearance to the frame's bottom edge**
+instead: `POSTER_BOTTOM_CLEARANCE_METERS = 1.1` (was an effective ~0.76m bottom under the old
+center-height/widescreen-preset math). Anchoring by center height would leave bottoms uneven once
+frames vary in height by aspect preset (a `widescreen` frame is shorter than a `standard` one at
+the same fixed width) — bottom-anchoring keeps every poster's bottom edge level regardless of
+preset, which reads better than aligning midpoints. `PosterFrameBuilder.getFrameOuterHeight(group)`
+exposes each built group's own outer height (stashed in `group.userData` at build time) so the
+placer can compute `centerY = POSTER_BOTTOM_CLEARANCE_METERS + outerHeight / 2` per poster. Same
+clearance for every poster regardless of room height; flagged as a first guess to eyeball later,
+same as the other placement constants.
 
 ## Non-goals (explicitly out of scope for this plan)
 
@@ -160,9 +180,10 @@ room height.
   result when the wall is narrower than one frame.
 - Content-selection helper — dedupe-by-appid-keep-earliest, cap-to-slot-count, deterministic order
   (pure function, easy to isolate and unit test without touching the placer class itself).
-- `PosterFrameBuilder.test.ts` — resulting group's bounding box matches the fixed outer footprint
-  regardless of input image aspect; image plane is contain-fit (never upscaled/cropped) for both a
-  landscape (16:10) and a portrait test image.
+- `PosterFrameBuilder.test.ts` — preset selection (`pickPosterSizePreset`) for widescreen/standard/
+  portrait aspects; resulting group's bounding box matches the fixed outer width and its preset's
+  derived height; a 16:10 image exactly matching its preset fills the aperture with zero
+  letterboxing; a portrait image contain-fits inside `standard` without upscaling.
 - `WallPosterPlacer.test.ts` — mocked `RoomEventTypes.Resized` + mocked `LocalScreenshotReader`:
   asserts placed group count, world positions, and pitch spacing; asserts re-fired resize with
   unchanged dimensions doesn't rebuild.
@@ -181,8 +202,11 @@ room height.
 
 - Corner-miter look of the four-box frame, once actually lit in the running scene — may want the
   extruded-profile upgrade noted above; can't tell without seeing it built.
-- Whether 0.9m/4.5m-pitch reads right at real room widths — needs eyeballing against the live
-  scene, not derivable from docs; treat the constants above as a first guess, not final.
+- Whether the revised 2.7m/10.8m-pitch size reads right at real room widths for longer than a
+  first look — treat as a second guess, not final, same caveat as the original numbers.
+- Whether `standard` (4:3) is the right second preset, or whether a source that actually needs it
+  (store screenshots, trailer thumbnails) will want something else once built — no real non-16:10
+  poster content exists yet to check against.
 - Whether `background_raw`/store screenshots (Source 2) should share this exact placer once built,
   or get their own — deferred per Non-goals above.
 

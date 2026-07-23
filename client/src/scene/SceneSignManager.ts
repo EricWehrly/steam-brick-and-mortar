@@ -22,6 +22,7 @@ import {
 } from '../types/InteractionEvents'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import { RoomConstants } from './RoomManager'
+import { BlockbusterColors } from '../utils/Colors'
 
 export interface SignStyle {
     backgroundColor: number
@@ -253,7 +254,7 @@ export class SceneSignManager {
             text: this.steamLibraryTitleText,
             anchorPosition: new THREE.Vector3(0, signHeightY, backWallZ),
             style: {
-                color: 0x003087,
+                color: BlockbusterColors.steamLibraryAccent,
                 fontSize: 0.35,
                 depth: SIGN_DEPTH,
             },

@@ -20,7 +20,10 @@ export const BlockbusterColors = {
     
     // Component-specific materials
     supportPosts: 0x0066CC,     // Brand blue for vertical supports/brackets
-    
+
+    // Cross-feature accent, shared with SceneSignManager's Steam-library block-letter sign
+    steamLibraryAccent: 0x003087,
+
     // Signage colors
     newReleasesRed: 0xDC143C,    // Crimson red background
     newReleasesText: 0xFFFFFF,   // White text
