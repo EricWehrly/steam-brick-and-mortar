@@ -5,16 +5,26 @@ This directory is structured specifically as a knowledge base and entrypoint for
 ## Current status
 **Act 2: Ready for Friends** — see [`acts/act2-ready-for-friends.md`](acts/act2-ready-for-friends.md).
 
-Active in-flight thread: **post-merge cleanup after the desktop local data pipeline** (PR 141,
-merged 2026-07-21 — desktop reads local Steam files instead of only the online API; see
-[`features/desktop-app.md`](features/desktop-app.md)). `SteamIntegration`'s startup flow was
-rewritten as a single-source waterfall (persisted cache → local disk → online fetch → demo,
-exactly one branch per launch, no automatic background re-fetch), and its three loading strategies
-were split into standalone modules (`docs/tech-debt.md#id-steam-integration-loading-strategy-split`).
-Next up: `autoLoadProfile` isn't wired to that waterfall yet
-(`docs/tech-debt.md#id-autoloadprofile-not-wired-to-startup-waterfall`, high priority), and the
-desktop offline-first plan's Round 1.5 (`LocalSteamLibraryLoader` blocking first render on a full
-network gap-fill) is still open — see the "Also In Act 2" list in the act doc above.
+**2026-07-22 reorientation**: Act 2 now targets a downloadable desktop client
+([`features/desktop-app.md`](features/desktop-app.md)) as the primary release vehicle, not a
+publicly-hosted web build — see the act doc's Overview for the full rationale. Web hosting is
+demoted to an Act 3 stretch goal ([`features/static-hosting.md`](features/static-hosting.md)).
+
+Two parallel in-flight threads:
+- **Input System** ([`features/input-system.md`](features/input-system.md)) — most of the
+  abstraction and gamepad support already exist; remaining work is a live pause-menu input-leak
+  bug, two half-wired camera controls (roll, acceleration), and VR controller routing (Gate 2).
+- **Framerate regression investigation**
+  ([`plans/framerate-regression-investigation-plan.md`](plans/framerate-regression-investigation-plan.md)) —
+  unstable/reduced framerate suspected from the post-processing pipeline and/or shadow-casting
+  work; not yet root-caused. See
+  [`research/frame-time-diagnostic-tooling-research.md`](research/frame-time-diagnostic-tooling-research.md)
+  for the tooling survey backing the investigation methodology.
+
+Still open from the prior thread (desktop local data pipeline, PR 141): `autoLoadProfile` isn't
+wired to the startup waterfall yet
+(`docs/tech-debt.md#id-autoloadprofile-not-wired-to-startup-waterfall`), tracked as an early Act 3
+item per the act doc's "Move to Act 3" list.
 
 ## Where to start
 1. Read the current act doc above — goals, feature list, completion criteria.

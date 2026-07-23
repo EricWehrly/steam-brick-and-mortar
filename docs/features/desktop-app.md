@@ -1,17 +1,20 @@
-# Feature: Native Desktop App (Exploratory Vector)
+# Feature: Native Desktop App
 
-**Act**: TBD — under evaluation for **between Act 2 and Act 3** (no longer parked in Act 4)
-**Status**: Exploratory — umbrella doc for "should we become a desktop program?" A **Tauri PoC now
-builds and runs** (`bb4d1023 "working desktop build!"`): the WebView2 vehicle is proven for
-flatscreen parity, but **no Pillar-2 native capability is wired in yet** (the shell is the default
-Tauri builder — no filesystem, HID, or process-spawn commands). VR entry remains the open spike
-question. Details: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
-**Priority**: Raised as of 2026-07-14 — desktop-local extraction proved comparatively far cheaper
-than the equivalent web path for at least one concrete feature (screenshots, see [Wall Art & Framed
-Posters](wall-art-framed-posters.md)), prompting a general sequencing call: **prefer desktop-native
-implementations for filling out store content going forward, and reserve new web/browser
-infrastructure for features flagged critical**. Not a full priority rewrite of this doc — just the
-standing default for new "fill out the store" feature work until revisited.
+**Act**: 2, Gate 1 — **the primary Act 2 release vehicle as of 2026-07-22** (previously "TBD, under
+evaluation between Act 2 and Act 3"; see the desktop-first reorientation note in
+`docs/acts/act2-ready-for-friends.md`). Publicly hosting the web client is now the demoted stretch
+goal, not the other way around.
+**Status**: Active — Tauri PoC **builds and runs** (`bb4d1023 "working desktop build!"`), desktop
+local-data-pipeline (identity/playtime/collections/tags entirely offline) has landed, and Pillar-2
+native capability (filesystem read) is wired in for that pipeline. **Remaining before this is a
+shippable release, not just a working dev build**: `scripts/release.sh`'s `build_desktop`/
+`pack_release` steps are still stubbed (see [Desktop Release UI](desktop-release-ui.md) and
+[Release Pipeline](../plans/release-pipeline-plan.md)), and VR entry (WebView2 `immersive-vr`)
+remains the open spike question. Details: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
+**Priority**: Critical — this is now the Gate 1 "prerequisite for sharing anything" role Static
+Hosting used to hold. The 2026-07-14 sequencing call (prefer desktop-native implementations for
+filling out store content, reserve new web infra for features flagged critical) stands and is now
+reinforced by this doc's own promotion, not just a related note.
 
 ## Why this doc exists
 
@@ -246,7 +249,10 @@ feature wants it:
 - What's the **trigger** — clutter (Tier C/D), launching games, local collections (AC4.4), or the
   sum? Probably the sum, but which single feature justifies *starting*?
 - Tauri vs Electron, given we already ship a Vite/Three client and care about binary size.
-- Does desktop replace the hosted web build, or run alongside it?
+- ~~Does desktop replace the hosted web build, or run alongside it?~~ **Answered 2026-07-22**:
+  desktop is the primary Act 2 release; the hosted web build is demoted to an Act 3 stretch goal
+  (not dropped — just no longer a Gate 1 dependency). See
+  [Static Hosting](static-hosting.md).
 
 ## Related
 

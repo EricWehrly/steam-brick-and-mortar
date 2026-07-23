@@ -1,8 +1,8 @@
 # Feature: Static Hosting
 
-**Act**: 2 (Gate 1 — required before soliciting any feedback)
+**Act**: 3 (best-effort stretch goal — demoted from Act 2 Gate 1 on 2026-07-22, see the desktop-first reorientation note in `docs/acts/act2-ready-for-friends.md`)
 **Status**: Not Started
-**Priority**: Critical
+**Priority**: Low (was Critical while web was the primary release vehicle)
 
 ## Goal
 
@@ -10,7 +10,7 @@ Host the client application somewhere publicly accessible so friends can try it 
 
 ## Context
 
-This is the single most load-bearing Gate 1 item: without a public URL, there is no "ready for friends." Everything else in Gate 1 (rate limiting, caching, input polish) is meaningless if people can't reach it.
+**2026-07-22**: no longer the load-bearing Gate 1 item it once was — [Native Desktop App](desktop-app.md) is now the primary Act 2 release vehicle (a downloadable Windows executable via [Desktop Release UI](desktop-release-ui.md)), and the feature gap between desktop and web has grown too wide to keep pursuing both as one delivery target. This doc's content below is unchanged and still accurate if/when web hosting is picked back up in Act 3.
 
 The backend already lives in AWS (Lambda + API Gateway at `https://steam-api-dev.wehrly.com`). Extending the AWS footprint for hosting is the natural path — S3 + CloudFront is the obvious fit and would also serve as the CDN layer for the multi-layer caching feature, so there's overlap worth considering.
 
