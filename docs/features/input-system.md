@@ -51,10 +51,14 @@ controls, and the VR routing itself.
 
 ### A live bug, not just missing polish
 
-`InputEventAdapter.ts:16-20` and `InputStateTracker.ts:40-48` attach keydown/keyup listeners at
-`document` level with **no focus/target check** — typing anywhere leaks into `keysPressed`. The
-only existing mitigation anywhere is `GameLibraryBinderUI.ts:421`'s `e.stopPropagation()` on one
-search input. This part is still open — see task 2 below.
+~~`InputEventAdapter.ts:16-20` and `InputStateTracker.ts:40-48` attach keydown/keyup listeners at
+`document` level with no focus/target check — typing anywhere leaks into `keysPressed`. The only
+existing mitigation anywhere is `GameLibraryBinderUI.ts:421`'s `e.stopPropagation()` on one search
+input.~~ **Fixed**: `InputStateTracker.handleKeyDown` (`InputStateTracker.ts`) now bails out early
+when `event.target` is a text-editable element (input/textarea/contenteditable), via a new shared
+`DOMUtils.isEditableElement()` check — see task 2 below for the reproducible case this closes
+(`SteamUIPanel`'s Steam-ID field had zero protection before this) and why no suppressor stack turned
+out to be needed.
 
 ~~Worse: `PauseMenuManager.pauseInput()`/`resumeInput()` fire `callbacks.onPauseInput?.()`/
 `onResumeInput?.()`, but `SystemUICoordinator.ts:68` constructed `PauseMenuManager` with empty
@@ -94,7 +98,7 @@ now logs `Input paused: menu` / `Input resumed: menu` on menu open/close).
 ## Stories / Tasks (priority order)
 
 1. ✅ **Fix the pause-menu input-leak bug** — wire real `onPauseInput`/`onResumeInput` callbacks into `SystemUICoordinator.ts`'s `PauseMenuManager` construction so opening the pause menu actually calls `WebXRCoordinator.pauseInput()`/`resumeInput()`. Done by emitting the existing `InputEventTypes.Pause`/`Resume` events (already consumed by `WebXREventHandler`) rather than a direct cross-coordinator call.
-2. **Focus management** — add a real `onFocus`/`onBlur` (or equivalent) suppression path so `InputEventAdapter`/`InputStateTracker`'s document-level keydown/keyup listeners don't fire while a UI panel (Binder, Steam UI, Pause Menu, any text input) has focus. Generalize the one-off `stopPropagation()` pattern in `GameLibraryBinderUI.ts:421` into something every panel gets, rather than each panel re-solving it. A context *stack* (not `InputManager`'s current flat `isListeningToEvents` boolean) is needed if more than one suppressor can be active at once — check whether that's actually a real scenario before building a stack for a boolean's worth of need.
+2. ✅ **Focus management** — done via `event.target`, not a suppressor stack. `InputStateTracker.handleKeyDown` now checks whether the event's originating element (`event.target`, always the actually-focused element for a `document`-level bubble-phase listener) is text-editable, and bails before touching `keysPressed`/`inputState` if so. This turned out to make the doc's "stack vs boolean" question moot: suppression is derived per-event from live DOM focus, not tracked as toggled state, so there's nothing to stack. `keyup` is deliberately left unguarded (always processed) so a key already down when focus shifts into a field doesn't get stuck on. Added `DOMUtils.isEditableElement()` and reused it to replace `PauseMenuManager`'s duplicate `isInputFocused()` check (was `contentEditable === 'true'`, kept that exact form — jsdom doesn't implement the inherited `isContentEditable` getter, and it matches working precedent). Confirmed `SteamUIPanel.ts:173`'s Steam-ID input had **no** protection before this (unlike the Binder's search input, which already had a local `stopPropagation()`) — typing a profile URL there was live-reproducible camera drift. Left `GameLibraryBinderUI.ts:421`'s existing `stopPropagation()` in place rather than removing it as "superseded": it's also serving a second job (blocking the binder's own document-level ArrowLeft/ArrowRight spread-navigation while the user moves the text cursor inside the search box), so removing it would have reintroduced that conflict.
 3. **Wire or remove `RollLeft`/`RollRight`** — `CameraInputApplier.ts` needs to apply the already-bound Q/E roll actions, or the dead binding should be removed. Small either way; don't leave it half-wired.
 4. **Wire or remove `getProgressiveSpeed()`** — same call: either give `CameraInputApplier` a caller for the existing acceleration-ramp logic, or delete the dead code.
 5. **Camera reset hotkey** — doesn't exist yet; add an action + binding + `CameraInputApplier` handling.
