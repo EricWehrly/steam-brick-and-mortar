@@ -19,9 +19,10 @@ import type { SteamGameData } from '../scene/game-box/types/GameData'
  * Player-selectable via the Layout dropdown in LayoutControlPanel.
  */
 export const LayoutModes = {
-    Arc:   'arc',
-    Row:   'row',
-    Spoke: 'spoke',
+    Arc:     'arc',
+    Row:     'row',
+    Spoke:   'spoke',
+    Liminal: 'liminal',
 } as const
 
 export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]

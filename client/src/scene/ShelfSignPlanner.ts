@@ -125,6 +125,14 @@ export class ShelfSignPlanner {
         const { sections } = detail
         this.clearSigns()
 
+        // Liminal flattens sections into one ring-addressed sequence (no section
+        // signage in v1 — see docs/features/liminal-mode.md, "Sections"); the shelf
+        // anchors below don't correspond to section boundaries the way they do
+        // elsewhere, so section signs would land on arbitrary corridor units.
+        if (this.activeLayoutMode === 'liminal') {
+            return
+        }
+
         // Place signs at the first and last shelf owned by each section index.
         // Sections with no name (ungrouped) or named 'Other' get no sign.
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
