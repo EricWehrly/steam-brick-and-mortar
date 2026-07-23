@@ -30,6 +30,11 @@ export class CameraInputApplier {
     }
 
     updateRotation(camera: THREE.Camera, actionResolver: InputActionResolver, options: MovementOptions, deltaX = 0): void {
+        if (actionResolver.isActionPressed(InputAction.ResetCamera)) {
+            camera.rotation.set(0, 0, 0)
+            return
+        }
+
         if (deltaX !== 0) {
             camera.rotation.y -= deltaX * options.mouseSensitivity
         }
