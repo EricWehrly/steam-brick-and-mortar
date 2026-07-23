@@ -92,6 +92,7 @@ export const Setting = {
     InputDevicesEnabled: 'inputDevicesEnabled',
     InputSpeed: 'inputSpeed',
     InputMouseSensitivity: 'inputMouseSensitivity',
+    InputMouseLockEnabled: 'inputMouseLockEnabled',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -193,6 +194,9 @@ export interface ApplicationSettings {
     inputDevicesEnabled: string
     inputSpeed: number
     inputMouseSensitivity: number
+    /** Whether pointer lock should re-engage when the pause menu closes. See
+     *  docs/plans/mouse-look-and-pointer-lock-plan.md. */
+    inputMouseLockEnabled: boolean
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -515,7 +519,8 @@ export class AppSettings {
             inputBindings: '{}',
             inputDevicesEnabled: '{}',
             inputSpeed: 0.1,
-            inputMouseSensitivity: 0.005
+            inputMouseSensitivity: 0.005,
+            inputMouseLockEnabled: true
         }
     }
 
@@ -539,7 +544,7 @@ export class AppSettings {
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
             'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled',
-            'antialias'
+            'antialias', 'inputMouseLockEnabled'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {

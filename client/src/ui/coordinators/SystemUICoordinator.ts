@@ -21,9 +21,12 @@ import { AppSettings } from '../../core/AppSettings'
 import {
     UIEventTypes,
     InputEventTypes,
+    WebXREventTypes,
     type SceneCanvasClickEvent,
     type InputPauseEvent,
-    type InputResumeEvent
+    type InputResumeEvent,
+    type MenuOpenEvent,
+    type MenuCloseEvent
 } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
@@ -50,6 +53,7 @@ export class SystemUICoordinator {
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
+    private isXRSessionActive = false
     private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
@@ -75,7 +79,9 @@ export class SystemUICoordinator {
             {},
             {
                 onPauseInput: this.handlePauseInput,
-                onResumeInput: this.handleResumeInput
+                onResumeInput: this.handleResumeInput,
+                onMenuOpen: this.handlePauseMenuOpened,
+                onMenuClose: this.handlePauseMenuClosed
             },
             undefined,
             this.eventManager,
@@ -211,6 +217,10 @@ export class SystemUICoordinator {
         // Register UI event handlers for pause menu
         this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
+
+        // Track XR session state so pointer lock never engages during a VR session
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
     }
 
     private readonly handleSettingsButtonClick = (): void => {
@@ -229,12 +239,47 @@ export class SystemUICoordinator {
         this.pauseMenuManager.close()
     }
 
+    private readonly handleXRSessionStart = (): void => {
+        this.isXRSessionActive = true
+    }
+
+    private readonly handleXRSessionEnd = (): void => {
+        this.isXRSessionActive = false
+    }
+
     private readonly handlePauseInput = (): void => {
         this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
     }
 
     private readonly handleResumeInput = (): void => {
         this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
+    }
+
+    private readonly handlePauseMenuOpened = (): void => {
+        this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+
+        // Release the cursor so it's free to use the menu - needed even though Escape already
+        // triggers the browser's own pointer-unlock, because a gamepad-bound OpenMenu press
+        // doesn't touch Escape at all and would otherwise open the menu with the cursor still captured.
+        document.exitPointerLock?.()
+    }
+
+    private readonly handlePauseMenuClosed = (): void => {
+        this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
+        this.requestPointerLockIfEnabled()
+    }
+
+    private requestPointerLockIfEnabled(): void {
+        if (!this.rendererDomElement || this.isXRSessionActive) {
+            return
+        }
+
+        if (this.appSettings.getSetting('inputMouseLockEnabled')) {
+            void this.rendererDomElement.requestPointerLock()?.catch(() => {
+                // Browsers can reject this (e.g. transient-activation cooldown after a recent
+                // exit, or the document losing focus) - non-fatal, just means the cursor stays free.
+            })
+        }
     }
 
     private readonly handleRendererMouseDown = (event: MouseEvent): void => {
