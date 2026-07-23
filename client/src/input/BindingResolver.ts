@@ -61,7 +61,8 @@ function resolveGamepadAxisValue(binding: GamepadAxisBinding, gamepads: Readonly
         }
     }
 
-    return clamp(bestValue, -1, 1)
+    const sensitivity = binding.sensitivity ?? 1
+    return clamp(bestValue, -1, 1) * sensitivity
 }
 
 function resolveGamepadButtonValue(binding: GamepadButtonBinding, gamepads: ReadonlyArray<Gamepad>): number {

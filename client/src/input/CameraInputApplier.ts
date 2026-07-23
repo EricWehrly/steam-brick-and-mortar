@@ -5,6 +5,7 @@ import { InputActionResolver } from './InputActionResolver'
 
 export class CameraInputApplier {
     private static readonly ROLL_RADIANS_PER_FRAME = 0.02
+    private static readonly MAX_PITCH_RADIANS = THREE.MathUtils.degToRad(89)
 
     updateMovement(
         camera: THREE.Camera,
@@ -29,19 +30,21 @@ export class CameraInputApplier {
         if (down > 0) camera.translateY(-(options.speed * down * sprintMultiplier))
     }
 
-    updateRotation(camera: THREE.Camera, actionResolver: InputActionResolver, options: MovementOptions, deltaX = 0): void {
+    updateRotation(camera: THREE.Camera, actionResolver: InputActionResolver, options: MovementOptions): void {
         if (actionResolver.isActionPressed(InputAction.ResetCamera)) {
             camera.rotation.set(0, 0, 0)
             return
         }
 
-        if (deltaX !== 0) {
-            camera.rotation.y -= deltaX * options.mouseSensitivity
+        const lookHorizontal = actionResolver.getAxisValue(InputAction.LookHorizontal)
+        if (lookHorizontal !== 0) {
+            camera.rotation.y -= lookHorizontal * options.mouseSensitivity
         }
 
-        const gamepadLook = actionResolver.getAxisValue(InputAction.LookHorizontal)
-        if (gamepadLook !== 0) {
-            camera.rotation.y -= gamepadLook * options.mouseSensitivity * 2
+        const lookVertical = actionResolver.getAxisValue(InputAction.LookVertical)
+        if (lookVertical !== 0) {
+            const nextPitch = camera.rotation.x - lookVertical * options.mouseSensitivity
+            camera.rotation.x = THREE.MathUtils.clamp(nextPitch, -CameraInputApplier.MAX_PITCH_RADIANS, CameraInputApplier.MAX_PITCH_RADIANS)
         }
 
         if (actionResolver.isActionPressed(InputAction.RollLeft)) {

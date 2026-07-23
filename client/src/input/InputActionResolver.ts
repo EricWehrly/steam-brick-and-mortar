@@ -31,7 +31,13 @@ export class InputActionResolver {
         this.deviceDetector.setXRSession(session)
     }
 
-    updateFrame(enabledProfiles: ReadonlyArray<InputProfileDefinition>, keysPressed: ReadonlySet<string>, mouseButtonsPressed: ReadonlySet<number>): void {
+    updateFrame(
+        enabledProfiles: ReadonlyArray<InputProfileDefinition>,
+        keysPressed: ReadonlySet<string>,
+        mouseButtonsPressed: ReadonlySet<number>,
+        mouseDeltaX = 0,
+        mouseDeltaY = 0
+    ): void {
         this.deviceDetector.pollGamepads()
 
         const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
@@ -52,8 +58,8 @@ export class InputActionResolver {
             const resolved = this.bindingResolver.resolve(profile, {
                 keysPressed,
                 mouseButtonsPressed,
-                mouseDeltaX: 0,
-                mouseDeltaY: 0,
+                mouseDeltaX,
+                mouseDeltaY,
                 gamepads
             })
 
