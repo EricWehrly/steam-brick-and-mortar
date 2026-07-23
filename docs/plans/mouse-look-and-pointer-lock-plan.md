@@ -134,13 +134,50 @@ Maps directly onto `docs/features/input-system.md` tasks 4 and 5:
    - Verified live: mapping table shows "Look Vertical: Mouse Y"; held a real right-click drag
      across ~60 render-loop frames including a deliberate extreme-value stress test at the pitch
      clamp boundary, no console errors
-2. **Task 5 — pointer lock by default**
-   - `AppSettings`: add `mouseLockEnabled` (default `true`)
-   - `ControlsPanel`: add the checkbox
-   - `PauseMenuManager`: request/exit lock in `open()`/`close()`, gated on the setting and
-     `!isSessionActive()`
-   - New small listener (likely in `InputEventAdapter` or a dedicated class) for
-     `pointerlockchange` to keep UI state honest
+2. ✅ **Task 5 — pointer lock by default** — done 2026-07-23, with two deliberate departures from
+   the plan above:
+   - **Setting name**: `inputMouseLockEnabled`, not `mouseLockEnabled` — matches this codebase's
+     existing `input*` naming convention for every other input setting (`inputSpeed`,
+     `inputMouseSensitivity`, etc.), not a functional change.
+   - **Owner of the request/release calls: `SystemUICoordinator`, not `PauseMenuManager`.**
+     `PauseMenuManager` doesn't have (and per "zero cross-class dependencies" shouldn't get) a
+     direct reference to the renderer canvas or XR session state. `SystemUICoordinator` already
+     holds `rendererDomElement` (used for scene-click raycasting) and already owns the
+     `onPauseInput`/`onResumeInput` callback-to-event wiring from task 1 — extending that same
+     wiring with `onMenuOpen`/`onMenuClose` callbacks (which `PauseMenuManager` already exposed but
+     nothing wired, exactly like task 1's bug) keeps this in the class that actually has what it
+     needs, and emits the same already-defined `UIEventTypes.MenuOpen`/`MenuClose` events
+     `WebXREventHandler` already listens for (though this class doesn't need to consume them itself
+     — see below). XR session state is tracked via a local `isXRSessionActive` boolean updated by
+     listening to `WebXREventTypes.SessionStart`/`SessionEnd` — event-driven, no direct call into
+     `WebXRCoordinator`/`WebXRManager`.
+   - `AppSettings.inputMouseLockEnabled` (default `true`), `ControlsPanel` checkbox in the Input
+     Devices section (same `UIComponentUtils.setupToggle` pattern as the existing "Active" toggle).
+   - `SystemUICoordinator.handlePauseMenuClosed` requests pointer lock on `rendererDomElement` when
+     the setting is on and no XR session is active; `handlePauseMenuOpened` unconditionally calls
+     `document.exitPointerLock()` — needed even though Escape already triggers the browser's own
+     auto-unlock, because a gamepad-bound `OpenMenu` button press doesn't touch Escape at all and
+     would otherwise open the menu with the cursor still captured and unusable.
+   - `requestPointerLock()` rejections (transient-activation cooldown, unfocused document, denied
+     permissions policy) are caught and swallowed — non-fatal, the cursor just stays free.
+   - **Open question #2, resolved as "not needed for this version":** no dedicated
+     `pointerlockchange` listener was added. The core mouse-look gate
+     (`InputStateTracker.isMouseLookActive()`, from task 4) already reads
+     `document.pointerLockElement` live on every `mousemove`, so it self-corrects immediately if
+     lock is lost through a path we don't control (tab blur, fullscreen exit) — no cached state to
+     go stale for the *mechanic* to keep working correctly. There's also no UI element yet (e.g. a
+     lock-status indicator) that would need to react to an external unlock. Revisit if either
+     changes.
+   - Verified via 5 new unit tests covering all four gating branches (enabled/disabled, XR
+     active/inactive, open releases/close requests). Live verification is partial: confirmed the
+     checkbox renders and reflects the default-on setting, and that closing the menu via a real
+     (trusted) Escape keypress produces zero console errors — but this session's sandboxed browser
+     pane disallows the `pointer-lock` Permissions-Policy feature entirely
+     (`document.featurePolicy.allowsFeature('pointer-lock')` → `false`, confirmed directly), so
+     actual OS-level cursor capture could not be visually verified from this tool. That's an
+     environment restriction of the testing sandbox, not a code defect — the graceful-rejection
+     path being silent and error-free is itself the expected, correct behavior for a
+     policy-disallowed context.
 
 ## Non-goals
 - VR controller routing itself (task 9) — this plan only makes sure task 4/5 code doesn't need to
@@ -158,10 +195,10 @@ Maps directly onto `docs/features/input-system.md` tasks 4 and 5:
 | `client/src/input/InputActionResolver.ts` | Accept real `mouseDeltaX`/`mouseDeltaY` instead of hardcoding `0` |
 | `client/src/input/CameraInputApplier.ts` | Drop `deltaX` param + `gamepadLook` special case; add clamped pitch application |
 | `client/src/input/InputProfile.ts` | Add default `LookVertical: mouse-axis y` binding |
-| `client/src/core/AppSettings.ts` | Add `mouseLockEnabled` boolean setting |
+| `client/src/core/AppSettings.ts` | Add `inputMouseLockEnabled` boolean setting |
 | `client/src/ui/pause/panels/ControlsPanel.ts` | Add mouse-lock checkbox in Input Devices section |
-| `client/src/ui/pause/PauseMenuManager.ts` | Request/release pointer lock in `open()`/`close()` |
-| `client/src/webxr/WebXRCoordinator.ts` | No change yet — confirmed `isSessionActive()` already exists for task 9 to use later |
+| `client/src/ui/coordinators/SystemUICoordinator.ts` | Wire `onMenuOpen`/`onMenuClose` callbacks (request/release pointer lock, track XR session state) — not `PauseMenuManager`, see task 5 write-up above for why |
+| `client/src/webxr/WebXRCoordinator.ts` | No change — confirmed `isSessionActive()` already exists for task 9 to use later |
 | `test/unit/webxr/input-manager.test.ts` | Update tests built around the removed `explicitDeltaX` param |
 
 ## Related documents
@@ -172,16 +209,15 @@ Maps directly onto `docs/features/input-system.md` tasks 4 and 5:
 ## Open questions
 1. ✅ Resolved (2026-07-23, "proceed"): `LookVertical` ships bound to `mouse-axis y` by default,
    as proposed.
-2. Where should the `pointerlockchange` listener live — folded into `InputEventAdapter` (already
-   owns the mouse/keyboard DOM listener lifecycle) or a small new dedicated class? Leaning toward
-   `InputEventAdapter` to avoid a class whose only job is one event listener, but worth checking
-   against "survey before you extend" once the shape of the state it needs to track is clearer.
+2. ✅ Resolved (2026-07-23): no `pointerlockchange` listener for this version — see task 5's
+   write-up above. Revisit if a lock-status UI indicator gets built, or if silent
+   `requestPointerLock()` rejections turn out to be a real support issue in practice.
 
 ---
-**Status**: 🔄 In Progress — task 4 (vertical look) done; task 5 (pointer lock) not started
-**Priority**: High (blocks task 5 in `docs/features/input-system.md`)
+**Status**: ✅ Done — both tasks 4 and 5 implemented
+**Priority**: N/A — plan complete
 **Blocked by**: None
-**Blocks**: `docs/features/input-system.md` task 5
+**Blocks**: Nothing further
 
 ---
 P1

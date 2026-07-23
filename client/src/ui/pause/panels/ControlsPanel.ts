@@ -3,7 +3,8 @@
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
-import { EventManager } from '../../../core/EventManager'
+import { EventManager, EventSource } from '../../../core/EventManager'
+import { AppSettings } from '../../../core/AppSettings'
 import { InputEventTypes } from '../../../types/InteractionEvents'
 import { getInputActionDefinition, InputAction, InputActionType, INPUT_ACTION_ORDER, type InputActionId } from '../../../input/InputActions'
 import { getDuplicateBindingWarnings, getLinkedInverseAssignment, isDerivedLinkedActionLocked } from '../../../input/InputBindingUtils'
@@ -17,6 +18,7 @@ export class ControlsPanel extends PauseMenuPanel {
     readonly title = 'Input'
     readonly icon = '⌨️'
     private readonly eventManager = EventManager.getInstance()
+    private readonly appSettings = AppSettings.getInstance()
     private deviceListenerRegistered = false
     private profileListenerRegistered = false
     private capturingActionId: InputActionId | null = null
@@ -44,6 +46,15 @@ export class ControlsPanel extends PauseMenuPanel {
                             <label class="input-device-enabled-toggle">
                                 <input id="input-device-enabled" type="checkbox" data-input-device-enabled />
                                 <span>Enabled for runtime input</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="pause-row control-item">
+                        <span class="control-key pause-row-key">Mouse Look</span>
+                        <div class="control-desc pause-row-text">
+                            <label class="input-device-enabled-toggle">
+                                <input id="input-mouse-lock-enabled" type="checkbox" data-input-mouse-lock-enabled />
+                                <span>Capture mouse cursor while playing (re-engages when the pause menu closes)</span>
                             </label>
                         </div>
                     </div>
@@ -90,6 +101,11 @@ export class ControlsPanel extends PauseMenuPanel {
         UIComponentUtils.setupToggle(panel, {
             toggleId: 'input-device-enabled',
             onChange: this.handleProfileEnabledToggle.bind(this)
+        })
+
+        UIComponentUtils.setupToggle(panel, {
+            toggleId: 'input-mouse-lock-enabled',
+            onChange: this.handleMouseLockEnabledToggle.bind(this)
         })
 
         UIComponentUtils.setupButton(panel, {
@@ -151,6 +167,10 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         inputManager.profileService.setProfileEnabled(inputManager.profileService.getActiveProfileId(), checked)
+    }
+
+    private handleMouseLockEnabledToggle(checked: boolean): void {
+        this.appSettings.setSetting('inputMouseLockEnabled', checked, EventSource.UI)
     }
 
     private handleResetProfileClick(): void {
@@ -447,6 +467,7 @@ export class ControlsPanel extends PauseMenuPanel {
 
         this.renderDeviceOptions(devices, profiles, activeProfileId)
         this.renderActiveToggle(activeProfile)
+        this.renderMouseLockToggle()
         this.renderMappingTable(activeProfile)
     }
 
@@ -509,6 +530,20 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         toggle.checked = profile.enabled
+    }
+
+    private renderMouseLockToggle(): void {
+        const panel = this.getPanelElement()
+        if (!panel) {
+            return
+        }
+
+        const toggle = panel.querySelector('#input-mouse-lock-enabled') as HTMLInputElement | null
+        if (!toggle) {
+            return
+        }
+
+        toggle.checked = this.appSettings.getSetting('inputMouseLockEnabled')
     }
 
     private renderMappingTable(profile: InputProfileDefinition): void {
