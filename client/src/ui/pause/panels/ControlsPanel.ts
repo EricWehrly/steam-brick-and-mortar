@@ -69,7 +69,7 @@ export class ControlsPanel extends PauseMenuPanel {
                     <button id="input-reset-profile" type="button" class="input-reset-button">Reset Active Profile</button>
                 </div>
                 <p class="input-fast-follow-note">
-                    Fast-follow: controller/touch/VR mappings for Interact, menu navigation, toggle UI/fullscreen, roll, and vertical look are partially defined but not fully wired in runtime yet.
+                    Fast-follow: controller/touch/VR mappings for Interact, menu navigation, toggle UI/fullscreen, and roll are partially defined but not fully wired in runtime yet.
                 </p>
             </div>
         `

@@ -3,6 +3,8 @@ import { KEY_CODE_TO_INPUT_KEY } from './InputContracts'
 import { DOMUtils } from '../utils/DOMUtils'
 
 export class InputStateTracker {
+    private static readonly RIGHT_MOUSE_BUTTON = 2
+
     private inputState: InputState = {
         keys: { w: false, a: false, s: false, d: false, q: false, e: false, space: false, c: false },
         mouse: { down: false, x: 0, y: 0 }
@@ -12,6 +14,7 @@ export class InputStateTracker {
     private readonly keysPressed = new Set<string>()
     private readonly mouseButtonsPressed = new Set<number>()
     private pendingMouseDeltaX = 0
+    private pendingMouseDeltaY = 0
     private callbacks: InputCallbacks
 
     constructor(callbacks: InputCallbacks) {
@@ -33,8 +36,9 @@ export class InputStateTracker {
     handleMouseMove = (event: MouseEvent): void => {
         this.inputState.mouse.x = event.clientX
         this.inputState.mouse.y = event.clientY
-        if (this.mouseButtonsPressed.has(2)) {
+        if (this.isMouseLookActive()) {
             this.pendingMouseDeltaX += event.movementX
+            this.pendingMouseDeltaY += event.movementY
         }
     }
 
@@ -90,6 +94,12 @@ export class InputStateTracker {
         return delta
     }
 
+    consumeMouseDeltaY(): number {
+        const delta = this.pendingMouseDeltaY
+        this.pendingMouseDeltaY = 0
+        return delta
+    }
+
     isShiftPressed(): boolean {
         return this.keysPressed.has('ShiftLeft') || this.keysPressed.has('ShiftRight')
     }
@@ -101,6 +111,10 @@ export class InputStateTracker {
     clear(): void {
         this.keysPressed.clear()
         this.mouseButtonsPressed.clear()
+    }
+
+    private isMouseLookActive(): boolean {
+        return this.mouseButtonsPressed.has(InputStateTracker.RIGHT_MOUSE_BUTTON) || Boolean(document.pointerLockElement)
     }
 
     private updateTrackedKeyState(code: string, updater: (key: InputKey) => void): void {

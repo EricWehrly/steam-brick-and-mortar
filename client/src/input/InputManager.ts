@@ -82,7 +82,9 @@ export class InputManager {
         this.actionResolver.updateFrame(
             this.profileService.getEnabledProfiles(),
             this.stateTracker.getKeysPressed(),
-            this.stateTracker.getMouseButtonsPressed()
+            this.stateTracker.getMouseButtonsPressed(),
+            this.stateTracker.consumeMouseDeltaX(),
+            this.stateTracker.consumeMouseDeltaY()
         )
     }
 
@@ -97,9 +99,8 @@ export class InputManager {
         )
     }
 
-    updateCameraRotation(camera: THREE.Camera, explicitDeltaX?: number): void {
-        const deltaX = explicitDeltaX ?? this.stateTracker.consumeMouseDeltaX()
-        this.cameraInputApplier.updateRotation(camera, this.actionResolver, this.options, deltaX)
+    updateCameraRotation(camera: THREE.Camera): void {
+        this.cameraInputApplier.updateRotation(camera, this.actionResolver, this.options)
     }
 
     getInputState(): InputState {

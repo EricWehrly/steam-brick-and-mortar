@@ -90,13 +90,50 @@ releases it (mandatory browser behavior, not scriptable around). Proposed flow:
 
 Maps directly onto `docs/features/input-system.md` tasks 4 and 5:
 
-1. **Task 4 — vertical look, retiring Path A**
-   - `InputStateTracker`: add Y accumulator, generalize the button-gate to "mouse-look active"
-   - `InputManager`/`InputActionResolver`: wire real deltas through, remove hardcoded `0, 0`
-   - `CameraInputApplier`: drop `deltaX` param, add clamped pitch from `LookVertical`
-   - `InputProfile.ts`: add default `LookVertical: mouse-axis y`
-   - Update/rewrite tests that assumed the old `explicitDeltaX` signature
-     (`test/unit/webxr/input-manager.test.ts` and any `CameraInputApplier.updateRotation` callers)
+1. ✅ **Task 4 — vertical look, retiring Path A** — done 2026-07-23. Implemented exactly as
+   proposed, plus one thing this plan didn't call out: a units-mismatch problem in the
+   cross-device axis merge. `InputActionResolver.updateFrame`'s merge picks whichever connected
+   profile produced the bigger raw magnitude for a given axis (`Math.abs(value) > Math.abs(existing)`)
+   — fine when both sides are already normalized (e.g. two `-1..1` gamepad axes), but mouse's raw
+   pixel deltas are unbounded while gamepad's normalized `-1..1` axis was getting a `* 2` multiplier
+   applied *after* merge in the old `CameraInputApplier` (to compensate for feeling weak next to
+   raw pixels). Once mouse started flowing through the same merge, that post-hoc `* 2` would have
+   applied to whichever device happened to win that frame, not specifically gamepad. Fix: moved the
+   `* 2` to where it belongs — a new optional `sensitivity` field on `GamepadAxisBinding` (mirroring
+   `MouseAxisBinding`'s existing field), applied in `resolveGamepadAxisValue` *after* its own
+   dead-zone clamp (applying it before would just get clamped back to 1, silently no-op-ing the
+   multiplier). `CameraInputApplier` now applies `options.mouseSensitivity` uniformly to whatever
+   the merged axis value is, regardless of source — reproduces the exact old feel for both devices,
+   bit-for-bit, without a per-source special case. Known accepted limitation, not solved: mouse's
+   raw pixel magnitude will typically still win the cross-device merge over gamepad's bounded
+   `±1 * sensitivity` range whenever both produce simultaneous nonzero input on the same frame —
+   a pre-existing "biggest magnitude wins" heuristic, not something this task introduced, and out
+   of scope to fully arbitrate here.
+   - `InputStateTracker`: added Y accumulator; generalized the button-gate to `isMouseLookActive()`
+     (right-click held **or** `Boolean(document.pointerLockElement)` — jsdom doesn't implement
+     Pointer Lock and returns `undefined` rather than `null` when unlocked, so a truthy check is
+     required, not `!== null`, matching the same jsdom gap found during task 2's `contentEditable`
+     work)
+   - `InputManager`/`InputActionResolver`: real deltas now flow through; `explicitDeltaX` param
+     removed entirely (only caller never passed one)
+   - `CameraInputApplier`: drop `deltaX` param, unify yaw onto `getAxisValue(LookHorizontal)`, add
+     clamped pitch (`±89°`) from `LookVertical`
+   - `InputProfile.ts`: added default `LookVertical: mouse-axis y`, confirmed via the open question
+     below being resolved as "bind by default"
+   - Rewrote the 5 test call sites across `test/unit/webxr/input-manager.test.ts` and
+     `test/unit/input/input-manager-multi-device.test.ts` that drove `updateCameraRotation` via the
+     removed explicit-delta param — they now dispatch real `mousedown(button:2)`/`mousemove` events
+     and call `updateFrame()`, exercising the actual accumulation path for the first time (it was
+     never covered before; every prior test bypassed it via the explicit param)
+   - Added dedicated coverage: `camera-input-applier-look.test.ts` (yaw/pitch/clamping),
+     `input-state-tracker-mouse-look.test.ts` (gate generalization), plus binding-resolver cases for
+     the vertical mouse axis and the new gamepad `sensitivity` field
+   - Fixed a stale `ControlsPanel` "Fast-follow" note that listed vertical look as not-wired for
+     controller — it's wired now (`CameraInputApplier` reads `LookVertical` regardless of source,
+     and gamepad's binding already existed, just was never read before this change)
+   - Verified live: mapping table shows "Look Vertical: Mouse Y"; held a real right-click drag
+     across ~60 render-loop frames including a deliberate extreme-value stress test at the pitch
+     clamp boundary, no console errors
 2. **Task 5 — pointer lock by default**
    - `AppSettings`: add `mouseLockEnabled` (default `true`)
    - `ControlsPanel`: add the checkbox
@@ -133,19 +170,18 @@ Maps directly onto `docs/features/input-system.md` tasks 4 and 5:
   #5 already flagged "vertical look policy... not fully applied in camera runtime" as a known gap
 
 ## Open questions
-1. Should `LookVertical` ship with a default binding (`mouse-axis y`, proposed above) or unbound
-   like Roll/Reset? Leaning bound-by-default since look is core, not a utility action — needs
-   confirmation before implementation.
+1. ✅ Resolved (2026-07-23, "proceed"): `LookVertical` ships bound to `mouse-axis y` by default,
+   as proposed.
 2. Where should the `pointerlockchange` listener live — folded into `InputEventAdapter` (already
    owns the mouse/keyboard DOM listener lifecycle) or a small new dedicated class? Leaning toward
    `InputEventAdapter` to avoid a class whose only job is one event listener, but worth checking
    against "survey before you extend" once the shape of the state it needs to track is clearer.
 
 ---
-**Status**: 📋 Plan — not yet implemented
-**Priority**: High (blocks tasks 4, 5 in `docs/features/input-system.md`)
+**Status**: 🔄 In Progress — task 4 (vertical look) done; task 5 (pointer lock) not started
+**Priority**: High (blocks task 5 in `docs/features/input-system.md`)
 **Blocked by**: None
-**Blocks**: `docs/features/input-system.md` tasks 4 and 5
+**Blocks**: `docs/features/input-system.md` task 5
 
 ---
 P1

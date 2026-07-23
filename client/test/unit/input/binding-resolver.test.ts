@@ -45,6 +45,58 @@ describe('BindingResolver', () => {
         expect(state.buttons.get(InputAction.Interact)).toBe(true)
     })
 
+    it('resolves mouse look vertical axis bindings', () => {
+        const resolver = new BindingResolver()
+        const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+        const state = resolver.resolve(mouseKeyboardProfile, {
+            keysPressed: new Set(),
+            mouseButtonsPressed: new Set([2]),
+            mouseDeltaX: 0,
+            mouseDeltaY: 5,
+            gamepads: []
+        })
+
+        expect(state.axes.get(InputAction.LookVertical)).toBe(5)
+    })
+
+    it('applies a gamepad axis binding sensitivity multiplier after the dead-zone clamp', () => {
+        const resolver = new BindingResolver()
+        const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+        const gamepad = {
+            connected: true,
+            id: 'Test Pad',
+            index: 0,
+            mapping: 'standard',
+            axes: [1, 0, 0, 0],
+            buttons: [],
+            vibrationActuator: null
+        } as unknown as Gamepad
+
+        const state = resolver.resolve(
+            {
+                ...mouseKeyboardProfile,
+                bindings: {
+                    [InputAction.LookHorizontal]: [
+                        { type: 'gamepad-axis', axis: 0, direction: 'both', deadZone: 0.15, sensitivity: 2 }
+                    ]
+                }
+            },
+            {
+                keysPressed: new Set(),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 0,
+                mouseDeltaY: 0,
+                gamepads: [gamepad]
+            }
+        )
+
+        // Full stick deflection clamps to 1 first, then the binding's sensitivity multiplies it -
+        // sensitivity must apply after the dead-zone clamp, or it would be clamped away too.
+        expect(state.axes.get(InputAction.LookHorizontal)).toBe(2)
+    })
+
     it('resolves gamepad axes and buttons', () => {
         const resolver = new BindingResolver()
         const gamepadProfile = getProfile(InputProfileId.GamepadStandard)

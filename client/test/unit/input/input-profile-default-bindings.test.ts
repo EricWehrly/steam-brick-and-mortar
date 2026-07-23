@@ -20,4 +20,14 @@ describe('MouseKeyboard profile default bindings', () => {
 
         expect(mouseKeyboardProfile?.bindings[InputAction.ResetCamera]).toBeUndefined()
     })
+
+    it('binds LookVertical to Mouse Y by default, alongside LookHorizontal on Mouse X', () => {
+        const mouseKeyboardProfile = BUILTIN_INPUT_PROFILES.find(
+            profile => profile.id === InputProfileId.MouseKeyboard
+        )
+
+        expect(mouseKeyboardProfile?.bindings[InputAction.LookVertical]).toEqual([
+            { type: 'mouse-axis', axis: 'y', sensitivity: 1, label: 'Mouse Y' }
+        ])
+    })
 })

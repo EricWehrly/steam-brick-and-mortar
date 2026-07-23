@@ -36,7 +36,7 @@ describe('InputManager multi-device behavior', () => {
         manager.updateFrame()
 
         const beforeYaw = camera.rotation.y
-        manager.updateCameraRotation(camera, 0)
+        manager.updateCameraRotation(camera)
         const afterYaw = camera.rotation.y
 
         expect(afterYaw).not.toBe(beforeYaw)

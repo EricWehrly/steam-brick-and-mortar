@@ -412,14 +412,16 @@ describe('InputManager User Experience Tests', () => {
 
     it('should enable smooth look controls with mouse', () => {
       const initialRotation = { x: mockCamera.rotation.x, y: mockCamera.rotation.y };
-      
-      // User looks right and slightly down (common VR interaction)
-      const lookRightDown = { deltaX: 10, deltaY: 5 };
-      inputManager.updateCameraRotation(mockCamera, lookRightDown.deltaX);
-      
+
+      // User looks right and slightly down (right-click drag, the desktop look gesture)
+      document.dispatchEvent(new MouseEvent('mousedown', { button: 2, bubbles: true }));
+      document.dispatchEvent(new MouseEvent('mousemove', { movementX: 10, movementY: 5, bubbles: true }));
+      inputManager.updateFrame();
+      inputManager.updateCameraRotation(mockCamera);
+
       // Camera should rotate to follow user's look direction
       expect(mockCamera.rotation.y).not.toBe(initialRotation.y); // Horizontal look changed
-      expect(mockCamera.rotation.x).toBe(initialRotation.x); // Vertical controlled elsewhere (current implementation)
+      expect(mockCamera.rotation.x).not.toBe(initialRotation.x); // Vertical look now wired too
     });
 
     it('should handle movement speed variations safely', () => {
@@ -496,24 +498,26 @@ describe('InputManager User Experience Tests', () => {
       const wKeyEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       document.dispatchEvent(wKeyEvent);
       
-      // User also starts looking (mouse down + move)
-      const mouseDown = new MouseEvent('mousedown', { 
-        clientX: 100, 
-        clientY: 100,
-        bubbles: true 
-      });
-      document.dispatchEvent(mouseDown);
-      
-      const mouseMove = new MouseEvent('mousemove', {
-        clientX: 120,
+      // User also starts looking (right-click drag)
+      const mouseDown = new MouseEvent('mousedown', {
+        button: 2,
+        clientX: 100,
         clientY: 100,
         bubbles: true
       });
+      document.dispatchEvent(mouseDown);
+
+      const mouseMove = new MouseEvent('mousemove', {
+        clientX: 120,
+        clientY: 100,
+        movementX: 20,
+        bubbles: true
+      });
       document.dispatchEvent(mouseMove);
-      
+
       // Apply both movement and look
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 20);
+      inputManager.updateCameraRotation(mockCamera);
       
       // Both movement and look should work simultaneously
       expect(mockCamera.position.z).toBeLessThan(initialPosition.z); // Moved forward
@@ -558,13 +562,17 @@ describe('InputManager User Experience Tests', () => {
         
         // Verify sensitivity actually affects look behavior
         const initialRotation = mockCamera.rotation.y;
-        inputManager.updateCameraRotation(mockCamera, 10);
-        
+        document.dispatchEvent(new MouseEvent('mousedown', { button: 2, bubbles: true }));
+        document.dispatchEvent(new MouseEvent('mousemove', { movementX: 10, bubbles: true }));
+        inputManager.updateFrame();
+        inputManager.updateCameraRotation(mockCamera);
+
         // Should have rotated (exact amount depends on sensitivity)
         expect(mockCamera.rotation.y).not.toBe(initialRotation);
-        
+
         // Reset for next test
         mockCamera.rotation.y = initialRotation;
+        document.dispatchEvent(new MouseEvent('mouseup', { button: 2, bubbles: true }));
         inputManager.stopListening();
       });
     });
@@ -577,27 +585,30 @@ describe('InputManager User Experience Tests', () => {
       };
       inputManager.setMovementOptions(lowOptions);
       inputManager.startListening();
-      
+      document.dispatchEvent(new MouseEvent('mousedown', { button: 2, bubbles: true }));
+
       // Should not crash or cause NaN values
       const wKeyEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       document.dispatchEvent(wKeyEvent);
+      document.dispatchEvent(new MouseEvent('mousemove', { movementX: 1, bubbles: true }));
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 1);
-      
+      inputManager.updateCameraRotation(mockCamera);
+
       expect(isFinite(mockCamera.position.x)).toBe(true);
       expect(isFinite(mockCamera.position.z)).toBe(true);
       expect(isFinite(mockCamera.rotation.y)).toBe(true);
-      
+
       // Test very high values (power users)
       const highOptions: Partial<MovementOptions> = {
         speed: 100,
         mouseSensitivity: 1.0
       };
       inputManager.setMovementOptions(highOptions);
-      
+
+      document.dispatchEvent(new MouseEvent('mousemove', { movementX: 1, bubbles: true }));
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 1);
-      
+      inputManager.updateCameraRotation(mockCamera);
+
       expect(isFinite(mockCamera.position.x)).toBe(true);
       expect(isFinite(mockCamera.position.z)).toBe(true);
       expect(isFinite(mockCamera.rotation.y)).toBe(true);
