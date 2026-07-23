@@ -17,6 +17,13 @@
 
 ## Also In Act 3 (Best Effort)
 
+- [Static Hosting](../features/static-hosting.md) — publicly hosting the web client (S3+CloudFront or equivalent), demoted from Act 2 Gate 1 (2026-07-22) once desktop became the primary release vehicle; revisit once desktop release has shipped and there's bandwidth to also serve a hosted web build, but web is no longer required to consider Act 2 done
+- **Wall Art & Framed Posters — web-facilitated screenshot pulling (early Act 3)** — the HTML-scrape +
+  `GetPublishedFileDetails` Lambda adapter for browser-only users, plus the points-shop-cosmetics
+  source; both are fully researched and confirmed live (2026-07-14) but deliberately not built until
+  now, per a desktop-first sequencing call — desktop-local extraction is comparatively far cheaper and
+  ships in Act 2 instead. Time this to land before Act 3's broader public-sharing work. See [Wall Art &
+  Framed Posters](../features/wall-art-framed-posters.md).
 - **Neon sign "&" 3D tube follow-through (early Act 3, nice-to-have)** — take the existing spike (`openclaw/spike-neon-sign-agent`, commit `d1ced42`) through human visual review and only then decide on production placement/scale/material tuning.
 - **Offline access / bookmarklet export-format research (Act 3)** — define a static export format for offline/bookmarklet flows (circumventing Lambda where appropriate). Superseded by real implementation: see [Manual Library Export](../archive/manual-library-export-feasibility.md).
 - **Outbound Steam-traffic audit, early Act 3 (tracked)** — before opening to the public, re-run the network traffic audit at public scale and add a fresh-data batching/coalescing step for concurrent cache-miss collisions. Full story: [Production Infrastructure §9.2.1.4](../features/production-infrastructure.md). Context/baseline: [Network Rate Limiting](../features/network-rate-limiting.md), [Traffic Safety Review](../plans/traffic-safety-review.md).

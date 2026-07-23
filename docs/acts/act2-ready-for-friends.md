@@ -4,11 +4,22 @@
 
 **Goal**: Works for people standing next to you during conversation.
 
-**Scope**: Infrastructure hardening, multi-user capability, and VR support. Desktop/flatscreen is the initial delivery target; VR is a required Act 2 deliverable but intentionally sequenced late — after infrastructure stability and initial friend playtesting.
+**Scope**: Infrastructure hardening, multi-user capability, and VR support. **Reoriented 2026-07-22:
+desktop is now the primary delivery vehicle, not a web app viewed on a desktop browser.** The
+Tauri desktop build ([Native Desktop App](../features/desktop-app.md)) is the release target — a
+downloadable Windows executable, distributed from the anonymous web demo store's existing
+`#steam-ui` space (see [Desktop Release UI](../features/desktop-release-ui.md)). Publicly hosting
+the web client is demoted to an Act 3 stretch goal (see
+[act3-ready-for-everyone.md](act3-ready-for-everyone.md)) — the feature gap between desktop
+(local filesystem, native HTTP, no CORS) and web has grown too wide to keep treating them as one
+delivery target. VR is a required Act 2 deliverable but intentionally sequenced late — after
+infrastructure stability and initial friend playtesting; VR runs through whichever build (desktop
+WebView2 or hosted web) proves it out first, see [Native Desktop App](../features/desktop-app.md)'s
+open VR-entry spike question.
 
 **Entry Criteria**: Act 1 complete — all imagined functionality demonstrated with personal demo capability.
 
-**Key requirements**: Handle 800+ game libraries efficiently, AWS Lambda rate limit mitigation, comprehensive caching, error recovery, multi-user capability, full VR support.
+**Key requirements**: Handle 800+ game libraries efficiently, AWS Lambda rate limit mitigation, comprehensive caching, error recovery, multi-user capability, full VR support, a packaged and downloadable desktop client.
 
 ---
 
@@ -16,10 +27,11 @@
 
 > Features that need to be solid before we hand this to anyone. Bugs here are embarrassing. Scope creep here is a trap.
 
-- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything; CloudFront is the likely choice (cost projection discussion to happen early Act 2); deploy consumes the local **release** artifact — see the Release Pipeline item below for what that build/pack step actually is
-- [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library; performance on first load is acceptable; definition of "correct" pinned before sign-off
-- [Network Rate Limiting](../features/network-rate-limiting.md) — substantially implemented (client `RateLimiter`, batching, backoff, circuit breaker; server-side 429 handling); client-side 429 handling and concurrency cap are the remaining gaps
-- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser, Lambda L1, and S3/Lambda L2 all exist; CloudFront layer and AppDetailsCache TTL are the remaining gaps
+- **Desktop Release Pipeline** — `scripts/release.sh` Steps 3–5 (`yarn build`, `cargo tauri build`, pack `release.zip`) are currently stubbed; **this is now the prerequisite for sharing anything**, replacing Static Hosting's old role. See [Release Pipeline](../plans/release-pipeline-plan.md) for the existing design (Steps 1–2 and 2.5 are done — S3 cache pull/repack, F2P artwork bake).
+- [Desktop Release UI](../features/desktop-release-ui.md) — `#steam-ui` panel gains a "download desktop client (Windows)" path off the anonymous demo store; dev builds show all available options, release builds strip to just the one download button
+- [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library or download the desktop client; performance on first load is acceptable; definition of "correct" pinned before sign-off
+- [Network Rate Limiting](../features/network-rate-limiting.md) — substantially implemented (client `RateLimiter`, batching, backoff, circuit breaker; server-side 429 handling); client-side 429 handling and concurrency cap are the remaining gaps; matters for desktop too — it hits the same Lambda for online-fetch/enrichment
+- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser, Lambda L1, and S3/Lambda L2 all exist; CloudFront layer and AppDetailsCache TTL are the remaining gaps; protects the shared backend regardless of which client hits it
 - [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
 
 ## Gate 2: Act 2 Complete
@@ -49,8 +61,7 @@
 - [Game Box Construction Chain](../features/game-box-construction-chain.md) — typed dependency chain replacing ad-hoc monolithic rebuilds in `LodGameArtworkRenderer`; each pipeline stage is an event with declared prerequisites; enables re-entry at any stage, clean failure signaling, and future taps (LOD streaming, preloading, perf logging); WIP plan, not yet started
 - [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) — north star from the startup/reload self-review: fold the remaining reconcile/full branch in `GameBoxSpawner.resetForLibraryReload()` into one always-diff apply (grow the texture array in place instead of dispose+rebuild on capacity growth); closes two recorded latent issues (full-reset disposal race, reconcile's unbounded slot leak) for free; not urgent on its own, but worth landing before Tier 3 in-session remote refresh (see Desktop Offline-First below) makes the slot-leak issue unbounded
 - Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures
-- ~~Test network isolation~~ — automatic blocking of external calls in tests is **done** (implemented via global fetch intercept in unit/integration test setup)
-- **Traffic safety / Release Pipeline** — reduce Steam-bound request volume before showing this around to anyone; see [Traffic Safety Review](../plans/traffic-safety-review.md). `scripts/release.sh` Steps 1–2 (pull the Lambda's S3 app-details cache, repack into one client-served bundle) and Step 2.5 (bake F2P artwork) are **done** — cuts enrichment traffic to near-zero for already-cached games and eliminates CDN artwork traffic for the anonymous store entirely; see [Release Pipeline](../plans/release-pipeline-plan.md). Steps 3–5 (`yarn build`, `cargo tauri build`, pack `release.zip`) are **not yet implemented** — currently stubbed functions in the same script.
+- **Traffic safety** — reduce Steam-bound request volume before showing this around to anyone; see [Traffic Safety Review](../plans/traffic-safety-review.md). Steps 1–2 (pull the Lambda's S3 app-details cache, repack into one client-served bundle) and Step 2.5 (bake F2P artwork) of the release pipeline are **done** — cuts enrichment traffic to near-zero for already-cached games and eliminates CDN artwork traffic for the anonymous store entirely. Steps 3–5 (the actual build/pack) are now Gate 1's **Desktop Release Pipeline** item above, not a best-effort item.
 - **CDN artwork traffic** — researched (2026-07-09), **both plans done**. [Texture Cache Refactor Plan](../archive/texture-cache-refactor-plan-COMPLETED.md) (Plan 1, archived 2026-07-11) — an audit found the double-fetch bug and MID-tier caching gap it targeted were already fixed by an unrelated artwork-pipeline rewrite; the one remaining item (re-enabling the disabled LOD graphics-settings sliders) was closed out directly. [F2P Artwork Bake](../plans/f2p-artwork-bake-plan.md) (Plan 2, built 2026-07-13): bakes the anonymous-store artwork set into one grid image (~2.6MB) and pre-seeds `PixelDataCache` under the real Steam CDN URL at startup, so the artwork pipeline never needs to know any of it was baked; connected-user libraries are deliberately *not* blanket-baked (per-user, potentially hundreds of MB — Steam's CDN, not our infra, is the right thing serving that traffic, and it's built for public fan-out at a much larger scale than we'd generate).
 - **Low-priority cleanup, not scheduled**: [`metadata-refetch-no-circuit-breaker`](../tech-debt.md#id-metadata-refetch-no-circuit-breaker) — a known (not yet observed) infinite-retry path for locally-seeded cache entries missing genre/category data, surfaced while planning the taxonomy-data-event work; expected to mostly resolve itself once that plan's baked-bundle genre/category harvesting lands, revisit only if it doesn't.
 - **Desktop offline-first refresh behavior** — see [Desktop Offline-First Plan](../plans/desktop-offline-first-plan.md): first real-library test surfaced an automatic online re-fetch firing for the local-scan channel (Round 1: excluded local-scan from the fetch; superseded since — that background re-fetch mechanism, "Fork A," was removed outright and replaced with `SteamIntegration`'s single-source startup waterfall) plus a full scene reset it compounded on top of; a **second** test then corrected the diagnosis — the actual primary cause of the "~300 unnecessary Lambda calls, waiting before the rest of the library loads" complaint is `LocalSteamLibraryLoader` itself blocking its first render on a full network gap-fill (Round 1.5, now top priority, not yet fixed). "Upgrade not replace" refresh redesign (web + desktop) and routing desktop network calls through Tauri's Rust HTTP client remain scheduled after that. Also surfaces [`cors-blocked-local-scan-artwork`](../tech-debt.md#id-cors-blocked-local-scan-artwork) (next thing to fix, and per the second test session, likely conflated with plain 404s — see the plan doc's log-noise section) and [`lod-tier-reset-race-condition`](../tech-debt.md#id-lod-tier-reset-race-condition) (disposal-ordering race breaking every second-and-later launch with a persisted library; fix implemented 2026-07-14, real-relaunch manual verification still open).
@@ -60,6 +71,7 @@
 ## Move to Act 3
 These "best effort" items should get moved from act 2 to "early act 3"
 
+- [Static Hosting](../features/static-hosting.md) — publicly hosting the web client; demoted from Gate 1 (2026-07-22 desktop-first reorientation) to an Act 3 stretch goal, see act3's "Also In Act 3" list
 - Infrastructure monitoring — CloudWatch metrics, client telemetry, cache performance dashboards
 - [Room Variants](../features/room-variants.md) — room structure cleanup first, then variant system; Cozy Basement is the target variant
 - [Post-Processing Effects](../features/postprocessing-effects.md) — SelectiveBloom lands alongside neon signs.
@@ -67,7 +79,7 @@ These "best effort" items should get moved from act 2 to "early act 3"
 
 ## Completion Criteria
 
-- Client is publicly hosted at a stable HTTPS URL
+- Desktop client is packaged and downloadable (Windows) from the anonymous demo store without local dev setup
 - 800+ game libraries load reliably without rate limiting failures
 - Graceful degradation when rate limits are hit
 - Multi-layer caching prevents repeated origin hits
