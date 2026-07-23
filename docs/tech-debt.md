@@ -9,63 +9,15 @@
 - Keep entries short and actionable.
 - Use stable IDs (`## id: ...`) for any debt that has `// TD: ...` source tags.
 - When a debt item is mostly product scope, move details to the feature doc and leave only a short cross-reference here (or remove it entirely).
+- **Section = priority, not just a label.** An entry's home section is a live claim about when it should be picked up — when that claim goes stale (a plan gets deprioritized, a section gets promoted), move the entry, don't just leave it where it was filed.
+  - **Fix Now** — actively worth picking up soon; either cheap/nearly-done or blocking current work. Should stay a short list.
+  - **Act 2** — real, intended work for the current act; not urgent enough to jump the queue, not vague enough to be backlog.
+  - **Later / Backlog** — no active trigger; explicitly deferred, conditional on something else landing first, or genuinely indefinite.
+  - **Resolved** — done. Kept as a one-line record (fix + date), not a full writeup — the code and commit history are the detail; this file is for scanning, not archaeology.
 
 ---
 
-## Fix Now (Intermission)
-
-## id: personal-data-in-git-history
-**Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
-**Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)
-**Context**: The real Steam persona name "spitemonger" (the account owner's own real identity, surfaced while fixing real-account-data test fixtures in `desktop/tauri-app/src/steam/{identity,keyvalues}.rs`) is baked into six **committed** files under `docs/research/local-steam/` — filenames and contents, including a full real game-library dump (`live-games-response-spitemonger.json`, 836 games). Already pushed to the public remote (`github.com/EricWehrly/steam-brick-and-mortar`).
-
-**Decision (for now)**: track it, don't act yet. Revisit when there's bandwidth for a proper history-scrub pass rather than a quick rename (renaming going forward doesn't remove it from history).
-
-**Done when**:
-- Personal-identifying data (persona name, real library contents) is not reachable in git history, not just absent from the current tree
-
-**Related files**: `docs/research/local-steam/live-appids-spitemonger.json`, `live-games-response-spitemonger.json`, `local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`, `local-steam-coverage-local-steam-spitemonger.{json,md}`
-
-## id: appid-keyed-cache-split
-**Priority**: High  
-**Effort**: ~1-2 days (cache model refactor + migration + tests)  
-**Context**: Current cache persistence paths still rely on monolithic single-entry storage patterns (for example one serialized cache blob), which makes per-app invalidation, debugging, and incremental updates harder than needed. Move to appid-keyed entries in a dedicated cache namespace/store instead of extending the single-entry path.
-
-Confirmed evidence: a real `cache_state` blob was found holding 833 `game_<appid>` entries with no source in current `client/src/**/*.ts` that reads or writes that key shape — orphaned from a prior caching scheme, dead weight re-serialized on every save.
-
-**Decision (for now)**:
-- Do not refactor this in the current review pass.
-- Track as high-priority intermission debt and execute in a focused refactor.
-
-**Done when**:
-- Cache entries are keyed by appid (not a single aggregate entry)
-- A separate cache namespace/store is introduced for this data path
-- Invalidation supports per-app purge without wiping unrelated cache entries
-- Read/write paths are updated consistently and covered by unit tests
-- Existing cache data migration (or a safe reset strategy) is documented
-
-**Related files**:
-- `client/src/steam/cache/SimpleCacheManager.ts`
-- `client/src/steam/SteamApiClient.ts`
-- `client/src/steam/GamesLoader.ts`
-
-## id: user-games-cache-entanglement
-**Priority**: Medium  
-**Effort**: ~1 day (model split + migration)  
-**Context**: The app has three logically distinct cache domains — user identity (vanity url → steamid), games (library entities from Steam), and artwork (images). Today the "games" cache entry (`games_<steamid>`) bundles per-profile metadata (`playtime_forever`, etc.) together with the game entity data itself, so clearing/refreshing "the user" and clearing/refreshing "the games" aren't cleanly separable — a user-scoped reset can't touch identity without also reasoning about games data that's keyed by that same identity. See [[appid-keyed-cache-split]] for the related storage-format debt.
-
-**Decision (for now)**:
-- Do not refactor this now. `SteamApiClient.clearCurrentUser()` (added alongside the pause-menu "Clear Profile & Reload" button) only deletes `resolve_*` entries, leaving `games_*` and the artwork cache untouched — this works today because `getCachedUsers()` requires both a `resolve_` and `games_` entry to consider a profile "cached," so deleting just `resolve_` is sufficient to make the app treat no profile as loaded.
-- Revisit if/when per-profile metadata (playtime, hidden/favorite flags, etc.) needs to live somewhere other than inline on the cached game record.
-
-**Done when**:
-- Profile-specific metadata (playtime, etc.) is modeled separately from the shared game entity data
-- User, games, and artwork caches can each be cleared/invalidated independently without special-casing
-
-**Related files**:
-- `client/src/steam/SteamApiClient.ts`
-- `client/src/steam/cache/SimpleCacheManager.ts`
-- `client/src/steam-integration/SteamIntegration.ts`
+## Fix Now
 
 ## id: cache-clear-domain-unification
 **Priority**: Medium  
@@ -109,112 +61,87 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 **Plan reference**:
 - `docs/plans/cache-clear-domain-unification-plan.md`
 
-
-## id: steam-integration-loading-strategy-split
-**Status**: ✅ Resolved 2026-07-22 — split into `OnlineLibraryLoader`/`DemoLibraryLoader`/`ImportLibraryHandler` (plain functions, not classes, matching `LocalSteamLibraryLoader`'s shape); `applyLibrary` stayed on `SteamIntegration` as shared substrate. `SteamIntegration.ts` dropped ~510 → ~365 lines.
-
-## id: autoloadprofile-not-wired-to-startup-waterfall
-**Priority**: High
-**Effort**: ~2-4 hours (small in isolation, but touches the same seam as [[steam-integration-loading-strategy-split]] - re-run the survey step before editing, don't just drop a check in)
-**Context**: `autoLoadProfile` is a real, user-facing `AppSettings` toggle ("Auto-load last used Steam profile" in `GameSettingsPanel`/`game-settings-panel.html`) that persists correctly and defaults to `true`, but nothing in `SteamIntegration`'s startup waterfall (`handleGameStart`) reads it. The waterfall (persisted cache → local disk scan → online fetch → demo) runs unconditionally regardless of the toggle's value - so turning it off currently does nothing.
-
-**Decision (for now)**: track it, don't fix inline. Surfaced during Act 2 post-merge cleanup (the same session that resolved [[steam-integration-loading-strategy-split]]) as a known gap rather than something to patch on top of that already-reworked seam in the same pass.
+## id: legacy-atlas-removal
+**Priority**: Low — narrowed 2026-07-22 after a code audit found the runtime path already LOD-atlas-only
+**Effort**: ~30 min (delete two dead settings, confirm no references)
+**Context**: Originally scoped as "remove legacy atlas renderer paths and settings flags." A code
+audit found `GpuGameBoxRenderer.ts` already instantiates only `LodArtworkOrchestratorDebug` (via
+`IGameArtworkPipeline`, HIGH/MID tiers only) - no conditional legacy-atlas code path exists
+anymore. What's left: `AppSettings.ts`'s `useMultiAtlas` and `useLodAtlas` flags are still defined
+but referenced nowhere else in the codebase - dead settings, not dead code paths.
 
 **Done when**:
-- `handleGameStart` honors `autoLoadProfile === false` by skipping straight past the cache/local-disk/online branches (falling through to demo, or an explicit idle/"choose a profile" state - product call, not yet made) instead of always auto-loading
-- A manual "load my profile" action (existing `LoadLibrary` event path) still works when auto-load is off
+- `useMultiAtlas` and `useLodAtlas` are removed from `AppSettings.ts` (and any settings-panel UI referencing them)
+- Confirmed no other reference exists first (a quick grep, not a refactor)
 
-**Related files**:
-- `client/src/steam-integration/SteamIntegration.ts`
-- `client/src/core/AppSettings.ts`
-- `client/src/ui/pause/panels/GameSettingsPanel.ts`
-
-## id: appsettings-default-vs-override-persistence
-**Priority**: Medium  
-**Effort**: ~1-2 hours  
-**Context**: App settings currently mix environment-derived defaults (Vite `DEV`) with persisted values. We started refactoring persistence to store only explicit overrides vs defaults, but paused to avoid churn during current shipping work.
-
-**Decision (for now)**:
-- Do not tweak this further in current pass.
-- Revisit after current release-critical tasks are complete.
-
-**Done when**:
-- Effective value model is explicitly defined as: runtime defaults + user overrides
-- Persistence behavior is documented and covered by tests (especially `developmentMode`)
-- Reset-to-default behavior in settings panels cannot force dev mode in production builds
-
-**Related files**:
-- `client/src/core/AppSettings.ts`
-- `client/src/ui/pause/panels/GameSettingsPanel.ts`
-## id: room-defaults-ownership
-**Priority**: Medium  
-**Effort**: ~1-2 hours (ownership cleanup + test updates)  
-**Context**: Room spatial defaults are currently split across domains. `RoomManager`/`RoomConstants` defines room defaults while `AppSettings` also hardcodes ceiling defaults (`4.2`). This creates drift risk and unclear ownership for baseline room dimensions.
-
-**Done when**:
-- A single owner is defined for room spatial defaults (including ceiling height; prefer room-domain ownership in `RoomManager`/`RoomConstants`)
-- `AppSettings` consumes room-owned defaults via dependency/bootstrap wiring instead of hardcoded competing values
-- Startup and settings-change tests verify no default mismatch can regress
-
-**When to pick up**:
-- Intermission debt pass after current room/lighting stabilization
-
-**Related files**:
-- `client/src/scene/RoomManager.ts`
-- `client/src/core/AppSettings.ts`
-
-**Source tag**:
-- `// TD: room-defaults-ownership` in `client/src/scene/RoomManager.ts`
-
----
-
-## id: angled-layout-center-aisle-overlap
-**Priority**: High  
-**Effort**: ~0.5-1 day (geometry pass + visual validation)  
-**Context**: In angled layouts (`arc`, `spoke`), shelf bodies can still visually crowd/overlap around center-aisle boundaries under some section distributions. Row layout spacing is currently acceptable; this debt is specifically for angled layout geometry seams.
-
-**Done when**:
-- Shelf body extents (not only shelf centers) are guaranteed to remain outside the reserved center aisle corridor in `arc` and `spoke`
-- No shelf-to-shelf overlap appears in angled layouts at default and high-count section distributions
-- Regression tests cover center-aisle clearance and nearest-neighbor spacing for both angled layouts
-
-**When to pick up**:
-- Early Act 2 (after current intermission layout tuning is merged)
-
-**Related files**:
-- `client/src/scene/props/shared/ArcLayoutUtils.ts`
-- `client/src/scene/props/shared/SpokeLayoutUtils.ts`
-
----
-
-## id: debug-window-consolidation
-**Priority**: Low  
-**Effort**: ~1-2 hours  
-**Context**: Debug classes self-register onto `window` in their own module files (`GpuMemoryEstimator`, `StartupEventTracker`, etc.). This scatters debug setup across the codebase and makes it harder to audit what's exposed in production builds.
-
-**Done when**:
-- A single `debug/DebugRegistry.ts` (or similar) imports all debug classes and attaches them to `window`
-- Individual class files no longer contain `window.*` assignments
-- The registry is only imported from the debug side-effect import site in `SteamBrickAndMortarApp` (already has `import '../debug/GpuMemoryEstimator'`)
-- Easy to tree-shake or gate behind a dev flag if desired
-
----
+**Source tags**:
+- `// TD: legacy-atlas-removal` in `client/src/scene/game-box/GpuGameBoxRenderer.ts`
+- `// TD: legacy-atlas-removal` in `client/src/core/AppSettings.ts`
 
 ## id: logger-level-discoverability
-**Priority**: Medium  
-**Effort**: ~1-2 hours  
-**Context**: Logger defaults are intentionally `info` to control runtime noise, but this behavior is easy to miss during implementation and review. This leads to debug instrumentation being promoted to `info` just to be visible, which pollutes normal logs and creates PR churn.
+**Priority**: Low — narrowed 2026-07-22; `client/README.md` already documents this thoroughly, only the agent-facing half is missing
+**Effort**: ~15 min (port the existing README section, not write new content)
+**Context**: Originally scoped as "no documentation exists for logger-level behavior." A code audit
+found `client/README.md` already documents it well (`setLogLevel()`, `setGlobalLogLevel()`,
+`?debug=true`), but `.github/copilot-instructions.md` - the agent-facing doc this entry actually
+asked for - still has no logger-level section, so an agent session has no reason to know to look
+in the README for it.
 
 **Done when**:
-- A short logger-level section is added to agent-facing instructions (and/or contributor docs) that clearly states default logger level behavior and how to temporarily enable `debug`
-- The preferred policy is documented: diagnostic instrumentation should default to `debug` unless explicitly needed at `info`
-- There is a single discoverable reference for runtime log-level toggling during debugging sessions
+- A short logger-level section (or a pointer to `client/README.md`'s existing one) is added to `.github/copilot-instructions.md`
 
 **Related files**:
 - `.github/copilot-instructions.md`
 - `client/README.md`
 
+## id: appid-keyed-cache-split
+**Priority**: High  
+**Effort**: ~1-2 days (cache model refactor + migration + tests)  
+**Context**: Current cache persistence paths still rely on monolithic single-entry storage patterns (for example one serialized cache blob), which makes per-app invalidation, debugging, and incremental updates harder than needed. Move to appid-keyed entries in a dedicated cache namespace/store instead of extending the single-entry path.
+
+Confirmed evidence: a real `cache_state` blob was found holding 833 `game_<appid>` entries with no source in current `client/src/**/*.ts` that reads or writes that key shape — orphaned from a prior caching scheme, dead weight re-serialized on every save.
+
+**Decision (for now)**:
+- Track as high-priority debt and execute in a focused refactor when picked up — not urgent enough to interrupt current desktop-release work, but cheap to scope and shouldn't drift indefinitely.
+
+**Done when**:
+- Cache entries are keyed by appid (not a single aggregate entry)
+- A separate cache namespace/store is introduced for this data path
+- Invalidation supports per-app purge without wiping unrelated cache entries
+- Read/write paths are updated consistently and covered by unit tests
+- Existing cache data migration (or a safe reset strategy) is documented
+
+**Related files**:
+- `client/src/steam/cache/SimpleCacheManager.ts`
+- `client/src/steam/SteamApiClient.ts`
+- `client/src/steam/GamesLoader.ts`
+
 ---
+
+## Act 2
+
+> Real, intended work for the desktop-first Act 2 push — not urgent enough to jump the Fix Now queue, active enough that it shouldn't be treated as indefinite backlog.
+
+## id: angled-layout-center-aisle-overlap
+**Priority**: Medium — downgraded 2026-07-22; both layouts already account for shelf body width, remaining gap is narrower than originally scoped
+**Effort**: ~2-4 hours (targeted validation + any remaining arc-specific fix, down from a full geometry pass)
+**Context**: Originally scoped as "shelf bodies can still crowd/overlap in `arc`/`spoke`, spacing is center-point-only." A code audit found real progress already landed (commit `0d739a7f`,
+2026-05-01): **Arc** now factors shelf half-width into its center-aisle config
+(`centerAisleHalfWidthX: AISLE_HALF_WIDTH_X + DEFAULT_SHELF_HALF_WIDTH_X`) and derives per-row
+clearance angle from it; **Spoke** has explicit body-extent enforcement via
+`enforceCenterRunnerAisleX()`, computing minimum shelf-center position from shelf half-width
+directly. What's unconfirmed: whether Arc's angle-based approach still has gaps under some section
+distributions (the original "under some section distributions" phrasing may still apply there
+specifically) - needs visual validation, not a redesign.
+
+**Done when**:
+- Visual validation confirms (or disproves) remaining overlap in `arc` specifically, across default and high-count section distributions
+- If a gap is found, a targeted fix lands for that case only - the general shelf-body-extent mechanism already exists in both layouts
+- Regression tests cover center-aisle clearance and nearest-neighbor spacing for both angled layouts
+
+**Related files**:
+- `client/src/scene/props/shared/ArcLayoutUtils.ts`
+- `client/src/scene/props/shared/SpokeLayoutUtils.ts`
 
 ## id: placement-headroom-policy
 **Priority**: High  
@@ -229,8 +156,6 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 **Source tag**:
 - `// TD: placement-headroom-policy` in `client/src/scene/spawning/GameBoxSpawner.ts`
-
----
 
 ## id: instanced-mesh-memory-envelope
 **Priority**: High  
@@ -252,12 +177,162 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 **Related files**:
 - `client/test/visual/wip/instance-limit-memory-experiment.spec.ts` (intentionally skipped)
 
+## id: cors-blocked-local-scan-artwork
+**Priority**: Medium — directly affects the desktop release's first impression (local-scan-loaded libraries are the desktop-native path)
+**Effort**: Not yet scoped — depends which of the two options in the plan doc gets picked (a
+narrow placeholder-artwork fallback vs. folding into the larger Rust-HTTP-client migration)
+**Context**: `ArtworkUrls.ts`'s `deriveArtworkFromAppId()` guesses a direct Steam CDN URL
+(`cdn.akamai.steamstatic.com/steam/apps/<appid>/library_600x900.jpg`) for games with no real
+capsule/header URL. Desktop's local-scan entries always lack one (local scan can't discover the
+CDN hash), so this fallback now runs at whole-library scale instead of its original rare-fallback
+use — observed ~1240 CORS-blocked `fetch()` calls in one real test session. Doesn't block the
+library from loading, but artwork for most locally-resolved games is currently broken/missing.
+
+**Decision (for now)**:
+- See `docs/plans/desktop-offline-first-plan.md`'s "Next up" section for
+  the two considered approaches - decide between them before starting.
+
+**Done when**:
+- Locally-resolved games with no real artwork URL either get real artwork through a CORS-safe
+  path, or degrade to an intentional placeholder - not a silently-failed cross-origin fetch either way
+
+**Related files**:
+- `client/src/steam/utils/ArtworkUrls.ts`
+- `docs/plans/desktop-offline-first-plan.md`
+
+## id: test-suite-runtime-cost-reduction
+**Priority**: High  
+**Effort**: ~0.5-1 day (narrowed 2026-07-22 — infra already exists, see below; remaining work is the audit + guideline doc, not building tooling)
+**Context**: Runtime cost is still inflated by overlapping unit/integration coverage and expensive setup paths. Directly relevant to the input-system and framerate-regression tracks both starting now — fast iteration on either depends on the test suite staying cheap to run. A code audit found the *detection* infra already exists — `client/test/reporters/summary-reporter.ts` flags tests over 2s as "SLOW (>2s)", and `vitest.config.ts` already tiers unit/integration/visual/live suites. What's missing is the audit itself (using that existing signal) and a documented "cheap tests first" guideline — no such policy exists anywhere in `docs/` or the CLAUDE.md files yet.
+
+**Done when**:
+- Slow/duplicative tests (per the existing SLOW reporter) are audited and grouped by overlap reason
+- Expensive integration assertions that are already covered at unit level are reduced or replaced
+- Runtime improves measurably without reducing behavioral coverage guarantees
+- A short "cheap tests first" guideline is written into `client/CLAUDE.md`'s Testing section (or similar) for future additions
+
+## id: shadow-default-policy-evaluation
+**Priority**: Medium — bumped from Low; a candidate contributor to the frame-time regression under investigation (see [Framerate Regression Investigation Plan](../plans/framerate-regression-investigation-plan.md))
+**Effort**: ~0.5 day (extend the existing policy to meshes, not design one from scratch — narrowed 2026-07-22)
+**Context**: A code audit found this is further along than "still all per-object flags" suggested:
+a `ShadowPolicy.ts` module already exists (`applyLightShadowPolicy()` etc.) and is applied to
+lights in `LightingRenderer.ts` — the centralized-policy design question for *lights* is already
+answered. What's still per-object, at creation sites, with no policy: mesh objects — floors
+(`RoomManager.ts`), signage (`SignageRenderer.ts`, `BlockLetterSignRenderer.ts`,
+`NeonTubeSignRenderer.ts`). The open question narrows to: does `ShadowPolicy.ts`'s existing
+approach extend cleanly to meshes, or do meshes need a different policy shape than lights did.
+
+**Done when**:
+- A short recommendation on extending `ShadowPolicy.ts` (or a mesh-specific sibling) to the mesh creation sites listed above
+- Tradeoffs are explicit for performance, visual correctness, and accidental over-shadowing risk
+- If adopted, a bounded rollout plan exists with clear exclusions (transparent surfaces, emissive signage, special-effect meshes)
+
+**Related files**:
+- `client/src/scene/RoomManager.ts`
+- `client/src/scene/SignageRenderer.ts`
+- `client/src/scene/signs/BlockLetterSignRenderer.ts`
+- `client/src/scene/signs/NeonTubeSignRenderer.ts`
+- `client/src/scene/LightingRenderer.ts`
+
+**Plan reference**:
+- `docs/plans/lighting-shadow-refactor-plan.md`
+
 ---
 
-## id: carpet-worker-offload
-**Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
+## Later / Backlog
 
----
+> No active trigger — explicitly deferred, conditional on something else landing first, or indefinite. Revisit when the stated condition is met, not on a schedule.
+
+## id: personal-data-in-git-history
+**Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
+**Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)
+**Context**: The real Steam persona name "spitemonger" (the account owner's own real identity, surfaced while fixing real-account-data test fixtures in `desktop/tauri-app/src/steam/{identity,keyvalues}.rs`) is baked into six **committed** files under `docs/research/local-steam/` — filenames and contents, including a full real game-library dump (`live-games-response-spitemonger.json`, 836 games). Already pushed to the public remote (`github.com/EricWehrly/steam-brick-and-mortar`).
+
+**Decision (for now)**: track it, don't act yet. Revisit when there's bandwidth for a proper history-scrub pass rather than a quick rename (renaming going forward doesn't remove it from history).
+
+**Done when**:
+- Personal-identifying data (persona name, real library contents) is not reachable in git history, not just absent from the current tree
+
+**Related files**: `docs/research/local-steam/live-appids-spitemonger.json`, `live-games-response-spitemonger.json`, `local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`, `local-steam-coverage-local-steam-spitemonger.{json,md}`
+
+## id: user-games-cache-entanglement
+**Priority**: Medium  
+**Effort**: ~1 day (model split + migration)  
+**Context**: The app has three logically distinct cache domains — user identity (vanity url → steamid), games (library entities from Steam), and artwork (images). Today the "games" cache entry (`games_<steamid>`) bundles per-profile metadata (`playtime_forever`, etc.) together with the game entity data itself, so clearing/refreshing "the user" and clearing/refreshing "the games" aren't cleanly separable — a user-scoped reset can't touch identity without also reasoning about games data that's keyed by that same identity. See [[appid-keyed-cache-split]] for the related storage-format debt.
+
+**Decision (for now)**:
+- Do not refactor this now. `SteamApiClient.clearCurrentUser()` (added alongside the pause-menu "Clear Profile & Reload" button) only deletes `resolve_*` entries, leaving `games_*` and the artwork cache untouched — this works today because `getCachedUsers()` requires both a `resolve_` and `games_` entry to consider a profile "cached," so deleting just `resolve_` is sufficient to make the app treat no profile as loaded.
+- Revisit if/when per-profile metadata (playtime, hidden/favorite flags, etc.) needs to live somewhere other than inline on the cached game record.
+
+**Done when**:
+- Profile-specific metadata (playtime, etc.) is modeled separately from the shared game entity data
+- User, games, and artwork caches can each be cleared/invalidated independently without special-casing
+
+**Related files**:
+- `client/src/steam/SteamApiClient.ts`
+- `client/src/steam/cache/SimpleCacheManager.ts`
+- `client/src/steam-integration/SteamIntegration.ts`
+
+## id: autoloadprofile-not-wired-to-startup-waterfall
+**Priority**: High — for whenever it's picked up; deliberately not Fix Now (touches the just-reworked startup-waterfall seam, see [[steam-integration-loading-strategy-split]])
+**Effort**: ~2-4 hours (small in isolation, but touches the same seam as [[steam-integration-loading-strategy-split]] - re-run the survey step before editing, don't just drop a check in)
+**Context**: `autoLoadProfile` is a real, user-facing `AppSettings` toggle ("Auto-load last used Steam profile" in `GameSettingsPanel`/`game-settings-panel.html`) that persists correctly and defaults to `true`, but nothing in `SteamIntegration`'s startup waterfall (`handleGameStart`) reads it. The waterfall (persisted cache → local disk scan → online fetch → demo) runs unconditionally regardless of the toggle's value - so turning it off currently does nothing.
+
+**Decision (for now)**: track it, don't fix inline. Surfaced during Act 2 post-merge cleanup (the same session that resolved [[steam-integration-loading-strategy-split]]) as a known gap rather than something to patch on top of that already-reworked seam in the same pass. Roadmap placement: `docs/acts/act2-ready-for-friends.md`'s "Move to Act 3" list.
+
+**Done when**:
+- `handleGameStart` honors `autoLoadProfile === false` by skipping straight past the cache/local-disk/online branches (falling through to demo, or an explicit idle/"choose a profile" state - product call, not yet made) instead of always auto-loading
+- A manual "load my profile" action (existing `LoadLibrary` event path) still works when auto-load is off
+
+**Related files**:
+- `client/src/steam-integration/SteamIntegration.ts`
+- `client/src/core/AppSettings.ts`
+- `client/src/ui/pause/panels/GameSettingsPanel.ts`
+
+## id: appsettings-default-vs-override-persistence
+**Priority**: Medium  
+**Effort**: ~1-2 hours  
+**Context**: App settings currently mix environment-derived defaults (Vite `DEV`) with persisted values. We started refactoring persistence to store only explicit overrides vs defaults, but paused to avoid churn during current shipping work.
+
+**Decision (for now)**:
+- Revisit after current release-critical tasks are complete.
+
+**Done when**:
+- Effective value model is explicitly defined as: runtime defaults + user overrides
+- Persistence behavior is documented and covered by tests (especially `developmentMode`)
+- Reset-to-default behavior in settings panels cannot force dev mode in production builds
+
+**Related files**:
+- `client/src/core/AppSettings.ts`
+- `client/src/ui/pause/panels/GameSettingsPanel.ts`
+
+## id: room-defaults-ownership
+**Priority**: Medium  
+**Effort**: ~1-2 hours (ownership cleanup + test updates)  
+**Context**: Room spatial defaults are currently split across domains. `RoomManager`/`RoomConstants` defines room defaults while `AppSettings` also hardcodes ceiling defaults (`4.2`). This creates drift risk and unclear ownership for baseline room dimensions.
+
+**Done when**:
+- A single owner is defined for room spatial defaults (including ceiling height; prefer room-domain ownership in `RoomManager`/`RoomConstants`)
+- `AppSettings` consumes room-owned defaults via dependency/bootstrap wiring instead of hardcoded competing values
+- Startup and settings-change tests verify no default mismatch can regress
+
+**Related files**:
+- `client/src/scene/RoomManager.ts`
+- `client/src/core/AppSettings.ts`
+
+**Source tag**:
+- `// TD: room-defaults-ownership` in `client/src/scene/RoomManager.ts`
+
+## id: debug-window-consolidation
+**Priority**: Low  
+**Effort**: ~1-2 hours  
+**Context**: Debug classes self-register onto `window` in their own module files (`GpuMemoryEstimator`, `StartupEventTracker`, etc.). This scatters debug setup across the codebase and makes it harder to audit what's exposed in production builds.
+
+**Done when**:
+- A single `debug/DebugRegistry.ts` (or similar) imports all debug classes and attaches them to `window`
+- Individual class files no longer contain `window.*` assignments
+- The registry is only imported from the debug side-effect import site in `SteamBrickAndMortarApp` (already has `import '../debug/GpuMemoryEstimator'`)
+- Easy to tree-shake or gate behind a dev flag if desired
 
 ## id: shelf-end-cap-signs
 **Priority**: Low  
@@ -271,7 +346,7 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 **Source tags**:  
 - `// TD: shelf-end-cap-signs` in `client/src/scene/SceneSignManager.ts`
 
----
+## id: system-events-split
 **Priority**: Low  
 **Effort**: ~1-2 hours  
 **Context**: `InteractionEvents.ts` already has a `// TD` noting it conflates user interaction events with system lifecycle events. The new `AppEventTypes` entries (`WorldDetailEnhanced`, `StoreFirstContentReady`, `StoreFullyPopulated`) are system events masquerading as app/UI events because there's nowhere better to put them yet.
@@ -284,42 +359,6 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 **Source tags**:  
 - `// TD: system-events-split` in `client/src/types/InteractionEvents.ts`
-
----
-**Priority**: High  
-**Effort**: ~1 day  
-**Context**: `GpuGameBoxRenderer` still carries legacy atlas renderer paths and settings flags that are no longer part of the intended steady-state architecture.
-
-**Done when**:
-- Legacy single/multi-atlas code paths are removed
-- LOD atlas is the only supported runtime path
-- Obsolete settings flags are removed from `AppSettings`
-- Dead renderer files are deleted (if truly unreferenced)
-
-**Related feature/doc context**:
-- `docs/features/gamesort-full-pipeline.md` (renderer simplification context)
-- `docs/archive/hot-path-refactoring-plan.md` (historical breakdown)
-
-**Source tags**:
-- `// TD: legacy-atlas-removal` in `client/src/scene/game-box/GpuGameBoxRenderer.ts`
-- `// TD: legacy-atlas-removal` in `client/src/core/AppSettings.ts`
-
----
-
-## id: approximated-placement-tripwire
-**Priority**: Medium  
-**Effort**: 1-2 hours (investigation + assertion hardening)  
-**Context**: Placement helpers include approximation/tripwire behavior that should be made explicit and verified against real placement flows.
-
-**Done when**:
-- Current approximation assumptions are documented inline
-- Guard rails/tests fail loudly when placement semantics drift
-- The debt can be removed or replaced with explicit invariant checks
-
-**Source tag**:
-- `// TD: approximated-placement-tripwire` in `client/src/scene/props/shared/GameBoxUtils.ts`
-
----
 
 ## id: sticker-coordinator
 **Priority**: Medium  
@@ -336,10 +375,6 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 **Source tag**:
 - `// TD: sticker-coordinator` in `client/src/scene/stickers/ShelfStickerHandler.ts`
-
----
-
-## Later (only true debt, not feature wish-list)
 
 ## id: metadata-refetch-no-circuit-breaker
 **Priority**: Low  
@@ -369,113 +404,6 @@ in on purpose is bad form — track it rather than let it go unrecorded.
 - `client/src/steam/GamesLoader.ts`
 - `client/src/steam/LocalSteamDataWriter.ts`
 - `docs/plans/taxonomy-data-event-plan.md`
-
-## id: lod-tier-reset-race-condition
-**Status**: Implemented (2026-07-14) — code + unit tests in, `yarn tsc`/`yarn test` clean
-(1163 passed). **Not yet manually verified against a real relaunch-with-persisted-library** on
-the desktop app itself — that verification is still open, see "Done when" below.
-**Context**: First observed via a `LibraryReloadRequest` mid-session reset (see
-`docs/plans/desktop-offline-first-plan.md`), and initially assessed as dormant once that specific
-trigger (Fork A firing for local-scan) was fixed. **That assessment was wrong** — a follow-up test
-(quit the desktop app, relaunch) reproduced it again, worse: 1328 `[LodTextureArrayManager] ERROR
-Unknown tier: mid` lines, plus `No label slots remaining` (956 occurrences) and elevated
-worker/postMessage traffic, across a 22,413-line log (vs. zero tier errors on the immediately-prior
-first-load-of-the-session log). A "startup-ordering race" theory was considered next and was also
-wrong.
-
-**Actual root cause (confirmed via code trace)**: a **disposal-ordering race**, not a startup
-race. `GameBoxSpawner.fullReset()` synchronously disposes `LodArtworkOrchestrator` (and its
-`LodTextureArrayManager`/renderer) on `StorePropsEventTypes.LibraryReloadRequest`, but in-flight
-`ArtworkPrefetchCoordinator`-initiated fetch promises for the *previous* library aren't cancelled —
-when they resolve afterward, they call back into the now-disposed orchestrator and write into its
-cleared `tiers` map, which no longer has a `mid` entry. `fullReset()` also unconditionally
-recreates the whole texture-array pipeline at a new capacity, even when the incoming library would
-fit the existing arrays (e.g. relaunching with the *same* persisted library) — the blanket dispose
-is a bigger hammer than the actual reason it exists (WebGL `DataArrayTexture` depth is fixed at
-construction, so capacity *growth* genuinely needs a new array — see
-`docs/architecture/label-and-placement-reset-architecture-review.md`'s new "Library Reload Reset"
-section for the full reasoning and the planned two-tier design).
-
-**Fix implemented, then simplified further after a self-review pass**
-(`docs/plans/startup-reload-review-findings.md` F1/F3; supersedes an earlier `isDisposed`-guard
-prototype built by a background agent in an unmerged worktree, and an intermediate
-soft-reset-plus-`generation`-counter design that shipped first and was then deleted once its only
-remaining caller turned out to be redundant):
-1. `GameBoxSpawner.resetForLibraryReload()` reconciles instead of disposing when the reload is
-   **capacity-compatible** (incoming library fits the already-allocated arrays — via
-   `incomingGameCount` on `StorePropsLibraryReloadRequestEvent` compared against a tracked
-   `currentTextureCapacity`) **and** the caller supplied `removedGameNames` (which appid names are
-   actually gone/renamed). `SteamIntegration.applyLibrary()` is the only caller that does — it
-   diffs the incoming library against `this.gameLibrary`'s current state via
-   `computeLibraryDiff()` (`Library.ts`), computed against *live rendered state*, not something a
-   caller upstream has to compute and thread through. Any other case (capacity-incompatible, or no
-   diff info at all — an online reload that hasn't fetched data yet) falls back to disposing and
-   rebuilding at the new capacity, same as before this debt item existed.
-2. Reconcile path: `GpuGameBoxRenderer.reconcileForLibraryReload()` →
-   `LodArtworkOrchestrator.reconcileForLibraryReload()`. Nothing is disposed, and — unlike the
-   deleted soft-reset design — nothing is rewound either. Only the removed/renamed games' entries
-   are cleared from `gameNameToTextureIndex`/`prefetchedHighArtworkUrl`, plus
-   `HighTextureCache.unregisterGame()` for their HIGH-tier registration (its `registerGame()`
-   already no-ops on a still-registered slot index, which would otherwise leak the previous
-   library's HIGH registration into a reused slot). Every other game's mapping is untouched, so
-   `prefetchArtwork()`'s existing "already mapped" check makes re-resolving it a no-op — the
-   practical win over the old soft-reset design: a relaunch that only gained/lost one game no
-   longer re-fetches artwork for the other 1,000+.
-3. No `generation` counter. It existed to guard against a late-resolving fetch writing into a slot
-   the soft reset had just reassigned to a different game — reconcile never reassigns a *kept*
-   game's slot, so that race doesn't exist anymore. (A removed game's own in-flight fetch can still
-   resolve after reconcile and silently re-populate its own now-deleted map entry — harmless, since
-   nothing places a game that's absent from the new library; tracked as an accepted edge case in
-   the review findings, not re-guarded against.)
-4. Capacity-incompatible / no-diff-info path: unchanged from the original fix — dispose + rebuild
-   at the new capacity.
-
-**Done when**:
-- [x] `GameBoxSpawner` no longer disposes/rebuilds the artwork pipeline for a same-capacity reload
-  with known diff info
-- [x] Unit coverage: `LodArtworkOrchestrator.test.ts` (reconcile keeps survivors' slots, clears
-  removed games'), `HighTextureCache.test.ts` (`unregisterGame` clears a slot for reuse),
-  `GameBoxSpawner.test.ts` (reconcile vs full-reset routing, including the "capacity-compatible but
-  no diff info" case), `import-library.test.ts` (`computeLibraryDiff`/`isDiffEmpty`, and
-  `applyLibrary` computing `removedGameNames` against live state for any import channel)
-- [x] Demo store → real library (capacity-incompatible) transition still works via the dispose path,
-  unchanged behavior (existing tests for this path still pass unmodified)
-- [ ] Manually verified against a real relaunch-with-persisted-library on the desktop app (no
-  `Unknown tier: mid` errors, no stale artwork bleed between libraries) — open
-
-**Residual risk, quieted 2026-07-16**: the same `Unknown tier: mid` symptom is still latently
-reachable through the surviving **full** reset path (capacity growth, e.g. demo → real library) —
-in-flight prefetches from the outgoing library can resolve after `dispose()` clears the tier map.
-"Usually settles before the ~3.5s scan completes on first launch" stopped holding once
-`SteamIntegration`'s Fork A background refresh lost its `local-scan` exclusion (see the diff-based
-Fork A reset work the same day) - that full-dispose path became reachable on every desktop launch
-instead of a rare edge case, and the noisy `ERROR Unknown tier: mid` log came back at volume.
-`LodTextureArrayManager` now tracks its own `disposed` flag, set in `dispose()`; `setSlotPixels()`
-checks it first and logs at `debug` instead of `error` for a post-dispose write, since this was
-never really an "unknown tier" - it's an expected disposed-instance race. The full-reset dispose
-path itself is unchanged (still correct when capacity actually needs to grow) - this only fixes
-the misleading log level. Closed permanently (not just quieted) if/when
-[Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) removes the full-reset
-dispose path entirely.
-
-**Update 2026-07-22**: the "every desktop launch instead of a rare edge case" frequency claim above
-is stale. Fork A (the background refresh that had lost its `local-scan` exclusion) is gone
-entirely now, replaced by `SteamIntegration`'s single-source startup waterfall - there's no
-automatic re-fetch to trigger the full-dispose path on a normal relaunch anymore. It's reachable
-only for a genuine capacity-incompatible transition (e.g. demo → real library, or an online fetch
-landing on top of an existing library), back to being the rare case it was originally scoped for.
-The `disposed`-flag log-level fix above is still correct and still worth having regardless. Manual
-relaunch verification (last "Done when" box) remains open.
-
-**Related files**:
-- `client/src/scene/spawning/GameBoxSpawner.ts`
-- `client/src/scene/spawning/ArtworkPrefetchCoordinator.ts`
-- `client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts`
-- `client/src/scene/game-box/instancing/LodTextureArrayManager.ts`
-- `client/src/scene/game-box/instancing/PlacementRunResettableInstancedBase.ts`
-- `client/src/scene/props/PropsEvents.ts` (`StorePropsEventTypes.LibraryReloadRequest`)
-- `docs/architecture/label-and-placement-reset-architecture-review.md`
-- `docs/plans/desktop-offline-first-plan.md`
 
 ## id: reconcile-slot-leak-on-repeated-reload
 **Priority**: Low — gated on Tier 3, not yet built
@@ -508,31 +436,6 @@ regardless).
 - `docs/features/idempotent-library-scene-sync.md`
 - `docs/plans/desktop-startup-load-ordering-plan.md`
 
-## id: cors-blocked-local-scan-artwork
-**Priority**: Medium — flagged as the next thing to fix after the offline-first plan's rounds are scheduled
-**Effort**: Not yet scoped — depends which of the two options in the plan doc gets picked (a
-narrow placeholder-artwork fallback vs. folding into the larger Rust-HTTP-client migration)
-**Context**: `ArtworkUrls.ts`'s `deriveArtworkFromAppId()` guesses a direct Steam CDN URL
-(`cdn.akamai.steamstatic.com/steam/apps/<appid>/library_600x900.jpg`) for games with no real
-capsule/header URL. Desktop's local-scan entries always lack one (local scan can't discover the
-CDN hash), so this fallback now runs at whole-library scale instead of its original rare-fallback
-use — observed ~1240 CORS-blocked `fetch()` calls in one real test session. Doesn't block the
-library from loading, but artwork for most locally-resolved games is currently broken/missing.
-
-**Decision (for now)**:
-- Not fixed this session. See `docs/plans/desktop-offline-first-plan.md`'s "Next up" section for
-  the two considered approaches - decide between them before starting.
-
-**Done when**:
-- Locally-resolved games with no real artwork URL either get real artwork through a CORS-safe
-  path, or degrade to an intentional placeholder - not a silently-failed cross-origin fetch either way
-
-**Related files**:
-- `client/src/steam/utils/ArtworkUrls.ts`
-- `docs/plans/desktop-offline-first-plan.md`
-
----
-
 ## id: library-game-appid-metadata-duplication
 **Priority**: Low  
 **Effort**: ~1 day (new appid-keyed store + wiring) if ever picked up  
@@ -550,8 +453,6 @@ library from loading, but artwork for most locally-resolved games is currently b
 - `client/src/steam-integration/SteamIntegration.ts`
 - `client/public/bookmarklets/export-library.js`
 
----
-
 ## id: aisle-terminology-main-vs-row
 **Priority**: Low  
 **Effort**: ~1-2 hours  
@@ -564,8 +465,6 @@ library from loading, but artwork for most locally-resolved games is currently b
 
 **Related docs**:
 - `docs/acts/act3-ready-for-everyone.md`
-
----
 
 ## id: layout-math-renderer-decoupling
 **Priority**: Low  
@@ -585,21 +484,6 @@ library from loading, but artwork for most locally-resolved games is currently b
 - `client/src/scene/props/shared/RowLayoutUtils.ts`
 - `client/src/scene/props/shared/SpokeLayoutUtils.ts`
 
----
-
-## id: test-suite-runtime-cost-reduction
-**Priority**: High  
-**Effort**: ~0.5-1 day (audit + targeted rewrites)  
-**Context**: Runtime cost is still inflated by overlapping unit/integration coverage and expensive setup paths. We want equivalent behavioral confidence with cheaper deterministic tests first.
-
-**Done when**:
-- Slow/duplicative tests are audited and grouped by overlap reason
-- Expensive integration assertions that are already covered at unit level are reduced or replaced
-- Runtime improves measurably without reducing behavioral coverage guarantees
-- A short "cheap tests first" guideline exists for future additions
-
----
-
 ## id: playwright-scene-health-collector
 **Priority**: Low  
 **Effort**: ~1 day (collector wiring + baseline report)  
@@ -609,8 +493,6 @@ library from loading, but artwork for most locally-resolved games is currently b
 - A single pass per mode captures logs, memory snapshot, startup smoothness, and screenshot pointer
 - Collection avoids duplicate app loads and output clobbering
 - Output format is stable enough to compare runs over time
-
----
 
 ## id: conventions-codification
 **Priority**: Medium  
@@ -622,39 +504,41 @@ library from loading, but artwork for most locally-resolved games is currently b
 - Reference is linked from contributor/agent docs
 - New reviews can point to the single source instead of restating policy
 
----
-
-## id: shadow-default-policy-evaluation
-**Priority**: Low  
-**Effort**: ~0.5 day (research + recommendation)  
-**Context**: Shadow participation is currently configured per-object (`castShadow` / `receiveShadow`) at creation sites. This is explicit but easy to miss and can drift. We should evaluate whether a universal/default shadow policy can be applied safely (for example through shared creation helpers or policy wrappers), versus keeping only per-object flags.
+## id: game-artwork-box-shading-plan
+**Priority**: Medium — narrowed 2026-07-22; artwork boxes are already resolved, only labels remain
+**Effort**: ~1 day (labels only, down from the original spike+full-implementation estimate)
+**Context**: Originally scoped as "instanced game artwork/labels use custom ShaderMaterial
+pipelines with no lighting/shadow chunks." A code audit found **artwork is already resolved** -
+`LitArtworkMaterial.ts` uses `MeshStandardMaterial` with shader injection anchored at
+`#include <map_fragment>`/`#include <roughnessmap_fragment>`, so lighting/shadow chunks are
+preserved. **Labels are not**: `InstancedLabelRenderer.ts` uses a raw `ShaderMaterial`
+(`instanced-label.frag`) that only samples a texture - no lighting chunks, so labels neither cast
+nor visually receive shadow.
 
 **Done when**:
-- We have a short recommendation doc comparing approaches: per-object only vs centralized defaults/policy wrappers
-- Tradeoffs are explicit for performance, visual correctness, and accidental over-shadowing risk
-- If a centralized approach is chosen, a bounded rollout plan exists with clear exclusions (transparent surfaces, emissive signage, special-effect meshes)
+- A chosen shading approach is documented and implemented for instanced label boxes specifically
+- Lighting/shadow behavior is validated across at least one quality tier and one fallback tier
+- Regression coverage exists for shadow participation assumptions in the label renderer
 
 **Related files**:
-- `client/src/scene/RoomManager.ts`
-- `client/src/scene/SignageRenderer.ts`
-- `client/src/scene/signs/BlockLetterSignRenderer.ts`
-- `client/src/scene/signs/NeonTubeSignRenderer.ts`
-- `client/src/scene/LightingRenderer.ts`
-
-**Plan reference**:
-- `docs/plans/lighting-shadow-refactor-plan.md`
-
----
-
-## id: game-artwork-box-shading-plan
-**Priority**: Medium  
-**Effort**: ~1-2 days (spike + implementation)  
-**Context**: Instanced game artwork/labels use custom ShaderMaterial pipelines that do not currently include Three.js lighting/shadow chunks, so boxes can cast but not visually receive lighting/shadow in a physically coherent way.
-
-**Done when**:
-- A chosen shading approach is documented and implemented for instanced artwork boxes
-- Lighting/shadow behavior is validated across at least one quality tier and one fallback tier
-- Regression coverage exists for shadow participation assumptions in instanced box renderers
+- `client/src/scene/game-box/instancing/InstancedLabelRenderer.ts`
+- `client/src/scene/game-box/materials/LitArtworkMaterial.ts` (the already-resolved reference implementation)
 
 **Plan reference**:
 - `docs/plans/game-artwork-box-shading-plan.md`
+
+---
+
+## Resolved
+
+## id: steam-integration-loading-strategy-split
+**Status**: ✅ Resolved 2026-07-22 — split into `OnlineLibraryLoader`/`DemoLibraryLoader`/`ImportLibraryHandler` (plain functions, not classes, matching `LocalSteamLibraryLoader`'s shape); `applyLibrary` stayed on `SteamIntegration` as shared substrate. `SteamIntegration.ts` dropped ~510 → ~365 lines.
+
+## id: lod-tier-reset-race-condition
+**Status**: ✅ Resolved 2026-07-22 — `GameBoxSpawner.resetForLibraryReload()` reconciles instead of disposing on capacity-compatible reloads (`LodArtworkOrchestrator.reconcileForLibraryReload()`); manually verified against a real desktop relaunch-with-persisted-library, no `Unknown tier: mid` errors. Residual (log-level only, not a bug): the surviving full-dispose path (capacity-incompatible transitions, e.g. demo → real library) still logs a disposed-instance race, now at `debug` not `error`; closes permanently once [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) removes that path.
+
+## id: carpet-worker-offload
+**Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
+
+## id: approximated-placement-tripwire
+**Status**: ✅ Resolved (date not tracked — confirmed via code audit 2026-07-22) — approximation assumptions documented inline (`GameBoxUtils.ts:9-13`, explicitly framed as a deliberate tripwire for model-sync regressions) and covered by `client/test/unit/scene/placement-tripwire.test.ts`.
