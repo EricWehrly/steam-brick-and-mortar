@@ -188,12 +188,6 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             [InputAction.ToggleUI]: [
                 { type: 'keyboard-button', code: 'Tab', label: 'Tab' }
             ],
-            [InputAction.RollLeft]: [
-                { type: 'keyboard-button', code: 'KeyQ', label: 'Q' }
-            ],
-            [InputAction.RollRight]: [
-                { type: 'keyboard-button', code: 'KeyE', label: 'E' }
-            ],
             [InputAction.Sprint]: [
                 { type: 'keyboard-button', code: 'ShiftLeft', label: 'Left Shift' },
                 { type: 'keyboard-button', code: 'ShiftRight', label: 'Right Shift' }
