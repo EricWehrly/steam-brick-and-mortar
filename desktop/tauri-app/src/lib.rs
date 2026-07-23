@@ -8,6 +8,8 @@ pub fn run() {
             steam::playtime::read_steam_playtimes,
             steam::collections::read_steam_collections,
             steam::appinfo::read_local_app_metadata,
+            steam::screenshots::read_local_screenshots,
+            steam::screenshots::read_local_screenshot_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
