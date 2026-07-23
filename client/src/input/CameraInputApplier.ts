@@ -4,6 +4,8 @@ import type { MovementOptions } from './InputContracts'
 import { InputActionResolver } from './InputActionResolver'
 
 export class CameraInputApplier {
+    private static readonly ROLL_RADIANS_PER_FRAME = 0.02
+
     updateMovement(
         camera: THREE.Camera,
         actionResolver: InputActionResolver,
@@ -35,6 +37,13 @@ export class CameraInputApplier {
         const gamepadLook = actionResolver.getAxisValue(InputAction.LookHorizontal)
         if (gamepadLook !== 0) {
             camera.rotation.y -= gamepadLook * options.mouseSensitivity * 2
+        }
+
+        if (actionResolver.isActionPressed(InputAction.RollLeft)) {
+            camera.rotation.z += CameraInputApplier.ROLL_RADIANS_PER_FRAME
+        }
+        if (actionResolver.isActionPressed(InputAction.RollRight)) {
+            camera.rotation.z -= CameraInputApplier.ROLL_RADIANS_PER_FRAME
         }
     }
 }
