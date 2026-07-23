@@ -22,6 +22,8 @@ import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 import { AISLE_WIDTH_X } from './LayoutAisleWidths'
 import { assignSectionsByBalancedXAxisRegions } from './BalancedSectionAllocator'
+import { computeSlotsPerShelf } from './StockStrategy'
+import { DEFAULT_SHELF_CONFIG } from './SharedPropsTypes'
 
 /**
  * RowStockStrategy
@@ -36,6 +38,13 @@ export class RowStockStrategy implements IStockStrategy {
         return boards.map(b => b.near)
     }
 }
+
+/**
+ * Near-only stocking means a Row shelf holds half what a near+far shelf (Arc) does.
+ * Derived from the actual strategy rather than hardcoded so section-shelf-count math
+ * stays correct if shelf geometry or stocking rules change.
+ */
+const SLOTS_PER_SHELF = computeSlotsPerShelf(new RowStockStrategy(), DEFAULT_SHELF_CONFIG.shelfCount)
 
 export interface RowLayoutConfig {
     /**
@@ -125,7 +134,7 @@ function buildAisleOutwardTraversalColumns(
 }
 
 function deriveRowLayoutConfigFromSectionCounts(sections: ReadonlyArray<Section>): RowLayoutConfig {
-    const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / SLOTS_PER_SHELF)))
     const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
     const dynamicShelvesPerRow = Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 2.6))
 
@@ -201,7 +210,7 @@ function computeRowShelvesForSections(sections: ReadonlyArray<Section>): Section
         return []
     }
 
-    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / SLOTS_PER_SHELF)))
     const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
     const rowShelves = computeRowShelfLayout(totalShelves, deriveRowLayoutConfigFromSectionCounts(sections))
     const sectionByShelfIndex = assignSectionsByBalancedXAxisRegions(rowShelves, shelvesPerSection)

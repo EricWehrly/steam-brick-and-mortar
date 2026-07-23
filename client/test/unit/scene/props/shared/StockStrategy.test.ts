@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import { ArcStockStrategy } from '../../../../../src/scene/props/shared/ArcLayoutUtils'
 import { RowStockStrategy } from '../../../../../src/scene/props/shared/RowLayoutUtils'
+import { SpokeStockStrategy } from '../../../../../src/scene/props/shared/SpokeLayoutUtils'
+import { computeSlotsPerShelf, GameLayoutConstants } from '../../../../../src/scene/props/shared/StockStrategy'
 import type { BoardSurfacePair } from '../../../../../src/scene/props/shared/StockStrategy'
 import type { StockSurface } from '../../../../../src/types/LayoutTypes'
 
@@ -80,5 +82,28 @@ describe('RowStockStrategy', () => {
 
     it('returns empty list for no boards', () => {
         expect(new RowStockStrategy().order([])).toHaveLength(0)
+    })
+})
+
+describe('computeSlotsPerShelf', () => {
+    const boardCount = 3
+
+    it('near-only strategies (Row) offer one surface per board', () => {
+        const slots = computeSlotsPerShelf(new RowStockStrategy(), boardCount)
+        expect(slots).toBe(boardCount * GameLayoutConstants.GAMES_PER_SURFACE)
+    })
+
+    it('near-only strategies (Spoke) offer one surface per board', () => {
+        const slots = computeSlotsPerShelf(new SpokeStockStrategy(), boardCount)
+        expect(slots).toBe(boardCount * GameLayoutConstants.GAMES_PER_SURFACE)
+    })
+
+    it('near+far strategies (Arc) offer two surfaces per board', () => {
+        const slots = computeSlotsPerShelf(new ArcStockStrategy(), boardCount)
+        expect(slots).toBe(boardCount * GameLayoutConstants.GAMES_PER_SURFACE * 2)
+    })
+
+    it('scales linearly with board count', () => {
+        expect(computeSlotsPerShelf(new RowStockStrategy(), 5)).toBe(5 * GameLayoutConstants.GAMES_PER_SURFACE)
     })
 })

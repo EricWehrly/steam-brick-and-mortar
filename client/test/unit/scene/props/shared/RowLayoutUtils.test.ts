@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { RowLayout, computeRowShelfLayout } from '../../../../../src/scene/props/shared/RowLayoutUtils'
+import { RowLayout, RowStockStrategy, computeRowShelfLayout } from '../../../../../src/scene/props/shared/RowLayoutUtils'
+import { computeSlotsPerShelf } from '../../../../../src/scene/props/shared/StockStrategy'
+import { DEFAULT_SHELF_CONFIG } from '../../../../../src/scene/props/shared/SharedPropsTypes'
+
+const ROW_SLOTS_PER_SHELF = computeSlotsPerShelf(new RowStockStrategy(), DEFAULT_SHELF_CONFIG.shelfCount)
 
 describe('computeRowShelfLayout', () => {
     it('generates requested shelf count', () => {
@@ -64,7 +68,7 @@ describe('RowLayout section-aware shelf ownership', () => {
         ] as any
 
         const shelves = RowLayout.computeShelvesForSections(sections)
-        const shelvesPerSection = sections.map((section: { games: unknown[] }) => Math.max(1, Math.ceil(section.games.length / 18)))
+        const shelvesPerSection = sections.map((section: { games: unknown[] }) => Math.max(1, Math.ceil(section.games.length / ROW_SLOTS_PER_SHELF)))
 
         for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
             const actual = shelves.filter(shelf => shelf.sectionIndex === sectionIndex).length
@@ -78,10 +82,13 @@ describe('RowLayout section-aware shelf ownership', () => {
     })
 
     it('keeps each section on a single aisle region (no wrapping across the aisle)', () => {
+        // Section sizes chosen so each section's shelf count comfortably fits within
+        // one side's per-row capacity — a section larger than that is a structural
+        // case the balanced allocator can't avoid straddling, not a bug to test for here.
         const sections = [
-            { name: 'Huge', games: Array.from({ length: 72 }, (_, i) => ({ appid: i + 1 })) },
-            { name: 'TinyA', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
-            { name: 'TinyB', games: Array.from({ length: 36 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Huge', games: Array.from({ length: 4 * ROW_SLOTS_PER_SHELF }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'TinyA', games: Array.from({ length: 1 * ROW_SLOTS_PER_SHELF }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'TinyB', games: Array.from({ length: 2 * ROW_SLOTS_PER_SHELF }, (_, i) => ({ appid: 2000 + i + 1 })) },
         ] as any
 
         const shelves = RowLayout.computeShelvesForSections(sections)

@@ -28,6 +28,8 @@ import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, SectionShelfInfo, Section } from '../../../types/LayoutTypes'
 import { AISLE_HALF_WIDTH_X } from './LayoutAisleWidths'
+import { computeSlotsPerShelf } from './StockStrategy'
+import { DEFAULT_SHELF_CONFIG } from './SharedPropsTypes'
 
 /**
  * SpokeStockStrategy
@@ -42,6 +44,10 @@ export class SpokeStockStrategy implements IStockStrategy {
         return boards.map(b => b.near)
     }
 }
+
+/** Near-only stocking, one physical shelf. Derived from the strategy rather than
+ *  hardcoded so this stays correct if stocking rules change. */
+const SLOTS_PER_SHELF = computeSlotsPerShelf(new SpokeStockStrategy(), DEFAULT_SHELF_CONFIG.shelfCount)
 
 export interface SpokeLayoutConfig {
     /** Number of spokes (one per section). Default: 4. */
@@ -281,10 +287,10 @@ function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): Secti
         return []
     }
 
-    // Spoke shelves are consumed near-only (9 games per physical shelf).
+    // Spoke shelves are consumed near-only (SLOTS_PER_SHELF games per physical shelf).
     // Treat each spoke "position" (left+right pair) as the semantic unit for a
-    // 18-game chunk, then expand to two physical shelves so aisles stay balanced.
-    const spokePositionsPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    // 2*SLOTS_PER_SHELF-game chunk, then expand to two physical shelves so aisles stay balanced.
+    const spokePositionsPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / (SLOTS_PER_SHELF * 2))))
     const shelvesPerSection = spokePositionsPerSection.map(positionCount => positionCount * 2)
     const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
 

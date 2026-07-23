@@ -3,25 +3,11 @@ import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import type { StockSurface } from '../../../types/LayoutTypes'
 import { ArcStockStrategy } from './ArcLayoutUtils'
+import { GameLayoutConstants } from './StockStrategy'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import { ShelfFace, type ShelfSurface } from './SharedPropsTypes'
 
-// TD: approximated-placement-tripwire
-// NOTE: Game positions are approximated from DEFAULT_SHELF_CONFIG (width, shelfCount, etc.).
-// If shelf GLTF geometry changes, update GameBoxUtils.calculateGamePositions or
-// run `test/unit/scene/placement-tripwire.test.ts` to validate positions don't
-// float outside the modeled shelf. This is a deliberate tripwire to catch model-sync regressions.
-export const GameLayoutConstants = {
-    // Games per shelf board surface (front or back).
-    // Intentionally low — readability over density. With 800 games, layout and FOV
-    // constrain what's visible; we don't want to cram the shelves.
-    GAMES_PER_SURFACE: 3,
-    // Number of shelf board surfaces per shelf unit (3 boards × front+back = 6).
-    SURFACES_PER_SHELF: 6,
-    // Spacing between game box centers. Box width is 0.3m.
-    // 0.55m gives comfortable spacing at VR scale — readable from player distance.
-    GAME_SPACING: 0.55
-} as const
+export { GameLayoutConstants }
 
 /** Shelf construction constant - 6° backward tilt for stability */
 const SHELF_ANGLE_DEGREES = 6

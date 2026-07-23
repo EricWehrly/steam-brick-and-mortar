@@ -22,6 +22,8 @@ import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 import { AISLE_HALF_WIDTH_X } from './LayoutAisleWidths'
 import { assignSectionsByBalancedXAxisRegions } from './BalancedSectionAllocator'
+import { computeSlotsPerShelf } from './StockStrategy'
+import { DEFAULT_SHELF_CONFIG } from './SharedPropsTypes'
 
 /**
  * ArcStockStrategy
@@ -40,6 +42,11 @@ export class ArcStockStrategy implements IStockStrategy {
         ]
     }
 }
+
+/** Near+far stocking fills both faces of every board. Derived from the strategy
+ *  rather than hardcoded so this stays correct if stocking rules change. */
+const SLOTS_PER_SHELF = computeSlotsPerShelf(new ArcStockStrategy(), DEFAULT_SHELF_CONFIG.shelfCount)
+
 export interface ArcLayoutConfig {
     /** Number of concentric arc rows. Default 5. */
     rows?: number
@@ -325,7 +332,7 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         return []
     }
 
-    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / SLOTS_PER_SHELF)))
     const ringBands = buildRingBandsForSections([shelvesPerSection.reduce((sum, count) => sum + count, 0)])
     const totalShelves = ringBands.shelvesPerRowByRow.reduce((sum, n) => sum + n, 0)
 

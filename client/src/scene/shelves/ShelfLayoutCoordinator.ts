@@ -13,10 +13,9 @@ import { LayoutRegistry } from '../props/shared/LayoutRegistry'
 import type { LayoutMode, SectionShelfInfo, ShelfInfo } from '../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from '../props/shared/ILayoutDefinition'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
-import { GameLayoutConstants } from '../props/shared/GameBoxUtils'
+import { computeSlotsPerShelf } from '../props/shared/StockStrategy'
+import { ShelfSurfaceUtils } from '../props/shared/ShelfSurfaceUtils'
 
-/** Slots-per-shelf: used to convert game count → shelf count per section. */
-const SLOTS_PER_SHELF = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
 // CONFIG-CANDIDATE(layout-capacity): expose as lighting/layout tuning once section streaming is implemented.
 const MAX_SHELVES_PER_ROW = 12
 
@@ -26,8 +25,10 @@ const MAX_SHELVES_PER_ROW = 12
  * Singleton, non-disposable coordinator. Listens to SectionsReady and computes
  * the spatial layout for all shelves across all sections.
  *
- * Sections drive shelf count: ceil(section.games.length / SLOTS_PER_SHELF) shelves
+ * Sections drive shelf count: ceil(section.games.length / slotsPerShelf) shelves
  * are allocated per section, placed contiguously within the active layout geometry.
+ * slotsPerShelf depends on the active layout's stocking strategy (near-only vs
+ * near+far) — see GameBoxUtils.computeSlotsPerShelf.
  *
  * Emits:
  *   - ShelfLayoutDetermined  once per layout run, with shelfBounds + stockStrategy
@@ -91,17 +92,22 @@ export class ShelfLayoutCoordinator {
             return
         }
 
+        const activeLayout = LayoutRegistry[this.layoutMode]
+        const slotsPerShelf = computeSlotsPerShelf(
+            activeLayout.createStockStrategy(),
+            ShelfSurfaceUtils.findShelfSurfaces(null, true).length
+        )
+
         // Compute total shelves across all sections
         const shelvesPerSection = nonEmptySections.map(s =>
-            Math.max(1, Math.ceil(s.games.length / SLOTS_PER_SHELF))
+            Math.max(1, Math.ceil(s.games.length / slotsPerShelf))
         )
         this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
 
         ShelfLayoutCoordinator.logger.debug(
-            `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${nonEmptySections.length} non-empty sections`
+            `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${nonEmptySections.length} non-empty sections (slotsPerShelf=${slotsPerShelf})`
         )
 
-        const activeLayout = LayoutRegistry[this.layoutMode]
         const isSectionAwareLayout = 'computeShelvesForSections' in activeLayout
         const shelves = isSectionAwareLayout
             ? (activeLayout as ISectionAwareLayoutDefinition)
@@ -157,7 +163,7 @@ export class ShelfLayoutCoordinator {
                     rows: rowCount,
                     shelvesPerRow,
                 },
-                stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
+                stockStrategy: activeLayout.createStockStrategy(),
             }
         )
 
