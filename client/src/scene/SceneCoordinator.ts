@@ -31,6 +31,7 @@ import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SceneSignManager } from './SceneSignManager'
 import { ShelfSignPlanner } from './ShelfSignPlanner'
+import { LiminalFogController } from './liminal/LiminalFogController'
 import { GameSorter } from './categorization/GameSorter'
 import type { BootstrapPath } from './bootstrap/BootstrapPath'
 import { DefaultBootstrapPath } from './bootstrap/DefaultBootstrapPath'
@@ -47,6 +48,7 @@ export class SceneCoordinator {
     private gameSorter: GameSorter
     private sceneSignManager: SceneSignManager
     private shelfSignPlanner: ShelfSignPlanner
+    private liminalFogController: LiminalFogController
 
     constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
@@ -66,6 +68,7 @@ export class SceneCoordinator {
         this.gameSorter = new GameSorter()
         this.sceneSignManager = SceneSignManager.instance
         this.shelfSignPlanner = new ShelfSignPlanner()
+        this.liminalFogController = new LiminalFogController()
 
         // Track WorldBuild phase — opens here, closed by each bootstrap path when done
         const tracker = StartupEventTracker.getInstance()
