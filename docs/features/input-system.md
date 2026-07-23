@@ -54,12 +54,16 @@ controls, and the VR routing itself.
 `InputEventAdapter.ts:16-20` and `InputStateTracker.ts:40-48` attach keydown/keyup listeners at
 `document` level with **no focus/target check** — typing anywhere leaks into `keysPressed`. The
 only existing mitigation anywhere is `GameLibraryBinderUI.ts:421`'s `e.stopPropagation()` on one
-search input. Worse: `PauseMenuManager.pauseInput()`/`resumeInput()` (`PauseMenuManager.ts:309-321`)
-fire `callbacks.onPauseInput?.()`/`onResumeInput?.()`, but `SystemUICoordinator.ts:68` constructs
-`PauseMenuManager` with **empty callbacks** (`new PauseMenuManager({}, {}, ...)`) — so opening the
-pause menu today does **not** actually suspend camera movement, despite `WebXRCoordinator`'s
-internal `inputPaused` flag existing and looking like it should. This is the highest-priority item
-below, not a "nice to have someday."
+search input. This part is still open — see task 2 below.
+
+~~Worse: `PauseMenuManager.pauseInput()`/`resumeInput()` fire `callbacks.onPauseInput?.()`/
+`onResumeInput?.()`, but `SystemUICoordinator.ts:68` constructed `PauseMenuManager` with empty
+callbacks, so opening the pause menu did not actually suspend camera movement.~~ **Fixed**:
+`SystemUICoordinator` now wires those callbacks to emit `InputEventTypes.Pause`/`Resume` (the same
+event `GameLibraryBinderUI` already emits for its own open/close), which the existing
+`WebXREventHandler` listener routes to `WebXRCoordinator.pauseInput()`/`resumeInput()`. Verified via
+unit test (`test/unit/ui/system-ui-coordinator-input-pause.test.ts`) and in the running app (console
+now logs `Input paused: menu` / `Input resumed: menu` on menu open/close).
 
 ### Two dead/half-wired camera controls
 
@@ -89,7 +93,7 @@ below, not a "nice to have someday."
 
 ## Stories / Tasks (priority order)
 
-1. **Fix the pause-menu input-leak bug** — wire real `onPauseInput`/`onResumeInput` callbacks into `SystemUICoordinator.ts:68`'s `PauseMenuManager` construction so opening the pause menu actually calls `WebXRCoordinator.pauseInput()`/`resumeInput()`. This is a correctness bug with an already-built fix path (the methods exist, they're just never called), not new design.
+1. ✅ **Fix the pause-menu input-leak bug** — wire real `onPauseInput`/`onResumeInput` callbacks into `SystemUICoordinator.ts`'s `PauseMenuManager` construction so opening the pause menu actually calls `WebXRCoordinator.pauseInput()`/`resumeInput()`. Done by emitting the existing `InputEventTypes.Pause`/`Resume` events (already consumed by `WebXREventHandler`) rather than a direct cross-coordinator call.
 2. **Focus management** — add a real `onFocus`/`onBlur` (or equivalent) suppression path so `InputEventAdapter`/`InputStateTracker`'s document-level keydown/keyup listeners don't fire while a UI panel (Binder, Steam UI, Pause Menu, any text input) has focus. Generalize the one-off `stopPropagation()` pattern in `GameLibraryBinderUI.ts:421` into something every panel gets, rather than each panel re-solving it. A context *stack* (not `InputManager`'s current flat `isListeningToEvents` boolean) is needed if more than one suppressor can be active at once — check whether that's actually a real scenario before building a stack for a boolean's worth of need.
 3. **Wire or remove `RollLeft`/`RollRight`** — `CameraInputApplier.ts` needs to apply the already-bound Q/E roll actions, or the dead binding should be removed. Small either way; don't leave it half-wired.
 4. **Wire or remove `getProgressiveSpeed()`** — same call: either give `CameraInputApplier` a caller for the existing acceleration-ramp logic, or delete the dead code.

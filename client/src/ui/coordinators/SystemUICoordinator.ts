@@ -18,7 +18,13 @@ import { LayoutControlPanel } from '../LayoutControlPanel'
 import { ScenePropsPanel } from '../ScenePropsPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
-import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
+import {
+    UIEventTypes,
+    InputEventTypes,
+    type SceneCanvasClickEvent,
+    type InputPauseEvent,
+    type InputResumeEvent
+} from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 
@@ -65,7 +71,17 @@ export class SystemUICoordinator {
             precision: 1
         })
 
-        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, this.performanceMonitor)
+        this.pauseMenuManager = new PauseMenuManager(
+            {},
+            {
+                onPauseInput: this.handlePauseInput,
+                onResumeInput: this.handleResumeInput
+            },
+            undefined,
+            this.eventManager,
+            this.appSettings,
+            this.performanceMonitor
+        )
     }
 
     public async init(
@@ -211,6 +227,14 @@ export class SystemUICoordinator {
 
     private readonly handleMenuClose = (): void => {
         this.pauseMenuManager.close()
+    }
+
+    private readonly handlePauseInput = (): void => {
+        this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
+    }
+
+    private readonly handleResumeInput = (): void => {
+        this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
     }
 
     private readonly handleRendererMouseDown = (event: MouseEvent): void => {
