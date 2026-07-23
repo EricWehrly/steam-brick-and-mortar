@@ -34,9 +34,10 @@ import { togglePanelCollapse } from './components/PanelCollapse'
 // ─── Option definitions ───────────────────────────────────────────────────────
 
 const LAYOUT_OPTIONS = [
-    { key: 'arc'   as LayoutMode, label: 'Arc'   },
-    { key: 'row'   as LayoutMode, label: 'Row'   },
-    { key: 'spoke' as LayoutMode, label: 'Spoke' },
+    { key: 'arc'     as LayoutMode, label: 'Arc'     },
+    { key: 'row'     as LayoutMode, label: 'Row'     },
+    { key: 'spoke'   as LayoutMode, label: 'Spoke'   },
+    { key: 'liminal' as LayoutMode, label: 'Liminal' },
 ] as const
 
 const GROUP_OPTIONS = [

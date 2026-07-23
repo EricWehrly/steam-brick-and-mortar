@@ -16,9 +16,11 @@ import type { LayoutMode } from '../../../types/LayoutTypes'
 import { ArcLayout } from './ArcLayoutUtils'
 import { RowLayout } from './RowLayoutUtils'
 import { SpokeLayout } from './SpokeLayoutUtils'
+import { LiminalCorridorLayout } from '../../liminal/LiminalCorridorLayout'
 
 export const LayoutRegistry: Record<LayoutMode, ILayoutDefinition> = {
     arc: ArcLayout,
     row: RowLayout,
     spoke: SpokeLayout,
+    liminal: LiminalCorridorLayout,
 }

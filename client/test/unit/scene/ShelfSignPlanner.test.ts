@@ -287,4 +287,15 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         expect(leftAisleSign?.[1].text).toBe('Action')
         expect(rightAisleSign?.[1].text).toBe('Action')
     })
+
+    it('places no signs at all in liminal mode — sections are flattened, not spatial', () => {
+        new ShelfSignPlanner()
+        emitShelfReady(0, new THREE.Vector3(-3.5, 0, -4), -Math.PI / 2, 0)
+        emitShelfReady(1, new THREE.Vector3(3.5, 0, -4), Math.PI / 2, 0)
+
+        emitSectionsReady([makeSection('Action')])
+        emitShelfLayoutDetermined('liminal')
+
+        expect(placeSignSpy).not.toHaveBeenCalled()
+    })
 })
