@@ -143,4 +143,34 @@ describe('WallPosterPlacer', () => {
 
         expect(vi.mocked(buildPosterTexture).mock.calls.length).toBe(callsAfterFirst)
     })
+
+    it('overflows onto the left and right walls once the back wall is full', async () => {
+        const { EventManager } = await import('../../../../../src/core/EventManager')
+        const { WallPosterPlacer } = await import('../../../../../src/scene/props/wall-art/WallPosterPlacer')
+        const { LocalScreenshotReader } = await import('../../../../../src/steam/LocalScreenshotReader')
+
+        const manyScreenshots = [440, 620, 730, 1200].map((appid, index) => ({
+            appid, filename: `${appid}/a.jpg`, width: 1600, height: 1000, creation: index, caption: null,
+        }))
+        vi.mocked(LocalScreenshotReader.listScreenshots).mockResolvedValue(manyScreenshots)
+
+        const scene = new THREE.Scene()
+        WallPosterPlacer.getInstance(scene)
+        await flushMicrotasks()
+
+        const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
+        const resizeHandler = vi.mocked(eventManager.registerEventHandler).mock.calls.find(
+            ([eventType]) => eventType === RoomEventTypes.Resized
+        )?.[1] as (event: CustomEvent<RoomResizedEvent>) => void
+
+        // Back wall (width 22) fits 2 slots; each side wall (depth 16) fits 1 - 4 total.
+        resizeHandler(resizeEvent(22, 16))
+        await flushMicrotasks()
+
+        expect(scene.children).toHaveLength(4)
+        const rotationsY = scene.children.map(child => child.rotation.y)
+        expect(rotationsY.filter(y => Math.abs(y) < 1e-6)).toHaveLength(2)
+        expect(rotationsY.some(y => Math.abs(y - Math.PI / 2) < 1e-6)).toBe(true)
+        expect(rotationsY.some(y => Math.abs(y + Math.PI / 2) < 1e-6)).toBe(true)
+    })
 })

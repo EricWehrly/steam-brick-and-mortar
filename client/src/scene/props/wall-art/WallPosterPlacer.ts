@@ -1,13 +1,17 @@
 /**
- * Places framed local-screenshot posters on the store's back wall. Self-contained per-prop-type
- * placer (mirrors UserPropPlacer's shape) - not an instance of a shared placement system, see
+ * Places framed local-screenshot posters across the store's back, left, and right walls (the
+ * front is the glass storefront - not a poster surface). Self-contained per-prop-type placer
+ * (mirrors UserPropPlacer's shape) - not an instance of a shared placement system, see
  * docs/plans/placement-anchor-system-plan.md for why that's deferred. Design details (spacing,
  * frame footprint, content selection) live in docs/plans/wall-poster-placement-plan.md.
  *
- * Two independent flows converge on layoutPosters(): screenshot/texture loading (async, one-time -
- * screenshots are static files, not tied to room layout) and wall geometry (from
+ * Two independent flows converge on layoutBuiltGroups(): screenshot/texture loading (async,
+ * one-time - screenshots are static files, not tied to room layout) and wall geometry (from
  * RoomEventTypes.Resized, may fire multiple times). Whichever finishes second triggers the first
  * real layout; textures are never rebuilt on a later resize, only repositioned.
+ *
+ * Walls fill in WALL_TARGETS order (back, then left, then right): with fewer screenshots than
+ * total capacity, the back wall - the one visible on entry - fills first.
  */
 
 import * as THREE from 'three'
@@ -18,6 +22,7 @@ import { LocalScreenshotReader, type LocalScreenshot } from '../../../steam/Loca
 import { buildPosterTexture } from './PosterTexture'
 import { buildPosterFrame, getFrameOuterHeight, FRAME_DEPTH_METERS } from './PosterFrameBuilder'
 import { computeWallPosterSlots } from './WallPosterLayout'
+import { WALL_TARGETS, type RoomSpan } from './WallTargets'
 import { selectPosterScreenshots } from './PosterSelection'
 import { Logger } from '../../../utils/Logger'
 
@@ -96,9 +101,14 @@ export class WallPosterPlacer {
         }
     }
 
+    private buildAllWallSlots(dimensions: RoomSpan): { wall: typeof WALL_TARGETS[number]; slots: number[] }[] {
+        return WALL_TARGETS.map(wall => ({ wall, slots: computeWallPosterSlots(wall.span(dimensions)) }))
+    }
+
     private async buildContentThenLayout(): Promise<void> {
-        const slots = computeWallPosterSlots(this.latestDimensions!.width)
-        const selected = selectPosterScreenshots(this.rawScreenshots!, slots.length)
+        const totalSlotCount = this.buildAllWallSlots(this.latestDimensions!)
+            .reduce((sum, entry) => sum + entry.slots.length, 0)
+        const selected = selectPosterScreenshots(this.rawScreenshots!, totalSlotCount)
 
         const groups: THREE.Group[] = []
         for (const screenshot of selected) {
@@ -125,29 +135,34 @@ export class WallPosterPlacer {
         if (layoutKey === this.lastLayoutKey) return
         this.lastLayoutKey = layoutKey
 
-        const slots = computeWallPosterSlots(dimensions.width)
         const roomWorldOffsetX = this.latestCenterOffset?.x ?? 0
         const roomWorldOffsetY = this.latestCenterOffset?.y ?? 0
         const roomWorldOffsetZ = this.latestCenterOffset
             ? this.latestCenterOffset.z + RoomConstants.STORE_FRONT_OFFSET
             : 0
-        const wallLocalZ = -dimensions.depth / 2 + WALL_STANDOFF_METERS + FRAME_DEPTH_METERS
+        const clearance = WALL_STANDOFF_METERS + FRAME_DEPTH_METERS
 
-        const placedCount = Math.min(slots.length, this.builtGroups.length)
-        for (let index = 0; index < this.builtGroups.length; index++) {
-            const group = this.builtGroups[index]
-            if (index < placedCount) {
+        let groupIndex = 0
+        for (const { wall, slots } of this.buildAllWallSlots(dimensions)) {
+            for (const slotOffset of slots) {
+                if (groupIndex >= this.builtGroups.length) break
+                const group = this.builtGroups[groupIndex]
+                groupIndex++
+
+                const { x, z } = wall.positionXZ(dimensions, slotOffset, clearance)
                 const centerY = POSTER_BOTTOM_CLEARANCE_METERS + getFrameOuterHeight(group) / 2
-                group.position.set(
-                    roomWorldOffsetX + slots[index],
-                    roomWorldOffsetY + centerY,
-                    roomWorldOffsetZ + wallLocalZ
-                )
+                group.rotation.y = wall.rotationY
+                group.position.set(roomWorldOffsetX + x, roomWorldOffsetY + centerY, roomWorldOffsetZ + z)
                 if (!group.parent) {
                     this.scene.add(group)
                 }
-            } else if (group.parent) {
-                this.scene.remove(group)
+            }
+        }
+
+        for (; groupIndex < this.builtGroups.length; groupIndex++) {
+            const leftover = this.builtGroups[groupIndex]
+            if (leftover.parent) {
+                this.scene.remove(leftover)
             }
         }
     }

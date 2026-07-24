@@ -1,8 +1,9 @@
 # Plan: Wall Poster Placement
 
-**Status**: Implemented, then revised (2026-07-23) after a real-machine visual check surfaced
-letterboxing at the original size/aspect — see the updated Spacing and Frame-footprint sections
-below for the numbers actually shipped.
+**Status**: Implemented across all three poster-eligible walls (back, left, right), then revised
+(2026-07-23) after a real-machine visual check surfaced letterboxing at the original size/aspect —
+see the updated Spacing and Frame-footprint sections below for the numbers actually shipped. This
+feature is parked here for now; work resumes with Source 2 (official store screenshots) later.
 **Feature**: [Wall Art & Framed Posters](../features/wall-art-framed-posters.md)
 **Not** an instance of a shared placement system — see [Placement Commonality — Deferred
 Survey](placement-anchor-system-plan.md) for why that's deferred. This placer is self-contained,
@@ -11,11 +12,12 @@ needs, owns its own layout math, expresses its own aesthetic preference directly
 
 ## Goal
 
-Get a handful of real local screenshots onto the store's back wall as framed posters: evenly
-spaced, not busy, evoking the video-rental-store wall-of-posters read. First cut only — near-game
-placement, other walls, and any cross-prop-type sharing are explicitly out of scope (see Non-Goals).
+Get real local screenshots onto the store's walls as framed posters: evenly spaced, not busy,
+evoking the video-rental-store wall-of-posters read. Covers back, left, and right walls (the front
+is the glass storefront, never a poster surface). Near-game placement and any cross-prop-type
+sharing remain explicitly out of scope (see Non-Goals).
 
-## Inputs already built (this session, uncommitted spike — see Disposition below)
+## Inputs already built (now committed - see Disposition below)
 
 - `client/src/steam/LocalScreenshotReader.ts` — `listScreenshots()` / `readScreenshotBytes(filename)`.
 - `client/src/scene/props/wall-art/PosterTexture.ts` — `buildPosterTexture(bytes)` →
@@ -93,14 +95,22 @@ prop where the payoff is marginal. This is revisitable per-poster if the flat sh
 well once it's actually lit in the running scene — swapping in a thin transparent quad later
 touches only `PosterFrameBuilder.ts`, nothing upstream.
 
-### Wall — back wall only, first cut
+### Walls — back, left, and right (revised: all three, not back-only)
 
-`RoomManager`'s back wall (`RoomManager.ts:310-325`) is unrotated — its front face already points
-+Z into the room, matching the frame group's default (unrotated) orientation, so no rotation math
-is needed for v1. Left/right walls are legitimate future poster locations (mirrors the "wall
-shelves and other decorations" idea raised alongside this), but need a 90° rotation and depth
-(not width) as the span — deferred as a near-trivial follow-up on the same layout function, not
-tackled now.
+Originally back-wall-only for the first cut; expanded per instruction ("expand to the other
+walls... sides and back"). `WallTargets.ts` maps each wall to: which room dimension its slots run
+along (`width` for back, `depth` for left/right - `RoomManager`'s left/right walls are
+`PlaneGeometry(depth, height)`), a rotation matching `RoomManager`'s own wall rotation exactly
+(`0` for back, `+90°` for left, `-90°` for right - `RoomManager.ts`'s `ensureWalls`), and a
+room-local XZ position formula that nudges the frame off the wall surface toward the room's
+interior. Reusing `RoomManager`'s exact rotation values (rather than re-deriving the trig) is safe
+because those values already orient the *actual* wall meshes correctly today - matching them
+guarantees a poster's front face ends up oriented the same way.
+
+Each wall gets its own slot list from the same `computeWallPosterSlots` (just fed a different
+span), and content fills wall-by-wall in `WALL_TARGETS` order (back, then left, then right) - so
+with fewer screenshots than total capacity across all three walls, the entrance-facing back wall
+fills first, which is the visually important one.
 
 ### Content selection — one poster per game, earliest screenshot, capped to slot count
 
@@ -143,14 +153,16 @@ same as the other placement constants.
   a longer-term want. Not attempted here; this is fixed evenly-spaced slots only. Revisit once this
   placer exists and a second data point (e.g. `UserPropPlacer`'s front-center/spread preference) is
   available to compare against, per the deferred-survey doc's revisit trigger.
-- **Left/right wall posters, wall shelves, other wall decorations** — same wall-slicing approach
-  should extend cleanly, but not built now.
+- **Wall shelves, other wall decorations (non-poster)** — a different prop type; not this placer's
+  job even though it shares the same wall geometry.
 - **Any shared placement abstraction** — see [Placement Commonality — Deferred
   Survey](placement-anchor-system-plan.md).
 - **Store/official-art posters (Source 2)** — this plan is Source 1 (local screenshots) only; the
   frame/layout machinery built here should be directly reusable once Source 2 textures exist
   (same `PosterFrameBuilder` input shape, just a different texture source), but that wiring isn't
-  built now.
+  built now. Source 2 also needs its own content-selection layer (highlight games: recently
+  purchased → play next → recently played) - see the feature doc's "Selection Criteria" section -
+  which is a separate concern from this plan's placement/frame machinery.
 
 ## Proposed files
 
@@ -159,19 +171,22 @@ same as the other placement constants.
 - `client/src/scene/props/wall-art/PosterFrameBuilder.ts` (new) — `buildPosterFrame(texture:
   THREE.CanvasTexture): THREE.Group`: four molding boxes + mat-board plane + contain-fit image
   plane, per the dimensions above.
+- `client/src/scene/props/wall-art/WallTargets.ts` (new) — `WALL_TARGETS`: per-wall span/rotation/
+  position-formula mapping for back/left/right. Pure, no THREE dependency.
 - `client/src/scene/props/wall-art/WallPosterPlacer.ts` (new) — singleton, `getInstance(scene)`.
-  Two independent async/event flows that converge on one `layoutPosters()` call once both have run
-  at least once:
-  - Content: on startup, `LocalScreenshotReader.listScreenshots()` → select (per above) →
-    `readScreenshotBytes` + `buildPosterTexture` + `buildPosterFrame` per selected screenshot →
-    cache the built (but unpositioned, not yet in-scene) groups. Runs once; texture loads aren't
-    repeated on room resize.
+  Two independent async/event flows that converge on one `layoutBuiltGroups()` call once both have
+  run at least once:
+  - Content: on startup, `LocalScreenshotReader.listScreenshots()` → select (per above, sized to
+    total capacity summed across all three walls) → `readScreenshotBytes` + `buildPosterTexture` +
+    `buildPosterFrame` per selected screenshot → cache the built (but unpositioned, not yet
+    in-scene) groups. Runs once; texture loads aren't repeated on room resize.
   - Layout: subscribes to `RoomEventTypes.Resized` (same event `StorePropsCoordinator` and
-    `RoomManager` already key off), recomputes slot positions via `WallPosterLayout` whenever
-    dimensions actually change (skip-if-unchanged guard, mirroring
+    `RoomManager` already key off), recomputes each wall's slot positions via `WallPosterLayout`/
+    `WallTargets` whenever dimensions actually change (skip-if-unchanged guard, mirroring
     `StorePropsCoordinator.handleRoomResized`'s existing pattern), and (re)positions the cached
-    groups into slots using the same `centerOffset`/`STORE_FRONT_OFFSET` world-offset formula
-    `StorePropsCoordinator` already uses for the entrance mat.
+    groups by walking `WALL_TARGETS` in order and consuming groups into each wall's slots in turn,
+    using the same `centerOffset`/`STORE_FRONT_OFFSET` world-offset formula `StorePropsCoordinator`
+    already uses for the entrance mat.
 - Reuses as-is: `LocalScreenshotReader.ts`, `PosterTexture.ts`.
 
 ## Tests
@@ -184,19 +199,19 @@ same as the other placement constants.
   portrait aspects; resulting group's bounding box matches the fixed outer width and its preset's
   derived height; a 16:10 image exactly matching its preset fills the aperture with zero
   letterboxing; a portrait image contain-fits inside `standard` without upscaling.
+- `WallTargets.test.ts` — span/rotation/position-formula correctness per wall (back along width,
+  left/right along depth; rotation matches `RoomManager`'s own wall rotations).
 - `WallPosterPlacer.test.ts` — mocked `RoomEventTypes.Resized` + mocked `LocalScreenshotReader`:
-  asserts placed group count, world positions, and pitch spacing; asserts re-fired resize with
-  unchanged dimensions doesn't rebuild.
+  asserts placed group count, world positions, and pitch spacing on the back wall; asserts
+  re-fired resize with unchanged dimensions doesn't rebuild; asserts overflow beyond the back
+  wall's capacity spills onto the left and right walls with the correct rotation each.
 
-## Spike file disposition
+## Spike file disposition (resolved)
 
-- `LocalScreenshotReader.ts`, `PosterTexture.ts` — match this plan's design as-is (already noted in
-  the feature doc as expected to hold regardless of the placement question). Recommend committing
-  now, unchanged.
-- `client/src/debug/LocalScreenshotPosterInspector.ts` (+ its `main.ts` import) — superseded by
-  `WallPosterPlacer` once this ships; the feature doc already flagged this as "the piece most
-  likely to be replaced outright." Recommend removing once `WallPosterPlacer` is placing real
-  posters, not committing as-is.
+- `LocalScreenshotReader.ts`, `PosterTexture.ts` — matched this plan's design as-is, committed
+  unchanged as real dependencies (`b3d4e088`), no longer spike files.
+- `client/src/debug/LocalScreenshotPosterInspector.ts` (+ its `main.ts` import) — removed, per the
+  plan: superseded by `WallPosterPlacer` once it shipped.
 
 ## Open questions
 
@@ -209,6 +224,10 @@ same as the other placement constants.
   poster content exists yet to check against.
 - Whether `background_raw`/store screenshots (Source 2) should share this exact placer once built,
   or get their own — deferred per Non-goals above.
+- Whether filling walls strictly in `WALL_TARGETS` order (back, then left, then right) is the
+  right default once there are enough screenshots to actually fill more than the back wall — an
+  even/round-robin distribution across walls is a plausible alternative, untested against real
+  content volume.
 
 ## Related
 
@@ -220,4 +239,5 @@ same as the other placement constants.
 - `client/src/scene/props/StorePropsCoordinator.ts` — the `RoomEventTypes.Resized` +
   world-offset-computation precedent this placer follows
 - `client/src/scene/SceneSignManager.ts` — source of the `0x003087` theme blue
-- `client/src/scene/RoomManager.ts` — wall geometry this placer reads
+- `client/src/scene/RoomManager.ts` — wall geometry (including left/right rotation values) this
+  placer reads and mirrors
