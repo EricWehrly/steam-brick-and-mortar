@@ -2,6 +2,7 @@ import { EventManager, EventSource } from '../core/EventManager'
 import type { InputDevicesChangedEvent } from '../types/InteractionEvents'
 import { InputEventTypes } from '../types/InteractionEvents'
 import { InputDeviceKind, type InputDeviceKindValue } from './InputProfile'
+import { Logger } from '../utils/Logger'
 
 export interface InputDeviceInfo {
     id: string
@@ -12,6 +13,8 @@ export interface InputDeviceInfo {
 }
 
 export class DeviceDetector {
+    private static readonly logger = Logger.createLogFunctions(DeviceDetector.name)
+
     private readonly eventManager: EventManager
     private devices = new Map<string, InputDeviceInfo>()
     private started = false
@@ -194,9 +197,16 @@ export class DeviceDetector {
     }
 
     private emitDevicesChanged(): void {
+        const devices = this.getAvailableDevices()
+
+        DeviceDetector.logger.info(
+            `Connected input devices (${devices.length}):`,
+            devices.map(device => `${device.name} [${device.kind}]`)
+        )
+
         this.eventManager.emit<InputDevicesChangedEvent>(
             InputEventTypes.DevicesChanged,
-            { devices: this.getAvailableDevices() },
+            { devices },
             EventSource.System
         )
     }

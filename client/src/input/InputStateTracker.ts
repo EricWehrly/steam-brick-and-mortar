@@ -65,6 +65,7 @@ export class InputStateTracker {
         return keys.w || keys.a || keys.s || keys.d || keys.q || keys.e
     }
 
+    // TD: progressive-speed-movement-unwired
     getProgressiveSpeed(key: string, options: MovementOptions, accelerationTime: number, maxSpeedMultiplier: number): number {
         const pressTime = this.keyPressTime[key]
         if (!pressTime) {

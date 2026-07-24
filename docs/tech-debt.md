@@ -237,6 +237,41 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 **Plan reference**:
 - `docs/plans/lighting-shadow-refactor-plan.md`
 
+## id: gamepad-button-actions-unconsumed
+**Priority**: Medium — directly contradicts a stated Gate 1 acceptance criterion ("gamepad
+navigation works for basic movement and game selection"); selection specifically does not
+**Effort**: Not yet scoped — needs a design decision on how gamepad `Interact` should trigger
+selection (synthetic raycast from screen center? reticle-based?) before implementation
+**Context**: Found 2026-07-23 while scoping [Input System](features/input-system.md) task 8.
+`InputAction.Interact`, `OpenMenu`, `ToggleUI`, and `ToggleFullscreen` are all defined and bound
+across every profile (`InputProfile.ts` — keyboard/mouse, gamepad, touch, VR) but **none of them
+are ever read** anywhere via `InputActionResolver.isActionPressed()` — grepped the full `client/src`
+tree, only `Sprint`, `ResetCamera`, `RollLeft`, `RollRight`, and the movement/look axes have a real
+consumer. Game selection today is mouse-click raycasting (`SceneClickGameBoxRaycast`/`GameFinder`),
+entirely bypassing the input-action abstraction; menu-open is a hardcoded `Escape` keydown listener
+in `PauseMenuManager`, same story. Same "binding exists, nothing reads it" shape as the
+`RollLeft`/`RollRight` gap task 3 already fixed, and the `progressive-speed-movement-unwired` entry
+below — but this one blocks a stated acceptance criterion rather than just being dead code.
+
+**Decision (for now)**:
+- Not fixed inline — wiring gamepad `Interact` to selection needs a real design call (what does
+  "point and select" mean without a mouse cursor: screen-center reticle raycast, last-focused box,
+  something else), and `OpenMenu`/`ToggleUI` wiring needs to decide whether they go through
+  `InputActionResolver` or stay as direct listeners like `Escape` does today. Tracking as debt
+  rather than guessing an approach.
+
+**Done when**:
+- A decision is made and documented for how gamepad `Interact` triggers game/UI selection
+- `OpenMenu`/`ToggleUI`/`ToggleFullscreen` either route through `InputActionResolver` consistently
+  or the doc is corrected to state they're keyboard/mouse-only by design
+- [Input System](features/input-system.md)'s Gate 1 acceptance criteria reflects the real state
+
+**Related files**:
+- `client/src/input/InputActionResolver.ts`
+- `client/src/input/CameraInputApplier.ts`
+- `client/src/ui/pause/PauseMenuManager.ts`
+- `docs/features/input-system.md`
+
 ---
 
 ## Later / Backlog
@@ -452,6 +487,28 @@ regardless).
 - `client/src/steam-integration/Library.ts`
 - `client/src/steam-integration/SteamIntegration.ts`
 - `client/public/bookmarklets/export-library.js`
+
+## id: progressive-speed-movement-unwired
+**Priority**: Low
+**Effort**: N/A — intentionally left unwired, no active work planned
+**Context**: `InputStateTracker.getProgressiveSpeed()` (ramps from 10% to a configurable multiplier
+of `options.speed` over a configurable hold time) has zero callers — `CameraInputApplier.updateMovement()`
+applies `options.speed` directly per axis with no ramp. Left over from an earlier movement design
+that was superseded before wiring. Kept rather than deleted per 2026-07-23 discussion: it's a
+plausible alternate movement scheme worth revisiting later, and deleting it now would mean
+re-deriving the same ramp curve from scratch if that decision comes back around.
+
+**Decision (for now)**:
+- Keep the method as-is (no caller). Do not delete, do not expand into a full implementation.
+  Revisit only if there's a concrete decision to add ramped movement acceleration back into
+  `CameraInputApplier`.
+
+**Done when**:
+- Either wired into `CameraInputApplier.updateMovement()` as a real per-axis multiplier, or removed
+  entirely if a future review decides ramped movement isn't wanted.
+
+**Source tag**:
+- `// TD: progressive-speed-movement-unwired` in `client/src/input/InputStateTracker.ts`
 
 ## id: aisle-terminology-main-vs-row
 **Priority**: Low  
