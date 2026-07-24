@@ -4,13 +4,12 @@
 without new web infrastructure. **Web-facilitated** Source 1 (the HTML-scrape/Lambda path) and
 Source 3 (points-shop cosmetics) are **deliberately deferred to early Act 3** — see Sequencing
 Decision below.
-**Status**: Research complete for all three sources. Desktop-local Source 1's Rust file-reading
-layer is **built, tested, and committed** (`9a5813e3`). The client-side byte-to-texture spike (resize
-+ render-in-scene) proved the pipeline works but is **not yet committed** — its shape is expected to
-change once the placement-anchor/prop-system question below is settled, so it's being held rather
-than landed as-is. See "Implementation status" below for exactly what's committed vs. exploratory.
-Frame/border craft and the placement-anchor system itself are not started. Source 2 (official art)
-and web-facilitated work are unstarted.
+**Status**: Research complete for all three sources. Source 1 (local screenshots) is **fully built
+and committed**: Rust file-reading layer (`9a5813e3`), and the client-side frame/placement pipeline
+(`b3d4e088`) — `WallPosterPlacer` hangs framed posters across the back, left, and right walls (the
+front is the glass storefront). See "Implementation status" below. Source 2 (official store art)
+and Source 3/web-facilitated work are unstarted; Source 2's content-selection requirement is now
+documented (see "Source 2 — Selection Criteria" below) even though it isn't built yet.
 **Priority**: Medium
 
 ## Sequencing Decision (2026-07-14)
@@ -58,23 +57,46 @@ screenshots, no client dependency:
   - Unit-tested against a realistic fixture (grouping, dimensions, caption, the `shortcutnames`
     sibling block, path-traversal rejection) plus one `#[ignore]`d real-machine test.
 
-**Not committed — exploratory client-side spike, on disk but held pending the placement-anchor/
-prop-system discussion below** (its final shape likely changes once that's settled, so it isn't
-being landed as-is):
+**Committed (`b3d4e088`)** — the client-side frame/placement pipeline, self-contained per
+[Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md) (the placement-anchor
+question below was resolved as "build per-prop-type placers, not a shared system yet" — see
+[Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md)):
 
 - `client/src/steam/LocalScreenshotReader.ts` — thin wrapper around the two Tauri commands.
 - `client/src/scene/props/wall-art/PosterTexture.ts` — resizes raw bytes into a
-  `THREE.CanvasTexture` capped at 1024px on the longer edge (`POSTER_MAX_DIMENSION`) — ~8x box
-  art's pixel count (300×450), ~84% smaller than a native 2560×1600 capture, never upscales.
+  `THREE.CanvasTexture` capped at 1024px on the longer edge (`POSTER_MAX_DIMENSION`), never upscales.
   Plain per-frame texture, deliberately not the `DataArrayTexture`/LOD atlas machinery (see
-  "Framing & Rendering" below) — that part of the design is expected to hold regardless of how
-  the anchor/prop-system discussion lands, since it's about texture shape, not placement.
-- `client/src/debug/LocalScreenshotPosterInspector.ts` — `window.testLocalScreenshotPoster()`
-  drops one real screenshot onto a plane 2m in front of the camera, for visual confirmation. This
-  is the piece most likely to be replaced outright once real placement exists — it exists only to
-  prove the byte pipeline reaches a texture, not as a placement mechanism.
-- Proved the pipeline works (verified in the running app), but these files' survival as-written
-  depends on how posters end up integrating with the prop/anchor system — see below.
+  "Framing & Rendering" below).
+- `client/src/scene/props/wall-art/PosterFrameBuilder.ts` — four-box molding + mat board +
+  contain-fit image plane. Outer frame width is fixed (2.7m, the spacing pitch unit); outer height
+  is picked from a small aspect-ratio preset set (`widescreen` 16:10, `standard` 4:3) nearest the
+  image's real aspect, with a proportional (not flat) border, so the aperture always matches the
+  outer footprint's aspect — real local screenshots (all 16:10) fill the frame with zero
+  letterboxing. "Glass front" is faked via low material roughness on the image plane, not a
+  second surface. Molding color is `BlockbusterColors.steamLibraryAccent` (`0x003087`), shared
+  with `SceneSignManager`'s Steam-library block-letter sign so the two can't drift apart.
+- `client/src/scene/props/wall-art/WallPosterLayout.ts` — pure slot math: 3-poster-width gaps
+  (pitch = 4x frame width = 10.8m), centered per wall, corner margin one frame-width deep.
+- `client/src/scene/props/wall-art/WallTargets.ts` — per-wall geometry mapping (back/left/right;
+  the front is the glass storefront, never a poster surface) — which room dimension each wall's
+  slots run along, rotation to face into the room (matches `RoomManager`'s own wall rotations),
+  and room-local position math. Walls fill in back → left → right order, so with fewer screenshots
+  than total capacity the entrance-facing back wall fills first.
+- `client/src/scene/props/wall-art/WallPosterPlacer.ts` — the singleton placer, wired into
+  `DefaultBootstrapPath` alongside `UserPropPlacer`. Selects one poster per distinct game
+  (earliest screenshot, deterministic order), builds a frame per selection, and positions each by
+  a **consistent floor-to-bottom clearance** (`POSTER_BOTTOM_CLEARANCE_METERS`, currently 1.1m) —
+  not a shared center height — so frames of different preset heights still hang with level
+  bottoms. All placement/size constants are named and isolated for later tuning; none have been
+  validated beyond a first real-machine look.
+- The old `LocalScreenshotPosterInspector.ts` debug tool was removed — superseded by the real
+  placer.
+
+Revision history on these numbers: initial cut used a smaller frame (0.9m) and a fixed single
+aperture aspect, which produced visible letterboxing since real captures are 16:10, not the
+aperture's ~4:3. Revised to the preset system above, and separately sized up 3x and reduced the
+gap rule from 4 to 3 frame-widths, per direct feedback after viewing it running. See
+[Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md) for the full before/after.
 
 ## Goal
 
@@ -208,6 +230,38 @@ ceiling here absent per-game manual curation. `library_hero`/`header`/capsule ar
 the existing box pipeline, so `screenshots[]` and `background_raw` are the only genuinely new fields
 this source adds.
 
+### Source 2 — Selection Criteria (2026-07-23, documented, not yet built)
+
+Source 2 posters should come from **"highlight" games**, not an arbitrary slice of the owned-games
+list — the request is to surface what the player would actually want to see called out: recently
+purchased, "play next" suggestions, or recently played, **in that preference order**, using
+whichever signal is actually available (fall through to the next when a signal can't be sourced).
+Feasibility per signal, grounded in this project's existing research rather than assumed:
+
+1. **Recently purchased** — **unresearched, likely infeasible.** No known public Steam Web API
+   exposes a purchase/acquisition timestamp: `IPlayerService/GetOwnedGames` returns playtime and
+   art fields but no purchase date, and no dedicated purchase-history endpoint is documented
+   anywhere in this project's Steam API research (`docs/research/steam-api-research.md`). Would
+   need a real feasibility pass (parsing `licenses`/package data isn't confirmed either) before
+   assuming this is buildable — don't build toward it without that check first.
+2. **"Play Next" / Discovery queue** — **confirmed infeasible via public API.** Already researched
+   and documented twice: [Fabricated Set Dressing](fabricated-set-dressing.md) ("Discovery queue
+   / Play Next — *not* exposed by the public API; session/library features. Likely
+   **desktop-app-only** or omitted") and [Native Desktop App](desktop-app.md)'s feature-gap table.
+   Nothing new to check here; treat as unavailable unless a desktop-side local read is found later.
+3. **Recently played** — **confirmed feasible.** `IPlayerService/GetRecentlyPlayedGames/v1` is a
+   documented public endpoint, already relied on elsewhere in this project's research
+   (`docs/research/steam-api-research.md`, `docs/research/steam-featured-games-and-profile-sections-research.md`).
+   No new adapter work beyond calling it.
+
+**Practical fallback chain given current research**: attempt recently-purchased only after a real
+feasibility pass finds a source for it → else attempt play-next only if a source is ever found →
+else use `GetRecentlyPlayedGames` as the working default, since it's the only signal confirmed
+buildable today. This selection layer decides **which games** get a Source-2 poster; it composes
+with (doesn't replace) the existing frame/placement pipeline — a selected game's `screenshots[]`/
+`background_raw` still feeds `PosterFrameBuilder`/`WallPosterPlacer` the same way Source 1's
+per-game selection does.
+
 ## Source 3 — Points-Shop Cosmetics (Profile Backgrounds, Badges)
 
 **New research, and the least settled of the three.** No official public Web API exposes the points
@@ -289,20 +343,19 @@ A framed poster differs from Tier A's standees in shape, not pipeline:
 
 ## What We Can Implement Now (Act 2, no new web infra)
 
-1. ✅ **Desktop-local screenshot extraction — byte-to-texture spike built.** Real screenshots
-   read from disk, resized, and rendered as a plane in the live scene. See "Implementation status"
-   below for exactly what landed and where. Not yet done: frame/border craft, the
-   placement-anchor system (item 3 below), and choosing a real in-world position instead of the
-   debug tool's fixed spot in front of the camera.
-2. **Spike: framed poster prop rendering store screenshots** (Source 2, official art). Zero new
-   network fragility — reuses appdetails data the box pipeline likely already touches for other art
-   fields. Same legal tier as existing box art. Fastest path, no blockers, works on either build.
-3. **Placement** — see [Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md) (draft,
-   awaiting sign-off) — a self-contained placer for this feature alone, not a shared system; see
+1. ✅ **Desktop-local screenshot extraction, frame/placement — done and committed.** Real
+   screenshots read from disk, framed, and hung across the back/left/right walls in the live
+   scene. See "Implementation status" above for exactly what landed and where.
+2. **Framed poster prop rendering store screenshots** (Source 2, official art) — reuses the same
+   `PosterFrameBuilder`/`WallPosterPlacer` pipeline with a different texture source. Not yet
+   started. Must apply the selection criteria below (highlight games, not arbitrary owned games)
+   before picking which games' screenshots to fetch.
+3. ✅ **Placement** — see [Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md) —
+   a self-contained placer for this feature alone, not a shared system; see
    [Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md) for why.
 4. **Fallback behavior** — user media (desktop-local, where available) as priority, store
    screenshot/`background_raw` as fallback, so every game with a shelf slot can have a poster even
-   without user content.
+   without user content. Not yet built — depends on Source 2 (item 2).
 
 ## Deferred to Early Act 3 (deliberate, not blocked)
 
@@ -315,21 +368,28 @@ A framed poster differs from Tier A's standees in shape, not pipeline:
 
 ## Recommended Sequencing
 
-1. ✅ Desktop-local screenshot byte-to-texture spike (done, see "Implementation status" below).
-2. Official-art poster spike (no blockers, validates the frame/plane rendering approach, works on
-   either build).
-3. Wall poster placement — self-contained placer, own frame/spacing/content-selection design; see
+1. ✅ Desktop-local screenshot byte-to-texture spike (done, see "Implementation status" above).
+2. ✅ Wall poster placement — self-contained placer covering back/left/right walls; see
    [Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md). Shared placement
    engineering across prop types is explicitly deferred — see
-   [Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md).
+   [Placement Commonality — Deferred Survey](../plans/placement-anchor-system-plan.md). Parked
+   here for now — next work on this feature resumes with item 3.
+3. Official-art poster spike (Source 2) — reuses the same frame/placement pipeline with a
+   different texture source; must apply the "Selection Criteria" section above first (recently
+   purchased → play next → recently played, whichever is actually available) rather than picking
+   arbitrary owned games.
 4. **Early Act 3**: web-facilitated Source 1 (Lambda route + `UserScreenshotsClient`), timed ahead of
    Act 3's broader public-sharing work.
 5. **Early Act 3**: points-shop cosmetics stretch, after a privacy gut-check.
 
 ## Open Questions
 
-- Frame/placement design: drafted in [Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md)
-  (frame geometry, spacing rule, content selection, theme-blue color) — not yet signed off or built.
+- Whether the shipped constants (2.7m frame width, 10.8m pitch, 1.1m floor clearance) read right
+  in the real running scene for longer than a first look — see
+  [Wall Poster Placement Plan](../plans/wall-poster-placement-plan.md)'s own open questions.
+  Corner-miter look of the four-box frame is in the same bucket.
+- **Recently-purchased feasibility** — needs an actual research pass (see "Selection Criteria"
+  above) before Source 2 work assumes it's available; don't build toward it speculatively.
 - Points-shop cosmetics: privacy/rights gut-check before investing in the scrape adapter.
 - Is `background_raw` worth pulling as a fourth Source-2 sub-type? Likely yes — same endpoint,
   marginal cost.
@@ -365,6 +425,9 @@ A framed poster differs from Tier A's standees in shape, not pipeline:
 - [Native Desktop App](desktop-app.md) — where the local-screenshot-read upgrade to Source 1 belongs
 - `docs/architecture/image-texture-pipeline.md` — texture fetch/cache pattern to reuse (not its
   instancing)
+- `docs/research/steam-api-research.md`, `docs/research/steam-featured-games-and-profile-sections-research.md`
+  — grounding for the Source 2 selection-criteria feasibility notes above (`GetRecentlyPlayedGames`
+  confirmed; no purchase-date/showcase-slot API found)
 - Act linkage: [Act 2 — Ready for Friends](../acts/act2-ready-for-friends.md) (desktop-local Source 1
   + Source 2 ship now); [Act 3 — Ready for Everyone](../acts/act3-ready-for-everyone.md) (web-facilitated
   Source 1 + Source 3, early Act 3, deliberately deferred); [Act 4 — Encore](../acts/act4-encore-someday-maybe.md)
