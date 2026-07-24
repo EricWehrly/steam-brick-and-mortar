@@ -68,36 +68,34 @@ export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase 
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
 
+    /**
+     * @returns the allocated instance index, or -1 on failure (uninitialized, at
+     * capacity, or texture allocation failed).
+     */
     public addLabelInstance(
         position: THREE.Vector3,
         gameName: string,
         appid?: number,
         rotation?: THREE.Quaternion
-    ): boolean {
+    ): number {
         if (!this.isInitialized) {
             this.initialize()
         }
 
         if (!this.instancedMesh || !this.geometry) {
             console.warn('InstancedLabelRenderer failed to initialize')
-            return false
+            return -1
         }
 
         const index = this.allocateInstanceIndex()
         if (index < 0) {
             console.warn(`No label slots remaining (${this.maxInstances})`)
-            return false
+            return -1
         }
 
-        let textureIndex = this.gameNameToTextureIndex.get(gameName)
+        const textureIndex = this.resolveTextureIndex(gameName)
         if (textureIndex === undefined) {
-            try {
-                textureIndex = this.textureArrayManager.addTextLabel(gameName)
-                this.gameNameToTextureIndex.set(gameName, textureIndex)
-            } catch (error) {
-                console.warn(`Failed to add texture for game: ${gameName}`, error)
-                return false
-            }
+            return -1
         }
 
         // rotation encodes shelf orientation and front/back side — always passed by callers.
@@ -119,7 +117,64 @@ export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase 
 
         this.storeLabelMetadata(index, gameName, position, appid)
 
+        return index
+    }
+
+    /**
+     * Repoint an existing label instance to a different game's name/position/rotation,
+     * without allocating a new instance slot. Used to recycle a shelf unit whose game
+     * resolved via label fallback (liminal mode's treadmill — see
+     * docs/plans/liminal-mode-plan.md P4/P10).
+     */
+    public setInstanceLabel(
+        instanceIndex: number,
+        position: THREE.Vector3,
+        gameName: string,
+        appid?: number,
+        rotation?: THREE.Quaternion
+    ): boolean {
+        if (!this.instancedMesh || !this.geometry) {
+            console.warn('InstancedLabelRenderer failed to initialize')
+            return false
+        }
+        if (instanceIndex < 0 || instanceIndex >= this.getCurrentInstanceCount()) {
+            console.warn(`Cannot repoint label instance ${instanceIndex}: out of range`)
+            return false
+        }
+
+        const textureIndex = this.resolveTextureIndex(gameName)
+        if (textureIndex === undefined) {
+            return false
+        }
+
+        const effectiveRotation = rotation ?? InstancedLabelRenderer.DEFAULT_ROTATION
+        const matrix = new THREE.Matrix4()
+        matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))
+        this.instancedMesh.setMatrixAt(instanceIndex, matrix)
+
+        const textureIndices = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
+        textureIndices.setX(instanceIndex, textureIndex)
+
+        this.invalidateInstancedMesh(this.instancedMesh)
+        textureIndices.needsUpdate = true
+
+        this.storeLabelMetadata(instanceIndex, gameName, position, appid)
+
         return true
+    }
+
+    private resolveTextureIndex(gameName: string): number | undefined {
+        let textureIndex = this.gameNameToTextureIndex.get(gameName)
+        if (textureIndex === undefined) {
+            try {
+                textureIndex = this.textureArrayManager.addTextLabel(gameName)
+                this.gameNameToTextureIndex.set(gameName, textureIndex)
+            } catch (error) {
+                console.warn(`Failed to add texture for game: ${gameName}`, error)
+                return undefined
+            }
+        }
+        return textureIndex
     }
 
     public updateGPU(): void {

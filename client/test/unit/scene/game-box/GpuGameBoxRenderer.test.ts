@@ -54,7 +54,7 @@ vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug',
     return { LodArtworkOrchestratorDebug: MockOrchestrator }
 })
 
-const mockAddLabelInstance = vi.fn(() => true)
+const mockAddLabelInstance = vi.fn(() => 0)
 const mockLabelClear = vi.fn()
 const mockLabelDispose = vi.fn()
 
@@ -119,6 +119,40 @@ describe('GpuGameBoxRenderer', () => {
         emitPlacementResolved(1)
         expect(mockPlaceInstance).toHaveBeenCalledTimes(1)
         expect(mockAddLabelInstance).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits PlacementCommitted with kind "artwork" when placeInstance resolves', () => {
+        mockPlaceInstance.mockReturnValueOnce(7)
+        emitPlacementResolved(1)
+
+        const committed = mockEmitEvent.mock.calls.find(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementCommitted
+        )
+        expect(committed).toBeTruthy()
+        expect(committed?.[1]).toMatchObject({ appid: 1, instanceIndex: 7, kind: 'artwork' })
+    })
+
+    it('emits PlacementCommitted with kind "label" when falling through to label fallback', () => {
+        mockPlaceInstance.mockReturnValueOnce(-1)
+        mockAddLabelInstance.mockReturnValueOnce(3)
+        emitPlacementResolved(2)
+
+        const committed = mockEmitEvent.mock.calls.find(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementCommitted
+        )
+        expect(committed).toBeTruthy()
+        expect(committed?.[1]).toMatchObject({ appid: 2, instanceIndex: 3, kind: 'label' })
+    })
+
+    it('does not emit PlacementCommitted when both artwork and label placement fail', () => {
+        mockPlaceInstance.mockReturnValueOnce(-1)
+        mockAddLabelInstance.mockReturnValueOnce(-1)
+        emitPlacementResolved(3)
+
+        const committed = mockEmitEvent.mock.calls.find(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementCommitted
+        )
+        expect(committed).toBeUndefined()
     })
 
     it('subscribes directly to PlacementRunResetRequested for run counters', () => {

@@ -413,6 +413,66 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
     }
     
     /**
+     * Repoint an existing instance to a different game's artwork/position/rotation,
+     * without allocating a new instance slot. Used to recycle a shelf unit's boxes
+     * (liminal mode's treadmill — see docs/plans/liminal-mode-plan.md P4) instead of
+     * tearing down and re-adding.
+     */
+    public setInstanceArtwork(instanceIndex: number, {
+        position,
+        textureIndex,
+        gameName,
+        highArtworkUrl,
+        lodLevel = this.config.defaultLod,
+        highTextureSlot = -1,
+        rotation,
+    }: AddInstanceParams): boolean {
+        if (!this.instancedMesh || !this.geometry) {
+            LodGameArtworkRenderer.logger.warn('Cannot repoint instance: renderer not initialized')
+            return false
+        }
+        if (instanceIndex < 0 || instanceIndex >= this.getCurrentInstanceCount()) {
+            LodGameArtworkRenderer.logger.warn(`Cannot repoint instance ${instanceIndex}: out of range`)
+            return false
+        }
+
+        const previous = this.instanceData.get(instanceIndex)
+        if (previous && this.textureIndexToInstance.get(previous.textureIndex) === instanceIndex) {
+            this.textureIndexToInstance.delete(previous.textureIndex)
+        }
+        if (previous && this.lazyHighTextures && this.highTextureCache) {
+            this.highTextureCache.unregisterGame(previous.textureIndex)
+        }
+        this.pendingHighPromotion.delete(previous?.textureIndex ?? -1)
+
+        const matrix = new THREE.Matrix4()
+        matrix.compose(position, rotation ?? LodGameArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+        this.instancedMesh.setMatrixAt(instanceIndex, matrix)
+
+        this.textureIndices![instanceIndex] = textureIndex
+        this.lodLevels![instanceIndex] = lodLevel
+        this.highTextureSlots![instanceIndex] = highTextureSlot
+
+        this.instanceData.set(instanceIndex, {
+            instanceIndex,
+            textureIndex,
+            gameName,
+            position: position.clone(),
+            lodLevel,
+            highTextureSlot
+        })
+        this.textureIndexToInstance.set(textureIndex, instanceIndex)
+
+        if (this.lazyHighTextures && this.highTextureCache && highArtworkUrl) {
+            this.highTextureCache.registerGame(textureIndex, gameName, highArtworkUrl)
+        }
+        this.spatialPrewarming?.registerGamePosition(textureIndex, gameName, position)
+
+        this.pendingAttributeUpdate = true
+        return true
+    }
+
+    /**
      * Update the LOD level for a specific instance.
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {

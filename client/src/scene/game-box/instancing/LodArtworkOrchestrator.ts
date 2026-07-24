@@ -480,6 +480,40 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         return instanceIndex
     }
 
+    /**
+     * Repoint an already-placed instance to a different (already-prefetched) game.
+     * Mirrors placeInstance()'s precondition — gameName must have been prefetched
+     * already via prefetchArtwork().
+     */
+    public setInstanceArtwork(
+        instanceIndex: number,
+        appid: number,
+        gameName: string,
+        position: THREE.Vector3,
+        rotation?: THREE.Quaternion
+    ): boolean {
+        const textureIndex = this.gameNameToTextureIndex.get(gameName)
+        if (textureIndex === undefined) {
+            LodArtworkOrchestrator.logger.warn(`setInstanceArtwork: no prefetched texture for "${gameName}" (appId ${appid})`)
+            return false
+        }
+
+        const highArtworkUrl = this.prefetchedHighArtworkUrl.get(gameName)
+        const success = this.renderer.setInstanceArtwork(instanceIndex, {
+            position,
+            textureIndex,
+            gameName,
+            highArtworkUrl,
+            lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
+            rotation,
+        })
+
+        if (success) {
+            this.instanceMetadata.set(instanceIndex, { name: gameName, appid, position: position.clone() })
+        }
+        return success
+    }
+
     public async setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,

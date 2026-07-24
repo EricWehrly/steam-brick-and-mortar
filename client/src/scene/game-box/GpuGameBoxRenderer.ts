@@ -53,6 +53,7 @@ import {
     GameRenderEventTypes,
     type PlacementRunResetRequestedEvent,
     type PlacementResolvedEvent,
+    type PlacementCommittedEvent,
 } from '../../types/InteractionEvents'
 
 export class GpuGameBoxRenderer {
@@ -125,6 +126,9 @@ export class GpuGameBoxRenderer {
         const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
         if (instanceIndex >= 0) {
             this.resolvedArtworkPlacements++
+            EventManager.getInstance().emit<PlacementCommittedEvent>(GameRenderEventTypes.PlacementCommitted, {
+                appid, instanceIndex, position, rotation, kind: 'artwork',
+            })
             return
         }
 
@@ -146,19 +150,18 @@ export class GpuGameBoxRenderer {
         position: THREE.Vector3,
         rotation: THREE.Quaternion
     ): void {
-        const success = this.instancedLabelRenderer.addLabelInstance(
-            position,
-            game.name,
-            typeof game.appid === 'number' ? game.appid : undefined,
-            rotation
-        )
-        if (success) {
+        const appid = typeof game.appid === 'number' ? game.appid : undefined
+        const instanceIndex = this.instancedLabelRenderer.addLabelInstance(position, game.name, appid, rotation)
+        if (instanceIndex >= 0) {
             this.resolvedLabelPlacements++
+            EventManager.getInstance().emit<PlacementCommittedEvent>(GameRenderEventTypes.PlacementCommitted, {
+                appid: appid ?? 0, instanceIndex, position, rotation, kind: 'label',
+            })
+            return
         }
-        if (!success) {
-            this.failedLabelPlacements++
-            GpuGameBoxRenderer.logger.warn(`Failed to add label box for "${game.name}" (label instance limit reached?)`)
-        }
+
+        this.failedLabelPlacements++
+        GpuGameBoxRenderer.logger.warn(`Failed to add label box for "${game.name}" (label instance limit reached?)`)
     }
 
     /**
