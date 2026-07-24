@@ -32,13 +32,13 @@ open VR-entry spike question.
 - [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library or download the desktop client; performance on first load is acceptable; definition of "correct" pinned before sign-off
 - [Network Rate Limiting](../features/network-rate-limiting.md) — substantially implemented (client `RateLimiter`, batching, backoff, circuit breaker; server-side 429 handling); client-side 429 handling and concurrency cap are the remaining gaps; matters for desktop too — it hits the same Lambda for online-fetch/enrichment
 - [Multi-Layer Caching](../features/multi-layer-caching.md) — browser, Lambda L1, and S3/Lambda L2 all exist; CloudFront layer and AppDetailsCache TTL are the remaining gaps; protects the shared backend regardless of which client hits it
-- [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
+- [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad movement/look solid (tested), keyboard accessibility for all menus; gamepad game-selection is a known gap, see [`gamepad-button-actions-unconsumed`](../tech-debt.md#id-gamepad-button-actions-unconsumed); VR controllers are Gate 2
 
 ## Gate 2: Act 2 Complete
 
 > Features that must land before Act 2 is done. VR support lives here — it's a delivery goal, not a stretch goal.
 
-- [VR Support](../features/vr-support.md) — full WebXR implementation; the whole store works in headset; this is the "impressor" that defines Act 2 done
+- [VR Support](../features/vr-support.md) — full WebXR implementation; the whole store works in headset; this is the "impressor" that defines Act 2 done. **Sequencing decided 2026-07-23: VR controllers before headset** — controller input routes through the same abstraction gamepad already proved out, and is independently testable without a headset. **Blocked on a plan doc** (`docs/plans/vr-support-plan.md`, not yet written) before any implementation starts — see the feature doc's "Sequencing" section.
 - [GameSort Full Pipeline](../features/gamesort-full-pipeline.md) — re-sort reorders game boxes and shelves in the scene, not just signs; sub-feature of the tag-sorting north star
 
 ## Also In Act 2 (Best Effort)
