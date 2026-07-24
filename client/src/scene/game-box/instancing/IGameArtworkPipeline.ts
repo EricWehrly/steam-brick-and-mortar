@@ -51,6 +51,19 @@ export interface IGameArtworkPipeline {
     ): number
 
     /**
+     * Repoint an existing instance to a different (already-prefetched) game, without
+     * allocating a new instance slot. Returns false if the instance index is invalid
+     * or gameName has no prefetched texture.
+     */
+    setInstanceArtwork(
+        instanceIndex: number,
+        appid: number,
+        gameName: string,
+        position: THREE.Vector3,
+        rotation?: THREE.Quaternion
+    ): boolean
+
+    /**
      * Reconcile for a capacity-compatible library reload: games not in removedGameNames keep
      * their existing texture-slot mapping (no re-fetch, no slot-allocator rewind), only
      * removedGameNames' mappings are cleared. Callers must only invoke this when the incoming

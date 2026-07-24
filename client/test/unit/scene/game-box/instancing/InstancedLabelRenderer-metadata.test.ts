@@ -121,7 +121,7 @@ describe('InstancedLabelRenderer metadata lifecycle', () => {
             123
         )
 
-        expect(added).toBe(true)
+        expect(added).toBeGreaterThanOrEqual(0)
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const meshCount = ((renderer as any).instancedMesh?.count ?? -1)
@@ -132,11 +132,11 @@ describe('InstancedLabelRenderer metadata lifecycle', () => {
         const renderer = new InstancedLabelRenderer({ maxInstances: 4 })
 
         const pos = new THREE.Vector3(0, 0, 0)
-        expect(renderer.addLabelInstance(pos, 'A', 1)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'B', 2)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'C', 3)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'D', 4)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(false)
+        expect(renderer.addLabelInstance(pos, 'A', 1)).toBe(0)
+        expect(renderer.addLabelInstance(pos, 'B', 2)).toBe(1)
+        expect(renderer.addLabelInstance(pos, 'C', 3)).toBe(2)
+        expect(renderer.addLabelInstance(pos, 'D', 4)).toBe(3)
+        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(-1)
 
         const resetHandlers = mockHandlers.get(GameRenderEventTypes.PlacementRunResetRequested)
         expect(resetHandlers?.length).toBeGreaterThan(0)
@@ -144,10 +144,61 @@ describe('InstancedLabelRenderer metadata lifecycle', () => {
             handler({ detail: {} } as CustomEvent<unknown>)
         }
 
-        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'F', 6)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'G', 7)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'H', 8)).toBe(true)
-        expect(renderer.addLabelInstance(pos, 'I', 9)).toBe(false)
+        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(0)
+        expect(renderer.addLabelInstance(pos, 'F', 6)).toBe(1)
+        expect(renderer.addLabelInstance(pos, 'G', 7)).toBe(2)
+        expect(renderer.addLabelInstance(pos, 'H', 8)).toBe(3)
+        expect(renderer.addLabelInstance(pos, 'I', 9)).toBe(-1)
+    })
+
+    describe('setInstanceLabel (repoint without allocating)', () => {
+        it('repoints an existing label instance without allocating a new slot', () => {
+            const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
+            const pos = new THREE.Vector3(0, 0, 0)
+
+            const target = renderer.addLabelInstance(pos, 'Game A', 1)
+            expect(target).toBeGreaterThanOrEqual(0)
+
+            const success = renderer.setInstanceLabel(target, new THREE.Vector3(5, 6, 7), 'Game Z', 99)
+            expect(success).toBe(true)
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            expect((renderer as any).instancedMesh?.count).toBe(1)
+        })
+
+        it('updates the label metadata (name, appid, position) together', () => {
+            const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
+            const target = renderer.addLabelInstance(new THREE.Vector3(0, 0, 0), 'Game A', 1)
+
+            const newPosition = new THREE.Vector3(5, 6, 7)
+            renderer.setInstanceLabel(target, newPosition, 'Game Z', 99)
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const metadata = (renderer as any).labelMetadata.get(target)
+            expect(metadata.name).toBe('Game Z')
+            expect(metadata.appid).toBe(99)
+            expect(metadata.position).toEqual(newPosition)
+        })
+
+        it('does not touch neighbouring instances', () => {
+            const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
+            const first = renderer.addLabelInstance(new THREE.Vector3(1, 1, 1), 'Game A', 1)
+            const second = renderer.addLabelInstance(new THREE.Vector3(2, 2, 2), 'Game B', 2)
+
+            renderer.setInstanceLabel(second, new THREE.Vector3(9, 9, 9), 'Game Z', 99)
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const firstMetadata = (renderer as any).labelMetadata.get(first)
+            expect(firstMetadata.name).toBe('Game A')
+            expect((renderer as any).instancedMesh?.count).toBe(2)
+        })
+
+        it('returns false for an out-of-range instance index', () => {
+            const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
+            renderer.addLabelInstance(new THREE.Vector3(), 'Game A', 1)
+
+            const success = renderer.setInstanceLabel(999, new THREE.Vector3(), 'Game Z', 99)
+            expect(success).toBe(false)
+        })
     })
 })

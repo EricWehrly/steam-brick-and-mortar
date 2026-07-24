@@ -424,6 +424,55 @@ describe('LodArtworkOrchestrator', () => {
         })
     })
 
+    describe('setInstanceArtwork', () => {
+        function withScene(): THREE.Scene {
+            const mockScene = new THREE.Scene()
+            mockDataManager.get.mockImplementation((key: DataKey) => {
+                if (key === DataKey.MainScene) return mockScene
+                return null
+            })
+            return mockScene
+        }
+
+        function mockArtworkPixels(): void {
+            const getPixelsAtSize = vi.fn().mockResolvedValue({
+                pixels: new Uint8ClampedArray(150 * 225 * 4),
+                width: 150,
+                height: 225,
+            })
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+            provider.getArtwork.mockReturnValue({ getPixelsAtSize })
+        }
+
+        it('repoints an already-placed instance to a different prefetched game', async () => {
+            withScene()
+            mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            await orchestrator.prefetchArtwork(100, undefined, 'Game A')
+            await orchestrator.prefetchArtwork(200, undefined, 'Game B')
+            const instanceIndex = orchestrator.placeInstance(100, 'Game A', new THREE.Vector3())
+            expect(instanceIndex).toBeGreaterThanOrEqual(0)
+
+            const success = orchestrator.setInstanceArtwork(instanceIndex, 200, 'Game B', new THREE.Vector3(1, 2, 3))
+            expect(success).toBe(true)
+        })
+
+        it('fails when the target game has not been prefetched', async () => {
+            withScene()
+            mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            await orchestrator.prefetchArtwork(100, undefined, 'Game A')
+            const instanceIndex = orchestrator.placeInstance(100, 'Game A', new THREE.Vector3())
+
+            const success = orchestrator.setInstanceArtwork(instanceIndex, 999, 'Never Prefetched', new THREE.Vector3())
+            expect(success).toBe(false)
+        })
+    })
+
     describe('Basic API', () => {
         beforeEach(() => {
             mockDataManager.get.mockReturnValue(null)  // No scene

@@ -260,6 +260,22 @@ export interface PlacementResolvedEvent extends BaseInteractionEvent {
 
 export interface PlacementRunResetRequestedEvent extends BaseInteractionEvent {}
 
+/**
+ * PlacementCommitted
+ *
+ * Emitted once a GPU instance actually exists for a placed game — the instanceIndex
+ * that placeInstance()/addLabelInstance() return and every other consumer discards.
+ * Liminal mode (docs/plans/liminal-mode-plan.md, P3) is the first consumer: it builds
+ * its own slot -> instanceIndex map from this to repoint recycled shelf units.
+ */
+export interface PlacementCommittedEvent extends BaseInteractionEvent {
+    appid: number
+    instanceIndex: number
+    position: THREE.Vector3
+    rotation: THREE.Quaternion
+    kind: 'artwork' | 'label'
+}
+
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
@@ -411,6 +427,7 @@ export const GameRenderEventTypes = {
     ArtworkIntentSettled: 'game-render:artwork-intent-settled',
     PlacementIntentReady: 'game-render:placement-intent-ready',
     PlacementResolved: 'game-render:placement-resolved',
+    PlacementCommitted: 'game-render:placement-committed',
 } as const
 
 export const CeilingEventTypes = {

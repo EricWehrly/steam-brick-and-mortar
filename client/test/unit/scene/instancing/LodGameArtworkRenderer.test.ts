@@ -244,6 +244,83 @@ describe('LodGameArtworkRenderer', () => {
         })
     })
 
+    describe('setInstanceArtwork (repoint without allocating)', () => {
+        beforeEach(() => {
+            renderer = new LodGameArtworkRenderer({
+                ...defaultConfig,
+                lazyHighTextures: false,
+                defaultLod: LOD_LEVEL.MID
+            })
+            renderer.initialize(mockTextureArrays, mockScene)
+        })
+
+        it('repoints an existing instance without allocating a new slot', () => {
+            renderer.addInstance({ position: new THREE.Vector3(0, 0, 0), textureIndex: 0, gameName: 'Game A' })
+            const target = renderer.addInstance({ position: new THREE.Vector3(1, 0, 0), textureIndex: 1, gameName: 'Game B' })
+
+            const success = renderer.setInstanceArtwork(target, {
+                position: new THREE.Vector3(9, 9, 9),
+                textureIndex: 5,
+                gameName: 'Game C',
+            })
+
+            expect(success).toBe(true)
+            expect(renderer.getInstanceCount()).toBe(2) // no new instance allocated
+        })
+
+        it('round-trips the new texture index through textureIndexToInstance', () => {
+            const target = renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Game A' })
+            renderer.setInstanceArtwork(target, {
+                position: new THREE.Vector3(),
+                textureIndex: 42,
+                gameName: 'Game B',
+            })
+
+            // onHighSlotChange resolves instanceIndex via textureIndexToInstance - exercise it
+            // indirectly by confirming a HIGH-slot update lands on the repointed instance.
+            const updated = renderer.setInstanceHighSlot(target, 3)
+            expect(updated).toBe(true)
+        })
+
+        it('resets LOD level to the repoint call default rather than carrying over the old level', () => {
+            const target = renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Game A' })
+            renderer.setInstanceLod(target, LOD_LEVEL.HIGH)
+            expect(renderer.getInstanceLod(target)).toBe(LOD_LEVEL.HIGH)
+
+            renderer.setInstanceArtwork(target, {
+                position: new THREE.Vector3(),
+                textureIndex: 7,
+                gameName: 'Game B',
+                lodLevel: LOD_LEVEL.MID,
+            })
+
+            expect(renderer.getInstanceLod(target)).toBe(LOD_LEVEL.MID)
+        })
+
+        it('does not touch neighbouring instances', () => {
+            const first = renderer.addInstance({ position: new THREE.Vector3(1, 1, 1), textureIndex: 0, gameName: 'Game A' })
+            const second = renderer.addInstance({ position: new THREE.Vector3(2, 2, 2), textureIndex: 1, gameName: 'Game B' })
+
+            renderer.setInstanceArtwork(second, {
+                position: new THREE.Vector3(9, 9, 9),
+                textureIndex: 5,
+                gameName: 'Game C',
+            })
+
+            expect(renderer.getInstanceLod(first)).not.toBeNull()
+            expect(renderer.getInstanceCount()).toBe(2)
+        })
+
+        it('returns false for an out-of-range instance index', () => {
+            const success = renderer.setInstanceArtwork(999, {
+                position: new THREE.Vector3(),
+                textureIndex: 0,
+                gameName: 'Game A',
+            })
+            expect(success).toBe(false)
+        })
+    })
+
     describe('LOD Management', () => {
         beforeEach(() => {
             renderer = new LodGameArtworkRenderer({
