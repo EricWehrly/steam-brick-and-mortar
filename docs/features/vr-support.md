@@ -1,12 +1,39 @@
 # Feature: VR Support
 
 **Act**: 2 (Gate 2 — required for Act 2 completion)
-**Status**: Not Started
+**Status**: Not Started — **blocked on a plan doc** (see "Sequencing" below); no code/architecture research has been done yet, this doc only records the sequencing decision
 **Priority**: High
 
 ## Goal
 
 The full store experience works in a VR headset via WebXR — navigation, browsing, and UI interaction all functional in headset. This is the "impressor" that defines Act 2 done.
+
+## Sequencing: Controllers before headset (decided 2026-07-23)
+
+This feature splits into two sub-scopes, deliberately sequenced:
+
+1. **VR Controllers** — route real WebXR controller input through the same `InputActionResolver`
+   abstraction gamepad already uses, via the already-defined `VR` `InputProfile`
+   (`InputProfile.ts:232-242`). Tracked as [Input System](input-system.md) task 9. Device
+   *detection* for VR controllers already works today — `DeviceDetector.setXRSession()` reads real
+   `XRSession.inputSources` and logs them the same way gamepad/keyboard do (see input-system.md's
+   2026-07-23 device-logging note) — what's missing is *routing*, not detection.
+2. **VR Headset** — locomotion, comfort pass, spatial UI, hardware testing. Not started, not
+   scoped yet.
+
+Controllers first because the input abstraction (gamepad → VR controller) is the piece already
+mostly proven out by this project's gamepad work, and because it's independently useful/testable
+(a developer can plug in a controller and exercise the routing path) without needing a headset
+in hand for every iteration. Headset work depends on controller routing existing first regardless
+(can't interact with anything in headset without controller input flowing somewhere), so this
+isn't a change to the dependency order, just an explicit statement of which half comes first.
+
+**Neither sub-scope starts implementation without a plan doc first** (`docs/plans/vr-support-plan.md`,
+not yet written) — this is a real architectural change (headset-driven camera pose replacing
+keybind-driven camera update in `WebXRCoordinator`, per its own guard comment) spanning multiple
+components, which this project's planning rules require a plan + sign-off for before code starts.
+This doc intentionally stops at sequencing/scoping — no code-level research has been done toward
+either sub-scope yet.
 
 ## Context
 
@@ -25,9 +52,12 @@ VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stabl
 
 ## Stories / Tasks
 
-- **Audit existing WebXR infrastructure** — review `WebXRCoordinator`, `WebXREventHandler`, `WebXRUICoordinator`; identify gaps vs. current state of the codebase
+**Sub-scope 1 — VR Controllers (first):**
+- **Controller input** — wire VR controller events into the input abstraction; tracked as [Input System](input-system.md) task 9. Raycast-based interaction for game boxes and UI is part of this, since selection needs to work from a controller before it needs to work from a headset-relative cursor at all.
+- **Audit existing WebXR infrastructure** — review `WebXRCoordinator`, `WebXREventHandler`, `WebXRUICoordinator`; identify gaps vs. current state of the codebase. Do this first — it's the input for the plan doc, not a parallel task.
+
+**Sub-scope 2 — VR Headset (after controllers):**
 - **VR locomotion** — decide teleport vs. smooth movement; implement and tune; configurable for comfort
-- **Controller input** — wire VR controller events into the input abstraction (from Input System feature); raycast-based interaction for game boxes and UI
 - **Spatial UI** — determine approach for UI panels in VR (world-space vs. HUD overlay); implement
 - **Comfort pass** — scale, movement speed, snap turn options; VR comfort best practices
 - **Hardware testing** — validate on at least one standalone headset (Quest) and one PCVR setup
@@ -36,6 +66,7 @@ VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stabl
 
 - Locomotion model is TBD — teleport is safer for comfort/accessibility, smooth movement is more immersive. Consider offering both.
 - UI in VR is a design question: world-space panels feel more immersive but are harder to read; HUD overlays are easier but feel flat. May need a prototype to decide.
-- The input abstraction from the Input System feature must exist first — VR controller events should route through the same layer as mouse/keyboard and gamepad.
+- The input abstraction from the Input System feature already exists (gamepad proved it out) — VR controller events route through the same `InputActionResolver`/`InputProfile` layer as mouse/keyboard and gamepad, not a new mechanism. See input-system.md's "survey before you extend" note.
 - VR controller interaction and raycasting connects to the raycast drag suppression work already in the subagent threads.
 - See `docs/architecture/webxr-architecture.md` for the foundational design decisions.
+- **Next step is scoping, not code**: write `docs/plans/vr-support-plan.md` covering at least sub-scope 1 (VR Controllers) — the WebXR infrastructure audit above should feed directly into it. Get sign-off before writing any implementation code, per this project's planning rules.
