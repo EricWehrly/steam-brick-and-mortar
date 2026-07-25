@@ -71,7 +71,7 @@ export class PropRenderer {
     this.propsGroup.name = 'AtmosphericProps'
     this.scene.add(this.propsGroup)
     this.lightFactory = new LightFactory(scene)
-    UserPropPlacer.getInstance(scene)
+    UserPropPlacer.getInstance()
   }
 
   /**

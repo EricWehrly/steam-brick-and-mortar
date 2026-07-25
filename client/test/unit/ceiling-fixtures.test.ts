@@ -11,6 +11,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { PropRenderer } from '../../src/scene/PropRenderer'
+import { DataManager, DataDomain } from '../../src/core/data'
 
 describe('Phase 2.4 - Ceiling Fixtures', () => {
   let scene: THREE.Scene
@@ -18,11 +19,14 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
 
   beforeEach(() => {
     scene = new THREE.Scene()
+    // UserPropPlacer (constructed by PropRenderer) fetches the scene from DataManager itself.
+    DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
     propRenderer = PropRenderer.getInstance(scene)
   })
 
   afterEach(() => {
     propRenderer.dispose()
+    DataManager.resetInstance()
   })
 
   test('createCeilingLightFixtures positions lights below ceiling', () => {

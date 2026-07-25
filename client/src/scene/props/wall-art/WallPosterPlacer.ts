@@ -25,6 +25,7 @@ import { computeWallPosterSlots } from './WallPosterLayout'
 import { WALL_TARGETS, type RoomSpan } from './WallTargets'
 import { selectPosterScreenshots } from './PosterSelection'
 import { Logger } from '../../../utils/Logger'
+import { DataManager } from '../../../core/data'
 
 /** Gap between the frame's back and the wall surface - avoids z-fighting with the wall material. */
 const WALL_STANDOFF_METERS = 0.02
@@ -58,8 +59,9 @@ export class WallPosterPlacer {
     private builtGroups: THREE.Group[] = []
     private lastLayoutKey: string | null = null
 
-    public static getInstance(scene: THREE.Scene): WallPosterPlacer {
+    public static getInstance(): WallPosterPlacer {
         if (!WallPosterPlacer.instance) {
+            const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
             WallPosterPlacer.instance = new WallPosterPlacer(scene)
         }
         return WallPosterPlacer.instance

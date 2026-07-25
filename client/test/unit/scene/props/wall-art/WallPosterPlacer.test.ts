@@ -75,16 +75,20 @@ describe('WallPosterPlacer', () => {
         vi.resetModules()
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         vi.clearAllMocks()
+        const { DataManager } = await import('../../../../../src/core/data')
+        DataManager.resetInstance()
     })
 
     it('places one frame per distinct game once screenshots and room geometry are both known', async () => {
         const { EventManager } = await import('../../../../../src/core/EventManager')
+        const { DataManager, DataDomain } = await import('../../../../../src/core/data')
         const { WallPosterPlacer } = await import('../../../../../src/scene/props/wall-art/WallPosterPlacer')
 
         const scene = new THREE.Scene()
-        WallPosterPlacer.getInstance(scene)
+        DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
         const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
@@ -102,10 +106,12 @@ describe('WallPosterPlacer', () => {
 
     it('spaces placed frames by the 3-frame-width gap pitch, centered on the wall', async () => {
         const { EventManager } = await import('../../../../../src/core/EventManager')
+        const { DataManager, DataDomain } = await import('../../../../../src/core/data')
         const { WallPosterPlacer } = await import('../../../../../src/scene/props/wall-art/WallPosterPlacer')
 
         const scene = new THREE.Scene()
-        WallPosterPlacer.getInstance(scene)
+        DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
         const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
@@ -122,11 +128,13 @@ describe('WallPosterPlacer', () => {
 
     it('does not rebuild textures when a later resize repeats the same dimensions', async () => {
         const { EventManager } = await import('../../../../../src/core/EventManager')
+        const { DataManager, DataDomain } = await import('../../../../../src/core/data')
         const { WallPosterPlacer } = await import('../../../../../src/scene/props/wall-art/WallPosterPlacer')
         const { buildPosterTexture } = await import('../../../../../src/scene/props/wall-art/PosterTexture')
 
         const scene = new THREE.Scene()
-        WallPosterPlacer.getInstance(scene)
+        DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
         const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
@@ -146,6 +154,7 @@ describe('WallPosterPlacer', () => {
 
     it('overflows onto the left and right walls once the back wall is full', async () => {
         const { EventManager } = await import('../../../../../src/core/EventManager')
+        const { DataManager, DataDomain } = await import('../../../../../src/core/data')
         const { WallPosterPlacer } = await import('../../../../../src/scene/props/wall-art/WallPosterPlacer')
         const { LocalScreenshotReader } = await import('../../../../../src/steam/LocalScreenshotReader')
 
@@ -155,7 +164,8 @@ describe('WallPosterPlacer', () => {
         vi.mocked(LocalScreenshotReader.listScreenshots).mockResolvedValue(manyScreenshots)
 
         const scene = new THREE.Scene()
-        WallPosterPlacer.getInstance(scene)
+        DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
         const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
