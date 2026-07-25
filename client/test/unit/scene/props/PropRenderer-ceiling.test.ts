@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { PropRenderer } from '../../../../src/scene/PropRenderer'
+import { DataManager, DataDomain } from '../../../../src/core/data'
 
 describe('PropRenderer — ceiling light fixtures', () => {
     let scene: THREE.Scene
@@ -8,11 +9,14 @@ describe('PropRenderer — ceiling light fixtures', () => {
 
     beforeEach(() => {
         scene = new THREE.Scene()
+        // UserPropPlacer (constructed by PropRenderer) fetches the scene from DataManager itself.
+        DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
         propRenderer = PropRenderer.getInstance(scene)
     })
 
     afterEach(() => {
         propRenderer.dispose()
+        DataManager.resetInstance()
     })
 
     function getFixtureGroup(): THREE.Group {

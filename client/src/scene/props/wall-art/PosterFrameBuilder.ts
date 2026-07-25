@@ -17,9 +17,17 @@
 
 import * as THREE from 'three'
 import { BlockbusterColors } from '../../../utils/Colors'
-import { FRAME_OUTER_WIDTH_METERS } from './WallPosterLayout'
 
+/** The frame's own size data belongs here, not in a layout/placement module - WallPosterLayout
+ *  imports getFrameOuterWidth() rather than this file importing a width from elsewhere. */
+export const FRAME_OUTER_WIDTH_METERS = 2.7
 export const FRAME_DEPTH_METERS = 0.12
+
+/** Outer width is fixed (unlike outer height, which varies by preset - see getFrameOuterHeight
+ *  below), so this takes no group argument. */
+export function getFrameOuterWidth(): number {
+    return FRAME_OUTER_WIDTH_METERS
+}
 
 /** Fraction of each dimension taken by the molding, applied to width and height independently
  *  so the aperture's aspect ratio always matches the outer footprint's - see file header. */

@@ -4,8 +4,8 @@ import {
     buildPosterFrame,
     pickPosterSizePreset,
     FRAME_DEPTH_METERS,
+    FRAME_OUTER_WIDTH_METERS,
 } from '../../../../../src/scene/props/wall-art/PosterFrameBuilder'
-import { FRAME_OUTER_WIDTH_METERS } from '../../../../../src/scene/props/wall-art/WallPosterLayout'
 
 function fakeTexture(width: number, height: number): THREE.CanvasTexture {
     const canvas = document.createElement('canvas')

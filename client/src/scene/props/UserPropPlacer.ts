@@ -6,6 +6,7 @@ import { StorePropsEventTypes, type UserPropGlbReadyEvent, type ShelfReadyEvent 
 import { UIEventTypes } from '../../types/InteractionEvents'
 import { DEFAULT_SHELF_CONFIG } from './shared/SharedPropsTypes'
 import modelPosesData from './model-poses.json'
+import { DataManager } from '../../core/data'
 
 interface BoneRotationDeltaDeg {
     readonly bone: string
@@ -112,8 +113,9 @@ export class UserPropPlacer {
     private readonly usedShelfIndices = new Set<number>()
     private pendingShelfProps: PendingShelfProp[] = []
 
-    public static getInstance(scene: THREE.Scene): UserPropPlacer {
+    public static getInstance(): UserPropPlacer {
         if (!UserPropPlacer.instance) {
+            const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
             UserPropPlacer.instance = new UserPropPlacer(scene)
         }
         return UserPropPlacer.instance

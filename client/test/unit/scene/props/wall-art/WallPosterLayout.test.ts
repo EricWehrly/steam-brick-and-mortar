@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { computeWallPosterSlots, FRAME_OUTER_WIDTH_METERS } from '../../../../../src/scene/props/wall-art/WallPosterLayout'
+import { computeWallPosterSlots } from '../../../../../src/scene/props/wall-art/WallPosterLayout'
+import { getFrameOuterWidth } from '../../../../../src/scene/props/wall-art/PosterFrameBuilder'
+
+const FRAME_OUTER_WIDTH_METERS = getFrameOuterWidth()
 
 describe('computeWallPosterSlots', () => {
     it('centers an odd slot count on the wall midpoint with 3-frame-width gap pitch', () => {
