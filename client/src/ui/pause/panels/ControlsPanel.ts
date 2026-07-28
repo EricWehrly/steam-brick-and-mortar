@@ -58,6 +58,15 @@ export class ControlsPanel extends PauseMenuPanel {
                             </label>
                         </div>
                     </div>
+                    <div class="pause-row control-item">
+                        <span class="control-key pause-row-key">Gamepad Reticle</span>
+                        <div class="control-desc pause-row-text">
+                            <label class="input-device-enabled-toggle">
+                                <input id="input-gamepad-reticle-enabled" type="checkbox" data-input-gamepad-reticle-enabled />
+                                <span>Show an aiming crosshair while a gamepad/VR controller is connected</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -106,6 +115,11 @@ export class ControlsPanel extends PauseMenuPanel {
         UIComponentUtils.setupToggle(panel, {
             toggleId: 'input-mouse-lock-enabled',
             onChange: this.handleMouseLockEnabledToggle.bind(this)
+        })
+
+        UIComponentUtils.setupToggle(panel, {
+            toggleId: 'input-gamepad-reticle-enabled',
+            onChange: this.handleGamepadReticleEnabledToggle.bind(this)
         })
 
         UIComponentUtils.setupButton(panel, {
@@ -171,6 +185,10 @@ export class ControlsPanel extends PauseMenuPanel {
 
     private handleMouseLockEnabledToggle(checked: boolean): void {
         this.appSettings.setSetting('inputMouseLockEnabled', checked, EventSource.UI)
+    }
+
+    private handleGamepadReticleEnabledToggle(checked: boolean): void {
+        this.appSettings.setSetting('inputGamepadReticleEnabled', checked, EventSource.UI)
     }
 
     private handleResetProfileClick(): void {
@@ -468,6 +486,7 @@ export class ControlsPanel extends PauseMenuPanel {
         this.renderDeviceOptions(devices, profiles, activeProfileId)
         this.renderActiveToggle(activeProfile)
         this.renderMouseLockToggle()
+        this.renderGamepadReticleToggle()
         this.renderMappingTable(activeProfile)
     }
 
@@ -544,6 +563,20 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         toggle.checked = this.appSettings.getSetting('inputMouseLockEnabled')
+    }
+
+    private renderGamepadReticleToggle(): void {
+        const panel = this.getPanelElement()
+        if (!panel) {
+            return
+        }
+
+        const toggle = panel.querySelector('#input-gamepad-reticle-enabled') as HTMLInputElement | null
+        if (!toggle) {
+            return
+        }
+
+        toggle.checked = this.appSettings.getSetting('inputGamepadReticleEnabled')
     }
 
     private renderMappingTable(profile: InputProfileDefinition): void {

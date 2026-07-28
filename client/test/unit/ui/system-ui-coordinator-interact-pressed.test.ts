@@ -14,6 +14,7 @@ import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
 import {
     InputEventTypes,
+    AppSettingsEventTypes,
     type SceneCanvasClickEvent,
     type InputDevicesChangedEvent
 } from '../../../src/types/InteractionEvents'
@@ -83,6 +84,7 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
     afterEach(() => {
         systemCoordinator?.dispose()
         document.body.innerHTML = ''
+        AppSettings.getInstance().setSetting('inputGamepadReticleEnabled', true)
     })
 
     it('emits a center-screen SceneCanvasClick when InteractPressed fires', () => {
@@ -120,5 +122,29 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
 
         emitDevices([{ id: 'mouse-keyboard', name: 'Mouse + Keyboard', kind: 'mouse-keyboard', connected: true, profileId: 'mouse-keyboard' }])
         expect(reticle?.style.display).toBe('none')
+    })
+
+    it('hides the reticle when the gamepad reticle setting is disabled, and reacts live to it changing', () => {
+        const reticle = document.getElementById('gamepad-reticle')
+        const devicesChanged = registeredHandlers.get(InputEventTypes.DevicesChanged)
+        const settingChanged = registeredHandlers.get(AppSettingsEventTypes.Changed)
+        const appSettings = AppSettings.getInstance()
+
+        devicesChanged?.(new CustomEvent('devices', {
+            detail: { devices: [{ id: 'gamepad-0', name: 'Test Pad', kind: 'gamepad', connected: true, profileId: 'gamepad-standard' }] }
+        }))
+        expect(reticle?.style.display).toBe('block')
+
+        appSettings.setSetting('inputGamepadReticleEnabled', false)
+        settingChanged?.(new CustomEvent('setting-changed', {
+            detail: { settingName: 'inputGamepadReticleEnabled', value: false, previousValue: true }
+        }))
+        expect(reticle?.style.display).toBe('none')
+
+        appSettings.setSetting('inputGamepadReticleEnabled', true)
+        settingChanged?.(new CustomEvent('setting-changed', {
+            detail: { settingName: 'inputGamepadReticleEnabled', value: true, previousValue: false }
+        }))
+        expect(reticle?.style.display).toBe('block')
     })
 })

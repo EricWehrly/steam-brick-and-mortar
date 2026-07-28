@@ -57,9 +57,7 @@ export class InputActionResolver {
         mouseDeltaX = 0,
         mouseDeltaY = 0
     ): void {
-        this.deviceDetector.pollGamepads()
-
-        const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
+        const gamepads = this.deviceDetector.pollGamepads()
         this.lastConnectedGamepads = gamepads
 
         const connectedProfiles = enabledProfiles.filter(profile => this.connectedProfileIds.has(profile.id))
