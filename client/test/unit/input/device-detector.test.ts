@@ -118,4 +118,71 @@ describe('DeviceDetector', () => {
         eventManager.deregisterEventHandler(InputEventTypes.DevicesChanged, handler)
         detector.stop()
     })
+
+    it('emits GamepadButtonPressed when a button transitions from released to pressed', () => {
+        const eventManager = EventManager.getInstance()
+        const detector = new DeviceDetector(eventManager)
+        const handler = vi.fn()
+        eventManager.registerEventHandler(InputEventTypes.GamepadButtonPressed, handler)
+
+        const buttons = Array.from({ length: 4 }, () => ({ pressed: false, touched: false, value: 0 }))
+        const gamepad = {
+            connected: true,
+            id: 'Button Pad',
+            index: 3,
+            mapping: 'standard',
+            axes: [],
+            buttons,
+            vibrationActuator: null
+        } as unknown as Gamepad
+
+        Object.defineProperty(navigator, 'getGamepads', {
+            value: () => [gamepad],
+            configurable: true
+        })
+
+        detector.pollGamepads()
+        expect(handler).not.toHaveBeenCalled()
+
+        buttons[1] = { pressed: true, touched: true, value: 1 }
+        detector.pollGamepads()
+
+        expect(handler).toHaveBeenCalledTimes(1)
+        const event = handler.mock.calls[0][0] as CustomEvent<{ gamepadIndex: number; buttonIndex: number }>
+        expect(event.detail).toMatchObject({ gamepadIndex: 3, buttonIndex: 1 })
+
+        eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, handler)
+        detector.stop()
+    })
+
+    it('does not re-emit GamepadButtonPressed while a button stays held across polls', () => {
+        const eventManager = EventManager.getInstance()
+        const detector = new DeviceDetector(eventManager)
+        const handler = vi.fn()
+        eventManager.registerEventHandler(InputEventTypes.GamepadButtonPressed, handler)
+
+        const gamepad = {
+            connected: true,
+            id: 'Held Pad',
+            index: 4,
+            mapping: 'standard',
+            axes: [],
+            buttons: [{ pressed: true, touched: true, value: 1 }],
+            vibrationActuator: null
+        } as unknown as Gamepad
+
+        Object.defineProperty(navigator, 'getGamepads', {
+            value: () => [gamepad],
+            configurable: true
+        })
+
+        detector.pollGamepads()
+        detector.pollGamepads()
+        detector.pollGamepads()
+
+        expect(handler).toHaveBeenCalledTimes(1)
+
+        eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, handler)
+        detector.stop()
+    })
 })

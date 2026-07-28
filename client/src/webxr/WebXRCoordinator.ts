@@ -105,17 +105,21 @@ export class WebXRCoordinator {
     }
 
     /**
-     * Pause input handling (e.g., when pause menu is open)
+     * Suspend camera movement/rotation (e.g., when pause menu is open). Uses pause()/resume()
+     * rather than stopListening()/startListening() - those remain a real DOM-listener
+     * teardown for setup/dispose, while pause() only gates camera application, keeping
+     * InputActionResolver resolving every frame so global actions (e.g. OpenMenu) can still be
+     * read to detect the press that closes the menu again.
      */
     pauseInput(): void {
-        this.inputManager.stopListening()
+        this.inputManager.pause()
     }
 
     /**
-     * Resume input handling
+     * Resume camera movement/rotation
      */
     resumeInput(): void {
-        this.inputManager.startListening()
+        this.inputManager.resume()
     }
 
     /**

@@ -26,10 +26,16 @@ import {
     type InputPauseEvent,
     type InputResumeEvent,
     type MenuOpenEvent,
-    type MenuCloseEvent
+    type MenuCloseEvent,
+    type InputDevicesChangedEvent
 } from '../../types/InteractionEvents'
+import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
+import '../../styles/gamepad-reticle.css'
+
+const RETICLE_ELEMENT_ID = 'gamepad-reticle'
+const CENTER_SCREEN_NDC = 0
 
 export class SystemUICoordinator {
     // TODO(input): Keep this coordinator minimal. When input complexity increases,
@@ -54,6 +60,8 @@ export class SystemUICoordinator {
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
+    private reticleElement: HTMLElement | null = null
+    private isNonPointerDeviceConnected = false
     private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
@@ -106,6 +114,7 @@ export class SystemUICoordinator {
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
+        this.createReticleElement()
 
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -218,6 +227,13 @@ export class SystemUICoordinator {
         this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
 
+        // Interact from a device with no cursor (keyboard Enter, gamepad A, ...) - real mouse
+        // clicks already dispatch SceneCanvasClick directly from handleRendererMouseUp below.
+        this.eventManager.registerEventHandler(InputEventTypes.InteractPressed, this.handleInteractPressed)
+
+        // Gamepad/VR aiming reticle visibility
+        this.eventManager.registerEventHandler<InputDevicesChangedEvent>(InputEventTypes.DevicesChanged, this.handleDevicesChanged)
+
         // Track XR session state so pointer lock never engages during a VR session
         this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
         this.eventManager.registerEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
@@ -233,10 +249,40 @@ export class SystemUICoordinator {
 
     private readonly handleMenuOpen = (): void => {
         this.pauseMenuManager.open()
+        this.updateReticleVisibility()
     }
 
     private readonly handleMenuClose = (): void => {
         this.pauseMenuManager.close()
+        this.updateReticleVisibility()
+    }
+
+    private readonly handleInteractPressed = (): void => {
+        // Simulates a click at the reticle position (screen center) - a real mouse click never
+        // reaches here at all (see the registration comment above).
+        this.eventManager.emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
+            clientX: 0,
+            clientY: 0,
+            button: 0,
+            ndcX: CENTER_SCREEN_NDC,
+            ndcY: CENTER_SCREEN_NDC
+        })
+    }
+
+    private readonly handleDevicesChanged = (event: CustomEvent<InputDevicesChangedEvent>): void => {
+        this.isNonPointerDeviceConnected = event.detail.devices.some(
+            device => device.connected && (device.kind === InputDeviceKind.Gamepad || device.kind === InputDeviceKind.VR)
+        )
+        this.updateReticleVisibility()
+    }
+
+    private updateReticleVisibility(): void {
+        if (!this.reticleElement) {
+            return
+        }
+
+        const shouldShow = this.isNonPointerDeviceConnected && !this.pauseMenuManager.isOpen()
+        this.reticleElement.style.display = shouldShow ? 'block' : 'none'
     }
 
     private readonly handleXRSessionStart = (): void => {
@@ -346,6 +392,15 @@ export class SystemUICoordinator {
         event.preventDefault()
     }
 
+    private createReticleElement(): void {
+        const element = document.createElement('div')
+        element.id = RETICLE_ELEMENT_ID
+        element.className = 'gamepad-reticle'
+        document.body.appendChild(element)
+        this.reticleElement = element
+        this.updateReticleVisibility()
+    }
+
     public dispose(): void {
         this.renderLoopRegistry.unregister(this.constructor.name)
 
@@ -359,6 +414,8 @@ export class SystemUICoordinator {
 
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
+        this.reticleElement?.remove()
+        this.reticleElement = null
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()

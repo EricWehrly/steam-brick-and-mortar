@@ -19,6 +19,8 @@ export interface InputState {
 export interface InputCallbacks {
     onKeyPress?: (key: string) => void
     onKeyRelease?: (key: string) => void
+    /** Every non-repeat keydown, any code - not just the translated movement keys above. */
+    onRawKeyDown?: (code: string) => void
 }
 
 export interface MovementOptions {

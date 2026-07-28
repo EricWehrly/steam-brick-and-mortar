@@ -186,12 +186,6 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             [InputAction.OpenMenu]: [
                 { type: 'keyboard-button', code: 'Escape', label: 'Escape' }
             ],
-            [InputAction.ToggleFullscreen]: [
-                { type: 'keyboard-button', code: 'KeyF', label: 'F' }
-            ],
-            [InputAction.ToggleUI]: [
-                { type: 'keyboard-button', code: 'Tab', label: 'Tab' }
-            ],
             [InputAction.Sprint]: [
                 { type: 'keyboard-button', code: 'ShiftLeft', label: 'Left Shift' },
                 { type: 'keyboard-button', code: 'ShiftRight', label: 'Right Shift' }
@@ -212,8 +206,6 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             [InputAction.LookVertical]: [{ type: 'gamepad-axis', axis: 3, direction: 'both', deadZone: 0.15, invert: true, sensitivity: 2, label: 'Right Stick Y' }],
             [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, label: 'A / Cross' }],
             [InputAction.OpenMenu]: [{ type: 'gamepad-button', button: 9, label: 'Menu / Start' }],
-            [InputAction.ToggleUI]: [{ type: 'gamepad-button', button: 8, label: 'View / Select' }]
-            ,
             [InputAction.Sprint]: [{ type: 'gamepad-button', button: 10, label: 'Left Stick Press' }]
         }
     },

@@ -57,6 +57,7 @@ vi.mock('../../../src/ui/pause/PauseMenuManager', () => ({
         init() {}
         setSystemDependencies() {}
         registerDefaultPanels() {}
+        isOpen() { return false }
         dispose() {}
     }
 }))
