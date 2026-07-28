@@ -146,6 +146,35 @@ export interface InputProfileChangedEvent extends BaseInteractionEvent {
     profileId: string
 }
 
+/**
+ * Fired by InputActionResolver - and only by InputActionResolver - the moment OpenMenu is
+ * pressed, for keyboard (Escape) or gamepad (Start). PauseMenuManager just toggles; the
+ * resolver has already done all the work of deciding which action this raw press means, so
+ * there's nothing left for a consumer to check.
+ */
+export interface OpenMenuPressedEvent extends BaseInteractionEvent {}
+
+/**
+ * Fired by InputActionResolver the moment Interact is pressed from keyboard (Enter) or gamepad
+ * (A/Cross) - never from mouse, since a real mouse click already has its own independent
+ * raycast dispatch (SystemUICoordinator's mousedown/mousemove/mouseup handling) that has nothing
+ * to do with bindings at all. SystemUICoordinator reacts by simulating a click at the reticle
+ * position (screen center).
+ */
+export interface InteractPressedEvent extends BaseInteractionEvent {}
+
+/**
+ * Fired by DeviceDetector the frame it detects a gamepad button transitioning from released to
+ * pressed - the Gamepad API has no native press event, so this is the one place that has to poll
+ * and diff, right next to where gamepad state is already read. This is a raw, unresolved signal -
+ * InputActionResolver is what decides which action (if any) it means and emits the corresponding
+ * specific event.
+ */
+export interface GamepadButtonPressedEvent extends BaseInteractionEvent {
+    gamepadIndex: number
+    buttonIndex: number
+}
+
 // =============================================================================
 // UI EVENTS
 // =============================================================================
@@ -327,7 +356,10 @@ export const InputEventTypes = {
     Resume: 'input:resume',
     SceneCanvasClick: 'input:scene-canvas-click',
     DevicesChanged: 'input:devices-changed',
-    ProfileChanged: 'input:profile-changed'
+    ProfileChanged: 'input:profile-changed',
+    OpenMenuPressed: 'input:open-menu-pressed',
+    InteractPressed: 'input:interact-pressed',
+    GamepadButtonPressed: 'input:gamepad-button-pressed'
 } as const
 
 export const UIEventTypes = {

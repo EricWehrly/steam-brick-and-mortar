@@ -1,0 +1,35 @@
+.gamepad-reticle {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 500;
+    display: none;
+}
+
+.gamepad-reticle::before,
+.gamepad-reticle::after {
+    content: '';
+    position: absolute;
+    background: var(--panel-accent);
+    border-radius: var(--panel-radius-sm);
+}
+
+.gamepad-reticle::before {
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    transform: translateY(-50%);
+}
+
+.gamepad-reticle::after {
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    transform: translateX(-50%);
+}

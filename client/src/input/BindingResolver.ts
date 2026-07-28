@@ -122,6 +122,31 @@ function resolveAxisBindingValue(binding: InputBinding, rawState: RawInputState)
 }
 
 export class BindingResolver {
+    /**
+     * Which button-type actions in this profile have a binding matching the given predicate -
+     * used to resolve a single raw press (a specific keyboard code, mouse button, or gamepad
+     * button) into the action(s) it triggers, without waiting for the next resolve() frame.
+     * Axis-type actions are excluded even though some (MoveForward/Back/Left/Right) use
+     * keyboard-button/gamepad-button bindings to simulate a directional axis - those are
+     * continuously applied via resolve(), not "pressed" in the trigger-once sense.
+     */
+    findButtonActionsBoundTo(profile: InputProfileDefinition, matches: (binding: InputBinding) => boolean): InputActionId[] {
+        const actionIds: InputActionId[] = []
+
+        for (const definition of INPUT_ACTION_DEFINITIONS) {
+            if (definition.type !== InputActionType.Button) {
+                continue
+            }
+
+            const bindings = profile.bindings[definition.id] ?? []
+            if (bindings.some(matches)) {
+                actionIds.push(definition.id)
+            }
+        }
+
+        return actionIds
+    }
+
     resolve(profile: InputProfileDefinition, rawState: RawInputState): ResolvedActionState {
         const axisValues = new Map<InputActionId, number>()
         const buttonValues = new Map<InputActionId, boolean>()

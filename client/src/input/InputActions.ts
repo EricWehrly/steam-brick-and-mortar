@@ -12,9 +12,7 @@ export const InputAction = {
     ResetCamera: 'reset-camera',
     Sprint: 'sprint',
     Interact: 'interact',
-    OpenMenu: 'open-menu',
-    ToggleFullscreen: 'toggle-fullscreen',
-    ToggleUI: 'toggle-ui'
+    OpenMenu: 'open-menu'
 } as const
 
 export type InputActionId = typeof InputAction[keyof typeof InputAction]
@@ -55,9 +53,7 @@ export const INPUT_ACTION_DEFINITIONS: ReadonlyArray<InputActionDefinition> = [
     { id: InputAction.ResetCamera, label: 'Reset Camera View', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.Sprint, label: 'Sprint', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.Interact, label: 'Interact', type: InputActionType.Button, context: InputContext.Scene },
-    { id: InputAction.OpenMenu, label: 'Open Menu', type: InputActionType.Button, context: InputContext.Global },
-    { id: InputAction.ToggleFullscreen, label: 'Toggle Fullscreen', type: InputActionType.Button, context: InputContext.Global },
-    { id: InputAction.ToggleUI, label: 'Toggle UI', type: InputActionType.Button, context: InputContext.Global }
+    { id: InputAction.OpenMenu, label: 'Open Menu', type: InputActionType.Button, context: InputContext.Global }
 ]
 
 export const INPUT_ACTION_ORDER = INPUT_ACTION_DEFINITIONS.map(action => action.id)

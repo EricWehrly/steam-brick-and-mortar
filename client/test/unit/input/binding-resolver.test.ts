@@ -178,4 +178,42 @@ describe('BindingResolver', () => {
 
         expect(state.buttons.get(InputAction.Interact)).toBe(true)
     })
+
+    describe('findButtonActionsBoundTo', () => {
+        it('finds the button action bound to a raw keyboard code', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const actionIds = resolver.findButtonActionsBoundTo(
+                mouseKeyboardProfile,
+                binding => binding.type === 'keyboard-button' && binding.code === 'Escape'
+            )
+
+            expect(actionIds).toEqual([InputAction.OpenMenu])
+        })
+
+        it('excludes axis actions even though they use keyboard-button bindings (e.g. movement keys)', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const actionIds = resolver.findButtonActionsBoundTo(
+                mouseKeyboardProfile,
+                binding => binding.type === 'keyboard-button' && binding.code === 'KeyW'
+            )
+
+            expect(actionIds).toEqual([])
+        })
+
+        it('returns an empty array when nothing matches', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const actionIds = resolver.findButtonActionsBoundTo(
+                mouseKeyboardProfile,
+                binding => binding.type === 'keyboard-button' && binding.code === 'KeyZ'
+            )
+
+            expect(actionIds).toEqual([])
+        })
+    })
 })

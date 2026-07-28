@@ -49,6 +49,10 @@ export class InputStateTracker {
 
         this.keysPressed.add(event.code)
         this.updateTrackedKeyState(event.code, this.setKeyPressed)
+
+        if (!event.repeat) {
+            this.callbacks.onRawKeyDown?.(event.code)
+        }
     }
 
     handleKeyUp = (event: KeyboardEvent): void => {

@@ -1,0 +1,124 @@
+/**
+ * System UI Coordinator - InteractPressed Wiring
+ *
+ * Interact from a cursor-less device (keyboard/gamepad) should dispatch a center-screen
+ * SceneCanvasClick, simulating a click at the reticle position. A real mouse click never reaches
+ * this path at all - it has its own independent dispatch (handleRendererMouseUp). The gamepad/VR
+ * aiming reticle should show only while such a device is connected and the pause menu is closed.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import * as THREE from 'three'
+import { SystemUICoordinator } from '../../../src/ui/coordinators/SystemUICoordinator'
+import { EventManager } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
+import {
+    InputEventTypes,
+    type SceneCanvasClickEvent,
+    type InputDevicesChangedEvent
+} from '../../../src/types/InteractionEvents'
+
+let isPauseMenuOpen = false
+
+const { registeredHandlers } = vi.hoisted(() => ({
+    registeredHandlers: new Map<string, (event: unknown) => void>()
+}))
+
+vi.mock('../../../src/core/EventManager', () => ({
+    EventManager: {
+        getInstance: () => ({
+            emit: vi.fn(),
+            registerEventHandler: vi.fn((eventType: string, handler: (event: unknown) => void) => {
+                registeredHandlers.set(eventType, handler)
+            }),
+            deregisterEventHandler: vi.fn()
+        })
+    },
+    EventSource: { UI: 'ui', ManagedLight: 'managed-light' }
+}))
+
+vi.mock('../../../src/ui/pause/PauseMenuManager', () => ({
+    PauseMenuManager: class {
+        init() {}
+        setSystemDependencies() {}
+        registerDefaultPanels() {}
+        isOpen() { return isPauseMenuOpen }
+        open() {}
+        close() {}
+        toggle() {}
+        dispose() {}
+    }
+}))
+
+vi.mock('../../../src/ui/PerformanceMonitor', () => ({
+    PerformanceMonitorUI: class { start() {}; dispose() {}; updateRenderStats() {} }
+}))
+
+vi.mock('../../../src/ui/LightingControlsPanel', () => ({
+    LightingControlsPanel: class { show() {}; hide() {}; toggle() {}; dispose() {} }
+}))
+
+function makeMockRenderer(): { domElement: HTMLCanvasElement } {
+    return { domElement: document.createElement('canvas') } as unknown as { domElement: HTMLCanvasElement }
+}
+
+function emitInteractPressed(): void {
+    registeredHandlers.get(InputEventTypes.InteractPressed)?.(new CustomEvent('input:interact-pressed'))
+}
+
+describe('SystemUICoordinator InteractPressed wiring', () => {
+    let systemCoordinator: SystemUICoordinator
+    const eventManagerMock = EventManager.getInstance()
+
+    beforeEach(async () => {
+        document.body.innerHTML = ''
+        registeredHandlers.clear()
+        isPauseMenuOpen = false
+
+        systemCoordinator = new SystemUICoordinator(eventManagerMock, AppSettings.getInstance())
+        await systemCoordinator.init(makeMockRenderer() as unknown as THREE.WebGLRenderer)
+        vi.mocked(eventManagerMock.emit).mockClear()
+    })
+
+    afterEach(() => {
+        systemCoordinator?.dispose()
+        document.body.innerHTML = ''
+    })
+
+    it('emits a center-screen SceneCanvasClick when InteractPressed fires', () => {
+        emitInteractPressed()
+
+        expect(eventManagerMock.emit).toHaveBeenCalledWith(
+            InputEventTypes.SceneCanvasClick,
+            expect.objectContaining({ ndcX: 0, ndcY: 0 } satisfies Partial<SceneCanvasClickEvent>)
+        )
+    })
+
+    it('shows the reticle only while a gamepad/VR device is connected and the menu is closed', () => {
+        const reticle = document.getElementById('gamepad-reticle')
+        expect(reticle).not.toBeNull()
+        expect(reticle?.style.display).toBe('none')
+
+        const devicesChanged = registeredHandlers.get(InputEventTypes.DevicesChanged)
+        const menuOpen = registeredHandlers.get('ui:menu-open')
+        const menuClose = registeredHandlers.get('ui:menu-close')
+
+        function emitDevices(devices: InputDevicesChangedEvent['devices']): void {
+            devicesChanged?.(new CustomEvent('devices', { detail: { devices } }))
+        }
+
+        emitDevices([{ id: 'gamepad-0', name: 'Test Pad', kind: 'gamepad', connected: true, profileId: 'gamepad-standard' }])
+        expect(reticle?.style.display).toBe('block')
+
+        isPauseMenuOpen = true
+        menuOpen?.(new CustomEvent('menu-open'))
+        expect(reticle?.style.display).toBe('none')
+
+        isPauseMenuOpen = false
+        menuClose?.(new CustomEvent('menu-close'))
+        expect(reticle?.style.display).toBe('block')
+
+        emitDevices([{ id: 'mouse-keyboard', name: 'Mouse + Keyboard', kind: 'mouse-keyboard', connected: true, profileId: 'mouse-keyboard' }])
+        expect(reticle?.style.display).toBe('none')
+    })
+})

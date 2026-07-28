@@ -11,6 +11,7 @@ import { InputActionResolver } from './InputActionResolver'
 import { InputEventAdapter } from './InputEventAdapter'
 import { InputProfileService } from './InputProfileService'
 import { InputStateTracker } from './InputStateTracker'
+import { InputEventTypes, type GamepadButtonPressedEvent } from '../types/InteractionEvents'
 
 export type { InputCallbacks, InputState, MovementOptions } from './InputContracts'
 
@@ -25,7 +26,9 @@ export class InputManager {
     }
 
     private isListeningToEvents = false
+    private isPaused = false
 
+    private readonly eventManager: EventManager
     private readonly stateTracker: InputStateTracker
     private readonly eventAdapter: InputEventAdapter
     readonly profileService: InputProfileService
@@ -35,16 +38,21 @@ export class InputManager {
     constructor(options: Partial<MovementOptions> = {}, callbacks: InputCallbacks = {}) {
         this.options = { ...this.options, ...options }
 
-        const eventManager = EventManager.getInstance()
+        this.eventManager = EventManager.getInstance()
         const profileStore = new InputProfileStore()
         const bindingResolver = new BindingResolver()
-        const deviceDetector = new DeviceDetector(eventManager)
+        const deviceDetector = new DeviceDetector(this.eventManager)
 
-        this.stateTracker = new InputStateTracker(callbacks)
+        this.stateTracker = new InputStateTracker({
+            ...callbacks,
+            onRawKeyDown: code => this.actionResolver.handleRawKeyPress(code, this.profileService.getEnabledProfiles())
+        })
         this.eventAdapter = new InputEventAdapter(this.stateTracker)
-        this.profileService = new InputProfileService(eventManager, profileStore)
-        this.actionResolver = new InputActionResolver(bindingResolver, deviceDetector)
+        this.profileService = new InputProfileService(this.eventManager, profileStore)
+        this.actionResolver = new InputActionResolver(bindingResolver, deviceDetector, this.eventManager)
         this.cameraInputApplier = new CameraInputApplier()
+
+        this.eventManager.registerEventHandler<GamepadButtonPressedEvent>(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
 
         InputManager.activeInstance = this
     }
@@ -78,6 +86,21 @@ export class InputManager {
         InputManager.logger.debug('Input controls deactivated')
     }
 
+    /**
+     * Suspends camera movement/rotation application (e.g. while the pause menu is open) without
+     * tearing down DOM listeners or gamepad polling - action resolution (InputActionResolver)
+     * keeps running every frame regardless, so global actions like OpenMenu can still be read
+     * (needed to detect the press that closes the menu again). Distinct from
+     * startListening()/stopListening(), which are real setup/teardown for dispose().
+     */
+    pause(): void {
+        this.isPaused = true
+    }
+
+    resume(): void {
+        this.isPaused = false
+    }
+
     updateFrame(): void {
         this.actionResolver.updateFrame(
             this.profileService.getEnabledProfiles(),
@@ -89,7 +112,13 @@ export class InputManager {
     }
 
     updateCameraMovement(camera: THREE.Camera): void {
+        // updateFrame() always runs, paused or not - global actions (OpenMenu) still need to
+        // resolve every frame so a press can be detected and close the menu again.
         this.updateFrame()
+
+        if (this.isPaused) {
+            return
+        }
 
         this.cameraInputApplier.updateMovement(
             camera,
@@ -100,6 +129,10 @@ export class InputManager {
     }
 
     updateCameraRotation(camera: THREE.Camera): void {
+        if (this.isPaused) {
+            return
+        }
+
         this.cameraInputApplier.updateRotation(camera, this.actionResolver, this.options)
     }
 
@@ -127,11 +160,17 @@ export class InputManager {
         return this.stateTracker.isShiftPressed()
     }
 
+    private readonly handleGamepadButtonPressed = (event: CustomEvent<GamepadButtonPressedEvent>): void => {
+        this.actionResolver.handleGamepadButtonPress(event.detail.buttonIndex, this.profileService.getEnabledProfiles())
+    }
+
     dispose(): void {
         this.stopListening()
         this.stateTracker.clearCallbacks()
         this.stateTracker.clear()
         this.actionResolver.clear()
+        this.actionResolver.dispose()
+        this.eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
 
         if (InputManager.activeInstance === this) {
             InputManager.activeInstance = null

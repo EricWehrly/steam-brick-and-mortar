@@ -20,11 +20,10 @@ import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
 import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
-import { SteamEventTypes } from '../../types/InteractionEvents'
+import { SteamEventTypes, InputEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
-import { DOMUtils } from '../../utils/DOMUtils'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -110,15 +109,23 @@ export class PauseMenuManager {
 
     init(): void {
         this.createMenuStructure()
-        this.setupKeyboardHandling()
         this.setupEventListeners()
     }
 
     private setupEventListeners(): void {
         this.eventManager.registerEventHandler(
-            SteamEventTypes.DataLoaded, 
+            SteamEventTypes.DataLoaded,
             this.onSteamDataLoaded.bind(this)
         )
+
+        // Replaces the old hardcoded Escape-only keydown listener - InputActionResolver already
+        // knows this means OpenMenu for any device (keyboard Escape, gamepad Start, ...), so
+        // there's nothing left to check here.
+        this.eventManager.registerEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
+    }
+
+    private readonly handleOpenMenuPressed = (): void => {
+        this.toggle()
     }
 
     private onSteamDataLoaded(_event: CustomEvent<SteamDataLoadedEvent>): void {
@@ -529,20 +536,6 @@ export class PauseMenuManager {
         }
     }
 
-    private setupKeyboardHandling(): void {
-        document.addEventListener('keydown', (event) => {
-            // Only handle escape if not in an input field
-            if (event.key === 'Escape' && !this.isInputFocused()) {
-                event.preventDefault()
-                this.toggle()
-            }
-        })
-    }
-
-    private isInputFocused(): boolean {
-        return DOMUtils.isEditableElement(document.activeElement)
-    }
-
     dispose(): void {
         // Close menu if open
         if (this.state.isOpen) {
@@ -555,6 +548,7 @@ export class PauseMenuManager {
             SteamEventTypes.DataLoaded,
             this.onSteamDataLoaded.bind(this)
         )
+        this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
 
         // Dispose all panels
         this.panels.forEach(panel => {

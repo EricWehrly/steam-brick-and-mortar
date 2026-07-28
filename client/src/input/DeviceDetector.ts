@@ -1,5 +1,5 @@
 import { EventManager, EventSource } from '../core/EventManager'
-import type { InputDevicesChangedEvent } from '../types/InteractionEvents'
+import type { InputDevicesChangedEvent, GamepadButtonPressedEvent } from '../types/InteractionEvents'
 import { InputEventTypes } from '../types/InteractionEvents'
 import { InputDeviceKind, type InputDeviceKindValue } from './InputProfile'
 import { Logger } from '../utils/Logger'
@@ -20,6 +20,7 @@ export class DeviceDetector {
     private started = false
     private touchSeen = false
     private xrSession: XRSession | null = null
+    private previousGamepadButtonsPressed = new Map<number, ReadonlyArray<boolean>>()
 
     constructor(eventManager: EventManager = EventManager.getInstance()) {
         this.eventManager = eventManager
@@ -101,8 +102,24 @@ export class DeviceDetector {
             }
         }
 
+        for (const gamepadIndex of this.previousGamepadButtonsPressed.keys()) {
+            if (!connectedGamepadIds.has(`gamepad-${gamepadIndex}`)) {
+                this.previousGamepadButtonsPressed.delete(gamepadIndex)
+            }
+        }
+
+        // Emit DevicesChanged before button-press events - listeners that resolve raw gamepad
+        // button presses (InputActionResolver) need this gamepad's profile to already be in
+        // the connected set, or a press detected on the very same poll a gamepad first appears
+        // would resolve against nothing.
         if (changed) {
             this.emitDevicesChanged()
+        }
+
+        for (const gamepad of gamepads) {
+            if (gamepad && gamepad.connected) {
+                this.emitNewlyPressedGamepadButtons(gamepad)
+            }
         }
     }
 
@@ -110,6 +127,23 @@ export class DeviceDetector {
         return Array.from(this.devices.values())
             .filter(device => device.connected)
             .sort((left, right) => left.name.localeCompare(right.name))
+    }
+
+    private emitNewlyPressedGamepadButtons(gamepad: Gamepad): void {
+        const previousButtons = this.previousGamepadButtonsPressed.get(gamepad.index)
+
+        gamepad.buttons.forEach((button, buttonIndex) => {
+            const wasPressed = previousButtons?.[buttonIndex] ?? false
+            if (button.pressed && !wasPressed) {
+                this.eventManager.emit<GamepadButtonPressedEvent>(
+                    InputEventTypes.GamepadButtonPressed,
+                    { gamepadIndex: gamepad.index, buttonIndex },
+                    EventSource.System
+                )
+            }
+        })
+
+        this.previousGamepadButtonsPressed.set(gamepad.index, gamepad.buttons.map(button => button.pressed))
     }
 
     private addGamepadDevice(gamepad: Gamepad): void {
