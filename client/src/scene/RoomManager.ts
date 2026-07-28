@@ -2,13 +2,24 @@ import * as THREE from 'three'
 import { AppSettings, Setting, type SettingChangedEvent } from '../core/AppSettings'
 import { EventManager } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, GameEventTypes, type ShelfLayoutDeterminedEvent, AppSettingsEventTypes } from '../types/InteractionEvents'
+import {
+    RoomEventTypes,
+    type RoomResizedEvent,
+    CeilingEventTypes,
+    GameEventTypes,
+    type ShelfLayoutDeterminedEvent,
+    AppSettingsEventTypes,
+    UIEventTypes,
+} from '../types/InteractionEvents'
+import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
 import { type CeilingToggleEvent } from '../types/LightingEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { Logger } from '../utils/Logger'
+import { LayoutModes } from '../types/LayoutTypes'
+import { RenderLoopRegistry } from './RenderLoopRegistry'
 
 // TD: room-defaults-ownership
 export class RoomConstants {
@@ -86,7 +97,16 @@ export class RoomManager {
     private hasPositionedCamera = false
     private currentCenterOffset?: { x: number; y: number; z: number }
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
-    
+
+    // Liminal treadmill: the room shell is a fixed-size envelope that must translate
+    // with the player indefinitely (Fork A — the player walks through absolute world
+    // space while shelves recycle to ever-further ranks). Baseline captured whenever
+    // the shell is (re)built; followed every frame while liminal is active. Without
+    // this, recycled shelves end up beyond the shell's static walls and get occluded.
+    private isLiminalActive = false
+    private appliedZAtLastBuild = 0
+    private cameraZAtLastBuild = 0
+
     // Room structure (reused on resize)
     private roomGroup: THREE.Group | null = null
     private floor: THREE.Mesh | null = null
@@ -117,9 +137,20 @@ export class RoomManager {
         this.eventManager.registerEventHandler(GameEventTypes.ShelfLayoutDetermined, this.onShelfLayoutDetermined.bind(this))
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.onAppSettingsChanged.bind(this))
-        
+        this.eventManager.registerEventHandler<LayoutRequestedEvent>(UIEventTypes.LayoutRequested, this.onLayoutRequested.bind(this))
+        RenderLoopRegistry.getInstance().register('RoomManager', this.onFrame.bind(this))
+
         // Fire-and-forget initial room creation
         this.createInitialRoom()
+    }
+
+    private onLayoutRequested(event: CustomEvent<LayoutRequestedEvent>): void {
+        this.isLiminalActive = event.detail.layoutMode === LayoutModes.Liminal
+    }
+
+    private onFrame(): void {
+        if (!this.isLiminalActive || !this.roomGroup) return
+        this.roomGroup.position.z = this.appliedZAtLastBuild + (this.camera.position.z - this.cameraZAtLastBuild)
     }
     
     private async createInitialRoom(): Promise<void> {
@@ -227,7 +258,7 @@ export class RoomManager {
             const appliedZ = centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
             this.roomGroup.position.set(centerOffset.x, centerOffset.y, appliedZ)
             this.currentCenterOffset = centerOffset
-            
+
             if (!this.hasPositionedCamera) {
                 this.hasPositionedCamera = true
                 const targetZ = appliedZ - (dimensions.depth / 2)
@@ -235,6 +266,11 @@ export class RoomManager {
                 this.camera.lookAt(0, 1.6, targetZ)
                 console.debug(`📷 Camera initial position set to face store center at Z=${targetZ.toFixed(1)}`)
             }
+
+            // Captured after any camera repositioning above, so the liminal
+            // follow logic (onFrame) always has an accurate baseline pair.
+            this.appliedZAtLastBuild = appliedZ
+            this.cameraZAtLastBuild = this.camera.position.z
         }
 
         this.emitProgress('Building floor')
@@ -384,6 +420,8 @@ export class RoomManager {
     }
 
     public dispose(): void {
+        RenderLoopRegistry.getInstance().unregister('RoomManager')
+
         if (this.roomGroup) {
             this.scene.remove(this.roomGroup)
             
