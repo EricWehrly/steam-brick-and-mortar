@@ -558,6 +558,36 @@ nor visually receive shadow.
 
 ---
 
+## id: gamepad-menu-navigation-unimplemented
+**Priority**: Medium
+**Effort**: Unestimated — a real UI-navigation layer (D-pad/stick-driven focus movement, `Interact`-to-activate), not a small patch
+**Context**: A gamepad-only user (no mouse/keyboard) can open the pause menu (`OpenMenu` is bound to
+button 9 by default) but has no way to navigate *inside* it — every panel control
+(`ControlsPanel`/`GraphicsSettingsPanel`/etc. checkboxes, sliders, selects, buttons) only responds
+to mouse clicks and native keyboard Tab/Enter focus. Nothing translates gamepad D-pad/stick state
+into DOM focus movement or synthesizes a click on the focused element. Surfaced 2026-07-24 while
+checking whether a gamepad-only player could reach the existing `fullscreen-enabled` checkbox in
+`GraphicsSettingsPanel` (`GraphicsSettingsPanel.ts`'s `setFullscreenEnabled()`) — the checkbox
+itself already works via the Fullscreen API, but a gamepad-only user cannot reach or toggle it,
+or any other in-menu control, today.
+
+**Decision (for now)**:
+- Not building this now — scoped as its own feature, not a fast-follow patch, since it needs a
+  design pass (focus order, visual focus indicator, analog-stick vs. D-pad repeat/acceleration,
+  and how `Interact` disambiguates "activate focused menu control" from its existing
+  "click at reticle" scene behavior while the menu is open).
+
+**Done when**:
+- A gamepad-only user can open the pause menu, move focus between its controls, and
+  activate/adjust each control type (checkbox, select, slider, button) without a mouse or keyboard.
+
+**Related files**:
+- `client/src/ui/pause/panels/ControlsPanel.ts`
+- `client/src/ui/pause/panels/GraphicsSettingsPanel.ts`
+- `client/src/ui/pause/PauseMenuManager.ts`
+
+---
+
 ## Resolved
 
 ## id: steam-integration-loading-strategy-split
