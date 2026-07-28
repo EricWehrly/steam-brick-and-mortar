@@ -54,6 +54,7 @@ import {
     type PlacementRunResetRequestedEvent,
     type PlacementResolvedEvent,
     type PlacementCommittedEvent,
+    type PlacementRepointRequestedEvent,
 } from '../../types/InteractionEvents'
 
 export class GpuGameBoxRenderer {
@@ -66,6 +67,7 @@ export class GpuGameBoxRenderer {
     private readonly boundHandleArtworkSettled: (event: CustomEvent<unknown>) => void
     private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
     private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
+    private readonly boundHandlePlacementRepointRequested: (event: CustomEvent<PlacementRepointRequestedEvent>) => void
     private resolvedArtworkPlacements = 0
     private resolvedLabelPlacements = 0
     private failedLabelPlacements = 0
@@ -82,6 +84,7 @@ export class GpuGameBoxRenderer {
         this.boundHandleArtworkSettled = this.handleArtworkSettled.bind(this)
         this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
         this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
+        this.boundHandlePlacementRepointRequested = this.handlePlacementRepointRequested.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ArtworkSettled,
@@ -95,6 +98,10 @@ export class GpuGameBoxRenderer {
             GameRenderEventTypes.PlacementRunResetRequested,
             this.boundHandlePlacementRunResetRequested
         )
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRepointRequested,
+            this.boundHandlePlacementRepointRequested
+        )
 
         GpuGameBoxRenderer.logger.lifecycle(
             `Initialized (textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity}, ` +
@@ -105,6 +112,27 @@ export class GpuGameBoxRenderer {
     private handlePlacementResolved(event: CustomEvent<PlacementResolvedEvent>): void {
         const { game, position, rotation } = event.detail
         this.placeResolvedGame(game, position, rotation)
+    }
+
+    /**
+     * Repoint an already-committed instance to a different game (liminal mode's
+     * treadmill). kind is fixed at the caller's discretion — an artwork instance
+     * can only be repointed via setInstanceArtwork (requires the new game to
+     * already have prefetched artwork; fails otherwise) and a label instance
+     * only via setInstanceLabel, since the two live in separate InstancedMeshes.
+     */
+    private handlePlacementRepointRequested(event: CustomEvent<PlacementRepointRequestedEvent>): void {
+        const { instanceIndex, kind, appid, gameName, position, rotation } = event.detail
+
+        const success = kind === 'artwork'
+            ? this.lodArtworkRenderer.setInstanceArtwork(instanceIndex, appid, gameName, position, rotation)
+            : this.instancedLabelRenderer.setInstanceLabel(instanceIndex, position, gameName, appid, rotation)
+
+        if (!success) {
+            GpuGameBoxRenderer.logger.warn(
+                `Repoint failed for "${gameName}" (kind=${kind}, instanceIndex=${instanceIndex}) — leaving previous occupant in place`
+            )
+        }
     }
 
     private handleArtworkSettled(_event: CustomEvent<unknown>): void {
@@ -194,6 +222,10 @@ export class GpuGameBoxRenderer {
         EventManager.getInstance().deregisterEventHandler(
             GameRenderEventTypes.PlacementRunResetRequested,
             this.boundHandlePlacementRunResetRequested
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRepointRequested,
+            this.boundHandlePlacementRepointRequested
         )
         this.renderIntentCoordinator.dispose()
         this.artworkPrefetchCoordinator.dispose()

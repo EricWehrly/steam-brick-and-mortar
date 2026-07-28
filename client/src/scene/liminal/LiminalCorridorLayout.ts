@@ -54,27 +54,39 @@ export const CORRIDOR_UNIT_SPACING_Z = 2.6
 /** Distance from the player's spawn point to the first (nearest) depth slot. */
 export const CORRIDOR_FIRST_SLOT_OFFSET_Z = 4.0
 
-const LEFT_FACING_ROTATION_Y = Math.PI / 2   // faces +X, toward the aisle
-const RIGHT_FACING_ROTATION_Y = -Math.PI / 2 // faces -X, toward the aisle
+export const LEFT_FACING_ROTATION_Y = Math.PI / 2   // faces +X, toward the aisle
+export const RIGHT_FACING_ROTATION_Y = -Math.PI / 2 // faces -X, toward the aisle
+
+export type CorridorSide = 'left' | 'right'
+
+/**
+ * World Z for a depth slot identified by its *rank* — a signed integer that
+ * starts at the slot's physical index (0..LIMINAL_DEPTH_SLOTS-1) but, once
+ * recycling starts (Story 5), can be any integer: a recycled unit's rank
+ * jumps to one past the corridor's current far/near edge rather than
+ * wrapping 0..LIMINAL_DEPTH_SLOTS-1, so the 5 physical units' ranks are
+ * always LIMINAL_DEPTH_SLOTS consecutive integers, just not always 0..4.
+ */
+export function computeSlotWorldZ(rank: number): number {
+    return -(CORRIDOR_FIRST_SLOT_OFFSET_Z + rank * CORRIDOR_UNIT_SPACING_Z)
+}
+
+export function computeUnitTransform(rank: number, side: CorridorSide): { position: THREE.Vector3; rotationY: number } {
+    const z = computeSlotWorldZ(rank)
+    return side === 'left'
+        ? { position: new THREE.Vector3(-CORRIDOR_HALF_WIDTH_X, 0, z), rotationY: LEFT_FACING_ROTATION_Y }
+        : { position: new THREE.Vector3(CORRIDOR_HALF_WIDTH_X, 0, z), rotationY: RIGHT_FACING_ROTATION_Y }
+}
 
 function computeLiminalCorridorShelves(): ShelfInfo[] {
     const shelves: ShelfInfo[] = []
 
     for (let slot = 0; slot < LIMINAL_DEPTH_SLOTS; slot++) {
-        const z = -(CORRIDOR_FIRST_SLOT_OFFSET_Z + slot * CORRIDOR_UNIT_SPACING_Z)
+        const left = computeUnitTransform(slot, 'left')
+        const right = computeUnitTransform(slot, 'right')
 
-        shelves.push({
-            position: new THREE.Vector3(-CORRIDOR_HALF_WIDTH_X, 0, z),
-            rotationY: LEFT_FACING_ROTATION_Y,
-            row: slot,
-            indexInRow: 0,
-        })
-        shelves.push({
-            position: new THREE.Vector3(CORRIDOR_HALF_WIDTH_X, 0, z),
-            rotationY: RIGHT_FACING_ROTATION_Y,
-            row: slot,
-            indexInRow: 1,
-        })
+        shelves.push({ position: left.position, rotationY: left.rotationY, row: slot, indexInRow: 0 })
+        shelves.push({ position: right.position, rotationY: right.rotationY, row: slot, indexInRow: 1 })
     }
 
     return shelves

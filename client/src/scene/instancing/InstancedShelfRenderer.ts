@@ -57,6 +57,7 @@ import { EventManager } from '../../core/EventManager'
 import {
     StorePropsEventTypes,
     type ShelfReadyEvent,
+    type ShelfUnitRepositionRequestedEvent,
 } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
@@ -122,6 +123,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private sceneInsertCancelled = false
 
     private readonly boundHandleShelfReady: (event: CustomEvent<ShelfReadyEvent>) => void
+    private readonly boundHandleShelfUnitRepositionRequested: (event: CustomEvent<ShelfUnitRepositionRequestedEvent>) => void
 
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -166,12 +168,18 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         this.boundHandleShelfReady = (event: CustomEvent<ShelfReadyEvent>) =>
             this.handleShelfReady(event.detail)
+        this.boundHandleShelfUnitRepositionRequested = (event: CustomEvent<ShelfUnitRepositionRequestedEvent>) =>
+            this.handleShelfUnitRepositionRequested(event.detail)
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             this.boundHandleShelfReady
         )
-        
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfUnitRepositionRequested,
+            this.boundHandleShelfUnitRepositionRequested
+        )
+
         InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
     }
     
@@ -484,6 +492,22 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         })
     }
 
+    /**
+     * Reposition an already-instanced shelf unit — liminal mode's treadmill
+     * recycling a unit into a new corridor slot. setInstance is idempotent
+     * for an existing index, so this is just a direct pass-through; the
+     * dedicated event (rather than reusing ShelfReady) exists purely because
+     * GameBoxSpawner treats ShelfReady's shelfIndex === 0 as "new layout wave,
+     * clear my anchor cache" — see ShelfUnitRepositionRequestedEvent's doc.
+     */
+    private handleShelfUnitRepositionRequested(detail: ShelfUnitRepositionRequestedEvent): void {
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, detail.rotationY, 0))
+        this.setInstance(detail.shelfIndex, {
+            position: detail.position as THREE.Vector3,
+            rotation,
+        })
+    }
+
     private flushPendingShelfReady(): void {
         if (!this.isReady() || this.pendingShelfReady.size === 0) {
             return
@@ -561,7 +585,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             StorePropsEventTypes.ShelfReady,
             this.boundHandleShelfReady
         )
-        
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.ShelfUnitRepositionRequested,
+            this.boundHandleShelfUnitRepositionRequested
+        )
+
         // Dispose all managers
         this.angledBoardManager.dispose()
         this.sideBoardManager.dispose()
