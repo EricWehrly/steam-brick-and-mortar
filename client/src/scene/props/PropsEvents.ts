@@ -103,6 +103,19 @@ export interface GamesPlacedEvent extends BaseInteractionEvent {
     status: BatchProcessingStatus
 }
 
+/**
+ * Reposition a single already-instanced shelf unit in place — distinct from
+ * ShelfReady, whose shelfIndex === 0 case means "a fresh layout wave started"
+ * to consumers like GameBoxSpawner (which clears its whole shelf-anchor cache
+ * on that signal). Repositioning one existing unit out of band (liminal
+ * mode's treadmill recycling a shelf into a new slot) must not trigger that.
+ */
+export interface ShelfUnitRepositionRequestedEvent extends BaseInteractionEvent {
+    shelfIndex: number
+    position: Readonly<THREE.Vector3>
+    rotationY: number
+}
+
 // =============================================================================
 // PROGRESS / TELEMETRY
 // =============================================================================
@@ -163,6 +176,7 @@ export const StorePropsEventTypes = {
     // Batch → placement pipeline
     BatchReadyForPlacement: 'store-props:batch-ready-placement',
     ShelfReady:  'store-props:shelf-ready',
+    ShelfUnitRepositionRequested: 'store-props:shelf-unit-reposition-requested',
     GamesPlaced: 'store-props:games-placed',
 
     // Progress / telemetry

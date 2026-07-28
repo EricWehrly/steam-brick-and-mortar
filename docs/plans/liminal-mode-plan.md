@@ -159,6 +159,14 @@ Note this is the one place library size still matters: v1 keeps the current
 has today, so it is not a regression — but eviction becomes necessary if we ever chase the
 5000-game case.
 
+**Update (Story 5 implementation): this gap no longer exists on `origin/act2/default`.**
+`ArtworkPrefetchCoordinator` now prefetches every game's artwork off raw Steam data-loading batches
+(`BatchCoordinator`/`SteamGamesBatchEvent`), fully decoupled from what `GameSorter`/`ShelfLayoutCoordinator`
+actually place on shelves — that coupling existed when this section was written but was refactored
+away since. In practice the whole library's artwork is already resolved by the time a user is
+walking around, regardless of the window. **No lookahead-prefetch machinery was built.** See Story 5
+below for what this changed about the recycle design.
+
 ### P6 — Shelf reposition + explicit GPU flush (already built, keep)
 
 `InstancedShelfRenderer.setInstance()`'s existing-index branch (`updateShelfUnitTransform`) plus the
@@ -363,13 +371,32 @@ that resolves via label fallback must be just as recyclable as one with artwork.
 instances unchanged; label repoint updates text and position together.
 
 **Story 5 — The treadmill.**
-`LiminalBoundaryTracker` + `LiminalWindowCoordinator.advance()` + lookahead prefetch (P5) + Fork A
-reposition (P7). This is the first story where the corridor is actually endless.
+`LiminalBoundaryTracker` + `LiminalWindowCoordinator.advance()` + Fork A reposition (P7). This is the
+first story where the corridor is actually endless. Lookahead prefetch was dropped from scope — see
+the P5 update above; the whole library is already prefetched independent of the window by the time
+a crossing can happen.
+
+*Recycle mechanism, as built* (a real design fork resolved with the user rather than following the
+architecture sketched in §5.3 verbatim): the original "repoint the recycled slot's 18 boxes in
+place" design ran into an unaddressed problem — an artwork-kind GPU instance and a label-kind
+instance live in separate `InstancedMesh`es with separate index spaces, so a box whose *new* game
+needs the other kind has no single instance to repoint into. Three options were weighed: full
+90-game reseed per crossing (simplest, but a real deviation from the targeted-repoint cost model);
+targeted repoint with dual-reserved artwork+label slots per box (correct, but doubles liminal's box
+instance budget); or targeted repoint that keeps each box's kind fixed for the corridor's lifetime
+and leaves a kind-mismatched box stale until its next recycle. The user chose the third. Each
+physical unit tracks a `rank` (a signed integer, not clamped to 0..4 — recycling jumps a unit's rank
+to one past the window's current far/near edge rather than wrapping); instance-to-shelf ownership is
+classified once, right after the initial seed settles, by nearest-shelf-XZ-distance over
+`DataKey.InstancedArtworkMetadata`/`InstancedLabelMetadata` (both already-published, position-indexed
+maps — no new correlation event was needed). `PlacementCommitted` from Story 4 ended up unused by
+this mechanism but is kept as a generically useful capability.
+
 *Acceptance*: walking forward or backward indefinitely never reaches an end; content advances in
 sort order; walking a full library's distance returns you to the first game; the recycle is not
 visible.
 *Tests*: crossings both directions; recycle preserves instance count; window contents match expected
-ring indices after N crossings; prefetch is requested before a game is needed.
+ring indices after N crossings; a kind-mismatched box is left stale rather than erroring.
 
 **Story 6 — Tuning pass (in the running app).**
 Expose `UNIT_SPACING_Z`, window depth (slots ahead / behind), and fog distance as live settings.

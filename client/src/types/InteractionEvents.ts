@@ -276,6 +276,22 @@ export interface PlacementCommittedEvent extends BaseInteractionEvent {
     kind: 'artwork' | 'label'
 }
 
+/**
+ * Repoint an already-committed game-box instance to a different game, without
+ * allocating a new instance (liminal mode's treadmill — see
+ * docs/plans/liminal-mode-plan.md P4/Story 5). kind must match the instance's
+ * existing kind — an artwork instance and a label instance live in separate
+ * InstancedMeshes with separate index spaces, so this cannot switch kind.
+ */
+export interface PlacementRepointRequestedEvent extends BaseInteractionEvent {
+    instanceIndex: number
+    kind: 'artwork' | 'label'
+    appid: number
+    gameName: string
+    position: THREE.Vector3
+    rotation: THREE.Quaternion
+}
+
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
@@ -290,6 +306,7 @@ export type {
     StorePropsLibraryReloadRequestEvent,
     BatchReadyForPlacementEvent,
     ShelfReadyEvent,
+    ShelfUnitRepositionRequestedEvent,
     GamesPlacedEvent,
     StorePropsProgressEvent,
 } from '../scene/props/PropsEvents'
@@ -428,6 +445,7 @@ export const GameRenderEventTypes = {
     PlacementIntentReady: 'game-render:placement-intent-ready',
     PlacementResolved: 'game-render:placement-resolved',
     PlacementCommitted: 'game-render:placement-committed',
+    PlacementRepointRequested: 'game-render:placement-repoint-requested',
 } as const
 
 export const CeilingEventTypes = {

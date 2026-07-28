@@ -5,6 +5,10 @@ import {
     CORRIDOR_HALF_WIDTH_X,
     CORRIDOR_UNIT_SPACING_Z,
     CORRIDOR_FIRST_SLOT_OFFSET_Z,
+    LEFT_FACING_ROTATION_Y,
+    RIGHT_FACING_ROTATION_Y,
+    computeSlotWorldZ,
+    computeUnitTransform,
 } from '../../../../src/scene/liminal/LiminalCorridorLayout'
 import { RowStockStrategy } from '../../../../src/scene/props/shared/RowLayoutUtils'
 
@@ -63,5 +67,32 @@ describe('LiminalCorridorLayout', () => {
     it('keeps all units on the ground plane', () => {
         const shelves = LiminalCorridorLayout.computeShelves(0)
         shelves.forEach(s => expect(s.position.y).toBe(0))
+    })
+
+    describe('computeSlotWorldZ / computeUnitTransform (Story 5 — recycling ranks)', () => {
+        it('matches the fixed slot positions for ranks 0..LIMINAL_DEPTH_SLOTS-1', () => {
+            const shelves = LiminalCorridorLayout.computeShelves(0)
+            for (let rank = 0; rank < LIMINAL_DEPTH_SLOTS; rank++) {
+                expect(computeSlotWorldZ(rank)).toBeCloseTo(-(CORRIDOR_FIRST_SLOT_OFFSET_Z + rank * CORRIDOR_UNIT_SPACING_Z))
+            }
+            expect(shelves).toHaveLength(LIMINAL_DEPTH_SLOTS * 2)
+        })
+
+        it('extends linearly for ranks beyond the initial window (post-recycle)', () => {
+            expect(computeSlotWorldZ(5)).toBeCloseTo(computeSlotWorldZ(4) - CORRIDOR_UNIT_SPACING_Z)
+            expect(computeSlotWorldZ(-1)).toBeCloseTo(computeSlotWorldZ(0) + CORRIDOR_UNIT_SPACING_Z)
+        })
+
+        it('computeUnitTransform places left/right at the correct X with inward-facing rotation', () => {
+            const left = computeUnitTransform(2, 'left')
+            const right = computeUnitTransform(2, 'right')
+
+            expect(left.position.x).toBeCloseTo(-CORRIDOR_HALF_WIDTH_X)
+            expect(right.position.x).toBeCloseTo(CORRIDOR_HALF_WIDTH_X)
+            expect(left.rotationY).toBe(LEFT_FACING_ROTATION_Y)
+            expect(right.rotationY).toBe(RIGHT_FACING_ROTATION_Y)
+            expect(left.position.z).toBeCloseTo(computeSlotWorldZ(2))
+            expect(right.position.z).toBeCloseTo(computeSlotWorldZ(2))
+        })
     })
 })

@@ -33,6 +33,7 @@ import { SceneSignManager } from './SceneSignManager'
 import { ShelfSignPlanner } from './ShelfSignPlanner'
 import { LiminalFogController } from './liminal/LiminalFogController'
 import { LiminalWindowCoordinator } from './liminal/LiminalWindowCoordinator'
+import { LiminalBoundaryTracker } from './liminal/LiminalBoundaryTracker'
 import { GameSorter } from './categorization/GameSorter'
 import type { BootstrapPath } from './bootstrap/BootstrapPath'
 import { DefaultBootstrapPath } from './bootstrap/DefaultBootstrapPath'
@@ -51,6 +52,7 @@ export class SceneCoordinator {
     private shelfSignPlanner: ShelfSignPlanner
     private liminalFogController: LiminalFogController
     private liminalWindowCoordinator: LiminalWindowCoordinator
+    private liminalBoundaryTracker: LiminalBoundaryTracker
 
     constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
@@ -72,6 +74,7 @@ export class SceneCoordinator {
         this.shelfSignPlanner = new ShelfSignPlanner()
         this.liminalFogController = new LiminalFogController()
         this.liminalWindowCoordinator = new LiminalWindowCoordinator()
+        this.liminalBoundaryTracker = new LiminalBoundaryTracker()
 
         // Track WorldBuild phase — opens here, closed by each bootstrap path when done
         const tracker = StartupEventTracker.getInstance()

@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
-import { GameRenderEventTypes, type PlacementResolvedEvent } from '../../../../src/types/InteractionEvents'
+import { GameRenderEventTypes, type PlacementResolvedEvent, type PlacementRepointRequestedEvent } from '../../../../src/types/InteractionEvents'
 
 const mockRegisterEventHandler = vi.fn()
 const mockDeregisterEventHandler = vi.fn()
@@ -41,6 +41,7 @@ const mockPlaceInstance = vi.fn(() => 0)
 const mockPrefetchArtwork = vi.fn(() => Promise.resolve('prefetched'))
 const mockClearPlacements = vi.fn()
 const mockOrchestratorDispose = vi.fn()
+const mockSetInstanceArtwork = vi.fn(() => true)
 
 vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => {
     class MockOrchestrator {
@@ -48,6 +49,7 @@ vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug',
         prefetchArtwork = mockPrefetchArtwork
         clearPlacements = mockClearPlacements
         dispose = mockOrchestratorDispose
+        setInstanceArtwork = mockSetInstanceArtwork
         getInstanceCount = vi.fn(() => 0)
         static fromAppSettings(_maxGames?: number) { return new MockOrchestrator() }
     }
@@ -57,12 +59,14 @@ vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug',
 const mockAddLabelInstance = vi.fn(() => 0)
 const mockLabelClear = vi.fn()
 const mockLabelDispose = vi.fn()
+const mockSetInstanceLabel = vi.fn(() => true)
 
 vi.mock('../../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => ({
     InstancedLabelRenderer: vi.fn().mockImplementation(function() {
         this.addLabelInstance = mockAddLabelInstance
         this.clear = mockLabelClear
         this.dispose = mockLabelDispose
+        this.setInstanceLabel = mockSetInstanceLabel
     }),
 }))
 
@@ -153,6 +157,46 @@ describe('GpuGameBoxRenderer', () => {
             (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementCommitted
         )
         expect(committed).toBeUndefined()
+    })
+
+    function emitPlacementRepointRequested(detail: PlacementRepointRequestedEvent): void {
+        const registration = mockRegisterEventHandler.mock.calls.find(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementRepointRequested
+        )
+        expect(registration).toBeTruthy()
+
+        const handler = registration?.[1] as (event: CustomEvent<PlacementRepointRequestedEvent>) => void
+        handler(new CustomEvent(GameRenderEventTypes.PlacementRepointRequested, { detail }))
+    }
+
+    it('forwards an artwork-kind repoint request to the orchestrator', () => {
+        emitPlacementRepointRequested({
+            instanceIndex: 4, kind: 'artwork', appid: 10, gameName: 'Game 10',
+            position: new THREE.Vector3(1, 2, 3), rotation: new THREE.Quaternion(),
+        })
+
+        expect(mockSetInstanceArtwork).toHaveBeenCalledTimes(1)
+        expect(mockSetInstanceArtwork).toHaveBeenCalledWith(4, 10, 'Game 10', expect.any(THREE.Vector3), expect.any(THREE.Quaternion))
+        expect(mockSetInstanceLabel).not.toHaveBeenCalled()
+    })
+
+    it('forwards a label-kind repoint request to the label renderer', () => {
+        emitPlacementRepointRequested({
+            instanceIndex: 2, kind: 'label', appid: 20, gameName: 'Game 20',
+            position: new THREE.Vector3(4, 5, 6), rotation: new THREE.Quaternion(),
+        })
+
+        expect(mockSetInstanceLabel).toHaveBeenCalledTimes(1)
+        expect(mockSetInstanceLabel).toHaveBeenCalledWith(2, expect.any(THREE.Vector3), 'Game 20', 20, expect.any(THREE.Quaternion))
+        expect(mockSetInstanceArtwork).not.toHaveBeenCalled()
+    })
+
+    it('logs a warning but does not throw when a repoint fails', () => {
+        mockSetInstanceArtwork.mockReturnValueOnce(false)
+        expect(() => emitPlacementRepointRequested({
+            instanceIndex: 4, kind: 'artwork', appid: 10, gameName: 'Never Prefetched',
+            position: new THREE.Vector3(), rotation: new THREE.Quaternion(),
+        })).not.toThrow()
     })
 
     it('subscribes directly to PlacementRunResetRequested for run counters', () => {
