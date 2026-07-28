@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventManager } from '../../../src/core/EventManager'
 import { DeviceDetector } from '../../../src/input/DeviceDetector'
+import { InputEventTypes } from '../../../src/types/InteractionEvents'
 
 function createGamepadEvent(type: string, gamepad: Gamepad): Event {
     const event = new Event(type)
@@ -85,6 +86,36 @@ describe('DeviceDetector', () => {
         const devices = detector.getAvailableDevices()
         expect(devices.some(device => device.id === 'gamepad-1')).toBe(true)
 
+        detector.stop()
+    })
+
+    it('emits DevicesChanged when pollGamepads() discovers a newly-connected gamepad', () => {
+        const eventManager = EventManager.getInstance()
+        const detector = new DeviceDetector(eventManager)
+        const handler = vi.fn()
+        eventManager.registerEventHandler(InputEventTypes.DevicesChanged, handler)
+
+        const gamepad = {
+            connected: true,
+            id: 'Polling Pad',
+            index: 2,
+            mapping: 'standard',
+            axes: [],
+            buttons: [],
+            vibrationActuator: null
+        } as unknown as Gamepad
+
+        Object.defineProperty(navigator, 'getGamepads', {
+            value: () => [gamepad],
+            configurable: true
+        })
+
+        handler.mockClear()
+        detector.pollGamepads()
+
+        expect(handler).toHaveBeenCalled()
+
+        eventManager.deregisterEventHandler(InputEventTypes.DevicesChanged, handler)
         detector.stop()
     })
 })

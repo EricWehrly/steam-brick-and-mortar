@@ -79,6 +79,7 @@ export class DeviceDetector {
 
         const gamepads = getGamepads()
         const connectedGamepadIds = new Set<string>()
+        let changed = false
 
         for (const gamepad of gamepads) {
             if (!gamepad || !gamepad.connected) {
@@ -87,10 +88,12 @@ export class DeviceDetector {
 
             const deviceId = `gamepad-${gamepad.index}`
             connectedGamepadIds.add(deviceId)
+            if (!this.devices.has(deviceId)) {
+                changed = true
+            }
             this.addGamepadDevice(gamepad)
         }
 
-        let changed = false
         for (const [deviceId, device] of this.devices.entries()) {
             if (device.kind === InputDeviceKind.Gamepad && !connectedGamepadIds.has(deviceId)) {
                 this.devices.delete(deviceId)
