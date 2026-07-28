@@ -22,6 +22,7 @@ import {
     UIEventTypes,
     InputEventTypes,
     WebXREventTypes,
+    AppSettingsEventTypes,
     type SceneCanvasClickEvent,
     type InputPauseEvent,
     type InputResumeEvent,
@@ -29,6 +30,7 @@ import {
     type MenuCloseEvent,
     type InputDevicesChangedEvent
 } from '../../types/InteractionEvents'
+import type { SettingChangedEvent } from '../../core/AppSettings'
 import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
@@ -233,6 +235,7 @@ export class SystemUICoordinator {
 
         // Gamepad/VR aiming reticle visibility
         this.eventManager.registerEventHandler<InputDevicesChangedEvent>(InputEventTypes.DevicesChanged, this.handleDevicesChanged)
+        this.eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, this.handleSettingChanged)
 
         // Track XR session state so pointer lock never engages during a VR session
         this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
@@ -276,12 +279,20 @@ export class SystemUICoordinator {
         this.updateReticleVisibility()
     }
 
+    private readonly handleSettingChanged = (event: CustomEvent<SettingChangedEvent>): void => {
+        if (event.detail.settingName === 'inputGamepadReticleEnabled') {
+            this.updateReticleVisibility()
+        }
+    }
+
     private updateReticleVisibility(): void {
         if (!this.reticleElement) {
             return
         }
 
-        const shouldShow = this.isNonPointerDeviceConnected && !this.pauseMenuManager.isOpen()
+        const shouldShow = this.isNonPointerDeviceConnected
+            && this.appSettings.getSetting('inputGamepadReticleEnabled')
+            && !this.pauseMenuManager.isOpen()
         this.reticleElement.style.display = shouldShow ? 'block' : 'none'
     }
 

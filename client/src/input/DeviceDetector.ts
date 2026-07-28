@@ -72,13 +72,19 @@ export class DeviceDetector {
         this.emitDevicesChanged()
     }
 
-    pollGamepads(): void {
+    /**
+     * Returns the connected gamepads polled this call, so callers needing the same data
+     * (InputActionResolver.updateFrame's continuous axis/button resolution) don't issue their
+     * own separate navigator.getGamepads() call - that API is only meant to be read once per frame.
+     */
+    pollGamepads(): ReadonlyArray<Gamepad> {
         const getGamepads = navigator.getGamepads?.bind(navigator)
         if (!getGamepads) {
-            return
+            return []
         }
 
         const gamepads = getGamepads()
+        const connectedGamepads: Gamepad[] = []
         const connectedGamepadIds = new Set<string>()
         let changed = false
 
@@ -87,6 +93,7 @@ export class DeviceDetector {
                 continue
             }
 
+            connectedGamepads.push(gamepad)
             const deviceId = `gamepad-${gamepad.index}`
             connectedGamepadIds.add(deviceId)
             if (!this.devices.has(deviceId)) {
@@ -116,11 +123,11 @@ export class DeviceDetector {
             this.emitDevicesChanged()
         }
 
-        for (const gamepad of gamepads) {
-            if (gamepad && gamepad.connected) {
-                this.emitNewlyPressedGamepadButtons(gamepad)
-            }
+        for (const gamepad of connectedGamepads) {
+            this.emitNewlyPressedGamepadButtons(gamepad)
         }
+
+        return connectedGamepads
     }
 
     getAvailableDevices(): ReadonlyArray<InputDeviceInfo> {

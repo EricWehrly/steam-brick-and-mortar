@@ -4,18 +4,6 @@ import { DeviceDetector, type InputDeviceInfo } from '../../../src/input/DeviceD
 import { InputActionResolver } from '../../../src/input/InputActionResolver'
 import { BUILTIN_INPUT_PROFILES, InputDeviceKind, InputProfileId } from '../../../src/input/InputProfile'
 
-function createGamepad(): Gamepad {
-    return {
-        connected: true,
-        id: 'Ghost Pad',
-        index: 0,
-        mapping: 'standard',
-        axes: [0, -1, 0, 0],
-        buttons: Array.from({ length: 12 }, () => ({ pressed: false, touched: false, value: 0 })),
-        vibrationActuator: null
-    } as unknown as Gamepad
-}
-
 describe('InputActionResolver', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
@@ -26,7 +14,7 @@ describe('InputActionResolver', () => {
         const detector = new DeviceDetector()
         const resolver = new InputActionResolver(new BindingResolver(), detector)
 
-        vi.spyOn(detector, 'pollGamepads').mockImplementation(() => {})
+        vi.spyOn(detector, 'pollGamepads').mockImplementation(() => [])
         vi.spyOn(detector, 'getAvailableDevices').mockReturnValue([
             {
                 id: 'mouse-keyboard',
@@ -36,11 +24,6 @@ describe('InputActionResolver', () => {
                 profileId: InputProfileId.MouseKeyboard
             } satisfies InputDeviceInfo
         ])
-
-        Object.defineProperty(navigator, 'getGamepads', {
-            value: () => [createGamepad()],
-            configurable: true
-        })
 
         resolver.updateFrame(BUILTIN_INPUT_PROFILES, new Set(['KeyW']), new Set())
 

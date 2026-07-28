@@ -93,6 +93,7 @@ export const Setting = {
     InputSpeed: 'inputSpeed',
     InputMouseSensitivity: 'inputMouseSensitivity',
     InputMouseLockEnabled: 'inputMouseLockEnabled',
+    InputGamepadReticleEnabled: 'inputGamepadReticleEnabled',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -197,6 +198,8 @@ export interface ApplicationSettings {
     /** Whether pointer lock should re-engage when the pause menu closes. See
      *  docs/plans/mouse-look-and-pointer-lock-plan.md. */
     inputMouseLockEnabled: boolean
+    /** Whether the center-screen aiming reticle shows while a gamepad/VR controller is connected. */
+    inputGamepadReticleEnabled: boolean
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -520,7 +523,8 @@ export class AppSettings {
             inputDevicesEnabled: '{}',
             inputSpeed: 0.1,
             inputMouseSensitivity: 0.005,
-            inputMouseLockEnabled: true
+            inputMouseLockEnabled: true,
+            inputGamepadReticleEnabled: true
         }
     }
 
@@ -544,7 +548,7 @@ export class AppSettings {
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
             'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled',
-            'antialias', 'inputMouseLockEnabled'
+            'antialias', 'inputMouseLockEnabled', 'inputGamepadReticleEnabled'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
