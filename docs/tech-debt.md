@@ -188,6 +188,13 @@ CDN hash), so this fallback now runs at whole-library scale instead of its origi
 use — observed ~1240 CORS-blocked `fetch()` calls in one real test session. Doesn't block the
 library from loading, but artwork for most locally-resolved games is currently broken/missing.
 
+**Superseded by**: [Startup Artwork Resolution & Caching](../plans/startup-artwork-resolution-plan.md) —
+root-caused further (2026-07-23): `LocalSteamDataWriter.writeLocalAppMetadata()` writes a
+name-only entry with null artwork for every locally-known appid *before* the network gap-fill's
+`findMissing()` check runs, so that check (which only asks "does any entry exist") never fires for
+these games at all — confirmed with real appid 2062430 via direct `curl` against Steam's CDN and
+API. Track further design/implementation there, not here.
+
 **Decision (for now)**:
 - See `docs/plans/desktop-offline-first-plan.md`'s "Next up" section for
   the two considered approaches - decide between them before starting.
@@ -236,41 +243,6 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 
 **Plan reference**:
 - `docs/plans/lighting-shadow-refactor-plan.md`
-
-## id: gamepad-button-actions-unconsumed
-**Priority**: Medium — directly contradicts a stated Gate 1 acceptance criterion ("gamepad
-navigation works for basic movement and game selection"); selection specifically does not
-**Effort**: Not yet scoped — needs a design decision on how gamepad `Interact` should trigger
-selection (synthetic raycast from screen center? reticle-based?) before implementation
-**Context**: Found 2026-07-23 while scoping [Input System](features/input-system.md) task 8.
-`InputAction.Interact`, `OpenMenu`, `ToggleUI`, and `ToggleFullscreen` are all defined and bound
-across every profile (`InputProfile.ts` — keyboard/mouse, gamepad, touch, VR) but **none of them
-are ever read** anywhere via `InputActionResolver.isActionPressed()` — grepped the full `client/src`
-tree, only `Sprint`, `ResetCamera`, `RollLeft`, `RollRight`, and the movement/look axes have a real
-consumer. Game selection today is mouse-click raycasting (`SceneClickGameBoxRaycast`/`GameFinder`),
-entirely bypassing the input-action abstraction; menu-open is a hardcoded `Escape` keydown listener
-in `PauseMenuManager`, same story. Same "binding exists, nothing reads it" shape as the
-`RollLeft`/`RollRight` gap task 3 already fixed, and the `progressive-speed-movement-unwired` entry
-below — but this one blocks a stated acceptance criterion rather than just being dead code.
-
-**Decision (for now)**:
-- Not fixed inline — wiring gamepad `Interact` to selection needs a real design call (what does
-  "point and select" mean without a mouse cursor: screen-center reticle raycast, last-focused box,
-  something else), and `OpenMenu`/`ToggleUI` wiring needs to decide whether they go through
-  `InputActionResolver` or stay as direct listeners like `Escape` does today. Tracking as debt
-  rather than guessing an approach.
-
-**Done when**:
-- A decision is made and documented for how gamepad `Interact` triggers game/UI selection
-- `OpenMenu`/`ToggleUI`/`ToggleFullscreen` either route through `InputActionResolver` consistently
-  or the doc is corrected to state they're keyboard/mouse-only by design
-- [Input System](features/input-system.md)'s Gate 1 acceptance criteria reflects the real state
-
-**Related files**:
-- `client/src/input/InputActionResolver.ts`
-- `client/src/input/CameraInputApplier.ts`
-- `client/src/ui/pause/PauseMenuManager.ts`
-- `docs/features/input-system.md`
 
 ---
 
@@ -599,3 +571,6 @@ nor visually receive shadow.
 
 ## id: approximated-placement-tripwire
 **Status**: ✅ Resolved (date not tracked — confirmed via code audit 2026-07-22) — approximation assumptions documented inline (`GameBoxUtils.ts:9-13`, explicitly framed as a deliberate tripwire for model-sync regressions) and covered by `client/test/unit/scene/placement-tripwire.test.ts`.
+
+## id: gamepad-button-actions-unconsumed
+**Status**: ✅ Resolved 2026-07-24 — see `docs/plans/input-action-routing-plan.md` (implemented, then revised twice the same day after design reviews — see the plan's "Revision history" for what changed and why each time). Keyboard `Interact`/`OpenMenu` now fire directly off the real `keydown` DOM event (via a new `InputStateTracker.onRawKeyDown` callback) — no polling, no frame-diffing, since keyboard already has a real press edge. Mouse deliberately has no equivalent path: a real mouse click already has its own independent dispatch (`SystemUICoordinator`), entirely separate from the binding system, so nothing was added to route it through here too. Gamepad has no native press event, so `DeviceDetector.pollGamepads()` (which already polls every frame) tracks per-button state and emits `InputEventTypes.GamepadButtonPressed` on a transition. Both keyboard and gamepad funnel through `InputActionResolver`'s new `handleRawKeyPress()`/`handleGamepadButtonPress()`, which look up bound actions via a new `BindingResolver.findButtonActionsBoundTo()` and resolve all the way to a *specific* event per action (`InputEventTypes.OpenMenuPressed`, `InputEventTypes.InteractPressed`) rather than a generic tagged envelope — `InputActionResolver` is the class whose job is deciding which action fired, so it does that fully rather than handing a partial answer downstream. No dispatcher class: `PauseMenuManager` listens for `OpenMenuPressed` directly and calls its own `toggle()` (replacing the old hardcoded `Escape`-only listener); `SystemUICoordinator` listens for `InteractPressed` (simulates a click at the reticle position by emitting the existing `SceneCanvasClick` with center-screen NDC) and owns the gamepad/VR reticle. Along the way, fixed two real bugs: (1) pausing didn't actually stop gamepad-driven camera movement — `InputManager` now has `pause()`/`resume()` that gate camera application only, while `updateFrame()` (gamepad polling) keeps running; (2) `DeviceDetector.pollGamepads()` only flagged a device-list change on gamepad *disconnect*, never *connect* via polling. `ToggleUI` and `ToggleFullscreen` were both removed entirely rather than built (see [Input System](features/input-system.md) Stretch section) — no consumer was ever designed for `ToggleUI`, and `ToggleFullscreen` was redundant scope (F11 already provides native browser fullscreen).
