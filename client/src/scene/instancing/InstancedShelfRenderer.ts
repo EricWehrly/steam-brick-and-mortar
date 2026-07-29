@@ -451,7 +451,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             { type: ShelfGeometryType.InteriorSurface,   indices: existing.instanceIndices.interiorSurfaces, manager: this.interiorSurfaceManager },
         ]
 
-        let partIdx = 0
+        // Each geometry type has its own index cursor into its own instanceIndices
+        // array — advanced only when a part of that same type is encountered, so
+        // parallel occurrences within a single type (e.g. 5 shelf boards) land on
+        // 5 distinct instances instead of all rewriting the type's first one.
+        const typeCursor = new Map<ShelfGeometryType, number>()
+
         for (const part of this.shelfUnitTemplate) {
             const rotatedOffset = unitRotation
                 ? part.offset.clone().applyQuaternion(unitRotation)
@@ -459,20 +464,17 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const worldPos = position.clone().add(rotatedOffset)
 
             const entry = partsWithIndices.find(p => p.type === part.type)
-            if (!entry || partIdx >= entry.indices.length) continue
+            const typeIdx = typeCursor.get(part.type) ?? 0
+            if (!entry || typeIdx >= entry.indices.length) continue
 
-            // Each geometry type has its own index cursor; use partIdx relative to type group
-            const typeIdx = partsWithIndices
-                .filter(p => p.type === part.type)
-                .indexOf(entry)
-            const instanceIndex = entry.indices[typeIdx] ?? entry.indices[0]
+            const instanceIndex = entry.indices[typeIdx]
 
             const finalRotation = unitRotation
                 ? (part.rotation ? unitRotation.clone().multiply(part.rotation) : unitRotation.clone())
                 : part.rotation
             entry.manager.setInstanceMatrix(instanceIndex, worldPos, finalRotation, part.scale)
 
-            partIdx++
+            typeCursor.set(part.type, typeIdx + 1)
         }
     }
 
