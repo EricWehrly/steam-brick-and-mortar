@@ -93,6 +93,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const qualityLevel = this.appSettings.getSetting('qualityLevel')
         const lightingQuality = this.appSettings.getSetting('lightingQuality')
         const smaaPreset = this.appSettings.getSetting('smaaPreset')
+        const msaaLevel = this.appSettings.getSetting('msaaLevel')
         const shadowQuality = this.appSettings.getSetting('shadowQuality')
         const pixelRatioScale = this.appSettings.getSetting('pixelRatioScale')
 
@@ -156,12 +157,26 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             smaaPresetControl: new SelectControl({
                 id: 'smaa-preset',
                 label: 'Anti-Aliasing (SMAA)',
+                description: 'Post-process edge smoothing — runs after lighting/effects, catches all edge types. Independent of MSAA below; the two can stack.',
                 hint: { text: '✨ instant', kind: 'instant' },
                 options: [
                     { value: 'low', label: 'Low', selected: smaaPreset === 'low' },
                     { value: 'medium', label: 'Medium', selected: smaaPreset === 'medium' },
                     { value: 'high', label: 'High', selected: smaaPreset === 'high' },
                     { value: 'ultra', label: 'Ultra', selected: smaaPreset === 'ultra' }
+                ]
+            }).render(),
+
+            msaaLevelControl: new SelectControl({
+                id: 'msaa-level',
+                label: 'Anti-Aliasing (MSAA)',
+                description: 'Hardware multisampling — runs before lighting/effects, only smooths geometry edges. Costs more here than SMAA above; try SMAA first.',
+                hint: { text: '✨ instant', kind: 'instant' },
+                options: [
+                    { value: 'low', label: 'Off', selected: msaaLevel === 'low' },
+                    { value: 'medium', label: '2x', selected: msaaLevel === 'medium' },
+                    { value: 'high', label: '4x', selected: msaaLevel === 'high' },
+                    { value: 'ultra', label: '8x', selected: msaaLevel === 'ultra' }
                 ]
             }).render(),
 
@@ -281,6 +296,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         UIComponentUtils.setupSelect<ApplicationSettings['smaaPreset']>(document.body, {
             selectId: 'smaa-preset',
             onChange: (preset) => this.updateSetting('smaaPreset', preset)
+        })
+
+        UIComponentUtils.setupSelect<ApplicationSettings['msaaLevel']>(document.body, {
+            selectId: 'msaa-level',
+            onChange: (level) => this.updateSetting('msaaLevel', level)
         })
     }
 

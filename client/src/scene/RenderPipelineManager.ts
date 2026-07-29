@@ -28,7 +28,30 @@ import { AppSettingsEventTypes } from '../types/InteractionEvents'
  * N8AOPostPass replaces NormalPass + SSAOEffect. It sets needsDepthTexture = true so the
  * EffectComposer automatically creates and distributes a stable depth texture.
  * gammaCorrection = false because ToneMappingEffect handles the HDR → display conversion.
- * SMAA runs after tone mapping so edge detection operates in LDR space.
+ * SMAA runs after tone mapping so edge detection operates on tone-mapped (LDR-valued) pixels —
+ * still stored in the same HalfFloat buffer, since EffectComposer keeps one buffer format for
+ * its entire pass chain (set once at construction, see `frameBufferType` below). Nothing is
+ * "lost" mid-pipeline from a format change; only the values transition from HDR to LDR range,
+ * at the tone-mapping pass specifically.
+ *
+ * MSAA (`composer.multisampling`) and SMAA are independent, additive-cost AA techniques —
+ * running both is possible but not how most engines use AA, and it's worth knowing why before
+ * combining them:
+ * - SMAA (image-space) catches every edge in the final frame, including shader/alpha-tested
+ *   aliasing MSAA can't see. MSAA only smooths geometric silhouette edges — a strict subset of
+ *   what SMAA already covers.
+ * - `composer.multisampling` is set once on EffectComposer's shared inputBuffer/outputBuffer
+ *   pair (see createBuffer() in `postprocessing`), and that same pair is ping-ponged through
+ *   *every* pass — not just RenderPass, the only one that rasterizes real triangle edges. Every
+ *   later full-screen pass (N8AO, tone mapping, SMAA) reads/writes multisampled buffers too, so
+ *   each pass boundary pays a WebGL2 multisample-resolve blit to make the buffer sampleable by
+ *   the next pass, even though a full-viewport quad has no internal edges for MSAA to improve.
+ * - That resolve cost is doubled again by the HalfFloat buffer format (2x the bytes-per-sample
+ *   of a typical 8-bit MSAA target), on top of running at every pass boundary instead of once.
+ * Net effect: MSAA here is pricier than intuition from a traditional forward-renderer suggests,
+ * for a benefit SMAA already mostly provides. Reasonable default: SMAA as the primary technique,
+ * MSAA off unless there's GPU headroom to spare — and if combining, don't max both (see
+ * docs/plans/framerate-regression-investigation-plan.md for the sweep meant to quantify this).
  */
 
 const SMAA_PRESET_MAP: Record<QualityLevel, SMAAPreset> = {
@@ -45,6 +68,16 @@ const N8AO_QUALITY_MAP: Record<QualityLevel, 'Low' | 'Medium' | 'High' | 'Ultra'
     [QUALITY_LEVEL.ULTRA]: 'Ultra',
 }
 
+/** Hardware MSAA sample count on EffectComposer's shared render targets — see the class doc
+ *  comment above for why this is pricier than SMAA here and how the two relate. 'low' maps to
+ *  0 (off), matching the pre-existing default before this setting existed. */
+const MSAA_SAMPLE_MAP: Record<QualityLevel, number> = {
+    [QUALITY_LEVEL.LOW]: 0,
+    [QUALITY_LEVEL.MEDIUM]: 2,
+    [QUALITY_LEVEL.HIGH]: 4,
+    [QUALITY_LEVEL.ULTRA]: 8,
+}
+
 export class RenderPipelineManager {
     private readonly composer: EffectComposer
     private readonly n8aoPass: N8AOPostPass
@@ -56,6 +89,8 @@ export class RenderPipelineManager {
         this.composer = new EffectComposer(renderer, {
             frameBufferType: THREE.HalfFloatType
         })
+        const msaaLevel = AppSettings.get('msaaLevel') as QualityLevel
+        this.composer.multisampling = MSAA_SAMPLE_MAP[msaaLevel]
 
         this.composer.addPass(new RenderPass(scene, camera))
 
@@ -88,6 +123,9 @@ export class RenderPipelineManager {
         }
         if (settingName === 'smaaPreset') {
             this.rebuildSmaaPass(value as QualityLevel)
+        }
+        if (settingName === 'msaaLevel') {
+            this.composer.multisampling = MSAA_SAMPLE_MAP[value as QualityLevel]
         }
     }
 

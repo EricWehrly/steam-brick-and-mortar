@@ -9,6 +9,7 @@ let capturedComposer: {
     render: ReturnType<typeof vi.fn>
     setSize: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
+    multisampling: number
 } | null = null
 
 let capturedN8aoPass: {
@@ -30,6 +31,7 @@ vi.mock('postprocessing', () => ({
             render: vi.fn(),
             setSize: vi.fn(),
             dispose: vi.fn(),
+            multisampling: 0,
         }
         return capturedComposer
     },
@@ -133,6 +135,29 @@ describe('RenderPipelineManager', () => {
 
         emitSettingChanged('ssaoEnabled', true)
         expect(capturedN8aoPass!.enabled).toBe(true)
+    })
+
+    it('initializes composer.multisampling from AppSettings msaaLevel (default: low = 0 samples)', () => {
+        expect(capturedComposer!.multisampling).toBe(0)
+    })
+
+    it('initializes composer.multisampling to 4 samples when msaaLevel is high', () => {
+        capturedComposer = null
+        AppSettings['instance'] = undefined as unknown as AppSettings
+        vi.spyOn(AppSettings, 'get').mockImplementation((key: string) => (key === 'msaaLevel' ? 'high' : true) as never)
+
+        const p = new RenderPipelineManager(renderer, scene, camera)
+        expect(capturedComposer!.multisampling).toBe(4)
+        p.dispose()
+        vi.restoreAllMocks()
+    })
+
+    it('updates composer.multisampling when msaaLevel setting changes', () => {
+        emitSettingChanged('msaaLevel', 'ultra')
+        expect(capturedComposer!.multisampling).toBe(8)
+
+        emitSettingChanged('msaaLevel', 'low')
+        expect(capturedComposer!.multisampling).toBe(0)
     })
 
     it('disposes old SMAA EffectPass and adds a new one when smaaPreset setting changes', () => {
