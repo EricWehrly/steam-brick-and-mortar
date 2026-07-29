@@ -8,9 +8,11 @@ import { AppSettings } from '../../../core/AppSettings'
 import { InputEventTypes } from '../../../types/InteractionEvents'
 import { getInputActionDefinition, InputAction, InputActionType, INPUT_ACTION_ORDER, type InputActionId } from '../../../input/InputActions'
 import { getDuplicateBindingWarnings, getLinkedInverseAssignment, isDerivedLinkedActionLocked } from '../../../input/InputBindingUtils'
+import { InputBindingCapture } from '../../../input/InputBindingCapture'
 import { InputManager } from '../../../input/InputManager'
-import { formatBindingList, InputDeviceKind, InputProfileId, type AxisDirection, type InputBinding, type InputProfileDefinition, type InputProfileIdValue } from '../../../input/InputProfile'
+import { formatBindingList, InputDeviceKind, InputProfileId, type InputBinding, type InputProfileDefinition, type InputProfileIdValue } from '../../../input/InputProfile'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import controlsPanelTemplate from '../templates/controls-panel.html?raw'
 import '../../../styles/pause-menu/controls-panel.css'
 
 export class ControlsPanel extends PauseMenuPanel {
@@ -21,114 +23,19 @@ export class ControlsPanel extends PauseMenuPanel {
     private readonly appSettings = AppSettings.getInstance()
     private deviceListenerRegistered = false
     private profileListenerRegistered = false
-    private capturingActionId: InputActionId | null = null
-    private capturingProfileId: InputProfileIdValue | null = null
-    private captureGamepadPollTimer: number | null = null
+    private readonly bindingCapture: InputBindingCapture
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
+        this.bindingCapture = new InputBindingCapture({
+            getActiveProfile: () => InputManager.getActiveInstance()?.profileService.getActiveProfile() ?? null,
+            onCaptured: this.handleBindingCaptured.bind(this),
+            onStatusUpdate: this.updateCaptureStatus.bind(this)
+        })
     }
 
     render(): string {
-        return `
-            <div class="app-section panel-card pause-section">
-                <h4>Input Devices</h4>
-                <div class="pause-row-list">
-                    <div class="pause-row control-item">
-                        <label for="input-device-select" class="control-key pause-row-key">Configure Device</label>
-                        <div class="control-desc pause-row-text">
-                            <select id="input-device-select" aria-label="Active input device"></select>
-                        </div>
-                    </div>
-                    <div class="pause-row control-item">
-                        <span class="control-key pause-row-key">Active</span>
-                        <div class="control-desc pause-row-text">
-                            <label class="input-device-enabled-toggle">
-                                <input id="input-device-enabled" type="checkbox" data-input-device-enabled />
-                                <span>Enabled for runtime input</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div id="input-mouse-settings-group">
-                        <div class="pause-row control-item">
-                            <span class="control-key pause-row-key">Mouse Look</span>
-                            <div class="control-desc pause-row-text">
-                                <label class="input-device-enabled-toggle">
-                                    <input id="input-mouse-lock-enabled" type="checkbox" data-input-mouse-lock-enabled />
-                                    <span>Capture mouse cursor while playing (re-engages when the pause menu closes)</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="pause-row control-item">
-                            <span class="control-key pause-row-key">Invert Mouse Look</span>
-                            <div class="control-desc pause-row-text">
-                                <label class="input-device-enabled-toggle">
-                                    <input id="input-look-invert-mouse" type="checkbox" data-input-look-invert-mouse />
-                                    <span>Flip the vertical look axis for mouse</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="pause-row control-item">
-                            <label for="input-look-sensitivity-mouse" class="control-key pause-row-key">Mouse Look Sensitivity</label>
-                            <div class="control-desc pause-row-text">
-                                <input id="input-look-sensitivity-mouse" type="range" min="0.1" max="5" step="0.1" />
-                                <span id="input-look-sensitivity-mouse-value"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="input-gamepad-settings-group">
-                        <div class="pause-row control-item">
-                            <span class="control-key pause-row-key">Gamepad Reticle</span>
-                            <div class="control-desc pause-row-text">
-                                <label class="input-device-enabled-toggle">
-                                    <input id="input-gamepad-reticle-enabled" type="checkbox" data-input-gamepad-reticle-enabled />
-                                    <span>Show an aiming crosshair while a gamepad/VR controller is connected</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="pause-row control-item">
-                            <span class="control-key pause-row-key">Invert Gamepad Look</span>
-                            <div class="control-desc pause-row-text">
-                                <label class="input-device-enabled-toggle">
-                                    <input id="input-look-invert-gamepad" type="checkbox" data-input-look-invert-gamepad />
-                                    <span>Flip the vertical look axis for the right stick</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="pause-row control-item">
-                            <label for="input-look-sensitivity-gamepad" class="control-key pause-row-key">Gamepad Look Sensitivity</label>
-                            <div class="control-desc pause-row-text">
-                                <input id="input-look-sensitivity-gamepad" type="range" min="0.1" max="5" step="0.1" />
-                                <span id="input-look-sensitivity-gamepad-value"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="app-section panel-card pause-section">
-                <h4>Current Mappings</h4>
-                <div id="input-capture-status" class="input-capture-status" aria-live="polite"></div>
-                <div class="input-mapping-table-wrap">
-                    <table class="input-mapping-table">
-                        <thead>
-                            <tr>
-                                <th>Action</th>
-                                <th>Binding</th>
-                                <th>Edit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="input-mapping-tbody"></tbody>
-                    </table>
-                </div>
-                <div class="input-mapping-actions">
-                    <button id="input-reset-profile" type="button" class="input-reset-button">Reset Active Profile</button>
-                </div>
-                <p class="input-fast-follow-note">
-                    Fast-follow: controller/touch/VR mappings for Interact, menu navigation, toggle UI/fullscreen, and roll are partially defined but not fully wired in runtime yet.
-                </p>
-            </div>
-        `
+        return controlsPanelTemplate
     }
 
     attachEvents(): void {
@@ -213,8 +120,7 @@ export class ControlsPanel extends PauseMenuPanel {
     }
 
     onHide(): void {
-        this.stopCaptureListeners()
-        this.capturingActionId = null
+        this.bindingCapture.stop()
     }
 
     private handleDevicesChanged = (): void => {
@@ -226,13 +132,9 @@ export class ControlsPanel extends PauseMenuPanel {
     }
 
     private handleProfileSelectionChange(selectedProfileId: InputProfileIdValue): void {
-        const inputManager = InputManager.getActiveInstance()
-        if (!inputManager) {
-            return
-        }
-
-        inputManager.profileService.setActiveProfile(selectedProfileId)
-        this.renderMappingTable(inputManager.profileService.getActiveProfile())
+        // setActiveProfile() emits ProfileChanged, which this panel already listens for
+        // (handleProfileChanged -> refreshUI()) - no need to re-render anything here directly.
+        InputManager.getActiveInstance()?.profileService.setActiveProfile(selectedProfileId)
     }
 
     private handleProfileEnabledToggle(checked: boolean): void {
@@ -253,13 +155,8 @@ export class ControlsPanel extends PauseMenuPanel {
     }
 
     private handleResetProfileClick(): void {
-        const inputManager = InputManager.getActiveInstance()
-        if (!inputManager) {
-            return
-        }
-
-        inputManager.profileService.resetActiveProfileBindings()
-        this.refreshUI()
+        // resetActiveProfileBindings() emits ProfileChanged, which triggers refreshUI() already.
+        InputManager.getActiveInstance()?.profileService.resetActiveProfileBindings()
     }
 
     private handleEditActionClick(actionId: InputActionId): void {
@@ -267,63 +164,14 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        this.startCapture(actionId)
+        this.bindingCapture.start(actionId)
     }
 
-    private startCapture(actionId: InputActionId): void {
-        if (this.capturingActionId) {
-            return
-        }
-
+    // setActionBinding() emits ProfileChanged, which triggers refreshUI() already (including for
+    // the linked-inverse assignment below, if any) - nothing left to refresh here.
+    private handleBindingCaptured(actionId: InputActionId, binding: InputBinding): void {
         const inputManager = InputManager.getActiveInstance()
         if (!inputManager) {
-            return
-        }
-
-        const activeProfile = inputManager.profileService.getActiveProfile()
-
-        this.stopCaptureListeners()
-        this.capturingActionId = actionId
-        this.capturingProfileId = activeProfile.id
-        const actionLabel = getInputActionDefinition(actionId).label
-
-        if (activeProfile.deviceKind === InputDeviceKind.Gamepad) {
-            this.updateCaptureStatus(`Move a stick or press a gamepad button for ${actionLabel}`)
-            this.captureGamepadPollTimer = window.setInterval(() => this.pollGamepadCapture(), 50)
-            return
-        }
-
-        if (activeProfile.deviceKind === InputDeviceKind.MouseKeyboard) {
-            this.updateCaptureStatus(`Press a key, click a mouse button, or move mouse axis for ${actionLabel}`)
-            document.addEventListener('keydown', this.handleCaptureKeyDown, { once: true })
-            document.addEventListener('mousedown', this.handleCaptureMouseDown, { once: true })
-            document.addEventListener('mousemove', this.handleCaptureMouseMove)
-            return
-        }
-
-        this.updateCaptureStatus(`Editing ${activeProfile.name} bindings is not supported yet`)
-        this.capturingActionId = null
-        this.capturingProfileId = null
-    }
-
-    private finishCapture(binding: InputBinding): void {
-        this.stopCaptureListeners()
-        const actionId = this.capturingActionId
-        this.capturingActionId = null
-        const captureProfileId = this.capturingProfileId
-        this.capturingProfileId = null
-
-        if (!actionId) {
-            return
-        }
-
-        const inputManager = InputManager.getActiveInstance()
-        if (!inputManager) {
-            return
-        }
-
-        if (captureProfileId && inputManager.profileService.getActiveProfileId() !== captureProfileId) {
-            this.updateCaptureStatus('Capture cancelled because active profile changed')
             return
         }
 
@@ -332,176 +180,10 @@ export class ControlsPanel extends PauseMenuPanel {
         if (linkedAssignment) {
             inputManager.profileService.setActionBinding(linkedAssignment.actionId, linkedAssignment.binding)
             const linkedLabel = getInputActionDefinition(linkedAssignment.actionId).label
-            this.updateCaptureStatus(`Binding updated; ${linkedLabel} assigned inverse`) 
+            this.updateCaptureStatus(`Binding updated; ${linkedLabel} assigned inverse`)
         } else {
             this.updateCaptureStatus('Binding updated')
         }
-        this.refreshUI()
-    }
-
-    private handleCaptureKeyDown = (event: KeyboardEvent): void => {
-        event.preventDefault()
-        const actionId = this.capturingActionId
-        if (!actionId) {
-            return
-        }
-
-        const direction = this.getButtonDirectionForAxisAction(actionId)
-        if (direction === null) {
-            this.stopCaptureListeners()
-            this.capturingActionId = null
-            this.capturingProfileId = null
-            this.updateCaptureStatus('Capture cancelled')
-            return
-        }
-
-        this.finishCapture({
-            type: 'keyboard-button',
-            code: event.code,
-            direction,
-            label: event.code
-        })
-    }
-
-    private handleCaptureMouseDown = (event: MouseEvent): void => {
-        event.preventDefault()
-        const actionId = this.capturingActionId
-        if (!actionId) {
-            return
-        }
-
-        const direction = this.getButtonDirectionForAxisAction(actionId)
-        if (direction === null) {
-            this.stopCaptureListeners()
-            this.capturingActionId = null
-            this.capturingProfileId = null
-            this.updateCaptureStatus('Capture cancelled')
-            return
-        }
-
-        this.finishCapture({
-            type: 'mouse-button',
-            button: event.button,
-            direction,
-            label: event.button === 0 ? 'Left Click' : `Mouse ${event.button}`
-        })
-    }
-
-    private handleCaptureMouseMove = (event: MouseEvent): void => {
-        const actionId = this.capturingActionId
-        if (!actionId || !this.isAxisAction(actionId)) {
-            return
-        }
-
-        if (Math.abs(event.movementX) < 3 && Math.abs(event.movementY) < 3) {
-            return
-        }
-
-        const axis = Math.abs(event.movementX) >= Math.abs(event.movementY) ? 'x' : 'y'
-        this.finishCapture({
-            type: 'mouse-axis',
-            axis,
-            sensitivity: 1,
-            label: axis === 'x' ? 'Mouse X' : 'Mouse Y'
-        })
-    }
-
-    private pollGamepadCapture(): void {
-        const actionId = this.capturingActionId
-        if (!actionId) {
-            return
-        }
-
-        const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
-        if (gamepads.length === 0) {
-            return
-        }
-
-        if (this.isAxisAction(actionId)) {
-            let strongestAxis: { index: number; value: number } | null = null
-            for (const gamepad of gamepads) {
-                gamepad.axes.forEach((axisValue, axisIndex) => {
-                    if (Math.abs(axisValue) < 0.5) {
-                        return
-                    }
-
-                    if (!strongestAxis || Math.abs(axisValue) > Math.abs(strongestAxis.value)) {
-                        strongestAxis = { index: axisIndex, value: axisValue }
-                    }
-                })
-            }
-
-            if (strongestAxis) {
-                const direction = this.getGamepadAxisDirectionForAction(actionId, strongestAxis.value)
-                this.finishCapture({
-                    type: 'gamepad-axis',
-                    axis: strongestAxis.index,
-                    direction,
-                    deadZone: 0.15,
-                    label: `Gamepad Axis ${strongestAxis.index}`
-                })
-                return
-            }
-        }
-
-        for (const gamepad of gamepads) {
-            for (let buttonIndex = 0; buttonIndex < gamepad.buttons.length; buttonIndex += 1) {
-                const button = gamepad.buttons[buttonIndex]
-                if (!button || button.value < 0.5) {
-                    continue
-                }
-
-                const direction = this.getButtonDirectionForAxisAction(actionId)
-                if (direction === null) {
-                    this.stopCaptureListeners()
-                    this.capturingActionId = null
-                    this.capturingProfileId = null
-                    this.updateCaptureStatus('Capture cancelled')
-                    return
-                }
-
-                this.finishCapture({
-                    type: 'gamepad-button',
-                    button: buttonIndex,
-                    direction,
-                    label: `Gamepad Button ${buttonIndex}`
-                })
-                return
-            }
-        }
-    }
-
-    private isAxisAction(actionId: InputActionId): boolean {
-        return getInputActionDefinition(actionId).type === InputActionType.Axis
-    }
-
-    private getButtonDirectionForAxisAction(actionId: InputActionId): AxisDirection | undefined | null {
-        if (!this.isAxisAction(actionId)) {
-            return undefined
-        }
-
-        if (actionId !== InputAction.LookHorizontal && actionId !== InputAction.LookVertical) {
-            return 'positive'
-        }
-
-        const response = window.prompt(
-            'Bind as + or - direction? Type + for increase (right/up), - for decrease (left/down).',
-            '+'
-        )
-
-        if (response === null) {
-            return null
-        }
-
-        return response.trim().startsWith('-') ? 'negative' : 'positive'
-    }
-
-    private getGamepadAxisDirectionForAction(actionId: InputActionId, axisValue: number): 'positive' | 'negative' | 'both' {
-        if (actionId === InputAction.LookHorizontal || actionId === InputAction.LookVertical) {
-            return 'both'
-        }
-
-        return axisValue >= 0 ? 'positive' : 'negative'
     }
 
     private updateCaptureStatus(message: string): void {
@@ -516,17 +198,6 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         status.textContent = message
-    }
-
-    private stopCaptureListeners(): void {
-        document.removeEventListener('keydown', this.handleCaptureKeyDown)
-        document.removeEventListener('mousedown', this.handleCaptureMouseDown)
-        document.removeEventListener('mousemove', this.handleCaptureMouseMove)
-
-        if (this.captureGamepadPollTimer !== null) {
-            window.clearInterval(this.captureGamepadPollTimer)
-            this.captureGamepadPollTimer = null
-        }
     }
 
 
@@ -544,13 +215,20 @@ export class ControlsPanel extends PauseMenuPanel {
         const activeProfileId = inputManager.profileService.getActiveProfileId()
         const activeProfile = inputManager.profileService.getActiveProfile()
 
-        this.renderDeviceOptions(devices, profiles, activeProfileId)
-        this.renderActiveToggle(activeProfile)
-        this.renderMouseLockToggle()
-        this.renderGamepadReticleToggle()
-        this.renderLookTuningControls()
-        this.updateDeviceSpecificSettingsVisibility(activeProfile)
-        this.renderMappingTable(activeProfile)
+        this.renderDeviceOptions(panel, devices, profiles, activeProfileId)
+        this.syncCheckbox(panel, '#input-device-enabled', activeProfile.enabled)
+        this.syncCheckbox(panel, '#input-mouse-lock-enabled', this.appSettings.getSetting('inputMouseLockEnabled'))
+        this.syncCheckbox(panel, '#input-gamepad-reticle-enabled', this.appSettings.getSetting('inputGamepadReticleEnabled'))
+        this.renderLookTuningControls(panel)
+        this.updateDeviceSpecificSettingsVisibility(panel, activeProfile)
+        this.renderMappingTable(panel, activeProfile)
+    }
+
+    private syncCheckbox(panel: HTMLElement, selector: string, checked: boolean): void {
+        const checkbox = panel.querySelector(selector) as HTMLInputElement | null
+        if (checkbox) {
+            checkbox.checked = checked
+        }
     }
 
     /**
@@ -558,12 +236,7 @@ export class ControlsPanel extends PauseMenuPanel {
      * selected; Gamepad Reticle / Invert / Sensitivity only for the gamepad profile. Touch/VR
      * show neither group, since neither setting applies to those device kinds today.
      */
-    private updateDeviceSpecificSettingsVisibility(activeProfile: InputProfileDefinition): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
+    private updateDeviceSpecificSettingsVisibility(panel: HTMLElement, activeProfile: InputProfileDefinition): void {
         const mouseGroup = panel.querySelector('#input-mouse-settings-group') as HTMLElement | null
         const gamepadGroup = panel.querySelector('#input-gamepad-settings-group') as HTMLElement | null
 
@@ -575,21 +248,9 @@ export class ControlsPanel extends PauseMenuPanel {
         }
     }
 
-    private renderLookTuningControls(): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
-        const invertMouseToggle = panel.querySelector('#input-look-invert-mouse') as HTMLInputElement | null
-        if (invertMouseToggle) {
-            invertMouseToggle.checked = this.appSettings.getSetting('inputLookInvertMouse')
-        }
-
-        const invertGamepadToggle = panel.querySelector('#input-look-invert-gamepad') as HTMLInputElement | null
-        if (invertGamepadToggle) {
-            invertGamepadToggle.checked = this.appSettings.getSetting('inputLookInvertGamepad')
-        }
+    private renderLookTuningControls(panel: HTMLElement): void {
+        this.syncCheckbox(panel, '#input-look-invert-mouse', this.appSettings.getSetting('inputLookInvertMouse'))
+        this.syncCheckbox(panel, '#input-look-invert-gamepad', this.appSettings.getSetting('inputLookInvertGamepad'))
 
         UIComponentUtils.updateSliderValue(
             panel, 'input-look-sensitivity-mouse', 'input-look-sensitivity-mouse-value',
@@ -605,15 +266,11 @@ export class ControlsPanel extends PauseMenuPanel {
     }
 
     private renderDeviceOptions(
+        panel: HTMLElement,
         devices: ReadonlyArray<{ name: string; profileId: string }>,
         profiles: ReadonlyArray<InputProfileDefinition>,
         activeProfileId: InputProfileIdValue
     ): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
         const select = panel.querySelector('#input-device-select') as HTMLSelectElement | null
         if (!select) {
             return
@@ -651,54 +308,7 @@ export class ControlsPanel extends PauseMenuPanel {
         }
     }
 
-    private renderActiveToggle(profile: InputProfileDefinition): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
-        const toggle = panel.querySelector('#input-device-enabled') as HTMLInputElement | null
-        if (!toggle) {
-            return
-        }
-
-        toggle.checked = profile.enabled
-    }
-
-    private renderMouseLockToggle(): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
-        const toggle = panel.querySelector('#input-mouse-lock-enabled') as HTMLInputElement | null
-        if (!toggle) {
-            return
-        }
-
-        toggle.checked = this.appSettings.getSetting('inputMouseLockEnabled')
-    }
-
-    private renderGamepadReticleToggle(): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
-        const toggle = panel.querySelector('#input-gamepad-reticle-enabled') as HTMLInputElement | null
-        if (!toggle) {
-            return
-        }
-
-        toggle.checked = this.appSettings.getSetting('inputGamepadReticleEnabled')
-    }
-
-    private renderMappingTable(profile: InputProfileDefinition): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
+    private renderMappingTable(panel: HTMLElement, profile: InputProfileDefinition): void {
         const duplicateWarnings = getDuplicateBindingWarnings(profile)
 
         const rows = INPUT_ACTION_ORDER.map((actionId) => {
@@ -776,7 +386,7 @@ export class ControlsPanel extends PauseMenuPanel {
             this.eventManager.deregisterEventHandler(InputEventTypes.ProfileChanged, this.handleProfileChanged)
             this.profileListenerRegistered = false
         }
-        this.stopCaptureListeners()
+        this.bindingCapture.stop()
         super.dispose()
     }
 }

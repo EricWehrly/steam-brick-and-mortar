@@ -104,7 +104,7 @@ export class PauseMenuManager {
         this.systemDependencies = systemDependencies || null
         this.eventManager = eventManager
         this.appSettings = appSettings
-        this.performanceMonitor = performanceMonitor    
+        this.performanceMonitor = performanceMonitor
     }
 
     init(): void {
