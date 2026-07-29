@@ -383,6 +383,50 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 **Source tag**:
 - `// TD: sticker-coordinator` in `client/src/scene/stickers/ShelfStickerHandler.ts`
 
+---
+
+## id: liminal-props-must-follow-player
+**Priority**: High (grows with every prop system liminal mode touches)
+**Effort**: ~1 day for lighting; unscoped for "every prop" — needs a survey pass first
+**Context**: Liminal mode's Fork A has the player walking indefinitely through absolute world
+space while the corridor recycles. `RoomManager`'s shell (floor/ceiling/walls) originally sized
+itself once from the initial shelf bounds and never moved again — shelves that recycled past the
+original span ended up behind the static back wall, occluded (see `docs/bugs.md`, fixed in
+`41f0b6fc`). Fixed by having `RoomManager` translate its `roomGroup` 1:1 with the camera each frame
+while liminal is active.
+
+That fix only covers `RoomManager`'s own geometry. Anything else anchored to a *fixed* world
+position from the original (non-recycling) layout has the identical problem and hasn't been
+audited yet:
+- `LightingRenderer`'s point lights / spotlights (`addPointLights()`, `entranceSpot`, etc.) — placed
+  at fixed positions/ranges relative to the original room. Once the player and shelves have moved
+  far enough past the original span, these lights no longer illuminate anything nearby. Ambient +
+  directional light (both position-independent) provide a floor so this isn't a hard-invisible bug
+  like the wall was, but distant recycled shelves will read dimmer/flatter than intended.
+- The "STEAM LIBRARY" title sign (`SceneSignManager`) — confirmed broken, see `docs/bugs.md`.
+- Any other prop anchored via a one-time absolute-position computation rather than parented to
+  `roomGroup` or otherwise following the camera (user-placed props via `UserPropPlacer`,
+  `PropRenderer`'s atmospheric props, etc. — not yet individually checked).
+
+**Decision (for now)**: don't fix lighting or do the full prop survey yet. Documented so the next
+liminal pass (or anyone adding a new prop system) knows to check "does this need to follow the
+player under Fork A" rather than rediscovering the pattern per-system.
+
+**Done when**:
+- Every prop/light system either follows the player under liminal mode (mirroring
+  `RoomManager.onFrame`'s translate-with-camera approach) or is confirmed not to need it
+- A short note in `client/CLAUDE.md` or the liminal feature doc names this as a checklist item for
+  new prop systems
+
+**Related files**: `client/src/scene/RoomManager.ts` (the reference implementation),
+`client/src/scene/LightingRenderer.ts`, `client/src/scene/SceneSignManager.ts`,
+`client/src/scene/props/UserPropPlacer.ts`, `client/src/scene/PropRenderer.ts`
+**Related docs**: `docs/plans/liminal-mode-plan.md` (Story 5/6), `docs/bugs.md`
+
+---
+
+## Later (only true debt, not feature wish-list)
+
 ## id: metadata-refetch-no-circuit-breaker
 **Priority**: Low  
 **Effort**: ~2-3 hours (bounded-retry/give-up state + tests)  

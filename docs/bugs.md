@@ -39,6 +39,29 @@ Active bugs and issues that need investigation or fixing.
 
 ## Low Priority
 
+### "STEAM LIBRARY" title sign doesn't follow the player in liminal mode
+**Status**: 🔴 Open
+**Reported**: 2026-07-28
+**Description**: In liminal mode, `RoomManager`'s shell (floor/ceiling/walls) now translates with
+the camera each frame so the corridor's treadmill stays properly bounded (see `docs/tech-debt.md`
+→ `liminal-props-must-follow-player`). The "STEAM LIBRARY" title sign, built by
+`SceneSignManager`, does not — it's positioned from a cached `roomWorldOffsetZ` snapshot rather
+than parented to `roomGroup` or given its own per-frame follow, so it stays behind at wherever the
+room was when the sign was last built while the corridor moves on.
+**Steps to Reproduce**:
+1. Switch to Liminal layout.
+2. Walk forward far enough to trigger at least one boundary-crossing recycle.
+3. Observe the title sign no longer sits above the back wall — it's stayed at its original spot.
+**Expected**: Sign stays anchored to the (now player-following) back wall.
+**Actual**: Sign stays fixed at its original world position.
+**Impact**: Cosmetic only; no functional/gameplay effect.
+**Next Steps**: Revisit when doing the signage pass — either parent the sign mesh to `roomGroup`
+directly, or give `SceneSignManager` the same per-frame follow treatment `RoomManager` has.
+**Files**: `client/src/scene/SceneSignManager.ts`, `client/src/scene/RoomManager.ts` (reference
+implementation)
+
+---
+
 ### Unexpected cache clearing
 **Status**: 🔴 Open
 **Reported**: 2026-01-16
