@@ -15,7 +15,7 @@ import { GameFinder } from './GameFinder'
 import { PixelDataCache, type CachedPixelResult } from '../scene/game-box/instancing/PixelDataCache'
 import { DataManager } from '../core/data/DataManager'
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes } from '../types/InteractionEvents'
+import { GameEventTypes, InputEventTypes } from '../types/InteractionEvents'
 import type { SteamGame } from '../steam'
 import type { LodQueryResult } from '../scene/game-box/instancing/LodArtworkOrchestratorDebug'
 
@@ -35,6 +35,7 @@ interface ArtworkInfo {
 }
 
 export class GameArtworkInspector {
+    private readonly eventManager = EventManager.getInstance()
     private modalElement: HTMLElement | null = null
     private pixelCache: PixelDataCache
     private pendingLodState: LodQueryResult | null = null
@@ -318,13 +319,11 @@ export class GameArtworkInspector {
             })
         })
 
-        document.addEventListener('keydown', this.handleKeydown.bind(this))
+        this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
     }
 
-    private handleKeydown(e: KeyboardEvent): void {
-        if (e.key === 'Escape') {
-            this.close()
-        }
+    private readonly handleCancelPressed = (): void => {
+        this.close()
     }
 
     close(): void {
@@ -336,8 +335,8 @@ export class GameArtworkInspector {
 
             this.modalElement.remove()
             this.modalElement = null
-            
-            document.removeEventListener('keydown', this.handleKeydown.bind(this))
+
+            this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
         }
     }
 

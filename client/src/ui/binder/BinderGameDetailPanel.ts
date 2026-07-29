@@ -1,6 +1,8 @@
 import { GameSpotlight } from '../../debug/GameSpotlight'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
 import { RATING_TIERS } from '../../scene/categorization/GroupResolver'
+import { EventManager } from '../../core/EventManager'
+import { InputEventTypes } from '../../types/InteractionEvents'
 import detailPanelTemplate from './detail-panel.html?raw'
 
 /**
@@ -27,8 +29,9 @@ export interface BinderGameDetailPanelOptions {
  * Substitution tokens use {{token}} syntax and are replaced at show() time.
  */
 export class BinderGameDetailPanel {
+    private readonly eventManager = EventManager.getInstance()
     private panel: HTMLElement | null = null
-    private escHandler: ((e: KeyboardEvent) => void) | null = null
+    private closeOnCancel: (() => void) | null = null
 
     public show(game: SteamGameData, options: BinderGameDetailPanelOptions = {}): void {
         this.hide()
@@ -105,10 +108,8 @@ export class BinderGameDetailPanel {
             }
         })
 
-        this.escHandler = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') close()
-        }
-        document.addEventListener('keydown', this.escHandler)
+        this.closeOnCancel = close
+        this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
 
         panel.addEventListener('click', (e) => {
             if (e.target === panel) close()
@@ -116,14 +117,18 @@ export class BinderGameDetailPanel {
     }
 
     public hide(): void {
-        if (this.escHandler) {
-            document.removeEventListener('keydown', this.escHandler)
-            this.escHandler = null
+        if (this.closeOnCancel) {
+            this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+            this.closeOnCancel = null
         }
         if (this.panel) {
             this.panel.remove()
             this.panel = null
         }
+    }
+
+    private readonly handleCancelPressed = (): void => {
+        this.closeOnCancel?.()
     }
 
     private escapeHtml(text: string): string {

@@ -180,7 +180,7 @@ describe('BindingResolver', () => {
     })
 
     describe('findButtonActionsBoundTo', () => {
-        it('finds the button action bound to a raw keyboard code', () => {
+        it('finds every button action bound to a raw keyboard code', () => {
             const resolver = new BindingResolver()
             const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
 
@@ -189,7 +189,7 @@ describe('BindingResolver', () => {
                 binding => binding.type === 'keyboard-button' && binding.code === 'Escape'
             )
 
-            expect(actionIds).toEqual([InputAction.OpenMenu])
+            expect(actionIds).toEqual([InputAction.OpenMenu, InputAction.Cancel])
         })
 
         it('excludes axis actions even though they use keyboard-button bindings (e.g. movement keys)', () => {
@@ -214,6 +214,81 @@ describe('BindingResolver', () => {
             )
 
             expect(actionIds).toEqual([])
+        })
+    })
+
+    describe('lookTuning', () => {
+        it('applies the mouse sensitivity multiplier to LookHorizontal, independent of gamepad sensitivity', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const state = resolver.resolve(mouseKeyboardProfile, {
+                keysPressed: new Set(),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 3,
+                mouseDeltaY: 0,
+                gamepads: [],
+                lookTuning: { invertMouse: false, invertGamepad: false, sensitivityMouse: 4, sensitivityGamepad: 1 }
+            })
+
+            expect(state.axes.get(InputAction.LookHorizontal)).toBe(12)
+        })
+
+        it('inverts LookVertical for mouse when invertMouse is set, without affecting LookHorizontal', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const state = resolver.resolve(mouseKeyboardProfile, {
+                keysPressed: new Set(),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 5,
+                mouseDeltaY: 5,
+                gamepads: [],
+                lookTuning: { invertMouse: true, invertGamepad: false, sensitivityMouse: 1, sensitivityGamepad: 1 }
+            })
+
+            expect(state.axes.get(InputAction.LookVertical)).toBe(-5)
+            expect(state.axes.get(InputAction.LookHorizontal)).toBe(5)
+        })
+
+        it('applies gamepad sensitivity/invert independently of the mouse tuning', () => {
+            const resolver = new BindingResolver()
+            const gamepadProfile = getProfile(InputProfileId.GamepadStandard)
+            const gamepad = {
+                connected: true,
+                index: 0,
+                axes: [0, 0, 0, -1],
+                buttons: []
+            } as unknown as Gamepad
+
+            const state = resolver.resolve(gamepadProfile, {
+                keysPressed: new Set(),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 0,
+                mouseDeltaY: 0,
+                gamepads: [gamepad],
+                lookTuning: { invertMouse: false, invertGamepad: true, sensitivityMouse: 99, sensitivityGamepad: 2 }
+            })
+
+            // Full stick deflection (-1) normalizes to -1 past the dead zone, sensitivity 2x = -2,
+            // then invertGamepad flips LookVertical's sign to 2 - the mouse's 99x sensitivity must
+            // have no bearing here since no mouse-axis binding contributed.
+            expect(state.axes.get(InputAction.LookVertical)).toBe(2)
+        })
+
+        it('defaults to a neutral (no-op) tuning when omitted, preserving the binding-level sensitivity', () => {
+            const resolver = new BindingResolver()
+            const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+            const state = resolver.resolve(mouseKeyboardProfile, {
+                keysPressed: new Set(),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 6,
+                mouseDeltaY: 0,
+                gamepads: []
+            })
+
+            expect(state.axes.get(InputAction.LookHorizontal)).toBe(6)
         })
     })
 })

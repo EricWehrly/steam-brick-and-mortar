@@ -122,10 +122,20 @@ export class PauseMenuManager {
         // knows this means OpenMenu for any device (keyboard Escape, gamepad Start, ...), so
         // there's nothing left to check here.
         this.eventManager.registerEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
+
+        // Cancel (gamepad B/Circle, or Escape/Start alongside OpenMenu above) closes the menu if
+        // it's open - a pure dismiss, not a toggle, so it never reopens a closed menu.
+        this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
     }
 
     private readonly handleOpenMenuPressed = (): void => {
         this.toggle()
+    }
+
+    private readonly handleCancelPressed = (): void => {
+        if (this.state.isOpen) {
+            this.close()
+        }
     }
 
     private onSteamDataLoaded(_event: CustomEvent<SteamDataLoadedEvent>): void {
@@ -549,6 +559,7 @@ export class PauseMenuManager {
             this.onSteamDataLoaded.bind(this)
         )
         this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
+        this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
 
         // Dispose all panels
         this.panels.forEach(panel => {

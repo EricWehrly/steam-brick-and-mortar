@@ -51,4 +51,20 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
         eventManager.emit(InputEventTypes.OpenMenuPressed, {})
         expect(pauseMenuManager.isOpen()).toBe(false)
     })
+
+    it('closes on CancelPressed (gamepad B/Circle) when open', () => {
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        expect(pauseMenuManager.isOpen()).toBe(true)
+
+        eventManager.emit(InputEventTypes.CancelPressed, {})
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
+
+    it('does not open on CancelPressed when already closed - a pure dismiss, not a toggle', () => {
+        expect(pauseMenuManager.isOpen()).toBe(false)
+
+        eventManager.emit(InputEventTypes.CancelPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
 })

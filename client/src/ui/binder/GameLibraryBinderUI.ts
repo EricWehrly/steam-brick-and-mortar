@@ -76,6 +76,10 @@ export class GameLibraryBinderUI {
             this.onGameSelected
         )
 
+        // Cancel (Escape / gamepad B/Circle) closes the binder if open - replaces the old
+        // raw Escape-only keydown check, so gamepad gets the same dismiss behavior.
+        this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+
         GameLibraryBinderUI.logger.debug('GameLibraryBinderUI initialized')
     }
     
@@ -128,13 +132,7 @@ export class GameLibraryBinderUI {
                 e.preventDefault()
                 this.toggle()
             }
-            
-            // ESC to close
-            if (e.key === 'Escape' && this.state.isOpen) {
-                e.preventDefault()
-                this.close()
-            }
-            
+
             // Arrow keys for navigation when open
             if (this.state.isOpen) {
                 if (e.key === 'ArrowLeft') {
@@ -482,6 +480,12 @@ export class GameLibraryBinderUI {
         this.openGameDetail(event.detail.appid)
     }
 
+    private readonly handleCancelPressed = (): void => {
+        if (this.state.isOpen) {
+            this.close()
+        }
+    }
+
     /**
      * Select a game to show details
      */
@@ -535,6 +539,7 @@ export class GameLibraryBinderUI {
             GameEventTypes.Selected,
             this.onGameSelected
         )
+        this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
 
         this.detailPanel.hide()
         this.container?.remove()

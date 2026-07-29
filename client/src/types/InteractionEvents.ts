@@ -164,6 +164,17 @@ export interface OpenMenuPressedEvent extends BaseInteractionEvent {}
 export interface InteractPressedEvent extends BaseInteractionEvent {}
 
 /**
+ * Fired by InputActionResolver the moment Cancel is pressed - keyboard Escape or gamepad B/Circle
+ * (Start is also bound to Cancel, alongside OpenMenu, so opening the pause menu simultaneously
+ * dismisses any other open overlay, mirroring what Escape already does for keyboard since it's
+ * both a real DOM keydown each overlay could listen for directly and the OpenMenu binding).
+ * Any overlay that closes itself on Escape today (GameLibraryBinderUI, BinderGameDetailPanel,
+ * GameArtworkInspector, PauseMenuManager) should react to this instead of a raw keydown listener,
+ * so gamepad gets the same "back/cancel" behavior for free.
+ */
+export interface CancelPressedEvent extends BaseInteractionEvent {}
+
+/**
  * Fired by DeviceDetector the frame it detects a gamepad button transitioning from released to
  * pressed - the Gamepad API has no native press event, so this is the one place that has to poll
  * and diff, right next to where gamepad state is already read. This is a raw, unresolved signal -
@@ -359,6 +370,7 @@ export const InputEventTypes = {
     ProfileChanged: 'input:profile-changed',
     OpenMenuPressed: 'input:open-menu-pressed',
     InteractPressed: 'input:interact-pressed',
+    CancelPressed: 'input:cancel-pressed',
     GamepadButtonPressed: 'input:gamepad-button-pressed'
 } as const
 

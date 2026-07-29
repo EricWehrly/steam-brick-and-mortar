@@ -49,22 +49,58 @@ export class ControlsPanel extends PauseMenuPanel {
                             </label>
                         </div>
                     </div>
-                    <div class="pause-row control-item">
-                        <span class="control-key pause-row-key">Mouse Look</span>
-                        <div class="control-desc pause-row-text">
-                            <label class="input-device-enabled-toggle">
-                                <input id="input-mouse-lock-enabled" type="checkbox" data-input-mouse-lock-enabled />
-                                <span>Capture mouse cursor while playing (re-engages when the pause menu closes)</span>
-                            </label>
+                    <div id="input-mouse-settings-group">
+                        <div class="pause-row control-item">
+                            <span class="control-key pause-row-key">Mouse Look</span>
+                            <div class="control-desc pause-row-text">
+                                <label class="input-device-enabled-toggle">
+                                    <input id="input-mouse-lock-enabled" type="checkbox" data-input-mouse-lock-enabled />
+                                    <span>Capture mouse cursor while playing (re-engages when the pause menu closes)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="pause-row control-item">
+                            <span class="control-key pause-row-key">Invert Mouse Look</span>
+                            <div class="control-desc pause-row-text">
+                                <label class="input-device-enabled-toggle">
+                                    <input id="input-look-invert-mouse" type="checkbox" data-input-look-invert-mouse />
+                                    <span>Flip the vertical look axis for mouse</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="pause-row control-item">
+                            <label for="input-look-sensitivity-mouse" class="control-key pause-row-key">Mouse Look Sensitivity</label>
+                            <div class="control-desc pause-row-text">
+                                <input id="input-look-sensitivity-mouse" type="range" min="0.1" max="5" step="0.1" />
+                                <span id="input-look-sensitivity-mouse-value"></span>
+                            </div>
                         </div>
                     </div>
-                    <div class="pause-row control-item">
-                        <span class="control-key pause-row-key">Gamepad Reticle</span>
-                        <div class="control-desc pause-row-text">
-                            <label class="input-device-enabled-toggle">
-                                <input id="input-gamepad-reticle-enabled" type="checkbox" data-input-gamepad-reticle-enabled />
-                                <span>Show an aiming crosshair while a gamepad/VR controller is connected</span>
-                            </label>
+                    <div id="input-gamepad-settings-group">
+                        <div class="pause-row control-item">
+                            <span class="control-key pause-row-key">Gamepad Reticle</span>
+                            <div class="control-desc pause-row-text">
+                                <label class="input-device-enabled-toggle">
+                                    <input id="input-gamepad-reticle-enabled" type="checkbox" data-input-gamepad-reticle-enabled />
+                                    <span>Show an aiming crosshair while a gamepad/VR controller is connected</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="pause-row control-item">
+                            <span class="control-key pause-row-key">Invert Gamepad Look</span>
+                            <div class="control-desc pause-row-text">
+                                <label class="input-device-enabled-toggle">
+                                    <input id="input-look-invert-gamepad" type="checkbox" data-input-look-invert-gamepad />
+                                    <span>Flip the vertical look axis for the right stick</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="pause-row control-item">
+                            <label for="input-look-sensitivity-gamepad" class="control-key pause-row-key">Gamepad Look Sensitivity</label>
+                            <div class="control-desc pause-row-text">
+                                <input id="input-look-sensitivity-gamepad" type="range" min="0.1" max="5" step="0.1" />
+                                <span id="input-look-sensitivity-gamepad-value"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -121,6 +157,31 @@ export class ControlsPanel extends PauseMenuPanel {
             toggleId: 'input-gamepad-reticle-enabled',
             onChange: this.handleGamepadReticleEnabledToggle.bind(this)
         })
+
+        UIComponentUtils.setupToggle(panel, {
+            toggleId: 'input-look-invert-mouse',
+            onChange: (checked) => this.appSettings.setSetting('inputLookInvertMouse', checked, EventSource.UI)
+        })
+
+        UIComponentUtils.setupToggle(panel, {
+            toggleId: 'input-look-invert-gamepad',
+            onChange: (checked) => this.appSettings.setSetting('inputLookInvertGamepad', checked, EventSource.UI)
+        })
+
+        UIComponentUtils.setupSliders(panel, [
+            {
+                sliderId: 'input-look-sensitivity-mouse',
+                valueDisplayId: 'input-look-sensitivity-mouse-value',
+                formatDisplay: (v) => `${v.toFixed(1)}x`,
+                onInput: (value) => this.appSettings.setSetting('inputLookSensitivityMouse', value, EventSource.UI)
+            },
+            {
+                sliderId: 'input-look-sensitivity-gamepad',
+                valueDisplayId: 'input-look-sensitivity-gamepad-value',
+                formatDisplay: (v) => `${v.toFixed(1)}x`,
+                onInput: (value) => this.appSettings.setSetting('inputLookSensitivityGamepad', value, EventSource.UI)
+            }
+        ])
 
         UIComponentUtils.setupButton(panel, {
             buttonId: 'input-reset-profile',
@@ -487,7 +548,60 @@ export class ControlsPanel extends PauseMenuPanel {
         this.renderActiveToggle(activeProfile)
         this.renderMouseLockToggle()
         this.renderGamepadReticleToggle()
+        this.renderLookTuningControls()
+        this.updateDeviceSpecificSettingsVisibility(activeProfile)
         this.renderMappingTable(activeProfile)
+    }
+
+    /**
+     * Mouse Look / Invert / Sensitivity only make sense while a mouse-keyboard profile is
+     * selected; Gamepad Reticle / Invert / Sensitivity only for the gamepad profile. Touch/VR
+     * show neither group, since neither setting applies to those device kinds today.
+     */
+    private updateDeviceSpecificSettingsVisibility(activeProfile: InputProfileDefinition): void {
+        const panel = this.getPanelElement()
+        if (!panel) {
+            return
+        }
+
+        const mouseGroup = panel.querySelector('#input-mouse-settings-group') as HTMLElement | null
+        const gamepadGroup = panel.querySelector('#input-gamepad-settings-group') as HTMLElement | null
+
+        if (mouseGroup) {
+            mouseGroup.style.display = activeProfile.deviceKind === InputDeviceKind.MouseKeyboard ? '' : 'none'
+        }
+        if (gamepadGroup) {
+            gamepadGroup.style.display = activeProfile.deviceKind === InputDeviceKind.Gamepad ? '' : 'none'
+        }
+    }
+
+    private renderLookTuningControls(): void {
+        const panel = this.getPanelElement()
+        if (!panel) {
+            return
+        }
+
+        const invertMouseToggle = panel.querySelector('#input-look-invert-mouse') as HTMLInputElement | null
+        if (invertMouseToggle) {
+            invertMouseToggle.checked = this.appSettings.getSetting('inputLookInvertMouse')
+        }
+
+        const invertGamepadToggle = panel.querySelector('#input-look-invert-gamepad') as HTMLInputElement | null
+        if (invertGamepadToggle) {
+            invertGamepadToggle.checked = this.appSettings.getSetting('inputLookInvertGamepad')
+        }
+
+        UIComponentUtils.updateSliderValue(
+            panel, 'input-look-sensitivity-mouse', 'input-look-sensitivity-mouse-value',
+            this.appSettings.getSetting('inputLookSensitivityMouse'),
+            (v) => `${v.toFixed(1)}x`
+        )
+
+        UIComponentUtils.updateSliderValue(
+            panel, 'input-look-sensitivity-gamepad', 'input-look-sensitivity-gamepad-value',
+            this.appSettings.getSetting('inputLookSensitivityGamepad'),
+            (v) => `${v.toFixed(1)}x`
+        )
     }
 
     private renderDeviceOptions(
@@ -630,6 +744,14 @@ export class ControlsPanel extends PauseMenuPanel {
 
     private isActionEditable(profile: InputProfileDefinition, actionId: InputActionId): boolean {
         if (isDerivedLinkedActionLocked(profile, actionId)) {
+            return false
+        }
+
+        // Joystick axis assignments (both movement and look) aren't remappable yet - force
+        // locked for consistency rather than leaving some analog-stick actions editable and
+        // others not, depending on whether they happen to have a linked inverse.
+        const bindings = profile.bindings[actionId] ?? []
+        if (bindings.some(binding => binding.type === 'gamepad-axis')) {
             return false
         }
 
