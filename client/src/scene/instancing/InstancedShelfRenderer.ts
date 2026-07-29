@@ -501,6 +501,15 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
      * dedicated event (rather than reusing ShelfReady) exists purely because
      * GameBoxSpawner treats ShelfReady's shelfIndex === 0 as "new layout wave,
      * clear my anchor cache" — see ShelfUnitRepositionRequestedEvent's doc.
+     *
+     * Unlike the initial ShelfReady placement (flushed to the GPU by the
+     * ShelfLayoutDetermined -> InstancedMeshManager.updateGPU() listener),
+     * nothing else flushes a recycle's matrix write — setInstanceMatrix only
+     * touches the CPU-side buffer. Without this, the boards stay visually
+     * frozen at wherever they were first placed no matter how many times
+     * they recycle, while the games repointed onto them move correctly
+     * (LodGameArtworkRenderer/InstancedLabelRenderer flush needsUpdate on
+     * every call via PlacementRunResettableInstancedBase).
      */
     private handleShelfUnitRepositionRequested(detail: ShelfUnitRepositionRequestedEvent): void {
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, detail.rotationY, 0))
@@ -508,6 +517,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             position: detail.position as THREE.Vector3,
             rotation,
         })
+        this.flushGpuUpdate()
+    }
+
+    private flushGpuUpdate(): void {
+        this.angledBoardManager.updateGPU()
+        this.sideBoardManager.updateGPU()
+        this.shelfBoardManager.updateGPU()
+        this.interiorSurfaceManager.updateGPU()
     }
 
     private flushPendingShelfReady(): void {

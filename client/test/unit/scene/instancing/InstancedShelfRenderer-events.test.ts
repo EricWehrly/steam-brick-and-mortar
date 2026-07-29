@@ -133,6 +133,32 @@ describe('InstancedShelfRenderer Events', () => {
             }
         })
 
+        it('flags every geometry type\'s GPU buffer dirty, not just the CPU-side matrix', async () => {
+            await renderer.initialize()
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
+                shelfIndex: 0, sectionIndex: 0, position: new THREE.Vector3(5, 0, -10), rotationY: 0
+            })
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const managers = ['angledBoardManager', 'sideBoardManager', 'shelfBoardManager', 'interiorSurfaceManager']
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .map((name) => (renderer as any)[name].getInstancedMesh() as THREE.InstancedMesh)
+
+            // needsUpdate is a setter-only property on THREE.BufferAttribute (no
+            // getter) — setting it true increments .version, so that's what a test
+            // must observe instead of reading needsUpdate back.
+            const versionsBefore = managers.map((mesh) => mesh.instanceMatrix.version)
+
+            eventManager.emit<ShelfUnitRepositionRequestedEvent>(StorePropsEventTypes.ShelfUnitRepositionRequested, {
+                shelfIndex: 0, position: new THREE.Vector3(5, 0, -40), rotationY: 0
+            })
+
+            // Without this, the CPU-side matrix updates (verified by the test above)
+            // never reach the GPU — boards stay visually frozen at their first
+            // placement no matter how many times they recycle.
+            managers.forEach((mesh, i) => expect(mesh.instanceMatrix.version).toBeGreaterThan(versionsBefore[i]))
+        })
+
         it('is idempotent — repositioning the same unit twice does not grow the instance count', async () => {
             await renderer.initialize()
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
