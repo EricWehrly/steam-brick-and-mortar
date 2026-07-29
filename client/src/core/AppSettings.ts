@@ -45,6 +45,7 @@ export const Setting = {
     ShadowMapEnabled: 'shadowMapEnabled',
     SsaoEnabled: 'ssaoEnabled',
     SmaaPreset: 'smaaPreset',
+    MsaaLevel: 'msaaLevel',
     ToneMappingExposure: 'toneMappingExposure',
     EnvironmentIntensity: 'environmentIntensity',
     PixelRatioScale: 'pixelRatioScale',
@@ -108,6 +109,7 @@ export const SettingCategory = {
         Setting.ShadowMapEnabled,
         Setting.SsaoEnabled,
         Setting.SmaaPreset,
+        Setting.MsaaLevel,
         Setting.ToneMappingExposure,
         Setting.EnvironmentIntensity,
         Setting.PixelRatioScale,
@@ -141,6 +143,10 @@ export interface ApplicationSettings {
     shadowMapEnabled: boolean
     ssaoEnabled: boolean
     smaaPreset: QualityLevel
+    /** Hardware MSAA sample count on the composer's own render targets (EffectComposer.multisampling),
+     *  independent of SMAA — see docs/plans/framerate-regression-investigation-plan.md for why these
+     *  are two separate techniques rather than one "AA level." */
+    msaaLevel: QualityLevel
     toneMappingExposure: number
     environmentIntensity: number
     pixelRatioScale: number
@@ -479,6 +485,7 @@ export class AppSettings {
             shadowMapEnabled: true,
             ssaoEnabled: true,
             smaaPreset: 'high',
+            msaaLevel: 'low', // 'low' maps to 0 samples (off) - matches pre-existing behavior
             toneMappingExposure: 0.25,
         environmentIntensity: 0.3,
             pixelRatioScale: 1,
@@ -553,6 +560,9 @@ export class AppSettings {
             return false
         }
         if (settingsObj.smaaPreset && !Object.values(QUALITY_LEVEL).includes(settingsObj.smaaPreset as QualityLevel)) {
+            return false
+        }
+        if (settingsObj.msaaLevel && !Object.values(QUALITY_LEVEL).includes(settingsObj.msaaLevel as QualityLevel)) {
             return false
         }
         
