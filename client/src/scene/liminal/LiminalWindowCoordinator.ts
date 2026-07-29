@@ -88,6 +88,7 @@ import {
     type CorridorSide,
 } from './LiminalCorridorLayout'
 import { LiminalEventTypes, type BoundaryCrossedEvent } from './LiminalEvents'
+import { computeSlotIndexForWorldZ } from './LiminalBoundaryTracker'
 
 const LIMINAL_WINDOW_SECTION_ID = 'liminal-window'
 
@@ -181,6 +182,44 @@ export class LiminalWindowCoordinator {
         // The synthetic SectionsReady above synchronously drives ShelfLayoutCoordinator
         // -> ShelfReady/ShelfLayoutDetermined -> GameBoxSpawner's placement (see class doc).
         this.classifyShelfInstances()
+        this.alignWindowToPlayer()
+    }
+
+    /**
+     * LiminalCorridorLayout.computeShelves() always seeds ranks 0..LIMINAL_DEPTH_SLOTS-1 —
+     * it has to stay a pure, player-position-agnostic function to remain a generic
+     * ILayoutDefinition. That places the whole window ahead of wherever the player
+     * actually is (e.g. at spawn, ahead of the entrance) rather than centered on them.
+     * Once per seed, shift every physical unit's rank by the same delta so the window
+     * ends up centered (2 behind, 2 ahead for LIMINAL_DEPTH_SLOTS=5) on the player's
+     * *current* slot — reusing the same reposition/repoint machinery advance() uses
+     * for a single unit, just applied to all of them at once.
+     */
+    private alignWindowToPlayer(): void {
+        const camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera)
+        if (!camera) return
+
+        const middleUnit = Math.floor(LIMINAL_DEPTH_SLOTS / 2)
+        const desiredCenterRank = computeSlotIndexForWorldZ(camera.position.z)
+        const delta = desiredCenterRank - this.unitRanks[middleUnit]
+        if (delta === 0) return
+
+        const zDelta = -delta * CORRIDOR_UNIT_SPACING_Z
+        const window = new LiminalWindow(this.flatGames, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
+
+        for (let unit = 0; unit < LIMINAL_DEPTH_SLOTS; unit++) {
+            const newRank = this.unitRanks[unit] + delta
+            this.unitRanks[unit] = newRank
+
+            const leftShelfIndex = unit * 2
+            const rightShelfIndex = unit * 2 + 1
+            this.repositionShelf(leftShelfIndex, newRank, 'left')
+            this.repositionShelf(rightShelfIndex, newRank, 'right')
+
+            const slotGames = window.gamesForSlot(newRank)
+            this.repointShelf(leftShelfIndex, 'left', slotGames.slice(0, this.slotsPerUnit), zDelta)
+            this.repointShelf(rightShelfIndex, 'right', slotGames.slice(this.slotsPerUnit), zDelta)
+        }
     }
 
     private buildWindowedSection(groupMode: GroupMode, sortMode: SortMode): Section {
