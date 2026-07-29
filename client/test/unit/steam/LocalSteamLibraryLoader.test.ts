@@ -30,15 +30,15 @@ vi.mock('../../../src/steam/LocalSteamDataWriter', async (importOriginal) => {
     }
 })
 
-const { getManyMock, findMissingMock } = vi.hoisted(() => ({
+const { getManyMock, findMissingArtworkMock } = vi.hoisted(() => ({
     getManyMock: vi.fn(),
-    findMissingMock: vi.fn(),
+    findMissingArtworkMock: vi.fn(),
 }))
 
 vi.mock('../../../src/steam/cache/AppDetailsCache', () => ({
     AppDetailsCache: {
         getMany: getManyMock,
-        findMissing: findMissingMock,
+        findMissingArtwork: findMissingArtworkMock,
     },
 }))
 
@@ -74,7 +74,7 @@ describe('LocalSteamLibraryLoader', () => {
         writeLocalAppMetadataMock.mockReset().mockResolvedValue(new Map())
         mergeCollectionsForAppidsMock.mockReset().mockResolvedValue(undefined)
         getManyMock.mockReset().mockResolvedValue(new Map())
-        findMissingMock.mockReset().mockResolvedValue([])
+        findMissingArtworkMock.mockReset().mockResolvedValue([])
         fetchAndCacheAppDetailsMock.mockReset().mockResolvedValue(new Map())
     })
 
@@ -139,7 +139,7 @@ describe('LocalSteamLibraryLoader', () => {
                 throw new Error(`unexpected command ${command}`)
             })
             // 620 already resolved locally/previously cached; 400 (collection-only, never played) is new.
-            findMissingMock.mockResolvedValue([400])
+            findMissingArtworkMock.mockResolvedValue([400])
             fetchAndCacheAppDetailsMock.mockResolvedValue(new Map([[400, makeEntry('Portal')]]))
             getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([
                 [620, makeEntry('Portal 2')],
@@ -148,7 +148,7 @@ describe('LocalSteamLibraryLoader', () => {
 
             const result = await loadLocalSteamLibrary()
 
-            expect(findMissingMock).toHaveBeenCalledWith(expect.arrayContaining([620, 400]))
+            expect(findMissingArtworkMock).toHaveBeenCalledWith(expect.arrayContaining([620, 400]))
             expect(fetchAndCacheAppDetailsMock).toHaveBeenCalledWith([400])
 
             // 400 has no local appinfo.vdf entry (resolved via network gap-fill instead), so it
@@ -177,7 +177,7 @@ describe('LocalSteamLibraryLoader', () => {
                 if (command === 'read_steam_collections') return Promise.resolve([])
                 throw new Error(`unexpected command ${command}`)
             })
-            findMissingMock.mockResolvedValue([])
+            findMissingArtworkMock.mockResolvedValue([])
             getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
 
             await loadLocalSteamLibrary()
@@ -197,7 +197,7 @@ describe('LocalSteamLibraryLoader', () => {
                 }
                 throw new Error(`unexpected command ${command}`)
             })
-            findMissingMock.mockResolvedValue([400])
+            findMissingArtworkMock.mockResolvedValue([400])
             fetchAndCacheAppDetailsMock.mockRejectedValue(new Error('Lambda unreachable'))
             getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
 

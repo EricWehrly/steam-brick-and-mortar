@@ -35,6 +35,16 @@ export interface AppDetailsData extends SteamGameMetadata {
      * (true) on the exceptional case; absent otherwise. See docs/plans/f2p-artwork-bake-plan.md.
      */
     undesirable_for_demo?: boolean;
+    /**
+     * True when this entry's fields came from a real Steam appdetails source (a live network
+     * fetch, or the baked release bundle - itself built from the same source) - as opposed to
+     * LocalSteamDataWriter's local-only appinfo.vdf resolution, which always writes
+     * NO_LOCAL_ARTWORK and never sets this. Lets AppDetailsCache distinguish "the network was
+     * asked and this is genuinely all there is" from "nobody's asked the network yet" - the local
+     * writer runs first and would otherwise satisfy a plain "has any entry" check forever. See
+     * docs/plans/startup-artwork-resolution-plan.md, Root Cause A.
+     */
+    artwork_network_checked?: boolean;
     [key: string]: unknown;
 }
 
