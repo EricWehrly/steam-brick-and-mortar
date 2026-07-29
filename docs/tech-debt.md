@@ -588,6 +588,29 @@ or any other in-menu control, today.
 
 ---
 
+## id: cancel-pressed-listener-duplication
+**Priority**: Low
+**Effort**: Small
+**Context**: `PauseMenuManager`, `GameLibraryBinderUI`, `BinderGameDetailPanel`, and
+`GameArtworkInspector` each independently register/deregister an `InputEventTypes.CancelPressed`
+handler that closes themselves if open - identical boilerplate in four places. A composition-based
+`CancelDismissHandler` helper was tried (2026-07-25) and reverted: it didn't feel like the right
+shape for the job. Worth another look, but not urgent - the duplication is small and mechanical,
+not a source of bugs.
+
+**Done when**:
+- The four register/deregister call sites share one implementation, however it ends up shaped
+  (base class, mixin, or a different composition helper) - or a deliberate decision is made that
+  four copies is fine and this entry is closed as won't-fix.
+
+**Related files**:
+- `client/src/ui/pause/PauseMenuManager.ts`
+- `client/src/ui/binder/GameLibraryBinderUI.ts`
+- `client/src/ui/binder/BinderGameDetailPanel.ts`
+- `client/src/debug/GameArtworkInspector.ts`
+
+---
+
 ## Resolved
 
 ## id: steam-integration-loading-strategy-split

@@ -228,13 +228,13 @@ describe('BindingResolver', () => {
                 mouseDeltaX: 3,
                 mouseDeltaY: 0,
                 gamepads: [],
-                lookTuning: { invertMouse: false, invertGamepad: false, sensitivityMouse: 4, sensitivityGamepad: 1 }
+                lookTuning: { mouse: { invert: false, sensitivity: 4 }, gamepad: { invert: false, sensitivity: 1 } }
             })
 
             expect(state.axes.get(InputAction.LookHorizontal)).toBe(12)
         })
 
-        it('inverts LookVertical for mouse when invertMouse is set, without affecting LookHorizontal', () => {
+        it('inverts LookVertical for mouse when mouse.invert is set, without affecting LookHorizontal', () => {
             const resolver = new BindingResolver()
             const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
 
@@ -244,7 +244,7 @@ describe('BindingResolver', () => {
                 mouseDeltaX: 5,
                 mouseDeltaY: 5,
                 gamepads: [],
-                lookTuning: { invertMouse: true, invertGamepad: false, sensitivityMouse: 1, sensitivityGamepad: 1 }
+                lookTuning: { mouse: { invert: true, sensitivity: 1 }, gamepad: { invert: false, sensitivity: 1 } }
             })
 
             expect(state.axes.get(InputAction.LookVertical)).toBe(-5)
@@ -267,12 +267,12 @@ describe('BindingResolver', () => {
                 mouseDeltaX: 0,
                 mouseDeltaY: 0,
                 gamepads: [gamepad],
-                lookTuning: { invertMouse: false, invertGamepad: true, sensitivityMouse: 99, sensitivityGamepad: 2 }
+                lookTuning: { mouse: { invert: false, sensitivity: 99 }, gamepad: { invert: true, sensitivity: 2 } }
             })
 
             // Full stick deflection (-1) normalizes to -1 past the dead zone, sensitivity 2x = -2,
-            // then invertGamepad flips LookVertical's sign to 2 - the mouse's 99x sensitivity must
-            // have no bearing here since no mouse-axis binding contributed.
+            // then gamepad.invert flips LookVertical's sign to 2 - the mouse's 99x sensitivity
+            // must have no bearing here since no mouse-axis binding contributed.
             expect(state.axes.get(InputAction.LookVertical)).toBe(2)
         })
 

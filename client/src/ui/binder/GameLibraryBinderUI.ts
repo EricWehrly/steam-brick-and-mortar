@@ -49,7 +49,7 @@ export class GameLibraryBinderUI {
     private dataManager: DataManager
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
     private readonly detailPanel = new BinderGameDetailPanel()
-    
+
     private constructor() {
         this.eventManager = EventManager.getInstance()
         this.dataManager = DataManager.getInstance()

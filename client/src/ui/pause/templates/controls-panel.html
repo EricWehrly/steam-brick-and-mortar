@@ -1,68 +1,97 @@
 <div class="app-section panel-card pause-section">
-    <h4>🎮 Movement Controls</h4>
-    <div class="control-list pause-row-list">
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">W A S D</span>
-            <span class="control-desc pause-row-text">Move around</span>
+    <h4>Input Devices</h4>
+    <div class="pause-row-list">
+        <div class="pause-row control-item">
+            <label for="input-device-select" class="control-key pause-row-key">Configure Device</label>
+            <div class="control-desc pause-row-text">
+                <select id="input-device-select" aria-label="Active input device"></select>
+            </div>
         </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Mouse</span>
-            <span class="control-desc pause-row-text">Look left/right (horizontal only)</span>
+        <div class="pause-row control-item">
+            <span class="control-key pause-row-key">Active</span>
+            <div class="control-desc pause-row-text">
+                <label class="input-device-enabled-toggle">
+                    <input id="input-device-enabled" type="checkbox" data-input-device-enabled />
+                    <span>Enabled for runtime input</span>
+                </label>
+            </div>
         </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Q / E</span>
-            <span class="control-desc pause-row-text">Roll camera left/right</span>
+        <div id="input-mouse-settings-group">
+            <div class="pause-row control-item">
+                <span class="control-key pause-row-key">Mouse Look</span>
+                <div class="control-desc pause-row-text">
+                    <label class="input-device-enabled-toggle">
+                        <input id="input-mouse-lock-enabled" type="checkbox" data-input-mouse-lock-enabled />
+                        <span>Capture mouse cursor while playing (re-engages when the pause menu closes)</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pause-row control-item">
+                <span class="control-key pause-row-key">Invert Mouse Look</span>
+                <div class="control-desc pause-row-text">
+                    <label class="input-device-enabled-toggle">
+                        <input id="input-look-invert-mouse" type="checkbox" data-input-look-invert-mouse />
+                        <span>Flip the vertical look axis for mouse</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pause-row control-item">
+                <label for="input-look-sensitivity-mouse" class="control-key pause-row-key">Mouse Look Sensitivity</label>
+                <div class="control-desc pause-row-text">
+                    <input id="input-look-sensitivity-mouse" type="range" min="0.1" max="5" step="0.1" />
+                    <span id="input-look-sensitivity-mouse-value"></span>
+                </div>
+            </div>
         </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Click</span>
-            <span class="control-desc pause-row-text">Interact with games</span>
+        <div id="input-gamepad-settings-group">
+            <div class="pause-row control-item">
+                <span class="control-key pause-row-key">Gamepad Reticle</span>
+                <div class="control-desc pause-row-text">
+                    <label class="input-device-enabled-toggle">
+                        <input id="input-gamepad-reticle-enabled" type="checkbox" data-input-gamepad-reticle-enabled />
+                        <span>Show an aiming crosshair while a gamepad/VR controller is connected</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pause-row control-item">
+                <span class="control-key pause-row-key">Invert Gamepad Look</span>
+                <div class="control-desc pause-row-text">
+                    <label class="input-device-enabled-toggle">
+                        <input id="input-look-invert-gamepad" type="checkbox" data-input-look-invert-gamepad />
+                        <span>Flip the vertical look axis for the right stick</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pause-row control-item">
+                <label for="input-look-sensitivity-gamepad" class="control-key pause-row-key">Gamepad Look Sensitivity</label>
+                <div class="control-desc pause-row-text">
+                    <input id="input-look-sensitivity-gamepad" type="range" min="0.1" max="5" step="0.1" />
+                    <span id="input-look-sensitivity-gamepad-value"></span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="app-section panel-card pause-section">
-    <h4>⚙️ System Controls</h4>
-    <div class="control-list pause-row-list">
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Escape</span>
-            <span class="control-desc pause-row-text">Open/close pause menu</span>
-        </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">F</span>
-            <span class="control-desc pause-row-text">Toggle fullscreen</span>
-        </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Tab</span>
-            <span class="control-desc pause-row-text">Toggle UI panels</span>
-        </div>
+    <h4>Current Mappings</h4>
+    <div id="input-capture-status" class="input-capture-status" aria-live="polite"></div>
+    <div class="input-mapping-table-wrap">
+        <table class="input-mapping-table">
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>Binding</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody id="input-mapping-tbody"></tbody>
+        </table>
     </div>
-</div>
-
-<div class="app-section panel-card pause-section">
-    <h4>🥽 VR Controls</h4>
-    <div class="control-list pause-row-list">
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">VR Controllers</span>
-            <span class="control-desc pause-row-text">Point and select games</span>
-        </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Room Scale</span>
-            <span class="control-desc pause-row-text">Walk around naturally</span>
-        </div>
-        <div class="control-item pause-row">
-            <span class="control-key pause-row-key">Grip Buttons</span>
-            <span class="control-desc pause-row-text">Navigate UI menus</span>
-        </div>
+    <div class="input-mapping-actions">
+        <button id="input-reset-profile" type="button" class="input-reset-button">Reset Active Profile</button>
     </div>
+    <p class="input-fast-follow-note">
+        Fast-follow: controller/touch/VR mappings for Interact, menu navigation, toggle UI/fullscreen, and roll are partially defined but not fully wired in runtime yet.
+    </p>
 </div>
-
-<div class="app-section panel-card pause-section">
-    <h4>ℹ️ About</h4>
-    <div class="help-text">
-        <p>Steam Brick and Mortar - A WebXR virtual game store experience.</p>
-        <p>Browse your Steam library in an immersive 3D environment.</p>
-        <p>Built with Three.js, WebXR, and lots of ❤️</p>
-    </div>
-</div>
-
-<!-- TODO: Make these controls mappable/configurable in a future update -->

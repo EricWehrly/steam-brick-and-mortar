@@ -180,10 +180,14 @@ export class InputActionResolver {
 
     private readLookTuning(): LookTuning {
         return {
-            invertMouse: AppSettings.get('inputLookInvertMouse'),
-            invertGamepad: AppSettings.get('inputLookInvertGamepad'),
-            sensitivityMouse: AppSettings.get('inputLookSensitivityMouse'),
-            sensitivityGamepad: AppSettings.get('inputLookSensitivityGamepad')
+            mouse: {
+                invert: AppSettings.get('inputLookInvertMouse'),
+                sensitivity: AppSettings.get('inputLookSensitivityMouse')
+            },
+            gamepad: {
+                invert: AppSettings.get('inputLookInvertGamepad'),
+                sensitivity: AppSettings.get('inputLookSensitivityGamepad')
+            }
         }
     }
 
