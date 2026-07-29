@@ -322,13 +322,17 @@ export class SteamBrickAndMortarApp {
         const urlParams = new URLSearchParams(window.location.search)
         const diagnosticsEnabled = urlParams.get('diagnostics') === '1'
         this.diagnosticsEnabled = diagnosticsEnabled
-        RenderLoopDiagnostics.initialize({ 
+        RenderLoopDiagnostics.initialize({
             enabled: diagnosticsEnabled,
             logInterval: 60,  // Log every ~1 second at 60fps
             frameTimeWarnThreshold: 16.67,  // Warn if frame exceeds 60fps budget
             callbackTimeWarnThreshold: 5  // Warn if any callback > 5ms
         })
-        
+        RenderLoopDiagnostics.attachRenderPipeline(
+            this.sceneManager.getRenderPipelineManager(),
+            this.sceneManager.getRenderer()
+        )
+
         // Start the render loop (all updates happen via registry)
         this.sceneManager.startRenderLoop()
     }

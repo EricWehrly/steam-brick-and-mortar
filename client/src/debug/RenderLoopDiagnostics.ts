@@ -13,8 +13,38 @@
  *   RenderLoopDiagnostics.initialize({ enabled: true, logInterval: 60 })
  */
 
+import type * as THREE from 'three'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import type { RenderLoopCallback } from '../scene/RenderLoopRegistry'
+import type { RenderPipelineManager, DiagnosticsRenderTarget } from '../scene/RenderPipelineManager'
+
+/** Three.js runs the shadow-map pass inside renderer.render(), which pmndrs RenderPass
+ *  calls internally — so this stage's time is a subset of pipeline:renderPass, not a
+ *  sibling cost. Don't sum stage totals expecting them to equal the frame total. */
+const SHADOW_MAP_STAGE_ID = 'pipeline:shadowMap'
+
+export interface CaptureStageStat {
+    /** Average time per occurrence within the capture window (ms) */
+    avg: number
+    /** Slowest single occurrence within the capture window (ms) */
+    max: number
+    /** All-time peak for this id, not scoped to the window (ms) */
+    peak: number
+    /** Sum of all occurrences within the capture window (ms) */
+    total: number
+    /** avg expressed as % of the configured frame-time budget */
+    percentOfFrameBudget: number
+}
+
+export interface CaptureReport {
+    durationMs: number
+    frameCount: number
+    avgFrameTime: number
+    maxFrameTime: number
+    slowFrameCount: number
+    longTaskCount: number
+    stages: Record<string, CaptureStageStat>
+}
 
 export interface DiagnosticsConfig {
     /** Enable diagnostics (default: false for production) */
@@ -51,6 +81,16 @@ export class RenderLoopDiagnostics {
     }
     
     private static longTaskObserver: PerformanceObserver | null = null
+    private static longTaskCount = 0
+    private static instrumentedTargets = new WeakSet<object>()
+
+    private static captureStartTime: number | null = null
+    private static captureFrameCountBaseline = 0
+    private static captureSlowFrameBaseline = 0
+    private static captureLongTaskBaseline = 0
+    private static captureFrameTimeTotal = 0
+    private static captureFrameTimeMax = 0
+    private static captureIdTotals: Map<string, { total: number; max: number; count: number }> = new Map()
 
     private static stats: FrameStats = {
         frameCount: 0,
@@ -97,6 +137,7 @@ export class RenderLoopDiagnostics {
         if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
             const observer = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
+                    this.longTaskCount++
                     console.warn(
                         `⚠️ [RenderLoopDiagnostics] Long task between frames: ${entry.duration.toFixed(1)}ms`
                     )
@@ -109,6 +150,36 @@ export class RenderLoopDiagnostics {
         this.isInitialized = true;
 
         ;(window as any).renderLoopDiagnostics = this
+    }
+
+    /**
+     * Wires per-stage timing onto the composer passes and the shadow-map render, so
+     * endFrame()'s previously-opaque "full frame" number breaks down into which stage
+     * costs what. No-ops when diagnostics are disabled — call after initialize().
+     */
+    public static attachRenderPipeline(
+        renderPipelineManager: RenderPipelineManager,
+        renderer: THREE.WebGLRenderer
+    ): void {
+        if (!this.config.enabled) {
+            return
+        }
+        renderPipelineManager.setPassInstrumentor(this.instrumentRenderStage.bind(this))
+        this.instrumentRenderStage(SHADOW_MAP_STAGE_ID, renderer.shadowMap as unknown as DiagnosticsRenderTarget)
+    }
+
+    private static instrumentRenderStage(id: string, target: DiagnosticsRenderTarget): void {
+        if (this.instrumentedTargets.has(target)) {
+            return
+        }
+        const originalRender = target.render.bind(target)
+        target.render = (...args: unknown[]) => {
+            const start = performance.now()
+            const result = originalRender(...args)
+            this.recordTiming(id, performance.now() - start)
+            return result
+        }
+        this.instrumentedTargets.add(target)
     }
 
     /**
@@ -130,39 +201,54 @@ export class RenderLoopDiagnostics {
         deltaTime: number
     ): void {
         this.isFirstCallbackInFrame = false
-        
+
         const callbackStart = performance.now()
         try {
             callback(now, deltaTime)
         } catch (error) {
             console.error(`🔧 [RenderLoopDiagnostics] Error in callback '${id}':`, error)
         }
-        const callbackTime = performance.now() - callbackStart
-        
+        this.recordTiming(id, performance.now() - callbackStart)
+    }
+
+    /**
+     * Shared timing sink for render-loop callbacks, composer passes, and the shadow-map
+     * render — all recorded under the same id-keyed structures so getStats()/report() see
+     * a uniform set of "things that cost frame time," not a callback-only view.
+     */
+    private static recordTiming(id: string, duration: number): void {
         // Track rolling window for periodic averages
         if (!this.stats.callbackTimes.has(id)) {
             this.stats.callbackTimes.set(id, [])
         }
         const times = this.stats.callbackTimes.get(id)!
-        times.push(callbackTime)
+        times.push(duration)
         if (times.length > this.config.logInterval) {
             times.shift()
         }
 
-        // Track all-time peak per callback — never cleared
+        // Track all-time peak — never cleared
         const currentPeak = this.stats.peakCallbackTimes.get(id) ?? 0
-        if (callbackTime > currentPeak) {
-            this.stats.peakCallbackTimes.set(id, callbackTime)
+        if (duration > currentPeak) {
+            this.stats.peakCallbackTimes.set(id, duration)
         }
-        
-        // Warn on individual slow callbacks
-        if (callbackTime > this.config.callbackTimeWarnThreshold) {
+
+        // Warn on individual slow occurrences
+        if (duration > this.config.callbackTimeWarnThreshold) {
             console.warn(
-                `⚠️ [RenderLoopDiagnostics] Slow callback '${id}': ${callbackTime.toFixed(2)}ms`
+                `⚠️ [RenderLoopDiagnostics] Slow '${id}': ${duration.toFixed(2)}ms`
             )
         }
+
+        if (this.captureStartTime !== null) {
+            const entry = this.captureIdTotals.get(id) ?? { total: 0, max: 0, count: 0 }
+            entry.total += duration
+            entry.count += 1
+            entry.max = Math.max(entry.max, duration)
+            this.captureIdTotals.set(id, entry)
+        }
     }
-    
+
     /**
      * Called after renderer.render() (onAfterFrame).
      * Measures the FULL frame: callbacks + GPU submission.
@@ -180,6 +266,11 @@ export class RenderLoopDiagnostics {
         // All-time peaks are never cleared by logStats()
         if (frameTime > this.stats.peakFrameTime) {
             this.stats.peakFrameTime = frameTime
+        }
+
+        if (this.captureStartTime !== null) {
+            this.captureFrameTimeTotal += frameTime
+            this.captureFrameTimeMax = Math.max(this.captureFrameTimeMax, frameTime)
         }
 
         this.stats.frameStartTime = 0 // Reset sentinel
@@ -266,6 +357,78 @@ export class RenderLoopDiagnostics {
     }
 
     /**
+     * Begin a capture window: report() will summarize everything recorded since this call.
+     * Safe to call again to restart the window: attachRenderPipeline()'s wrapping stays
+     * installed across restarts since it's a one-time setup, not part of the capture state.
+     */
+    public static startCapture(): void {
+        this.captureStartTime = performance.now()
+        this.captureFrameCountBaseline = this.stats.frameCount
+        this.captureSlowFrameBaseline = this.stats.slowFrameCount
+        this.captureLongTaskBaseline = this.longTaskCount
+        this.captureFrameTimeTotal = 0
+        this.captureFrameTimeMax = 0
+        this.captureIdTotals = new Map()
+        console.log('📸 [RenderLoopDiagnostics] Capture started — call report() when ready')
+    }
+
+    /**
+     * Summarize everything recorded since the last startCapture(). Callable repeatedly
+     * without restarting — each call reports the window "since start," not "since last report."
+     */
+    public static report(): CaptureReport | null {
+        if (this.captureStartTime === null) {
+            console.warn('⚠️ [RenderLoopDiagnostics] No capture in progress — call startCapture() first')
+            return null
+        }
+
+        const durationMs = performance.now() - this.captureStartTime
+        const frameCount = this.stats.frameCount - this.captureFrameCountBaseline
+        const avgFrameTime = frameCount > 0 ? this.captureFrameTimeTotal / frameCount : 0
+        const frameBudget = this.config.frameTimeWarnThreshold
+
+        const stages: Record<string, CaptureStageStat> = {}
+        for (const [id, entry] of this.captureIdTotals.entries()) {
+            const avg = entry.count > 0 ? entry.total / entry.count : 0
+            stages[id] = {
+                avg: parseFloat(avg.toFixed(3)),
+                max: parseFloat(entry.max.toFixed(3)),
+                peak: parseFloat((this.stats.peakCallbackTimes.get(id) ?? 0).toFixed(3)),
+                total: parseFloat(entry.total.toFixed(2)),
+                percentOfFrameBudget: parseFloat(((avg / frameBudget) * 100).toFixed(1)),
+            }
+        }
+
+        const report: CaptureReport = {
+            durationMs: parseFloat(durationMs.toFixed(1)),
+            frameCount,
+            avgFrameTime: parseFloat(avgFrameTime.toFixed(3)),
+            maxFrameTime: parseFloat(this.captureFrameTimeMax.toFixed(3)),
+            slowFrameCount: this.stats.slowFrameCount - this.captureSlowFrameBaseline,
+            longTaskCount: this.longTaskCount - this.captureLongTaskBaseline,
+            stages,
+        }
+
+        console.log(
+            `📊 [RenderLoopDiagnostics] Capture report — ${(durationMs / 1000).toFixed(1)}s, ` +
+            `${frameCount} frames, avg ${report.avgFrameTime}ms, max ${report.maxFrameTime}ms, ` +
+            `${report.slowFrameCount} slow frames, ${report.longTaskCount} long tasks`
+        )
+        console.table(
+            Object.fromEntries(
+                Object.entries(stages).map(([id, s]) => [id, {
+                    'avg ms': s.avg,
+                    'max ms': s.max,
+                    'peak ms (all-time)': s.peak,
+                    '% of budget': s.percentOfFrameBudget,
+                }])
+            )
+        )
+
+        return report
+    }
+
+    /**
      * Disable diagnostics and remove instrumentation
      */
     public static disable(): void {
@@ -294,6 +457,15 @@ export class RenderLoopDiagnostics {
         }
         this.longTaskObserver?.disconnect()
         this.longTaskObserver = null
+        this.longTaskCount = 0
+        this.instrumentedTargets = new WeakSet<object>()
+        this.captureStartTime = null
+        this.captureFrameCountBaseline = 0
+        this.captureSlowFrameBaseline = 0
+        this.captureLongTaskBaseline = 0
+        this.captureFrameTimeTotal = 0
+        this.captureFrameTimeMax = 0
+        this.captureIdTotals = new Map()
         this.stats = {
             frameCount: 0,
             totalFrameTime: 0,
