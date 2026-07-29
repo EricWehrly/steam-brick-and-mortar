@@ -17,8 +17,14 @@ import type { SteamGameData } from '../../../../src/scene/game-box/types/GameDat
 import type { InstanceMetadata } from '../../../../src/debug/GameFinder'
 import { LiminalWindowCoordinator } from '../../../../src/scene/liminal/LiminalWindowCoordinator'
 import type { MockFn } from '../../../utils/test-types'
-import { LIMINAL_DEPTH_SLOTS, computeUnitTransform } from '../../../../src/scene/liminal/LiminalCorridorLayout'
+import {
+    LIMINAL_DEPTH_SLOTS,
+    computeUnitTransform,
+    CORRIDOR_FIRST_SLOT_OFFSET_Z,
+    CORRIDOR_UNIT_SPACING_Z,
+} from '../../../../src/scene/liminal/LiminalCorridorLayout'
 import { LiminalEventTypes, type BoundaryCrossedEvent } from '../../../../src/scene/liminal/LiminalEvents'
+import { computeSlotIndexForWorldZ } from '../../../../src/scene/liminal/LiminalBoundaryTracker'
 import { computeSlotsPerShelf } from '../../../../src/scene/props/shared/StockStrategy'
 import { RowStockStrategy } from '../../../../src/scene/props/shared/RowLayoutUtils'
 import { DEFAULT_SHELF_CONFIG } from '../../../../src/scene/props/shared/SharedPropsTypes'
@@ -78,6 +84,11 @@ describe('LiminalWindowCoordinator', () => {
 
     beforeEach(() => {
         EventManager.getInstance().removeAllListeners()
+
+        // No camera by default: alignWindowToPlayer() no-ops without one, keeping
+        // existing tests' reposition/repoint counts unaffected by the player-centering
+        // correction — tests that exercise it set a real camera explicitly.
+        DataManager.getInstance().set(DataKey.MainCamera, undefined as unknown as THREE.Camera, { domain: DataDomain.Scene })
 
         // Construct the coordinator first, then register spies — matches production
         // registration order (this class is constructed before ShelfLayoutCoordinator/
@@ -340,5 +351,63 @@ describe('LiminalWindowCoordinator', () => {
             expect(repositionSpy).toHaveBeenCalledTimes(2) // shelves still reposition
             expect(repointSpy).not.toHaveBeenCalled() // nothing to repoint
         })
+    })
+
+    describe('alignWindowToPlayer (initial window centers on the player, not always 5 ahead)', () => {
+        let repositionSpy: MockFn<[ShelfUnitRepositionRequestedEvent], void>
+
+        beforeEach(() => {
+            repositionSpy = vi.fn()
+            EventManager.getInstance().registerEventHandler<ShelfUnitRepositionRequestedEvent>(
+                StorePropsEventTypes.ShelfUnitRepositionRequested,
+                (e) => repositionSpy(e.detail)
+            )
+        })
+
+        function setCamera(z: number): void {
+            const camera = new THREE.PerspectiveCamera()
+            camera.position.set(0, 1.6, z)
+            DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        }
+
+        it('shifts every unit so the middle unit lands on the player\'s actual slot at spawn (z=0)', () => {
+            setCamera(0) // spawn — computeSlotIndexForWorldZ(0) = -2, not the assumed middle rank of 2
+            emitLayoutRequested('liminal')
+            seedWindowHelper(200)
+
+            const desiredCenterRank = computeSlotIndexForWorldZ(0)
+            const middleUnit = Math.floor(LIMINAL_DEPTH_SLOTS / 2)
+
+            // All 5 units (10 shelves) must have repositioned — the whole window shifts together.
+            expect(repositionSpy).toHaveBeenCalledTimes(LIMINAL_DEPTH_SLOTS * 2)
+
+            const byShelf = new Map(repositionSpy.mock.calls.map(([detail]) => [detail.shelfIndex, detail]))
+            const expectedMiddleLeft = computeUnitTransform(desiredCenterRank, 'left')
+            expect(byShelf.get(middleUnit * 2)?.position).toEqual(expectedMiddleLeft.position)
+        })
+
+        it('does not reposition anything when the player is already at the assumed center rank', () => {
+            // computeSlotWorldZ(2) = -(4.0 + 2*2.6) = -9.2, which maps back to rank 2 exactly —
+            // the initial seed's assumed middle-unit rank, so delta === 0.
+            setCamera(-(CORRIDOR_FIRST_SLOT_OFFSET_Z + 2 * CORRIDOR_UNIT_SPACING_Z))
+            emitLayoutRequested('liminal')
+            seedWindowHelper(200)
+
+            expect(repositionSpy).not.toHaveBeenCalled()
+        })
+
+        it('does nothing without a camera available in DataManager', () => {
+            DataManager.getInstance().set(DataKey.MainCamera, undefined as unknown as THREE.Camera, { domain: DataDomain.Scene })
+            emitLayoutRequested('liminal')
+            seedWindowHelper(200)
+
+            expect(repositionSpy).not.toHaveBeenCalled()
+        })
+
+        function seedWindowHelper(gameCount: number): void {
+            const sections = makeSections(gameCount, 1)
+            emitSectionsReadyForPlacement(sections)
+            emitSectionsReady(sections)
+        }
     })
 })
