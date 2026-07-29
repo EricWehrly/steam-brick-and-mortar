@@ -7,6 +7,7 @@
 
 import type { AppDetailsData } from '../batch/BatchAppDetailsClient'
 import { IndexedDbCache, type IndexedDbCacheResult } from './IndexedDbCache'
+import { UrlUtils } from '../../utils/UrlUtils'
 
 /**
  * Result of a cache lookup for app details.
@@ -102,13 +103,18 @@ export class AppDetailsCache {
     static async markArtworkPathDead(appid: number, url: string): Promise<void> {
         const existing = await AppDetailsCache.get(appid)
         if (!existing) return
-        if (existing.artwork_dead_paths?.includes(url)) return
+
+        // Steam's own hint URLs rotate their `?t=` cache-busting param between sessions - strip it
+        // so a dead path recorded under one timestamp still matches the same candidate URL next
+        // session, instead of silently accumulating one dead entry per rotation.
+        const normalizedUrl = UrlUtils.stripQueryParam(url, 't')
+        if (existing.artwork_dead_paths?.includes(normalizedUrl)) return
 
         const incoming: AppDetailsData = {
             type: existing.type,
             name: existing.name,
             artwork: existing.artwork,
-            artwork_dead_paths: [url],
+            artwork_dead_paths: [normalizedUrl],
         }
         await AppDetailsCache.mergeMany(new Map([[appid, incoming]]), Date.now())
     }

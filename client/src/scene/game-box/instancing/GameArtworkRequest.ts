@@ -11,6 +11,7 @@ import type {
 import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
 import { AppDetailsCache } from '../../../steam/cache/AppDetailsCache'
 import { Logger } from '../../../utils/Logger'
+import { UrlUtils } from '../../../utils/UrlUtils'
 
 /**
  * Handle to artwork for a specific game.
@@ -115,7 +116,8 @@ export class GameArtworkRequest implements GameArtwork {
         let lastError: Error | null = null
 
         for (const { url, type } of strategy) {
-            if (deadPaths.has(url)) {
+            // Compare with the `?t=` cache-buster stripped - see AppDetailsCache.markArtworkPathDead.
+            if (deadPaths.has(UrlUtils.stripQueryParam(url, 't'))) {
                 skippedDeadUrls.push(url)
                 continue
             }

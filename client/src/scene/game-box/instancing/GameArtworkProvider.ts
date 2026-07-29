@@ -21,6 +21,7 @@
  */
 
 import { Logger } from '../../../utils/Logger'
+import { UrlUtils } from '../../../utils/UrlUtils'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
@@ -239,8 +240,12 @@ export class GameArtworkProvider {
         targetHeight: number,
         cacheKey: string
     ): Promise<PixelDataResult> {
-        // Build a size-qualified cache key for disk lookups
-        const sizedCacheUrl = `${url}@${targetWidth}x${targetHeight}`
+        // Build a size-qualified cache key for disk lookups. Steam's own hint URLs (header_image
+        // etc.) carry a `?t=` cache-busting timestamp that Steam itself rotates - stripped here so
+        // the same artwork keeps hitting the same disk-cache entry across sessions. The fetch below
+        // still uses the original url unmodified.
+        const cacheKeyUrl = UrlUtils.stripQueryParam(url, 't')
+        const sizedCacheUrl = `${cacheKeyUrl}@${targetWidth}x${targetHeight}`
 
         // Check disk cache first
         if (this.pixelCache) {
@@ -293,7 +298,8 @@ export class GameArtworkProvider {
      */
     public async isPixelsCached(url: string, width?: number, height?: number): Promise<boolean> {
         if (!this.pixelCache) return false
-        const key = (width !== undefined && height !== undefined) ? `${url}@${width}x${height}` : url
+        const cacheKeyUrl = UrlUtils.stripQueryParam(url, 't')
+        const key = (width !== undefined && height !== undefined) ? `${cacheKeyUrl}@${width}x${height}` : cacheKeyUrl
         const cached = await this.pixelCache.get(key)
         return cached !== null
     }

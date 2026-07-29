@@ -192,8 +192,27 @@ interface ProcessBlobResult {
  * Process a blob into texture pixel data with flexible dimensions
  * @param useNativeSize If true, use image's native dimensions (no resize)
  */
+// Steam's CDN filenames imply a size (e.g. library_600x900.jpg) but often serve smaller -
+// most library_600x900.jpg images are physically 300x450. Keyed by filename so the check only
+// applies to artwork we can confidently classify; unrecognized URLs (metadata hints, whatever)
+// are skipped rather than guessed at.
+// Reference: https://steamcommunity.com/discussions/forum/1/4202490864582293420/
+const EXPECTED_NATIVE_WIDTH_BY_FILENAME: Record<string, number> = {
+    'library_600x900.jpg': 300,
+    'header.jpg': 460,
+    'capsule_616x353.jpg': 616
+}
+
+function getExpectedNativeWidth(url: string): number | undefined {
+    for (const [filename, width] of Object.entries(EXPECTED_NATIVE_WIDTH_BY_FILENAME)) {
+        if (url.includes(filename)) return width
+    }
+    return undefined
+}
+
 async function processBlobWithDimensions(
     blob: Blob,
+    url: string,
     targetWidth?: number,
     targetHeight?: number,
     useNativeSize?: boolean
@@ -219,11 +238,9 @@ async function processBlobWithDimensions(
         height = imageBitmap.height
     }
 
-    // Most Steam library_600x900.jpg images are physically 300x450 on the CDN.
-    // Log genuine high-res images so we can track which titles actually ship at full res.
-    // Reference: https://steamcommunity.com/discussions/forum/1/4202490864582293420/
-    if (imageBitmap.width > 300) {
-        console.debug(`[TextureWorker] High-res CDN image detected: native ${imageBitmap.width}×${imageBitmap.height} (most titles are 300×450)`)
+    const expectedNativeWidth = getExpectedNativeWidth(url)
+    if (expectedNativeWidth !== undefined && imageBitmap.width > expectedNativeWidth) {
+        console.debug(`[TextureWorker] High-res CDN image detected: native ${imageBitmap.width}×${imageBitmap.height} (expected ~${expectedNativeWidth}px wide for this artwork type)`)
     }
     
     ensureCanvas(width, height)
@@ -353,14 +370,14 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
             
             if (useNativeSize || (textureWidth && textureHeight)) {
                 // Use new flexible processing
-                processed = await processBlobWithDimensions(blob, textureWidth, textureHeight, useNativeSize)
+                processed = await processBlobWithDimensions(blob, url, textureWidth, textureHeight, useNativeSize)
             } else if (textureSize) {
                 // Legacy square mode
                 const imageData = await processBlob(blob, textureSize)
                 processed = { imageData, width: textureSize, height: textureSize }
             } else {
                 // Default to native size if nothing specified
-                processed = await processBlobWithDimensions(blob, undefined, undefined, true)
+                processed = await processBlobWithDimensions(blob, url, undefined, undefined, true)
             }
             
             const processingTime = performance.now() - startTime
