@@ -96,22 +96,25 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
 }
 
 /**
- * Whatever LocalSteamDataWriter's local-only resolution couldn't cover - genuinely new to
- * AppDetailsCache from any source - gets one network fetch attempt. Best-effort: a failure here
- * (Lambda unreachable) leaves those appids absent from the final games list rather than blocking
- * the rest of the library from rendering.
+ * Whatever hasn't been checked against the network yet - either genuinely new to AppDetailsCache,
+ * or only ever written by LocalSteamDataWriter's local-only appinfo.vdf pass (which always writes
+ * null artwork, never a real header_image/capsule_image) - gets one network fetch attempt.
+ * Best-effort: a failure here (Lambda unreachable) leaves those appids without real artwork this
+ * run rather than blocking the rest of the library from rendering. Uses findMissingArtwork, not
+ * findMissing - see its doc comment for why "has any entry" isn't the right gate here (Root Cause
+ * A, docs/plans/startup-artwork-resolution-plan.md).
  */
 async function resolveRemainingAppidsFromNetwork(candidateAppids: ReadonlySet<number>): Promise<void> {
-    const missingAppids = await AppDetailsCache.findMissing([...candidateAppids])
+    const missingAppids = await AppDetailsCache.findMissingArtwork([...candidateAppids])
     if (missingAppids.length === 0) {
         return
     }
 
     try {
         const resolved = await SteamApiClient.getInstance().gamesLoader.fetchAndCacheAppDetails(missingAppids)
-        logger.info(`Resolved ${resolved.size}/${missingAppids.length} collection-only appids via network fetch`)
+        logger.info(`Resolved ${resolved.size}/${missingAppids.length} appid(s) needing real artwork via network fetch`)
     } catch (error) {
-        logger.warn(`Failed to network-resolve ${missingAppids.length} unseen appid(s), proceeding without them:`, error)
+        logger.warn(`Failed to network-resolve ${missingAppids.length} appid(s) needing real artwork, proceeding without them:`, error)
     }
 }
 

@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AppDetailsData, AppDetailsResponse } from '../../../src/steam/batch/BatchAppDetailsClient'
 
-const { setManyMock, getManyMock } = vi.hoisted(() => ({
-    setManyMock: vi.fn(),
+const { mergeManyMock, getManyMock } = vi.hoisted(() => ({
+    mergeManyMock: vi.fn(),
     getManyMock: vi.fn(),
 }))
 
 vi.mock('../../../src/steam/cache/AppDetailsCache', () => ({
-    AppDetailsCache: { setMany: setManyMock, getMany: getManyMock },
+    AppDetailsCache: { mergeMany: mergeManyMock, getMany: getManyMock },
 }))
 
 import { GamesLoader } from '../../../src/steam/GamesLoader'
@@ -22,7 +22,7 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
     let loader: GamesLoader
 
     beforeEach(() => {
-        setManyMock.mockReset().mockResolvedValue(undefined)
+        mergeManyMock.mockReset().mockResolvedValue(undefined)
         fetchBatchMock = vi.fn()
         loader = new GamesLoader(
             {} as any,
@@ -50,8 +50,8 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
         const result = await loader.fetchAndCacheAppDetails([620])
 
         expect(result.get(620)?.name).toBe('Portal 2')
-        expect(setManyMock).toHaveBeenCalledTimes(1)
-        expect(setManyMock.mock.calls[0][0].get(620).name).toBe('Portal 2')
+        expect(mergeManyMock).toHaveBeenCalledTimes(1)
+        expect(mergeManyMock.mock.calls[0][0].get(620).name).toBe('Portal 2')
     })
 
     it('omits appids with no data rather than failing the whole call', async () => {
@@ -78,7 +78,7 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
         const result = await loader.fetchAndCacheAppDetails([620, 999])
 
         expect(result.has(999)).toBe(false)
-        expect(setManyMock.mock.calls[0][0].has(999)).toBe(false)
+        expect(mergeManyMock.mock.calls[0][0].has(999)).toBe(false)
     })
 
     it('does not write to AppDetailsCache when nothing resolved', async () => {
@@ -87,7 +87,7 @@ describe('GamesLoader.fetchAndCacheAppDetails', () => {
         const result = await loader.fetchAndCacheAppDetails([620])
 
         expect(result.size).toBe(0)
-        expect(setManyMock).not.toHaveBeenCalled()
+        expect(mergeManyMock).not.toHaveBeenCalled()
     })
 })
 

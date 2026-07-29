@@ -37,6 +37,38 @@ describe('AppDetailsCache.findMissing', () => {
     })
 })
 
+describe('AppDetailsCache.findMissingArtwork', () => {
+    beforeEach(() => {
+        setupIndexedDBMock()
+        AppDetailsCache.resetForTesting()
+    })
+
+    it('treats an appid with no entry at all as missing', async () => {
+        expect(await AppDetailsCache.findMissingArtwork([620])).toEqual([620])
+    })
+
+    it('treats a local-only entry (no artwork_network_checked) as still missing', async () => {
+        // Matches LocalSteamDataWriter.buildAppDetailsEntry's shape: a real name, but no
+        // network-sourced artwork and no artwork_network_checked marker.
+        await AppDetailsCache.set(620, makeEntry('Portal 2'))
+
+        expect(await AppDetailsCache.findMissingArtwork([620])).toEqual([620])
+    })
+
+    it('does not treat a network-checked entry as missing, even with null artwork', async () => {
+        await AppDetailsCache.set(620, { ...makeEntry('Portal 2'), artwork_network_checked: true })
+
+        expect(await AppDetailsCache.findMissingArtwork([620])).toEqual([])
+    })
+
+    it('only returns the appids that still need a real artwork fetch', async () => {
+        await AppDetailsCache.set(620, { ...makeEntry('Portal 2'), artwork_network_checked: true })
+        await AppDetailsCache.set(400, makeEntry('Portal'))
+
+        expect(await AppDetailsCache.findMissingArtwork([620, 400, 240])).toEqual([400, 240])
+    })
+})
+
 describe('AppDetailsCache.mergeMany', () => {
     beforeEach(() => {
         setupIndexedDBMock()
@@ -91,6 +123,20 @@ describe('AppDetailsCache.mergeMany', () => {
         await AppDetailsCache.mergeMany(new Map([[620, { type: 'game', name: 'Portal 2', artwork: NO_ARTWORK }]]), now + 1000)
 
         expect((await AppDetailsCache.get(620))?.is_free).toBe(true)
+    })
+
+    it('a known artwork_network_checked is not erased by a later local-only write that omits it', async () => {
+        const now = Date.now()
+        await AppDetailsCache.mergeMany(
+            new Map([[620, { type: 'game', name: 'Portal 2', artwork: NO_ARTWORK, artwork_network_checked: true }]]),
+            now
+        )
+
+        // LocalSteamDataWriter's local-only entries never set artwork_network_checked at all -
+        // a later local-scan merge must not erase a real network check that already happened.
+        await AppDetailsCache.mergeMany(new Map([[620, makeEntry('Portal 2')]]), now + 1000)
+
+        expect((await AppDetailsCache.get(620))?.artwork_network_checked).toBe(true)
     })
 
     it('merges artwork per sub-field instead of replacing the whole object', async () => {

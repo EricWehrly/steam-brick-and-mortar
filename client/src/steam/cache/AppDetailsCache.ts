@@ -67,6 +67,21 @@ export class AppDetailsCache {
         return appids.filter(appid => !cached.has(appid))
     }
 
+    /**
+     * Like findMissing, but "missing" means "still needs a real network appdetails fetch to get
+     * real artwork/header/capsule URLs" rather than just "has no entry at all." An appid can have
+     * an entry already - LocalSteamDataWriter's local-only appinfo.vdf resolution always writes
+     * one, with null artwork - without ever having been checked against the network, which is the
+     * only source that can supply real header_image/capsule_image URLs. Without this distinction,
+     * findMissing's plain "has any entry" check is permanently satisfied by the local-only write,
+     * and the appid never gets a real artwork fetch. See
+     * docs/plans/startup-artwork-resolution-plan.md, Root Cause A.
+     */
+    static async findMissingArtwork(appids: number[]): Promise<number[]> {
+        const cached = await AppDetailsCache.getMany(appids)
+        return appids.filter(appid => !cached.get(appid)?.artwork_network_checked)
+    }
+
     static async set(appid: number, data: AppDetailsData): Promise<void> {
         return AppDetailsCache.store.set(appid, data)
     }

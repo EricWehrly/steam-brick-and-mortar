@@ -44,8 +44,12 @@ export class BakedCacheLoader {
             return
         }
 
+        // The baked bundle is itself built from the Lambda's real appdetails cache (see
+        // scripts/repack-steam-cache.sh) - stamp the same "network already checked" marker a
+        // live fetch would, so a locally-scanned game already covered by the bundle doesn't also
+        // trigger a redundant live gap-fill fetch (see AppDetailsData.artwork_network_checked).
         const dataMap = new Map<number, AppDetailsData>(
-            Object.values(bundle.games).map(entry => [entry.appid, entry.data])
+            Object.values(bundle.games).map(entry => [entry.appid, { ...entry.data, artwork_network_checked: true }])
         )
         await AppDetailsCache.setMany(dataMap)
         BakedCacheLoader.logger.info(`Seeded ${dataMap.size} games from baked cache bundle`)

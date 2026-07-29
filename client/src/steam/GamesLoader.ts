@@ -115,12 +115,13 @@ export class GamesLoader {
 
     /**
      * Fetches appdetails for the given appids directly from the network and writes them into
-     * AppDetailsCache - no cache check first (caller already knows these aren't cached), no
-     * BatchEmitter streaming (this is a one-off gap-fill, not the main progressive-load path).
-     * Used by LocalSteamLibraryLoader to resolve collection-referenced appids the local scan has
-     * no appinfo.vdf data for. Awaitable and cache-only, unlike fetchAndEmitUncached (fire-and-
-     * forget, pushes into a BatchEmitter) - the two share fetchAndNormalizeBatch for the actual
-     * network call and unlisted-shell handling.
+     * AppDetailsCache - no BatchEmitter streaming (this is a one-off gap-fill, not the main
+     * progressive-load path). Used by LocalSteamLibraryLoader to resolve appids
+     * findMissingArtwork() flagged as still needing real artwork - which can already have a
+     * local-only entry (name/tags/user_collections from LocalSteamDataWriter) that a blind
+     * overwrite would destroy, so this merges rather than sets. Awaitable and cache-only, unlike
+     * fetchAndEmitUncached (fire-and-forget, pushes into a BatchEmitter) - the two share
+     * fetchAndNormalizeBatch for the actual network call and unlisted-shell handling.
      */
     public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {
         if (appids.length === 0) {
@@ -129,7 +130,7 @@ export class GamesLoader {
 
         const { normalized } = await this.fetchAndNormalizeBatch(appids)
         if (normalized.size > 0) {
-            await AppDetailsCache.setMany(normalized)
+            await AppDetailsCache.mergeMany(normalized, Date.now())
         }
         return normalized
     }
@@ -155,7 +156,7 @@ export class GamesLoader {
             // "known, not solved" tradeoff as docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker.
             if (response.success === false && response.unlisted) continue
             if (!response.data) continue
-            normalized.set(appid, this.normalizeBatchData(response.data))
+            normalized.set(appid, { ...this.normalizeBatchData(response.data), artwork_network_checked: true })
         }
         return { responses, normalized }
     }
