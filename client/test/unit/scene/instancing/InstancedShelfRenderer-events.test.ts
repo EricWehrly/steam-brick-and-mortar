@@ -96,6 +96,43 @@ describe('InstancedShelfRenderer Events', () => {
             expect(renderer.getStats().shelfUnits).toBe(2)
         })
 
+        it('moves every board of a multi-part geometry type, not just the first', async () => {
+            await renderer.initialize()
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
+                shelfIndex: 0, sectionIndex: 0, position: new THREE.Vector3(5, 0, -10), rotationY: 0
+            })
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const shelfBoardManager = (renderer as any).shelfBoardManager
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const shelfUnit = (renderer as any).shelfUnits.get(0)
+            const shelfBoardIndices: number[] = shelfUnit.instanceIndices.shelfBoards
+            expect(shelfBoardIndices.length).toBeGreaterThan(1) // DEFAULT_SHELF_CONFIG.shelfCount = 3
+
+            const mesh = shelfBoardManager.getInstancedMesh()
+            const before = shelfBoardIndices.map((index: number) => {
+                const m = new THREE.Matrix4()
+                mesh.getMatrixAt(index, m)
+                return new THREE.Vector3().setFromMatrixPosition(m)
+            })
+
+            eventManager.emit<ShelfUnitRepositionRequestedEvent>(StorePropsEventTypes.ShelfUnitRepositionRequested, {
+                shelfIndex: 0, position: new THREE.Vector3(5, 0, -40), rotationY: 0
+            })
+
+            const after = shelfBoardIndices.map((index: number) => {
+                const m = new THREE.Matrix4()
+                mesh.getMatrixAt(index, m)
+                return new THREE.Vector3().setFromMatrixPosition(m)
+            })
+
+            // Every board (not just the first) must have actually moved.
+            for (let i = 0; i < before.length; i++) {
+                expect(after[i].z).not.toBeCloseTo(before[i].z)
+                expect(after[i].z).toBeLessThan(-30) // moved toward the new position (z=-40 area)
+            }
+        })
+
         it('is idempotent — repositioning the same unit twice does not grow the instance count', async () => {
             await renderer.initialize()
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
