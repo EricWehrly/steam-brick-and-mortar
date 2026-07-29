@@ -78,11 +78,29 @@ const MSAA_SAMPLE_MAP: Record<QualityLevel, number> = {
     [QUALITY_LEVEL.ULTRA]: 8,
 }
 
+/** Structural type for a render stage's timing wrapper — Pass instances and
+ *  THREE.WebGLShadowMap both satisfy this without a shared base type. */
+export interface DiagnosticsRenderTarget {
+    render: (...args: unknown[]) => unknown
+}
+
+export type PassInstrumentor = (id: string, target: DiagnosticsRenderTarget) => void
+
+export const PIPELINE_STAGE_IDS = {
+    RENDER_PASS: 'pipeline:renderPass',
+    N8AO: 'pipeline:n8ao',
+    TONE_MAPPING: 'pipeline:toneMapping',
+    SMAA: 'pipeline:smaa',
+} as const
+
 export class RenderPipelineManager {
     private readonly composer: EffectComposer
+    private readonly renderPass: RenderPass
     private readonly n8aoPass: N8AOPostPass
+    private readonly toneMappingPass: EffectPass
     private readonly camera: THREE.PerspectiveCamera
     private smaaPass: EffectPass
+    private passInstrumentor: PassInstrumentor | null = null
 
     constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
         this.camera = camera
@@ -92,7 +110,8 @@ export class RenderPipelineManager {
         const msaaLevel = AppSettings.get('msaaLevel') as QualityLevel
         this.composer.multisampling = MSAA_SAMPLE_MAP[msaaLevel]
 
-        this.composer.addPass(new RenderPass(scene, camera))
+        this.renderPass = new RenderPass(scene, camera)
+        this.composer.addPass(this.renderPass)
 
         this.n8aoPass = new N8AOPostPass(scene, camera, window.innerWidth, window.innerHeight)
         this.n8aoPass.configuration.aoRadius = 1.5
@@ -105,7 +124,8 @@ export class RenderPipelineManager {
         // N8AOPostPass extends Three.js Pass, not pmndrs Pass — interface is identical at runtime
         this.composer.addPass(this.n8aoPass as unknown as Pass)
 
-        this.composer.addPass(new EffectPass(camera, new ToneMappingEffect({ mode: ToneMappingMode.AGX })))
+        this.toneMappingPass = new EffectPass(camera, new ToneMappingEffect({ mode: ToneMappingMode.AGX }))
+        this.composer.addPass(this.toneMappingPass)
         const smaaQuality = AppSettings.get('smaaPreset') as QualityLevel
         this.smaaPass = new EffectPass(camera, new SMAAEffect({ preset: SMAA_PRESET_MAP[smaaQuality] }))
         this.composer.addPass(this.smaaPass)
@@ -114,6 +134,22 @@ export class RenderPipelineManager {
             AppSettingsEventTypes.Changed,
             this.onSettingChanged.bind(this)
         )
+    }
+
+    /**
+     * Wires a timing wrapper onto each composer pass for diagnostics — pass null to detach.
+     * Re-applies automatically when a pass is rebuilt (see rebuildSmaaPass) so a mid-session
+     * settings change doesn't silently drop out of the instrumented set.
+     */
+    public setPassInstrumentor(instrumentor: PassInstrumentor | null): void {
+        this.passInstrumentor = instrumentor
+        if (!instrumentor) {
+            return
+        }
+        instrumentor(PIPELINE_STAGE_IDS.RENDER_PASS, this.renderPass as unknown as DiagnosticsRenderTarget)
+        instrumentor(PIPELINE_STAGE_IDS.N8AO, this.n8aoPass as unknown as DiagnosticsRenderTarget)
+        instrumentor(PIPELINE_STAGE_IDS.TONE_MAPPING, this.toneMappingPass as unknown as DiagnosticsRenderTarget)
+        instrumentor(PIPELINE_STAGE_IDS.SMAA, this.smaaPass as unknown as DiagnosticsRenderTarget)
     }
 
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
@@ -137,6 +173,10 @@ export class RenderPipelineManager {
         }
         this.smaaPass = new EffectPass(this.camera, new SMAAEffect({ preset: SMAA_PRESET_MAP[quality] }))
         this.composer.addPass(this.smaaPass)
+
+        if (this.passInstrumentor) {
+            this.passInstrumentor(PIPELINE_STAGE_IDS.SMAA, this.smaaPass as unknown as DiagnosticsRenderTarget)
+        }
     }
 
     render(): void {

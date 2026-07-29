@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 vi.mock('../../../src/scene/SceneManager', () => ({
     SceneManager: vi.fn().mockImplementation(function() { return {
         getRenderer: vi.fn().mockReturnValue({}),
+        getRenderPipelineManager: vi.fn().mockReturnValue({ setPassInstrumentor: vi.fn() }),
         getCamera: vi.fn().mockReturnValue({}),
         getScene: vi.fn().mockReturnValue({
             getObjectByName: vi.fn().mockReturnValue(null),
@@ -32,6 +33,7 @@ vi.mock('../../../src/scene/SceneManager', () => ({
 vi.mock('../../../src/debug/SceneManagerDebug', () => ({
     SceneManagerDebug: vi.fn().mockImplementation(function() { return {
         getRenderer: vi.fn().mockReturnValue({}),
+        getRenderPipelineManager: vi.fn().mockReturnValue({ setPassInstrumentor: vi.fn() }),
         getCamera: vi.fn().mockReturnValue({}),
         getScene: vi.fn().mockReturnValue({
             getObjectByName: vi.fn().mockReturnValue(null),
