@@ -31,6 +31,7 @@ import type {
     InputResumeEvent,
     OpenMenuPressedEvent,
     InteractPressedEvent,
+    CancelPressedEvent,
     GamepadButtonPressedEvent,
     UIEventTypes,
     MenuOpenEvent,
@@ -75,6 +76,7 @@ export interface InteractionEventMap {
     [InputEventTypes.Resume]: InputResumeEvent
     [InputEventTypes.OpenMenuPressed]: OpenMenuPressedEvent
     [InputEventTypes.InteractPressed]: InteractPressedEvent
+    [InputEventTypes.CancelPressed]: CancelPressedEvent
     [InputEventTypes.GamepadButtonPressed]: GamepadButtonPressedEvent
 
     // UI events

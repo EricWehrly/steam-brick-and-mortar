@@ -1,7 +1,8 @@
 import { EventManager, EventSource } from '../core/EventManager'
+import { AppSettings } from '../core/AppSettings'
 import { InputEventTypes, type InputDevicesChangedEvent } from '../types/InteractionEvents'
 import { InputAction } from './InputActions'
-import { BindingResolver } from './BindingResolver'
+import { BindingResolver, type LookTuning } from './BindingResolver'
 import { DeviceDetector, type InputDeviceInfo } from './DeviceDetector'
 import type { InputProfileDefinition } from './InputProfile'
 
@@ -10,7 +11,8 @@ import type { InputProfileDefinition } from './InputProfile'
 // are correctly read continuously via isActionPressed() instead.
 const SPECIFIC_PRESS_EVENTS: Partial<Record<string, string>> = {
     [InputAction.OpenMenu]: InputEventTypes.OpenMenuPressed,
-    [InputAction.Interact]: InputEventTypes.InteractPressed
+    [InputAction.Interact]: InputEventTypes.InteractPressed,
+    [InputAction.Cancel]: InputEventTypes.CancelPressed
 }
 
 export interface InputActionSnapshot {
@@ -61,6 +63,7 @@ export class InputActionResolver {
         this.lastConnectedGamepads = gamepads
 
         const connectedProfiles = enabledProfiles.filter(profile => this.connectedProfileIds.has(profile.id))
+        const lookTuning = this.readLookTuning()
 
         const mergedAxes = new Map<string, number>()
         const mergedButtons = new Map<string, boolean>()
@@ -71,7 +74,8 @@ export class InputActionResolver {
                 mouseButtonsPressed,
                 mouseDeltaX,
                 mouseDeltaY,
-                gamepads
+                gamepads,
+                lookTuning
             })
 
             for (const [actionId, value] of resolved.axes.entries()) {
@@ -172,6 +176,15 @@ export class InputActionResolver {
 
     private readonly handleDevicesChanged = (): void => {
         this.refreshConnectedProfileIds()
+    }
+
+    private readLookTuning(): LookTuning {
+        return {
+            invertMouse: AppSettings.get('inputLookInvertMouse'),
+            invertGamepad: AppSettings.get('inputLookInvertGamepad'),
+            sensitivityMouse: AppSettings.get('inputLookSensitivityMouse'),
+            sensitivityGamepad: AppSettings.get('inputLookSensitivityGamepad')
+        }
     }
 
     private refreshConnectedProfileIds(): void {

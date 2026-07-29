@@ -13,12 +13,34 @@ import type {
     MouseAxisBinding
 } from './InputProfile'
 
+/**
+ * User-facing look invert/sensitivity, set independently per device (AppSettings owns the
+ * values; bindings only describe which physical axis reads Look, not how it feels). Applied only
+ * to LookHorizontal/LookVertical, keyed by whether the contributing binding is mouse-axis or
+ * gamepad-axis - optional so call sites that don't care about tuning (most existing tests) can
+ * omit it and get a neutral no-op default.
+ */
+export interface LookTuning {
+    invertMouse: boolean
+    invertGamepad: boolean
+    sensitivityMouse: number
+    sensitivityGamepad: number
+}
+
+const NEUTRAL_LOOK_TUNING: LookTuning = {
+    invertMouse: false,
+    invertGamepad: false,
+    sensitivityMouse: 1,
+    sensitivityGamepad: 1
+}
+
 export interface RawInputState {
     keysPressed: ReadonlySet<string>
     mouseButtonsPressed: ReadonlySet<number>
     mouseDeltaX: number
     mouseDeltaY: number
     gamepads: ReadonlyArray<Gamepad>
+    lookTuning?: LookTuning
 }
 
 export interface ResolvedActionState {
@@ -106,6 +128,18 @@ function resolveBindingValue(binding: InputBinding, rawState: RawInputState): nu
     }
 }
 
+function applyLookTuning(binding: InputBinding, value: number, isVerticalLook: boolean, tuning: LookTuning): number {
+    if (binding.type !== 'mouse-axis' && binding.type !== 'gamepad-axis') {
+        return value
+    }
+
+    const sensitivity = binding.type === 'mouse-axis' ? tuning.sensitivityMouse : tuning.sensitivityGamepad
+    const invert = binding.type === 'mouse-axis' ? tuning.invertMouse : tuning.invertGamepad
+
+    const tuned = value * sensitivity
+    return isVerticalLook && invert ? -tuned : tuned
+}
+
 function isButtonBinding(binding: InputBinding): binding is Extract<InputBinding, { type: 'keyboard-button' | 'mouse-button' | 'gamepad-button' }> {
     return binding.type === 'keyboard-button' || binding.type === 'mouse-button' || binding.type === 'gamepad-button'
 }
@@ -164,16 +198,20 @@ export class BindingResolver {
             }
 
             if (definition.type === InputActionType.Axis) {
+                const isLookAxis = definition.id === InputAction.LookHorizontal || definition.id === InputAction.LookVertical
                 let axisValue = 0
                 for (const binding of bindings) {
-                    const value = resolveAxisBindingValue(binding, rawState)
-                    if (definition.id === InputAction.LookHorizontal || definition.id === InputAction.LookVertical) {
+                    let value = resolveAxisBindingValue(binding, rawState)
+                    if (isLookAxis) {
+                        value = applyLookTuning(binding, value, definition.id === InputAction.LookVertical, rawState.lookTuning ?? NEUTRAL_LOOK_TUNING)
+                    }
+                    if (isLookAxis) {
                         axisValue += value
                     } else {
                         axisValue = Math.max(axisValue, Math.abs(value))
                     }
                 }
-                if (definition.id === InputAction.LookHorizontal || definition.id === InputAction.LookVertical) {
+                if (isLookAxis) {
                     axisValues.set(definition.id, axisValue)
                 } else {
                     axisValues.set(definition.id, clamp(axisValue, -1, 1))

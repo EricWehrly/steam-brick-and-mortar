@@ -27,7 +27,43 @@ describe('MouseKeyboard profile default bindings', () => {
         )
 
         expect(mouseKeyboardProfile?.bindings[InputAction.LookVertical]).toEqual([
-            { type: 'mouse-axis', axis: 'y', sensitivity: 1, label: 'Mouse Y' }
+            { type: 'mouse-axis', axis: 'y', label: 'Mouse Y' }
+        ])
+    })
+
+    it('ships with a default binding for Cancel (Escape), alongside OpenMenu', () => {
+        const mouseKeyboardProfile = BUILTIN_INPUT_PROFILES.find(
+            profile => profile.id === InputProfileId.MouseKeyboard
+        )
+
+        expect(mouseKeyboardProfile?.bindings[InputAction.Cancel]).toEqual([
+            { type: 'keyboard-button', code: 'Escape', label: 'Escape' }
+        ])
+    })
+})
+
+describe('GamepadStandard profile default bindings', () => {
+    it('binds ResetCamera to the right stick press (R3) by default', () => {
+        const gamepadProfile = BUILTIN_INPUT_PROFILES.find(
+            profile => profile.id === InputProfileId.GamepadStandard
+        )
+
+        expect(gamepadProfile?.bindings[InputAction.ResetCamera]).toEqual([
+            { type: 'gamepad-button', button: 11, label: 'Right Stick Press' }
+        ])
+    })
+
+    it('binds Cancel to both B/Circle and Menu/Start, alongside OpenMenu on Start', () => {
+        const gamepadProfile = BUILTIN_INPUT_PROFILES.find(
+            profile => profile.id === InputProfileId.GamepadStandard
+        )
+
+        expect(gamepadProfile?.bindings[InputAction.Cancel]).toEqual([
+            { type: 'gamepad-button', button: 1, label: 'B / Circle' },
+            { type: 'gamepad-button', button: 9, label: 'Menu / Start' }
+        ])
+        expect(gamepadProfile?.bindings[InputAction.OpenMenu]).toEqual([
+            { type: 'gamepad-button', button: 9, label: 'Menu / Start' }
         ])
     })
 })

@@ -174,16 +174,19 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
                 { type: 'keyboard-button', code: 'KeyC', label: 'C' }
             ],
             [InputAction.LookHorizontal]: [
-                { type: 'mouse-axis', axis: 'x', sensitivity: 1, label: 'Mouse X' }
+                { type: 'mouse-axis', axis: 'x', label: 'Mouse X' }
             ],
             [InputAction.LookVertical]: [
-                { type: 'mouse-axis', axis: 'y', sensitivity: 1, label: 'Mouse Y' }
+                { type: 'mouse-axis', axis: 'y', label: 'Mouse Y' }
             ],
             [InputAction.Interact]: [
                 { type: 'mouse-button', button: 0, label: 'Left Click' },
                 { type: 'keyboard-button', code: 'Enter', label: 'Enter' }
             ],
             [InputAction.OpenMenu]: [
+                { type: 'keyboard-button', code: 'Escape', label: 'Escape' }
+            ],
+            [InputAction.Cancel]: [
                 { type: 'keyboard-button', code: 'Escape', label: 'Escape' }
             ],
             [InputAction.Sprint]: [
@@ -202,10 +205,15 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             [InputAction.MoveBack]: [{ type: 'gamepad-axis', axis: 1, direction: 'positive', deadZone: 0.15, label: 'Left Stick Down' }],
             [InputAction.MoveLeft]: [{ type: 'gamepad-axis', axis: 0, direction: 'negative', deadZone: 0.15, label: 'Left Stick Left' }],
             [InputAction.MoveRight]: [{ type: 'gamepad-axis', axis: 0, direction: 'positive', deadZone: 0.15, label: 'Left Stick Right' }],
-            [InputAction.LookHorizontal]: [{ type: 'gamepad-axis', axis: 2, direction: 'both', deadZone: 0.15, sensitivity: 2, label: 'Right Stick X' }],
-            [InputAction.LookVertical]: [{ type: 'gamepad-axis', axis: 3, direction: 'both', deadZone: 0.15, invert: true, sensitivity: 2, label: 'Right Stick Y' }],
+            [InputAction.LookHorizontal]: [{ type: 'gamepad-axis', axis: 2, direction: 'both', deadZone: 0.15, label: 'Right Stick X' }],
+            [InputAction.LookVertical]: [{ type: 'gamepad-axis', axis: 3, direction: 'both', deadZone: 0.15, label: 'Right Stick Y' }],
             [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, label: 'A / Cross' }],
             [InputAction.OpenMenu]: [{ type: 'gamepad-button', button: 9, label: 'Menu / Start' }],
+            [InputAction.Cancel]: [
+                { type: 'gamepad-button', button: 1, label: 'B / Circle' },
+                { type: 'gamepad-button', button: 9, label: 'Menu / Start' }
+            ],
+            [InputAction.ResetCamera]: [{ type: 'gamepad-button', button: 11, label: 'Right Stick Press' }],
             [InputAction.Sprint]: [{ type: 'gamepad-button', button: 10, label: 'Left Stick Press' }]
         }
     },

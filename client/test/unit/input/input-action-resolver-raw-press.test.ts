@@ -27,6 +27,7 @@ describe('InputActionResolver raw press resolution', () => {
     let resolver: InputActionResolver
     let openMenuHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
     let interactHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
+    let cancelHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
 
     beforeEach(() => {
         deviceDetector = new DeviceDetector(eventManager)
@@ -34,13 +35,16 @@ describe('InputActionResolver raw press resolution', () => {
         resolver = new InputActionResolver(new BindingResolver(), deviceDetector, eventManager)
         openMenuHandler = vi.fn<(event: CustomEvent) => void>()
         interactHandler = vi.fn<(event: CustomEvent) => void>()
+        cancelHandler = vi.fn<(event: CustomEvent) => void>()
         eventManager.registerEventHandler(InputEventTypes.OpenMenuPressed, openMenuHandler)
         eventManager.registerEventHandler(InputEventTypes.InteractPressed, interactHandler)
+        eventManager.registerEventHandler(InputEventTypes.CancelPressed, cancelHandler)
     })
 
     afterEach(() => {
         eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, openMenuHandler)
         eventManager.deregisterEventHandler(InputEventTypes.InteractPressed, interactHandler)
+        eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, cancelHandler)
         resolver.dispose()
         deviceDetector.stop()
     })
@@ -80,6 +84,31 @@ describe('InputActionResolver raw press resolution', () => {
         resolver.handleGamepadButtonPress(9, getProfiles(InputProfileId.GamepadStandard))
 
         expect(openMenuHandler).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits both OpenMenuPressed and CancelPressed for Escape, so keyboard OpenMenu dismisses other open UI too', () => {
+        resolver.handleRawKeyPress('Escape', getProfiles(InputProfileId.MouseKeyboard))
+
+        expect(openMenuHandler).toHaveBeenCalledTimes(1)
+        expect(cancelHandler).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits only CancelPressed for gamepad B/Circle (button 1), not OpenMenuPressed', () => {
+        connectMockGamepad()
+
+        resolver.handleGamepadButtonPress(1, getProfiles(InputProfileId.GamepadStandard))
+
+        expect(cancelHandler).toHaveBeenCalledTimes(1)
+        expect(openMenuHandler).not.toHaveBeenCalled()
+    })
+
+    it('emits both OpenMenuPressed and CancelPressed for gamepad Start (button 9), so opening the menu also dismisses other open UI', () => {
+        connectMockGamepad()
+
+        resolver.handleGamepadButtonPress(9, getProfiles(InputProfileId.GamepadStandard))
+
+        expect(openMenuHandler).toHaveBeenCalledTimes(1)
+        expect(cancelHandler).toHaveBeenCalledTimes(1)
     })
 
     it('does not emit for a raw press with no matching binding', () => {

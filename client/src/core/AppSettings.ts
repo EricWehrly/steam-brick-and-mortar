@@ -94,6 +94,10 @@ export const Setting = {
     InputMouseSensitivity: 'inputMouseSensitivity',
     InputMouseLockEnabled: 'inputMouseLockEnabled',
     InputGamepadReticleEnabled: 'inputGamepadReticleEnabled',
+    InputLookInvertMouse: 'inputLookInvertMouse',
+    InputLookInvertGamepad: 'inputLookInvertGamepad',
+    InputLookSensitivityMouse: 'inputLookSensitivityMouse',
+    InputLookSensitivityGamepad: 'inputLookSensitivityGamepad',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -200,6 +204,13 @@ export interface ApplicationSettings {
     inputMouseLockEnabled: boolean
     /** Whether the center-screen aiming reticle shows while a gamepad/VR controller is connected. */
     inputGamepadReticleEnabled: boolean
+    /** Invert the vertical look axis - set independently per device since a flipped mouse Y and a
+     *  flipped gamepad stick Y are different, unrelated preferences. */
+    inputLookInvertMouse: boolean
+    inputLookInvertGamepad: boolean
+    /** Look sensitivity multiplier - set independently per device. */
+    inputLookSensitivityMouse: number
+    inputLookSensitivityGamepad: number
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -524,7 +535,11 @@ export class AppSettings {
             inputSpeed: 0.1,
             inputMouseSensitivity: 0.005,
             inputMouseLockEnabled: true,
-            inputGamepadReticleEnabled: true
+            inputGamepadReticleEnabled: true,
+            inputLookInvertMouse: false,
+            inputLookInvertGamepad: true,
+            inputLookSensitivityMouse: 1,
+            inputLookSensitivityGamepad: 2
         }
     }
 
@@ -548,7 +563,8 @@ export class AppSettings {
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
             'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled',
-            'antialias', 'inputMouseLockEnabled', 'inputGamepadReticleEnabled'
+            'antialias', 'inputMouseLockEnabled', 'inputGamepadReticleEnabled',
+            'inputLookInvertMouse', 'inputLookInvertGamepad'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
@@ -556,7 +572,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity']
+        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false

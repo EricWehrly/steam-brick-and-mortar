@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { BinderGameDetailPanel } from '../../../src/ui/binder/BinderGameDetailPanel'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
+import { EventManager } from '../../../src/core/EventManager'
+import { InputEventTypes } from '../../../src/types/InteractionEvents'
 
 vi.mock('../../../src/debug/GameSpotlight')
 
@@ -138,9 +140,9 @@ describe('BinderGameDetailPanel', () => {
             expect(onClose).toHaveBeenCalledOnce()
         })
 
-        it('ESC key closes the panel', () => {
+        it('Cancel action (Escape / gamepad B) closes the panel', () => {
             panel.show(mockGame)
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+            EventManager.getInstance().emit(InputEventTypes.CancelPressed, {})
             expect(document.getElementById('binder-detail-panel')).toBeNull()
         })
 
