@@ -45,6 +45,17 @@ export interface AppDetailsData extends SteamGameMetadata {
      * docs/plans/startup-artwork-resolution-plan.md, Root Cause A.
      */
     artwork_network_checked?: boolean;
+    /**
+     * Exact artwork URLs already confirmed dead for this appid - any format/route (guessed legacy
+     * CDN path, a stale hint, whatever). No taxonomy of *why* a path is dead (CORS vs. 404 vs.
+     * genuinely no artwork all record the same way - see
+     * docs/plans/startup-artwork-resolution-plan.md). Lives on the same entry as everything else
+     * about this appid's artwork rather than a separate cache, specifically so the baked release
+     * bundle picks it up for free - the bake/repack scripts already serialize whatever's in
+     * AppDetailsCache verbatim. Union-merged (see mergeAppDetails), never replaced wholesale -
+     * two independent writers discovering different dead paths must not stomp each other.
+     */
+    artwork_dead_paths?: string[];
     [key: string]: unknown;
 }
 

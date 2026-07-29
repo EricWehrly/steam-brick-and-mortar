@@ -8,24 +8,37 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { setupIndexedDBMock } from '../../../mocks/indexeddb.mock'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataDomain } from '../../../../src/core/data/DataTypes'
 import { SteamArtworkStateManager } from '../../../../src/core/data/SteamArtworkStateManager'
 import { SteamDataManager } from '../../../../src/core/data/SteamDataManager'
-import { 
-    GameArtworkProvider, 
+import {
+    GameArtworkProvider,
     ARTWORK_DIMENSIONS,
     type GameArtwork,
     type ArtworkFormat
 } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
+import { AppDetailsCache } from '../../../../src/steam/cache/AppDetailsCache'
+import type { AppDetailsData } from '../../../../src/steam/batch/BatchAppDetailsClient'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
+
+const NO_ARTWORK: AppDetailsData['artwork'] = {
+    header: null, capsule: null, capsule_v5: null, background: null, background_raw: null,
+}
+
+/** URL marker any mocked fetch call rejects on - lets a test force one specific candidate to fail
+ *  while every other candidate in the same strategy still resolves via the default success path. */
+const FAILING_URL_MARKER = 'DOOMED'
 
 // Mock TextureWorker
 vi.mock('../../../../src/scene/game-box/instancing/TextureWorker', () => ({
     TextureWorker: vi.fn().mockImplementation(function() { return {
-        fetchAndProcessWithOptions: vi.fn().mockResolvedValue({
-            imageData: new Uint8ClampedArray(300 * 450 * 4).fill(128)
-        }),
+        fetchAndProcessWithOptions: vi.fn((url: string) =>
+            url.includes(FAILING_URL_MARKER)
+                ? Promise.reject(new Error('HTTP 404: Not Found'))
+                : Promise.resolve({ imageData: new Uint8ClampedArray(300 * 450 * 4).fill(128) })
+        ),
         dispose: vi.fn()
     } })
 }))
@@ -60,6 +73,8 @@ describe('GameArtworkProvider', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        setupIndexedDBMock()
+        AppDetailsCache.resetForTesting()
         DataManager.resetInstance()
         ;(SteamDataManager as unknown as { _instance: null })._instance = null
 
@@ -279,6 +294,53 @@ describe('GameArtworkProvider', () => {
             state = SteamArtworkStateManager.getState(12345)
             expect(state?.selectedType).toBe('header')
             expect(state?.selectedUrl).toBe('https://example.com/header.jpg')
+        })
+    })
+
+    describe('Persistent dead-path cache (AppDetailsCache.artwork_dead_paths)', () => {
+        it('skips a known-dead CDN guess without attempting it, resolving via the next candidate', async () => {
+            const deadGuess = 'https://cdn.akamai.steamstatic.com/steam/apps/2062430/library_600x900.jpg'
+            // Matches how a real dead mark gets there - AppDetailsCache.markArtworkPathDead requires
+            // an existing entry (see its own doc comment), so seed one directly here too.
+            await AppDetailsCache.set(2062430, {
+                type: 'game', name: 'BALL x PIT', artwork: NO_ARTWORK, artwork_dead_paths: [deadGuess],
+            })
+
+            // No hints supplied - strategy is CDN guesses only: library (dead), capsule, header.
+            // The mocked worker succeeds for any URL, so a resolved selection of anything other
+            // than the dead guess proves it was skipped rather than attempted-and-succeeded.
+            const artwork = provider.getArtwork(2062430, 'BALL x PIT', 'library')
+            const dims = ARTWORK_DIMENSIONS.library
+            await artwork.getPixelsAtSize(dims.width, dims.height)
+
+            const state = SteamArtworkStateManager.getState(2062430)
+            expect(state?.selectedUrl).not.toBe(deadGuess)
+        })
+
+        it('persists a URL as dead once it fails, so a future strategy build can skip it', async () => {
+            const doomedUrl = `https://example.com/${FAILING_URL_MARKER}.jpg`
+            // markArtworkPathDead no-ops with nothing to merge into - a real appid reaching artwork
+            // resolution always has some AppDetailsCache entry by then (see
+            // docs/plans/startup-artwork-resolution-plan.md, Root Cause A).
+            await AppDetailsCache.set(2062430, { type: 'game', name: 'BALL x PIT', artwork: NO_ARTWORK })
+
+            expect(await AppDetailsCache.getDeadArtworkPaths(2062430)).not.toContain(doomedUrl)
+
+            const artwork = provider.getArtwork(2062430, 'BALL x PIT', 'header', { header: doomedUrl })
+            const dims = ARTWORK_DIMENSIONS.header
+            await artwork.getPixelsAtSize(dims.width, dims.height)
+
+            expect(await AppDetailsCache.getDeadArtworkPaths(2062430)).toContain(doomedUrl)
+        })
+
+        it('does not create a shell entry to record a dead path when the appid has no cache entry at all', async () => {
+            const doomedUrl = `https://example.com/${FAILING_URL_MARKER}.jpg`
+
+            const artwork = provider.getArtwork(999999, 'Unknown Game', 'header', { header: doomedUrl })
+            const dims = ARTWORK_DIMENSIONS.header
+            await artwork.getPixelsAtSize(dims.width, dims.height)
+
+            expect(await AppDetailsCache.get(999999)).toBeNull()
         })
     })
 })
