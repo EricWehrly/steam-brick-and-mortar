@@ -82,6 +82,37 @@ export class AppDetailsCache {
         return appids.filter(appid => !cached.get(appid)?.artwork_network_checked)
     }
 
+    /**
+     * The full set of artwork URLs already confirmed dead for this appid. Read once per
+     * resolution attempt (not once per candidate URL) - see GameArtworkProvider.
+     */
+    static async getDeadArtworkPaths(appid: number): Promise<ReadonlySet<string>> {
+        const entry = await AppDetailsCache.get(appid)
+        return new Set(entry?.artwork_dead_paths ?? [])
+    }
+
+    /**
+     * Records one more dead artwork URL for an appid - merged, not overwritten, so it can't lose
+     * anything else already known about this appid (and mergeMany's union semantics for this
+     * field mean it can't lose a dead path a concurrent writer just recorded either). No-ops if
+     * there's no existing entry at all - an appid nothing else is known about yet isn't worth
+     * creating a shell record just to hold one dead URL; the fetch simply gets re-attempted (and
+     * re-fails, harmlessly) until something else gives it a real entry.
+     */
+    static async markArtworkPathDead(appid: number, url: string): Promise<void> {
+        const existing = await AppDetailsCache.get(appid)
+        if (!existing) return
+        if (existing.artwork_dead_paths?.includes(url)) return
+
+        const incoming: AppDetailsData = {
+            type: existing.type,
+            name: existing.name,
+            artwork: existing.artwork,
+            artwork_dead_paths: [url],
+        }
+        await AppDetailsCache.mergeMany(new Map([[appid, incoming]]), Date.now())
+    }
+
     static async set(appid: number, data: AppDetailsData): Promise<void> {
         return AppDetailsCache.store.set(appid, data)
     }
@@ -170,6 +201,18 @@ const isNonEmptyRecord = (value: unknown): boolean =>
 const isDefined = (value: unknown): boolean => value !== undefined && value !== null
 
 /**
+ * Union, not prefer-newer - unlike every other field here, losing a known-dead path is a real
+ * regression (it means re-attempting a URL already confirmed dead), not just stale data. Two
+ * independent writers discovering different dead paths for the same appid must both survive a
+ * merge regardless of which one is "newer."
+ */
+function unionStringArrays(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+    if (!a?.length) return b?.length ? b : undefined
+    if (!b?.length) return a
+    return [...new Set([...a, ...b])]
+}
+
+/**
  * Picks incoming over existing when incoming is meaningful and (incoming is at least as new, or
  * existing isn't meaningful either); otherwise keeps existing; falls back to `undefined` only
  * when neither side has anything. `isMeaningful` takes `unknown` (not `T`) deliberately - it's a
@@ -229,6 +272,7 @@ function mergeAppDetails(
         short_description: prefer(incoming.short_description, existing.short_description, isNonEmptyString),
         full_data: prefer(incoming.full_data, existing.full_data, isDefined),
         undesirable_for_demo: prefer(incoming.undesirable_for_demo, existing.undesirable_for_demo, isDefined),
+        artwork_dead_paths: unionStringArrays(incoming.artwork_dead_paths, existing.artwork_dead_paths),
         release_date: prefer(incoming.release_date, existing.release_date, isDefined),
         metacritic: prefer(incoming.metacritic, existing.metacritic, isDefined),
         // positive/negative/userscore: 0 is treated as a meaningful, real value (not "never

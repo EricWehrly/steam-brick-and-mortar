@@ -158,6 +158,25 @@ describe('AppDetailsCache.mergeMany', () => {
         })
     })
 
+    it('unions artwork_dead_paths from two independent writers instead of one replacing the other', async () => {
+        const now = Date.now()
+        await AppDetailsCache.mergeMany(
+            new Map([[620, { type: 'game', name: 'Portal 2', artwork: NO_ARTWORK, artwork_dead_paths: ['https://cdn/a.jpg'] }]]),
+            now
+        )
+
+        // A second, independent writer discovers a *different* dead path - even though this write
+        // is older, its dead path must still be added, not dropped in favor of the newer record.
+        await AppDetailsCache.mergeMany(
+            new Map([[620, { type: 'game', name: 'Portal 2', artwork: NO_ARTWORK, artwork_dead_paths: ['https://cdn/b.jpg'] }]]),
+            now - 5000
+        )
+
+        expect((await AppDetailsCache.get(620))?.artwork_dead_paths).toEqual(
+            expect.arrayContaining(['https://cdn/a.jpg', 'https://cdn/b.jpg'])
+        )
+    })
+
     it('a real userscore of 0 is treated as meaningful data, not "unset"', async () => {
         await AppDetailsCache.mergeMany(new Map([[620, { type: 'game', name: 'Portal 2', artwork: NO_ARTWORK, userscore: 0 }]]), 1000)
 

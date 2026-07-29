@@ -9,6 +9,7 @@ import type {
     PixelDataResult 
 } from './GameArtworkProvider'
 import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
+import { AppDetailsCache } from '../../../steam/cache/AppDetailsCache'
 import { Logger } from '../../../utils/Logger'
 
 /**
@@ -103,36 +104,56 @@ export class GameArtworkRequest implements GameArtwork {
 
     private async fetchFromStrategy(width: number, height: number): Promise<PixelDataResult> {
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
+        const deadPaths = await AppDetailsCache.getDeadArtworkPaths(this.appId)
         const triedUrls: string[] = []
+        const skippedDeadUrls: string[] = []
+        // Not awaited inline (a candidate's dead-mark write shouldn't delay trying the next
+        // candidate) but always drained before this method settles, success or failure - a
+        // fire-and-forget write can otherwise lose the race against a fast app-quit right after
+        // the resolution that triggered it, silently losing the one thing this cache exists for.
+        const pendingDeadMarks: Promise<void>[] = []
         let lastError: Error | null = null
-        
+
         for (const { url, type } of strategy) {
+            if (deadPaths.has(url)) {
+                skippedDeadUrls.push(url)
+                continue
+            }
+
             triedUrls.push(url)
             const route = this.classifyRoute(url, type)
-            
+
             try {
                 const result = await this.provider.fetchPixels(
                     url, width, height, `${this.appId}-${this.format}`
                 )
 
                 this.recordSuccessfulResolution(result, url, type, route)
+                await Promise.allSettled(pendingDeadMarks)
                 return result
             } catch (e) {
                 lastError = e instanceof Error ? e : new Error(String(e))
+                pendingDeadMarks.push(
+                    AppDetailsCache.markArtworkPathDead(this.appId, url).catch(() => { /* best-effort persistence */ })
+                )
             }
         }
-        
-        // All URLs failed - categorize and record
-        const rawErrorMessage = lastError?.message ?? 'Unknown error'
-        this.failureReason = this.categorizeError(rawErrorMessage, triedUrls)
-        this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
+
+        await Promise.allSettled(pendingDeadMarks)
+
+        // All URLs failed, or were already known-dead from a prior session - categorize and record
+        const rawErrorMessage = lastError?.message
+            ?? (skippedDeadUrls.length > 0 ? 'All candidates previously failed' : 'Unknown error')
+        this.failureReason = lastError ? this.categorizeError(rawErrorMessage, triedUrls) : 'NO_ARTWORK'
+        this.provider.recordFailure(this.appId, this.format, this.failureReason, [...triedUrls, ...skippedDeadUrls])
         this.setArtworkSelection('label')
 
         // rawError= is included because reason= can't discriminate CORS from 404 on Chromium
         // (both surface as an identical TypeError) - see categorizeError().
         GameArtworkRequest.logger.warn(
             `Artwork resolution failed for appId ${this.appId} (${this.gameName}). ` +
-            `reason=${this.failureReason}; rawError=${rawErrorMessage}; tried=${triedUrls.join(' -> ')}`
+            `reason=${this.failureReason}; rawError=${rawErrorMessage}; tried=${triedUrls.join(' -> ')}` +
+            (skippedDeadUrls.length > 0 ? `; skipped(known-dead)=${skippedDeadUrls.join(' -> ')}` : '')
         )
 
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
