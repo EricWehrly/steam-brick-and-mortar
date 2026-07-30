@@ -2,14 +2,17 @@
 
 **Status**: Dominant cause confirmed and fixed (SSAO/N8AO) — see "Findings (2026-07-29)".
 **2026-07-30**: extended into a full re-implementation of the unified "Renderer Quality Preset" —
-see "Findings (2026-07-30)" and "Implementation: unified render quality preset" below. **2026-07-29:
-doc restructured** — the capture-tool design and sweep methodology, now built and reusable beyond
-this one investigation, moved to
-[Frame Budget Capture Tooling](../architecture/frame-budget-capture-tooling.md). This doc keeps the
-investigation-specific narrative: suspicion, findings, decision, and the fixes that shipped.
+see "Findings (2026-07-30)" and "Implementation: unified render quality preset" below. A separate
+follow-up thread (recurring frame-time spikes noticed while re-measuring) was chased down to Chrome's
+own compositor scheduling via a captured DevTools trace and **closed as not app-actionable** — see
+"Investigation: recurring frame-time spikes" below. **2026-07-29: doc restructured** — the
+capture-tool design and sweep methodology, now built and reusable beyond this one investigation,
+moved to [Frame Budget Capture Tooling](../architecture/frame-budget-capture-tooling.md). This doc
+keeps the investigation-specific narrative: suspicion, findings, decision, and the fixes that
+shipped.
 **Priority**: Downgraded from High — the ambient always-on cost that motivated the "High" priority is
-fixed, and the quality-preset re-implementation is done. What's left (visual validation, the
-Advanced-controls stretch goal) is opportunistic, not a dedicated push.
+fixed, the quality-preset re-implementation is done, and the frame-time-spike thread is closed. What's
+left (visual validation, the Advanced-controls stretch goal) is opportunistic, not a dedicated push.
 **Related tech debt**: [`shadow-default-policy-evaluation`](../tech-debt.md#id-shadow-default-policy-evaluation)
 
 ## Why this doc exists
@@ -320,8 +323,102 @@ open. Fixed a pre-existing gap in the process: `refreshSettingsDisplay()` never 
   `environmentIntensity`, `pixelRatioScale`'s interaction with `useLodAtlas`'s LOD distances) —
   scoped to exactly the settings this investigation already measured
 
+## Investigation: recurring frame-time spikes — closed, not app-actionable (2026-07-30)
+
+Follow-up to "Findings (2026-07-30)" above, prompted by noticing frame time still swings hard
+second-to-second at both new SSAO settings despite a static camera and a settled scene. Chased with
+a live tooling fix, a captured Chrome DevTools Performance trace, and two questions answered directly
+from the code — closed with a clear, non-app-code root cause.
+
+### Tooling fix: RenderLoopDiagnostics was flooding its own measurement
+
+`?diagnostics=1` fired a `console.warn` on nearly every frame (the slow-frame check trips often on
+hardware running close to its 16.67ms budget) and on every pipeline-stage occurrence over
+`callbackTimeWarnThreshold` — thousands of calls per capture, expensive enough on their own to slow
+down the very session being measured. Both were already redundant with the periodic summary log and
+`report()`'s per-stage breakdown, so the per-occurrence `console.warn` calls were removed entirely
+(counts like `slowFrameCount` are still tracked, just not printed per-occurrence). The periodic
+auto-log itself (`logStats()`, firing every ~60 frames whether or not anyone asked for it) was
+removed outright rather than throttled — it carried no jitter/stddev/bucket data, its "slow frames"
+count was lifetime-cumulative shown next to a windowed average, and a single tab-visibility gap could
+poison its "peak all-time" number for the rest of the session (observed: "peak all-time:
+50342.60ms"). `getStats()`/`report()` already cover everything it did and more; nothing prints
+automatically anymore.
+
+A first attempt also added `MAX_PLAUSIBLE_FRAME_TIME_MS` — a sanity ceiling that would silently
+exclude any implausibly-large deltaTime (assumed tab-visibility artifact) from every stat. **Reverted
+before landing.** Correctly rejected: silently discarding the largest frame-time excursions is
+backwards for an investigation trying to find *why* frame time swings — a real stall, not a
+tab-visibility gap, is exactly the data point that filter would have hidden. Kept the raw numbers; if
+tab-visibility gaps turn out to be a real recurring nuisance later, they need addressing by watching
+visibility-change events directly, not by guessing from magnitude.
+
+### The actual spikes, re-measured cleanly
+
+With the spam gone, two 15s captures (`ssaoQuality=2` then `ssaoQuality=1`, the shipped default) via
+the console-command workflow showed: per-second bucket **averages are stable** (10.5–11.6ms across
+all 15 buckets, both captures — no drift, unlike the 2026-07-29 finding) but several buckets show a
+real spike — stddev jumping to 6–7ms, max frame time hitting 25–68ms (5–6x normal) — while
+neighboring buckets stay calm. Notably, the *cheaper* SSAO setting (index 1) showed **more and larger
+spikes** than the more expensive one (index 2 — 6 spike-buckets vs. 1), ruling out SSAO cost as the
+driver: going cheaper made it worse, not better.
+
+### Two questions asked directly, answered from the code
+
+1. **Can vsync be disabled?** No. The installed Three.js version (0.183.2)'s `WebGLRenderer`
+   constructor forwards `canvas`, `context`, `depth`, `stencil`, `alpha`, `antialias`,
+   `premultipliedAlpha`, `preserveDrawingBuffer`, `powerPreference`, `failIfMajorPerformanceCaveat`,
+   `reversedDepthBuffer`, `outputBufferType` — no `desynchronized` support (the one browser hint that
+   can reduce vsync-locked presentation latency), and no browser exposes a swap-interval control to
+   web content at all. `requestAnimationFrame` cadence *is* the vsync-locked compositor cadence, by
+   design, in every browser including Tauri's WebView2. The only way around it would be bypassing the
+   webview's rendering for a native GPU surface driven from Tauri's Rust side — a rearchitecture, not
+   a setting. Practical consequence: every one of these spikes is "missed N vsync ticks in a row," not
+   smoothly-scaling extra work.
+2. **Does `HeapMemoryReporter` trigger or encourage GC?** No — it only calls `performance.memory`
+   (read-only) every 4,000 frames and logs the delta (`client/src/debug/HeapMemoryReporter.ts`). No
+   allocation, no forced collection; V8 decides when to collect entirely on its own. 4,000 frames
+   (~44–67s at this framerate) is also far too coarse a sampling interval to correlate with spikes
+   recurring every 1–3 seconds — an earlier reference to a heap-size drop as a "lead" was an
+   overreach and is retracted here.
+
+### Chrome DevTools Performance trace — the actual answer
+
+A ~14s trace captured during the same steady-state conditions, decompressed and queried directly
+(`traceEvents` from the exported `.json.gz`, ~189k events) rather than eyeballed in the DevTools UI,
+checked every suspect in turn:
+
+| Suspect | Finding |
+|---|---|
+| GC (all V8 GC phases) | **Ruled out** — 15.7ms total across the whole ~14s trace, max single event 1.63ms |
+| Main-thread JS (`RunTask` on `CrRendererMain`) | **Ruled out** — one 278ms task at the very start (startup/settle, not the steady-state pattern), nothing else over ~27ms anywhere else |
+| GPU work (`GPUTask`) | **Ruled out** — max 15.6ms |
+| Chrome's compositor pipeline (`PipelineReporter` and its sub-stages) | **This is where the time goes** — median 33ms per frame; `BeginImplFrameToSendBeginMainFrame`, `ReceiveCompositorFrameToStartDraw`, `EndActivateToSubmitCompositorFrame`, and `StartDrawToSwapStart` each independently spike 40–70ms at different moments, no single stage consistently dominant |
+
+None of the spiking stages touch application code — they're internal Chrome compositor/scheduling
+steps (vsync tick → ask main thread to start; frame received → wait to rasterize; layer tree ready →
+submit to GPU). Which stage spikes moves around between samples rather than pointing at one
+deterministic path — the signature of scheduling contention (compositor thread not getting scheduled
+promptly) rather than a fixable code path. The pattern was already visible in the non-profiled console
+captures too (same shape, no DevTools trace running), so it isn't purely profiler-recording overhead —
+real, but outside what SBAM's own code can see or influence, consistent with the vsync finding above
+(no lever exists to pull here).
+
+### Conclusion
+
+**Closed as not app-actionable.** Not GC, not application JS, not GPU shader work, not any single
+render-pipeline pass, not SSAO. The mechanism is confirmed (vsync misses — no way to disable vsync to
+test around it) and the location is confirmed (Chrome's own compositor scheduling, several internal
+stages, no consistent single bottleneck), but the cause sits below the web-app layer entirely.
+Isolating machine-level contention (closing other apps/tabs and re-profiling) is the only remaining
+lever, left as an optional follow-up rather than a next step — see "Explicitly out of scope" below.
+
 ## Explicitly out of scope for this doc
 
+- Machine-level contention isolation for the frame-time-spike investigation (closing other
+  apps/tabs and re-profiling to see if it's this machine's general load rather than anything about
+  the scene) — the compositor-scheduling root cause is confirmed and not app-fixable either way, so
+  this is optional curiosity, not follow-up work
 - The fixed benchmark-group matrix and floor/ceiling composite captures (see
   [Frame Budget Capture Tooling](../architecture/frame-budget-capture-tooling.md)) — the isolated
   one-setting-at-a-time sweep above answered the preset-map question directly; the composite
@@ -356,6 +453,9 @@ open. Fixed a pre-existing gap in the process: `refreshSettingsDisplay()` never 
 - `client/src/core/AppSettings.ts` — `RENDER_QUALITY_PRESETS`, the settings-to-preset map itself
 - `client/src/ui/pause/panels/GraphicsSettingsPanel.ts` — `applyQualityPreset()`, now the sole
   consumer of `RENDER_QUALITY_PRESETS`
+- `client/src/debug/RenderLoopDiagnostics.ts` — no longer prints anything automatically; `getStats()`
+  and `startCapture()`/`report()` are the only output paths now (source of the 2026-07-30 tooling fix)
+- `client/src/debug/HeapMemoryReporter.ts` — confirmed read-only, doesn't influence GC (2026-07-30)
 
 ---
 **Signature**: P1
