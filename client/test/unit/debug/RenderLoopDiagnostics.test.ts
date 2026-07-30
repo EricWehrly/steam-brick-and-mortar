@@ -172,7 +172,7 @@ describe('RenderLoopDiagnostics', () => {
     it('attachRenderPipeline is a no-op when diagnostics are disabled', () => {
         RenderLoopDiagnostics.initialize({ enabled: false })
         const fakePipeline = { setPassInstrumentor: vi.fn() }
-        const fakeRenderer = { shadowMap: { render: vi.fn() } }
+        const fakeRenderer = { shadowMap: { render: vi.fn() }, getContext: vi.fn().mockReturnValue(null) }
 
         RenderLoopDiagnostics.attachRenderPipeline(
             fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
@@ -186,7 +186,7 @@ describe('RenderLoopDiagnostics', () => {
         RenderLoopDiagnostics.initialize({ enabled: true })
         const fakePipeline = { setPassInstrumentor: vi.fn() }
         const originalShadowRender = vi.fn()
-        const fakeRenderer = { shadowMap: { render: originalShadowRender } }
+        const fakeRenderer = { shadowMap: { render: originalShadowRender }, getContext: vi.fn().mockReturnValue(null) }
 
         RenderLoopDiagnostics.attachRenderPipeline(
             fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
@@ -209,7 +209,7 @@ describe('RenderLoopDiagnostics', () => {
     it('does not re-wrap the shadow map on a second attachRenderPipeline call', () => {
         RenderLoopDiagnostics.initialize({ enabled: true })
         const fakePipeline = { setPassInstrumentor: vi.fn() }
-        const fakeRenderer = { shadowMap: { render: vi.fn() } }
+        const fakeRenderer = { shadowMap: { render: vi.fn() }, getContext: vi.fn().mockReturnValue(null) }
 
         RenderLoopDiagnostics.attachRenderPipeline(
             fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
@@ -233,7 +233,7 @@ describe('RenderLoopDiagnostics', () => {
                 capturedInstrumentor = instrumentor
             })
         }
-        const fakeRenderer = { shadowMap: { render: vi.fn() } }
+        const fakeRenderer = { shadowMap: { render: vi.fn() }, getContext: vi.fn().mockReturnValue(null) }
 
         RenderLoopDiagnostics.attachRenderPipeline(
             fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
@@ -254,5 +254,79 @@ describe('RenderLoopDiagnostics', () => {
         const report = RenderLoopDiagnostics.report()
         expect(report!.stages['pipeline:n8ao']).toBeDefined()
         expect(n8aoRender).toHaveBeenCalledOnce()
+    })
+
+    it('records real GPU time under pipeline:n8ao:gpu when a GPU timer is attached', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        let capturedInstrumentor: PassInstrumentor | null = null
+        const fakePipeline = {
+            setPassInstrumentor: vi.fn((instrumentor: PassInstrumentor) => {
+                capturedInstrumentor = instrumentor
+            })
+        }
+        // jsdom has no real WebGL2RenderingContext, so attachRenderPipeline's own detection
+        // never fires — inject a fake GPU timer directly to test instrumentRenderStage's
+        // GPU-timed branch in isolation from that environment gap.
+        const fakeGpuTimer = {
+            isSupported: true,
+            measure: (work: () => void, onResult: (ms: number) => void) => {
+                work()
+                onResult(7.5)
+            },
+            dispose: vi.fn(),
+        }
+        ;(RenderLoopDiagnostics as unknown as { gpuTimerQuery: unknown }).gpuTimerQuery = fakeGpuTimer
+
+        const fakeRenderer = { shadowMap: { render: vi.fn() }, getContext: vi.fn().mockReturnValue(null) }
+        RenderLoopDiagnostics.attachRenderPipeline(
+            fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
+            fakeRenderer as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[1]
+        )
+
+        const n8aoRender = vi.fn()
+        const target: DiagnosticsRenderTarget = { render: n8aoRender }
+        capturedInstrumentor!('pipeline:n8ao', target)
+
+        RenderLoopDiagnostics.startCapture()
+        target.render()
+
+        silenceConsole()
+        const report = RenderLoopDiagnostics.report()
+        expect(report!.stages['pipeline:n8ao']).toBeDefined()
+        expect(report!.stages['pipeline:n8ao:gpu']).toBeDefined()
+        expect(report!.stages['pipeline:n8ao:gpu'].avg).toBeCloseTo(7.5, 3)
+        expect(n8aoRender).toHaveBeenCalledOnce()
+    })
+
+    it('does not GPU-time stages outside GPU_TIMED_STAGE_IDS even when a GPU timer is attached', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        let capturedInstrumentor: PassInstrumentor | null = null
+        const fakePipeline = {
+            setPassInstrumentor: vi.fn((instrumentor: PassInstrumentor) => {
+                capturedInstrumentor = instrumentor
+            })
+        }
+        const fakeGpuTimer = {
+            isSupported: true,
+            measure: vi.fn(),
+            dispose: vi.fn(),
+        }
+        ;(RenderLoopDiagnostics as unknown as { gpuTimerQuery: unknown }).gpuTimerQuery = fakeGpuTimer
+
+        const fakeRenderer = { shadowMap: { render: vi.fn() }, getContext: vi.fn().mockReturnValue(null) }
+        RenderLoopDiagnostics.attachRenderPipeline(
+            fakePipeline as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[0],
+            fakeRenderer as unknown as Parameters<typeof RenderLoopDiagnostics.attachRenderPipeline>[1]
+        )
+
+        const smaaRender = vi.fn()
+        const target: DiagnosticsRenderTarget = { render: smaaRender }
+        capturedInstrumentor!('pipeline:smaa', target)
+
+        RenderLoopDiagnostics.startCapture()
+        target.render()
+
+        expect(fakeGpuTimer.measure).not.toHaveBeenCalled()
+        expect(smaaRender).toHaveBeenCalledOnce()
     })
 })

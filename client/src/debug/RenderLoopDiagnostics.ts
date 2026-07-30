@@ -17,11 +17,17 @@ import type * as THREE from 'three'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import type { RenderLoopCallback } from '../scene/RenderLoopRegistry'
 import type { RenderPipelineManager, DiagnosticsRenderTarget } from '../scene/RenderPipelineManager'
+import { GpuTimerQuery } from './GpuTimerQuery'
 
 /** Three.js runs the shadow-map pass inside renderer.render(), which pmndrs RenderPass
  *  calls internally — so this stage's time is a subset of pipeline:renderPass, not a
  *  sibling cost. Don't sum stage totals expecting them to equal the frame total. */
 const SHADOW_MAP_STAGE_ID = 'pipeline:shadowMap'
+
+/** Stage ids that also get a real GPU timer query (see GpuTimerQuery), recorded under
+ *  `${id}:gpu` alongside the existing CPU submission-time entry. Narrow on purpose —
+ *  extend only when a specific pass's real GPU cost is actually in question. */
+const GPU_TIMED_STAGE_IDS = new Set<string>(['pipeline:n8ao'])
 
 /** How far a frame's delta must move from the previous frame's delta to count as a
  *  jitter event — distinct from frameTimeWarnThreshold's absolute-budget check. */
@@ -120,6 +126,7 @@ export class RenderLoopDiagnostics {
     private static longTaskObserver: PerformanceObserver | null = null
     private static longTaskCount = 0
     private static instrumentedTargets = new WeakSet<object>()
+    private static gpuTimerQuery: GpuTimerQuery | null = null
 
     private static captureStartTime: number | null = null
     private static captureSlowFrameBaseline = 0
@@ -206,6 +213,15 @@ export class RenderLoopDiagnostics {
         if (!this.config.enabled) {
             return
         }
+
+        const gl = renderer.getContext()
+        if (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext) {
+            this.gpuTimerQuery = new GpuTimerQuery(gl)
+            if (!this.gpuTimerQuery.isSupported) {
+                console.warn('🔧 [RenderLoopDiagnostics] EXT_disjoint_timer_query_webgl2 unavailable — GPU-side timing skipped, CPU submission time still recorded')
+            }
+        }
+
         renderPipelineManager.setPassInstrumentor(this.instrumentRenderStage.bind(this))
         this.instrumentRenderStage(SHADOW_MAP_STAGE_ID, renderer.shadowMap as unknown as DiagnosticsRenderTarget)
     }
@@ -215,9 +231,18 @@ export class RenderLoopDiagnostics {
             return
         }
         const originalRender = target.render.bind(target)
+        const gpuTimed = GPU_TIMED_STAGE_IDS.has(id)
         target.render = (...args: unknown[]) => {
             const start = performance.now()
-            const result = originalRender(...args)
+            let result: unknown
+            if (gpuTimed && this.gpuTimerQuery?.isSupported) {
+                this.gpuTimerQuery.measure(
+                    () => { result = originalRender(...args) },
+                    (gpuMs) => this.recordTiming(`${id}:gpu`, gpuMs)
+                )
+            } else {
+                result = originalRender(...args)
+            }
             this.recordTiming(id, performance.now() - start)
             return result
         }
@@ -234,6 +259,7 @@ export class RenderLoopDiagnostics {
     private static beginFrame(now: number, deltaTime: number): void {
         this.isFirstCallbackInFrame = true
         this.stats.workStartTime = now
+        this.gpuTimerQuery?.poll()
 
         this.stats.frameCount++
         this.stats.totalFrameTime += deltaTime
@@ -578,6 +604,8 @@ export class RenderLoopDiagnostics {
         this.longTaskObserver = null
         this.longTaskCount = 0
         this.instrumentedTargets = new WeakSet<object>()
+        this.gpuTimerQuery?.dispose()
+        this.gpuTimerQuery = null
         this.captureStartTime = null
         this.captureSlowFrameBaseline = 0
         this.captureLongTaskBaseline = 0
