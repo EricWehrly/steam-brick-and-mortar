@@ -436,14 +436,30 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
             return false
         }
 
+        // A small library recycled through liminal's endless corridor wraps
+        // (LiminalWindow/LibraryRing), so the same game — and thus the same
+        // textureIndex — can legitimately occupy more than one instance at
+        // once. Only this instance's own repoint may tear down shared cache
+        // state, and only once it's confirmed no *other* instance still
+        // depends on that texture — otherwise a still-displayed instance
+        // loses its HighTextureCache entry and every future HIGH request for
+        // it logs "unknown game" (falls back to MID, harmless but noisy).
         const previous = this.instanceData.get(instanceIndex)
-        if (previous && this.textureIndexToInstance.get(previous.textureIndex) === instanceIndex) {
+        const previousTextureStillOwnedHere = previous !== undefined
+            && this.textureIndexToInstance.get(previous.textureIndex) === instanceIndex
+        if (previousTextureStillOwnedHere) {
             this.textureIndexToInstance.delete(previous.textureIndex)
         }
-        if (previous && this.lazyHighTextures && this.highTextureCache) {
+        const previousTextureStillDisplayedElsewhere = previous !== undefined
+            && Array.from(this.instanceData.values()).some(
+                (data) => data.instanceIndex !== instanceIndex && data.textureIndex === previous.textureIndex
+            )
+        if (previous && this.lazyHighTextures && this.highTextureCache && !previousTextureStillDisplayedElsewhere) {
             this.highTextureCache.unregisterGame(previous.textureIndex)
         }
-        this.pendingHighPromotion.delete(previous?.textureIndex ?? -1)
+        if (!previousTextureStillDisplayedElsewhere) {
+            this.pendingHighPromotion.delete(previous?.textureIndex ?? -1)
+        }
 
         const matrix = new THREE.Matrix4()
         matrix.compose(position, rotation ?? LodGameArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))

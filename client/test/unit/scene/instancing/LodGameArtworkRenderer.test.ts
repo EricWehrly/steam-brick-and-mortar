@@ -35,6 +35,7 @@ vi.mock('../../../../src/scene/game-box/instancing/HighTextureCache', () => ({
         setSlotChangeCallback: vi.fn(),
         getTexture: vi.fn().mockReturnValue({}), // Return mock texture
         registerGame: vi.fn(),
+        unregisterGame: vi.fn(),
         requestHighTexture: vi.fn().mockReturnValue(-1),
         isLoaded: vi.fn().mockReturnValue(false),
         flushToGpu: vi.fn().mockReturnValue(false),
@@ -318,6 +319,50 @@ describe('LodGameArtworkRenderer', () => {
                 gameName: 'Game A',
             })
             expect(success).toBe(false)
+        })
+    })
+
+    describe('setInstanceArtwork with a duplicate textureIndex across instances (liminal ring wraparound)', () => {
+        beforeEach(() => {
+            renderer = new LodGameArtworkRenderer({
+                ...defaultConfig,
+                lazyHighTextures: true,
+                defaultLod: LOD_LEVEL.MID
+            })
+            renderer.initialize(mockTextureArrays, mockScene)
+        })
+
+        it('does not unregister a texture from HighTextureCache while another instance still displays it', () => {
+            const first = renderer.addInstance({
+                position: new THREE.Vector3(0, 0, 0), textureIndex: 3, gameName: 'Shared Game', highArtworkUrl: 'a.jpg'
+            })
+            renderer.addInstance({
+                position: new THREE.Vector3(1, 0, 0), textureIndex: 3, gameName: 'Shared Game', highArtworkUrl: 'a.jpg'
+            })
+
+            const cache = renderer.getHighTextureCache() as unknown as { unregisterGame: ReturnType<typeof vi.fn> }
+            renderer.setInstanceArtwork(first, {
+                position: new THREE.Vector3(9, 9, 9),
+                textureIndex: 8,
+                gameName: 'New Game',
+            })
+
+            expect(cache.unregisterGame).not.toHaveBeenCalledWith(3)
+        })
+
+        it('unregisters the texture once no instance displays it anymore', () => {
+            const first = renderer.addInstance({
+                position: new THREE.Vector3(0, 0, 0), textureIndex: 3, gameName: 'Solo Game', highArtworkUrl: 'a.jpg'
+            })
+
+            const cache = renderer.getHighTextureCache() as unknown as { unregisterGame: ReturnType<typeof vi.fn> }
+            renderer.setInstanceArtwork(first, {
+                position: new THREE.Vector3(9, 9, 9),
+                textureIndex: 8,
+                gameName: 'New Game',
+            })
+
+            expect(cache.unregisterGame).toHaveBeenCalledWith(3)
         })
     })
 
