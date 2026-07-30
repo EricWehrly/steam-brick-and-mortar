@@ -27,4 +27,13 @@ export class UrlUtils {
     static isDiagnosticsEnabled(): boolean {
         return new URLSearchParams(window.location.search).get('diagnostics') === '1'
     }
+
+    /**
+     * Whether ?sweep=1 is present — triggers PerfSweep.run() once the scene reaches steady
+     * state. Implies diagnostics (see SteamBrickAndMortarApp.startRenderLoop): the sweep
+     * needs RenderLoopDiagnostics' capture API, so a bare ?sweep=1 is enough on its own.
+     */
+    static isPerfSweepEnabled(): boolean {
+        return new URLSearchParams(window.location.search).get('sweep') === '1'
+    }
 }

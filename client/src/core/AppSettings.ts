@@ -227,6 +227,69 @@ export interface SettingChangedEvent extends BaseInteractionEvent {
     previousValue: ApplicationSettings[keyof ApplicationSettings]
 }
 
+export type RenderQualityPreset = Pick<ApplicationSettings,
+    | 'lightingQuality'
+    | 'shadowQuality'
+    | 'shadowMapEnabled'
+    | 'ssaoQuality'
+    | 'smaaPreset'
+    | 'msaaLevel'
+    | 'pixelRatioScale'
+>
+
+/**
+ * Settings bundle applied by the "Renderer Quality Preset" selector. Values are measured, not
+ * guessed — see docs/plans/framerate-regression-investigation-plan.md's 2026-07-30 sweep and the
+ * SSAO GPU-timing table it's built on. Each tier maps to one intent:
+ * Low = maximum fps, no feature fully disabled (shadows/SSAO stay on at their cheapest non-off
+ * level). Medium = visual quality with a consistent framerate — every value here measured at or
+ * near the vsync floor. High = visual quality first, framerate can dip. Ultra = maximum visual
+ * quality regardless of cost, including the one setting (shadowQuality 4, PCFSoft→VSM) that
+ * measured a real ~2x frame-time jump on its own.
+ *
+ * Ultra's pixelRatioScale below is a placeholder — GraphicsSettingsPanel.applyQualityPreset()
+ * resolves it to window.devicePixelRatio at apply-time instead, so it scales to the user's actual
+ * display rather than a fixed number.
+ */
+export const RENDER_QUALITY_PRESETS: Record<QualityLevel, RenderQualityPreset> = {
+    low: {
+        lightingQuality: LIGHTING_QUALITY.SIMPLE,
+        shadowQuality: 1,
+        shadowMapEnabled: true,
+        ssaoQuality: 1, // 16 samples, half-res — cheapest non-off SSAO tier
+        smaaPreset: QUALITY_LEVEL.LOW,
+        msaaLevel: QUALITY_LEVEL.LOW,
+        pixelRatioScale: 0.75,
+    },
+    medium: {
+        lightingQuality: LIGHTING_QUALITY.ENHANCED,
+        shadowQuality: 2,
+        shadowMapEnabled: true,
+        ssaoQuality: 2, // 64 samples, half-res — real quality step, still ~4.5ms GPU
+        smaaPreset: QUALITY_LEVEL.MEDIUM,
+        msaaLevel: QUALITY_LEVEL.LOW,
+        pixelRatioScale: 1,
+    },
+    high: {
+        lightingQuality: LIGHTING_QUALITY.ADVANCED,
+        shadowQuality: 3,
+        shadowMapEnabled: true,
+        ssaoQuality: 4, // 16 samples, full-res — trades half-res softness for precision
+        smaaPreset: QUALITY_LEVEL.HIGH,
+        msaaLevel: QUALITY_LEVEL.HIGH,
+        pixelRatioScale: 1.5,
+    },
+    ultra: {
+        lightingQuality: LIGHTING_QUALITY.OUCH_MY_EYES,
+        shadowQuality: 4,
+        shadowMapEnabled: true,
+        ssaoQuality: 5, // 64 samples, full-res — most expensive tier, ~13.8ms GPU
+        smaaPreset: QUALITY_LEVEL.ULTRA,
+        msaaLevel: QUALITY_LEVEL.ULTRA,
+        pixelRatioScale: 2, // resolved to window.devicePixelRatio at apply-time
+    },
+}
+
 /**
  * Centralized application settings service
  * Provides type-safe access to settings with localStorage persistence

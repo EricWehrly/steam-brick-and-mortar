@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, QUALITY_LEVEL, RENDER_QUALITY_PRESETS, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
 import { SSAO_QUALITY_LEVELS } from '../../../scene/RenderPipelineManager'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
@@ -297,8 +297,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         UIComponentUtils.setupSelect<ApplicationSettings['qualityLevel']>(document.body, {
             selectId: 'quality-level-select',
             onChange: (quality) => {
-                this.applyQualityPreset(quality)
+                // qualityLevel must be set before applyQualityPreset()'s refreshSettingsDisplay()
+                // call, which reads it back to sync the select itself - reversed, the select would
+                // visually snap back to the previous value even though every other setting applied.
                 this.updateSetting('qualityLevel', quality)
+                this.applyQualityPreset(quality)
             }
         })
 
@@ -473,32 +476,14 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             return
         }
 
-        let shadowMapEnabled = true
-        let pixelRatioScale = 1
+        const preset = RENDER_QUALITY_PRESETS[quality]
+        const pixelRatioScale = quality === QUALITY_LEVEL.ULTRA ? window.devicePixelRatio : preset.pixelRatioScale
 
-        switch (quality) {
-            case 'low':
-                shadowMapEnabled = false
-                pixelRatioScale = 1
-                break
-            case 'medium':
-                shadowMapEnabled = true
-                pixelRatioScale = 1.5
-                break
-            case 'high':
-                shadowMapEnabled = true
-                pixelRatioScale = 2
-                break
-            case 'ultra':
-                shadowMapEnabled = true
-                pixelRatioScale = window.devicePixelRatio
-                break
-        }
-
-        this.renderer.shadowMap.enabled = shadowMapEnabled
+        this.renderer.shadowMap.enabled = preset.shadowMapEnabled
         this.renderer.setPixelRatio(pixelRatioScale)
 
-        this.appSettings.updateSettings({ shadowMapEnabled, pixelRatioScale }, EventSource.System)
+        this.appSettings.updateSettings({ ...preset, pixelRatioScale }, EventSource.System)
+        this.refreshSettingsDisplay()
     }
 
     private getShadowQualityLabel(quality: number): string {
@@ -581,6 +566,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const smaaPresetSelect = document.getElementById('smaa-preset') as HTMLSelectElement
         if (smaaPresetSelect) {
             smaaPresetSelect.value = this.appSettings.getSetting('smaaPreset')
+        }
+
+        const msaaLevelSelect = document.getElementById('msaa-level') as HTMLSelectElement
+        if (msaaLevelSelect) {
+            msaaLevelSelect.value = this.appSettings.getSetting('msaaLevel')
         }
 
         UIComponentUtils.updateSliderValue(
