@@ -25,7 +25,7 @@ XR path: `renderer.toneMapping = AgXToneMapping` on `sessionstart`, reset on `se
 | Effect | Status | Notes |
 |---|---|---|
 | **ToneMappingEffect (AGX)** | ✅ Implemented | Final tone curve. `renderer.toneMappingExposure` still active. |
-| **N8AOPostPass** | ✅ Implemented | Replaces SSAOEffect. HBAO-style AO from `n8ao` package. Quality follows `qualityLevel` setting; on/off via `ssaoEnabled`. `gammaCorrection = false` (ToneMappingEffect handles HDR→display). Initial params: `aoRadius 1.5`, `intensity 2.5` — needs visual tuning for scene scale. |
+| **N8AOPostPass** | ✅ Implemented | Replaces SSAOEffect. HBAO-style AO from `n8ao` package. Quality/on-off both driven by `ssaoQuality` (0=Off..5), a `GraphicsSettingsPanel` slider ordered by *measured GPU cost*, not sample count alone — `halfRes` matters more than `aoSamples`. See `RenderPipelineManager.SSAO_QUALITY_LEVELS` and `docs/plans/framerate-regression-investigation-plan.md`'s 2026-07-29 findings (N8AO's real GPU cost was ~84% of the frame budget at the old default). `gammaCorrection = false` (ToneMappingEffect handles HDR→display). `aoRadius 1.5`, `intensity 2.5` — needs visual tuning for scene scale. |
 | **SMAAEffect (HIGH preset)** | ✅ Implemented | Runs after tone mapping in LDR space. Preset follows `smaaPreset` setting. |
 
 ### Quality / Scene Effects (desktop, can be toggled)
