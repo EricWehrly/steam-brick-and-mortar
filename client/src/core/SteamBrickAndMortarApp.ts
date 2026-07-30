@@ -318,11 +318,10 @@ export class SteamBrickAndMortarApp {
         // TODO: Normalize configuration inputs
         // and don't require so many lines in the main files
 
-        // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1)
+        // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1 or ?sweep=1)
         // This MUST happen before startRenderLoop() - decision is made once, zero per-frame overhead when disabled
         // TODO: set appsettings from url, have diagnostics class set up at this phase?
-        const perfSweepEnabled = UrlUtils.isPerfSweepEnabled()
-        const diagnosticsEnabled = UrlUtils.isDiagnosticsEnabled() || perfSweepEnabled
+        const diagnosticsEnabled = UrlUtils.isDiagnosticsEnabled()
         this.diagnosticsEnabled = diagnosticsEnabled
         RenderLoopDiagnostics.initialize({
             enabled: diagnosticsEnabled,
@@ -330,12 +329,10 @@ export class SteamBrickAndMortarApp {
             frameTimeWarnThreshold: 16.67,  // Counts a frame as "slow" past 60fps budget
             callbackTimeWarnThreshold: 5  // Counts a callback/stage occurrence as slow-worth-noting
         })
-        RenderLoopDiagnostics.attachRenderPipeline(
-            this.sceneManager.getRenderPipelineManager(),
-            this.sceneManager.getRenderer()
-        )
+        // Render-pipeline-specific instrumentation is wired by RenderPipelineManagerDebug at
+        // construction time (see SceneManager) — it self-gates on the same UrlUtils check.
 
-        if (perfSweepEnabled) {
+        if (UrlUtils.isPerfSweepEnabled()) {
             this.eventManager.registerEventHandler(AppEventTypes.WorldDetailEnhanced, () => {
                 PerfSweep.run()
             })

@@ -19,6 +19,7 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { BlockbusterColors } from '../utils/Colors'
 import { RenderPipelineManager } from './RenderPipelineManager'
+import { RenderPipelineManagerDebug } from '../debug/RenderPipelineManagerDebug'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
@@ -83,7 +84,9 @@ export class SceneManager {
         this.setupRenderer()
         this.setupEnvironmentLighting()
         this.setupCamera()
-        this.renderPipelineManager = new RenderPipelineManager(this.renderer, this.scene, this.camera)
+        // RenderPipelineManagerDebug self-gates on UrlUtils.isDiagnosticsEnabled() — safe to
+        // always construct, matching ThreeWebGLRendererDebug/SceneManagerDebug's own pattern.
+        this.renderPipelineManager = new RenderPipelineManagerDebug(this.renderer, this.scene, this.camera)
         this.setupEventListeners()
         this.initializeSkybox()
 
