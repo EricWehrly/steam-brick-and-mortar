@@ -69,6 +69,86 @@ describe('RenderLoopDiagnostics', () => {
         expect(RenderLoopDiagnostics.report()!.frameCount).toBe(2)
     })
 
+    // These tests pin performance.now() to 0 so startCapture()'s real-clock captureStartTime
+    // lands on the same timeline as the synthetic `now` values passed to runFrame() — without
+    // this, bucket/timestamp math would compare synthetic frame timestamps against a real
+    // (unrelated, much larger) clock reading. Frame-time bookkeeping itself uses the synthetic
+    // `now`/`deltaTime` params directly, not performance.now(), so this only affects timestamp
+    // alignment for capture start, not the deltaTime values under test.
+    function pinClockToZero(): void {
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+    }
+
+    it('avgFrameTime reflects real deltaTime (frame cadence), not just CPU work time', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        pinClockToZero()
+        // No registered callbacks and no real render work — if avgFrameTime were actually
+        // measuring CPU work span (the bug this test guards against), it would read ~0.
+        RenderLoopDiagnostics.startCapture()
+        runFrame(registry, 0, 16.8)
+        runFrame(registry, 16.8, 16.8)
+        runFrame(registry, 33.6, 16.8)
+
+        silenceConsole()
+        const report = RenderLoopDiagnostics.report()
+
+        expect(report!.avgFrameTime).toBeCloseTo(16.8, 1)
+        expect(report!.maxFrameTime).toBeCloseTo(16.8, 1)
+    })
+
+    it('computes stddev across the capture window deltas', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        pinClockToZero()
+
+        RenderLoopDiagnostics.startCapture()
+        runFrame(registry, 0, 10)
+        runFrame(registry, 10, 20)
+        runFrame(registry, 30, 10)
+        runFrame(registry, 40, 20)
+
+        silenceConsole()
+        const report = RenderLoopDiagnostics.report()
+
+        // mean=15, deviations [-5,5,-5,5] -> variance=25 -> stddev=5
+        expect(report!.stddevFrameTime).toBeCloseTo(5, 1)
+    })
+
+    it('counts a jitter event when frame-to-frame delta swings past the threshold', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        pinClockToZero()
+
+        RenderLoopDiagnostics.startCapture()
+        runFrame(registry, 0, 16)
+        runFrame(registry, 16, 16.5) // small change, not jitter
+        runFrame(registry, 32.5, 40) // big swing, jitter
+        runFrame(registry, 72.5, 16) // big swing back, jitter
+
+        silenceConsole()
+        const report = RenderLoopDiagnostics.report()
+
+        expect(report!.jitterEventCount).toBe(2)
+    })
+
+    it('buckets frames by elapsed second since capture start', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true })
+        pinClockToZero()
+
+        RenderLoopDiagnostics.startCapture()
+        // Two frames land in second 0, one crosses into second 1
+        runFrame(registry, 0, 400)
+        runFrame(registry, 900, 400)
+        runFrame(registry, 1200, 400)
+
+        silenceConsole()
+        const report = RenderLoopDiagnostics.report()
+
+        expect(report!.buckets).toHaveLength(2)
+        expect(report!.buckets[0].bucketIndex).toBe(0)
+        expect(report!.buckets[0].frameCount).toBe(2)
+        expect(report!.buckets[1].bucketIndex).toBe(1)
+        expect(report!.buckets[1].frameCount).toBe(1)
+    })
+
     it('breaks down per-id timing under stages, keyed by callback id', () => {
         RenderLoopDiagnostics.initialize({ enabled: true })
         registry.register('slowCallback', () => {

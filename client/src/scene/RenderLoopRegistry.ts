@@ -15,8 +15,11 @@ export interface RenderLoopCallback {
  * All hooks are optional - only set what you need
  */
 export interface InstrumentationHooks {
-    /** Called before executing any callbacks */
-    onBeforeFrame?: () => void
+    /** Called before executing any callbacks. now/deltaTime are the same values passed to
+     *  executeAll() — deltaTime is the real wall-clock gap since the previous frame's
+     *  executeAll() call, i.e. actual frame cadence including GPU/vsync time, not just the
+     *  CPU work done inside this callback. */
+    onBeforeFrame?: (now: number, deltaTime: number) => void
     /** Called after all callbacks have executed */
     onAfterFrame?: () => void
     /** Called after renderer.render() — full frame cost including GPU submission */
@@ -79,7 +82,7 @@ export class RenderLoopRegistry {
      */
     public executeAll(now: number, deltaTime: number): void {
         // Call frame begin hook if set
-        this.instrumentation?.onBeforeFrame?.()
+        this.instrumentation?.onBeforeFrame?.(now, deltaTime)
         
         if (this.instrumentation?.wrapCallback) {
             // Instrumented path - wrapper handles execution and timing
