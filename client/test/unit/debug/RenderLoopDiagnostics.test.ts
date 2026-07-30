@@ -134,10 +134,11 @@ describe('RenderLoopDiagnostics', () => {
         pinClockToZero()
 
         RenderLoopDiagnostics.startCapture()
-        // Two frames land in second 0, one crosses into second 1
-        runFrame(registry, 0, 400)
-        runFrame(registry, 900, 400)
-        runFrame(registry, 1200, 400)
+        // Two frames land in second 0, one crosses into second 1. deltaTime kept under
+        // MAX_PLAUSIBLE_FRAME_TIME_MS - only `now` needs to cross the bucket boundary.
+        runFrame(registry, 0, 50)
+        runFrame(registry, 900, 50)
+        runFrame(registry, 1200, 50)
 
         silenceConsole()
         const report = RenderLoopDiagnostics.report()
@@ -147,6 +148,45 @@ describe('RenderLoopDiagnostics', () => {
         expect(report!.buckets[0].frameCount).toBe(2)
         expect(report!.buckets[1].bucketIndex).toBe(1)
         expect(report!.buckets[1].frameCount).toBe(1)
+    })
+
+    it('does not console.warn per slow frame or per slow stage occurrence', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true, frameTimeWarnThreshold: 5 })
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        vi.spyOn(console, 'log').mockImplementation(() => {})
+        vi.spyOn(console, 'table').mockImplementation(() => {})
+        registry.register('cb', () => {})
+
+        RenderLoopDiagnostics.startCapture()
+        for (let i = 0; i < 5; i++) {
+            runFrame(registry, i * 16, 16) // exceeds the 5ms threshold on every frame
+        }
+
+        const report = RenderLoopDiagnostics.report()
+
+        expect(report!.slowFrameCount).toBe(5)
+        expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('never prints automatically, no matter how many frames run — only report()/getStats() do', () => {
+        RenderLoopDiagnostics.initialize({ enabled: true, frameTimeWarnThreshold: 1 })
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+        const tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {})
+        registry.register('cb', () => {})
+
+        // Past the old logInterval (60) auto-log boundary, twice over.
+        for (let i = 0; i < 130; i++) {
+            runFrame(registry, i * 16, 16)
+        }
+
+        expect(warnSpy).not.toHaveBeenCalled()
+        expect(logSpy).not.toHaveBeenCalled()
+        expect(tableSpy).not.toHaveBeenCalled()
+
+        const stats = RenderLoopDiagnostics.getStats()
+        expect(stats.frameCount).toBe(130)
+        expect(stats.slowFrameCount).toBe(130)
     })
 
     it('breaks down per-id timing under stages, keyed by callback id', () => {

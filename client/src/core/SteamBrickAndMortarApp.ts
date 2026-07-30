@@ -326,9 +326,9 @@ export class SteamBrickAndMortarApp {
         this.diagnosticsEnabled = diagnosticsEnabled
         RenderLoopDiagnostics.initialize({
             enabled: diagnosticsEnabled,
-            logInterval: 60,  // Log every ~1 second at 60fps
-            frameTimeWarnThreshold: 16.67,  // Warn if frame exceeds 60fps budget
-            callbackTimeWarnThreshold: 5  // Warn if any callback > 5ms
+            logInterval: 60,  // Rolling average window size, in frames (~1s at 60fps)
+            frameTimeWarnThreshold: 16.67,  // Counts a frame as "slow" past 60fps budget
+            callbackTimeWarnThreshold: 5  // Counts a callback/stage occurrence as slow-worth-noting
         })
         RenderLoopDiagnostics.attachRenderPipeline(
             this.sceneManager.getRenderPipelineManager(),

@@ -8,9 +8,14 @@
  * - If diagnostics disabled: No instrumentation set, zero overhead
  * - If diagnostics enabled: Wrapper with timing, ~0.1ms overhead per frame
  *
+ * Nothing here prints to the console on its own — stats accumulate silently.
+ * Read them on demand with getStats(), or with startCapture()/report() for a
+ * scoped window (per-second buckets, stddev, jitter count, per-stage
+ * breakdown — see docs/architecture/frame-budget-capture-tooling.md).
+ *
  * Usage:
  *   // At app startup, BEFORE render loop starts:
- *   RenderLoopDiagnostics.initialize({ enabled: true, logInterval: 60 })
+ *   RenderLoopDiagnostics.initialize({ enabled: true })
  */
 
 import type * as THREE from 'three'
@@ -83,27 +88,21 @@ export interface CaptureReport {
 export interface DiagnosticsConfig {
     /** Enable diagnostics (default: false for production) */
     enabled: boolean
-    /** Log frame stats every N frames (default: 60 = ~1 second) */
+    /** Size of the rolling window callbackTimes/getStats() average over, in frames (default: 60) */
     logInterval?: number
-    /** Warn if frame time exceeds this (ms, default: 16.67 for 60fps) */
+    /** Threshold for counting a frame as "slow" in slowFrameCount/report() (ms, default: 16.67 for 60fps) */
     frameTimeWarnThreshold?: number
-    /** Warn if any callback exceeds this (ms, default: 5) */
+    /** Threshold for counting a callback/stage occurrence as slow-worth-noting (ms, default: 5) */
     callbackTimeWarnThreshold?: number
 }
 
 interface FrameStats {
     frameCount: number
-    /** Real wall-clock frame time (deltaTime from RenderLoopRegistry) */
-    totalFrameTime: number
-    maxFrameTime: number
     callbackTimes: Map<string, number[]>
     /** CPU-work span: stamped at frame start, consumed in endFrame() */
     workStartTime: number
-    totalWorkTime: number
-    maxWorkTime: number
-    /** All-time peaks — never reset by logStats() */
+    /** All-time peak, never reset */
     peakFrameTime: number
-    peakWorkTime: number
     peakCallbackTimes: Map<string, number>
     /** How many frames exceeded frameTimeWarnThreshold */
     slowFrameCount: number
@@ -140,14 +139,9 @@ export class RenderLoopDiagnostics {
 
     private static stats: FrameStats = {
         frameCount: 0,
-        totalFrameTime: 0,
-        maxFrameTime: 0,
         callbackTimes: new Map(),
         workStartTime: 0,
-        totalWorkTime: 0,
-        maxWorkTime: 0,
         peakFrameTime: 0,
-        peakWorkTime: 0,
         peakCallbackTimes: new Map(),
         slowFrameCount: 0,
     }
@@ -262,17 +256,11 @@ export class RenderLoopDiagnostics {
         this.gpuTimerQuery?.poll()
 
         this.stats.frameCount++
-        this.stats.totalFrameTime += deltaTime
-        this.stats.maxFrameTime = Math.max(this.stats.maxFrameTime, deltaTime)
         if (deltaTime > this.stats.peakFrameTime) {
             this.stats.peakFrameTime = deltaTime
         }
         if (deltaTime > this.config.frameTimeWarnThreshold) {
             this.stats.slowFrameCount++
-            console.warn(
-                `⚠️ [RenderLoopDiagnostics] Slow frame #${this.stats.frameCount}: ` +
-                `${deltaTime.toFixed(2)}ms (budget: ${this.config.frameTimeWarnThreshold}ms)`
-            )
         }
 
         if (this.captureStartTime !== null) {
@@ -282,10 +270,6 @@ export class RenderLoopDiagnostics {
             }
         }
         this.previousFrameDelta = deltaTime
-
-        if (this.stats.frameCount % this.config.logInterval === 0) {
-            this.logStats()
-        }
     }
 
     /**
@@ -330,13 +314,6 @@ export class RenderLoopDiagnostics {
             this.stats.peakCallbackTimes.set(id, duration)
         }
 
-        // Warn on individual slow occurrences
-        if (duration > this.config.callbackTimeWarnThreshold) {
-            console.warn(
-                `⚠️ [RenderLoopDiagnostics] Slow '${id}': ${duration.toFixed(2)}ms`
-            )
-        }
-
         if (this.captureStartTime !== null) {
             const entry = this.captureIdTotals.get(id) ?? { total: 0, max: 0, count: 0 }
             entry.total += duration
@@ -359,11 +336,6 @@ export class RenderLoopDiagnostics {
         }
 
         const workTime = performance.now() - this.stats.workStartTime
-        this.stats.totalWorkTime += workTime
-        this.stats.maxWorkTime = Math.max(this.stats.maxWorkTime, workTime)
-        if (workTime > this.stats.peakWorkTime) {
-            this.stats.peakWorkTime = workTime
-        }
 
         if (this.captureStartTime !== null) {
             this.captureWorkTimeTotal += workTime
@@ -371,48 +343,6 @@ export class RenderLoopDiagnostics {
         }
 
         this.stats.workStartTime = 0 // Reset sentinel
-    }
-
-    private static logStats(): void {
-        const avgFrameTime = this.stats.totalFrameTime / this.config.logInterval
-        const avgWorkTime = this.stats.totalWorkTime / this.config.logInterval
-
-        const hasSlowCallbacks = Array.from(this.stats.callbackTimes.values()).some(times => {
-            const avg = times.reduce((a, b) => a + b, 0) / times.length
-            return avg >= 1.0
-        })
-
-        // Always reset rolling window, but only log if something is worth seeing
-        const windowMaxFrameTime = this.stats.maxFrameTime
-        const windowMaxWorkTime = this.stats.maxWorkTime
-        this.stats.totalFrameTime = 0
-        this.stats.maxFrameTime = 0
-        this.stats.totalWorkTime = 0
-        this.stats.maxWorkTime = 0
-
-        if (avgWorkTime < 1.0 && !hasSlowCallbacks) {
-            return
-        }
-
-        console.log(
-            `📊 [RenderLoopDiagnostics] Frame Stats (last ${this.config.logInterval} frames):` +
-            ` avg ${avgFrameTime.toFixed(2)}ms (work ${avgWorkTime.toFixed(2)}ms),` +
-            ` max ${windowMaxFrameTime.toFixed(2)}ms (work ${windowMaxWorkTime.toFixed(2)}ms)` +
-            ` | peak all-time: ${this.stats.peakFrameTime.toFixed(2)}ms` +
-            ` | slow frames: ${this.stats.slowFrameCount}`
-        )
-
-        // Log per-callback averages (only those >= 0.5ms avg or with a peak spike)
-        for (const [id, times] of this.stats.callbackTimes.entries()) {
-            const avg = times.reduce((a, b) => a + b, 0) / times.length
-            const windowMax = Math.max(...times)
-            const peak = this.stats.peakCallbackTimes.get(id) ?? 0
-            if (avg >= 0.5 || peak >= this.config.callbackTimeWarnThreshold) {
-                console.log(
-                    `   ${id}: avg ${avg.toFixed(2)}ms, max ${windowMax.toFixed(2)}ms, peak ${peak.toFixed(2)}ms`
-                )
-            }
-        }
     }
 
     /**
@@ -617,14 +547,9 @@ export class RenderLoopDiagnostics {
         this.captureIdTotals = new Map()
         this.stats = {
             frameCount: 0,
-            totalFrameTime: 0,
-            maxFrameTime: 0,
             callbackTimes: new Map(),
             workStartTime: 0,
-            totalWorkTime: 0,
-            maxWorkTime: 0,
             peakFrameTime: 0,
-            peakWorkTime: 0,
             peakCallbackTimes: new Map(),
             slowFrameCount: 0,
         }
