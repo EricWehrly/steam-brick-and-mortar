@@ -2,7 +2,7 @@
 
 **Parent features**: [Static Hosting](../features/static-hosting.md) · [Native Desktop App](../features/desktop-app.md)
 **Act**: 2
-**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls raw S3 objects and repacks them into one client-ready bundle: `app-details.json.gz` (1361 games, ~3.4 MiB), via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) filters `is_free == true` from that bundle itself, bakes F2P artwork, and writes an `undesirable_for_demo` flag back onto any appid whose artwork 404'd — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). (2026-07-12: the earlier F2P/rest bundle split was removed — see "Split" section below, superseded.) Steps 3-5 (build/pack) still stubbed.
+**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls raw S3 objects and repacks them into one client-ready bundle: `app-details.json.gz` (1361 games, ~3.4 MiB), via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) filters `is_free == true` from that bundle itself, bakes F2P artwork, and writes an `undesirable_for_demo` flag back onto any appid whose artwork 404'd — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). (2026-07-12: the earlier F2P/rest bundle split was removed — see "Split" section below, superseded.) Steps 3-5 (build/pack) still stubbed. **Step 2.4 proposed 2026-07-29, design decided, not yet implemented** — folding desktop-discovered dead-artwork-URLs and local-librarycache-derived real URLs back into the baked bundle (runs before Step 2.5, which now prefers a folded-in real URL over its own guess), developer-workflow scope for now: dev-build-only (`#[cfg(debug_assertions)]` + `import.meta.env.DEV`, absent entirely from release builds), triggered manually from a settings-menu action rather than running automatically. See section below.
 
 ## Why this exists (the actual goal)
 
@@ -46,11 +46,18 @@ aws s3 sync s3://steam-brick-and-mortar-dev-game-cache/ .release-cache/raw/ \
 #    a new language — see "Why bash, not Node/TS" below.
 scripts/repack-steam-cache.sh .release-cache/raw client/public/steam-cache
 
+# 2.4. Fold in desktop-discovered contributions (dead artwork URLs, validated real library/header
+#      CDN URLs harvested from a developer's own local Steam install) - see "Step 2.4" below.
+#      Runs BEFORE 2.5 deliberately: if a real library URL is already known here, F2P baking
+#      must use it instead of downloading its own guessed CDN path.
+scripts/fold-contributions.sh client/public/steam-cache/app-details.json.gz data/contributions
+
 # 2.5. Filter is_free == true from that bundle, bake the F2P/anonymous-store artwork set
 #      (library_600x900.jpg per F2P appid) into one grid image so it ships with the release
 #      and never touches Steam's CDN for those games, and write undesirable_for_demo: true
 #      back onto any appid whose artwork 404'd. Requires ImageMagick (magick/montage) on
-#      whatever machine runs this. See docs/plans/f2p-artwork-bake-plan.md.
+#      whatever machine runs this. Now prefers an already-known real artwork.library URL (from
+#      2.4, if present) over downloading its own guessed path - see docs/plans/f2p-artwork-bake-plan.md.
 scripts/bake-f2p-artwork.sh client/public/steam-cache/app-details.json.gz client/public/artwork-cache
 
 # 3. Build the web client — dist/ does NOT embed the cache (it's a public/ asset, fetched
@@ -67,6 +74,135 @@ zip -r release.zip \
 ```
 
 (Steps 3-5 sketch — exact staging paths and zip contents still a detail to settle.)
+
+## Step 2.4 (proposed, 2026-07-29): folding in desktop-discovered contributions
+
+**Status**: Proposed, design decided 2026-07-29 (see decisions below), awaiting implementation.
+
+The desktop app's local-scan pipeline now *discovers* two kinds of real data at runtime that
+never existed anywhere before the app ran ([Startup Artwork Resolution](startup-artwork-resolution-plan.md)):
+confirmed-dead artwork URLs (`artwork_dead_paths`), and, once the local-librarycache build plan
+there lands, real `library`/`header` CDN URLs read off a user's own Steam install. Right now both
+live only in that one machine's IndexedDB — every other build (and every other user) re-discovers
+the same dead URLs and never benefits from the local-librarycache find at all. This step is about
+getting that data from a running desktop app into the baked bundle, following the same pattern
+Step 2.5 already established for its own discoveries (`undesirable_for_demo`).
+
+**Scope, explicitly**: a *developer* workflow for now, not an end-user telemetry pipeline —
+matches how Step 2.5 already works (something a developer runs before cutting a release, not
+something that happens automatically on a stranger's machine and phones home). "Other people
+contributing their own file" means another developer/contributor manually handing you a file (PR,
+attachment, whatever) — not a live submission channel. That's explicitly a later stretch.
+
+**Runs before Step 2.5, deliberately** (decided 2026-07-29): if a real `artwork.library` URL is
+already known by the time F2P baking runs, F2P baking must use it instead of downloading its own
+guessed `library_600x900.jpg` path — a locally-discovered, already-validated real URL always wins
+over a guess, full stop. `bake-f2p-artwork.sh`'s per-appid loop needs a corresponding change: check
+`.data.artwork.library` first, only fall back to the existing guess-and-download behavior when
+that's absent.
+
+### Dev-only, manually triggered — not automatic, not present in release builds (decided 2026-07-29)
+
+This whole mechanism only exists for the developer gathering data ahead of a release — never for
+an end user's shipped copy of the app. Two gates, not one, so a release build simply has nothing
+to accidentally run:
+
+- **Rust side**: the write/validate command(s) are `#[cfg(debug_assertions)]`-gated (same idiom
+  `main.rs` already uses for the Windows console subsystem) — the capability doesn't exist in the
+  compiled release binary at all, not just "exists but is hidden."
+- **TS side**: the settings-menu entry that triggers it is gated behind `import.meta.env.DEV`
+  (Vite's build-mode flag — already the established convention, see `AppSettings.ts`'s
+  `getDefaultSettings()`, chosen there specifically so prod/dev behavior is "tied to the build, not
+  a runtime hostname check").
+
+Runs **on demand from a settings-menu action**, not automatically on every local-scan — the
+earlier design (queue validation checks the moment `find_local_library_art` discovers a new
+candidate, every session) would mean network calls firing passively just from normal use, which is
+exactly the "not blast a bunch of requests" concern this is trying to avoid, not just at any single
+moment but as standing background behavior. A manual trigger means the developer decides when to
+spend that budget, and there's no automatic code path left for a release build to need disabling in
+the first place — belt and suspenders with the two gates above.
+
+### Two separate contribution files, both exported on demand (decided 2026-07-29)
+
+Dead-paths and discovered library-URLs come from genuinely different call sites with different
+validation guarantees (see below) — kept as two independent files rather than one shared format:
+
+- `data/contributions/artwork-dead-paths.ndjson`
+- `data/contributions/library-art-urls.ndjson`
+
+Both NDJSON (one JSON object per line) rather than a single JSON object keyed by appid — two
+independent contribution files, or two contributors' copies of the same file, concatenate and
+`git merge` cleanly line-by-line; a single appid-keyed JSON object gets a real git conflict almost
+any time two contributors touch different appids near each other in key order. Each line reuses
+the exact partial-`AppDetailsData` shape `AppDetailsCache.mergeMany()` already accepts client-side
+(`{ appid, discovered_at, ...fields }`) rather than inventing a third format alongside the existing
+bundle shape and the existing runtime merge shape. `discovered_at` (decided 2026-07-29: yes, every
+line carries one) lets the bake-time fold-in resolve conflicting contributions the same
+"prefer newer meaningful value" way `mergeAppDetails` already does at runtime — except
+`artwork_dead_paths`, which stays a union (losing a known-dead path is a real regression, not
+staleness, same rule the runtime merge already applies).
+
+**`artwork-dead-paths.ndjson` is a snapshot export, not a live-written log** (revised 2026-07-29,
+now that the settings-menu trigger exists as a natural export moment): the settings-menu action
+reads `AppDetailsCache`'s *current* `artwork_dead_paths` across every appid and writes the file in
+one pass. This means `GameArtworkRequest`/`AppDetailsCache.markArtworkPathDead()` — already
+shipped, already field-tested this session — need **no changes at all**; they keep accumulating
+dead paths into IndexedDB exactly as they do today, and this export just reads that accumulated
+state whenever the developer asks for it, rather than needing a second write path wired into the
+existing failure-handling code.
+
+### Validating library-URL discoveries before they're ever written (decided 2026-07-29)
+
+`library-art-urls.ndjson` only ever receives entries that have passed a real check — **never write
+an unvalidated URL to this file.** Unlike the dead-paths file, this can't be a pure snapshot of
+already-known state, since validating *is* the new work the settings-menu action performs. Runs
+client-side in the running desktop app (not at bake time, and not as a separate Node/bash tool —
+see "Why bash, not Node/TS" below for why bake-time tooling stays bash+jq, which argues *for*
+keeping this validation step in the already-TypeScript live app instead), all within that one
+on-demand action:
+
+1. Run `find_local_library_art` (the local-librarycache build plan's Deliverable 1) fresh, or reuse
+   this session's result if the local scan already ran. For each discovered hash-migrated
+   `library`/`header` slot, check whether `AppDetailsCache`'s existing entry for that appid already
+   has an `artwork.library`/`artwork.header` URL built from this exact hash. If so, skip it —
+   already validated, nothing changed since last time.
+2. Everything left over queues for validation, paced through the existing
+   [`RateLimiter`](../../client/src/steam/rate-limit/RateLimiter.ts) (already used elsewhere in the
+   client — reused here, not reinvented) rather than firing all checks at once. A real check is one
+   `fetch(url, { method: 'HEAD' })` against the constructed CDN URL — the app already does full
+   `fetch()`s against these same CDN hosts elsewhere and gets clean CORS headers back on genuine
+   200s, so no new CORS-bypass mechanism is needed here, only for telling apart *why* something
+   failed (which, same as the existing dead-path philosophy, this doesn't need to know).
+3. **On success**: merge `artwork.library`/`artwork.header` into `AppDetailsCache` (so this session
+   benefits immediately too, not just a future shipped bundle) and append the validated entry to
+   `library-art-urls.ndjson` right away — as each check completes, not batched up and written once
+   at the end, so progress survives an interrupted run.
+4. **On failure**: reuse the existing dead-path mechanism unchanged —
+   `AppDetailsCache.markArtworkPathDead(appid, constructedUrl)`. A failed validation is just another
+   dead-path discovery; no second failure-handling path needed, and it'll show up in the *next*
+   dead-paths snapshot export for free.
+5. When the queue finishes, one `console.log` summary (validated / failed / already-known counts)
+   — this is the live app's own console, not a build script's log, so `console.log` rather than
+   `scripts/common.sh`'s `log_*` helpers.
+
+### Where the files are written — portable, not hardcoded (decided 2026-07-29)
+
+Resolved via Tauri's own `app_handle.path().app_data_dir()` (Tauri v2's official, per-OS-portable
+path API), the same spirit as `paths.rs`'s existing "resolve, don't hardcode" approach to finding
+*Steam's* install — except here it's our own app's data dir, which Tauri already knows how to
+locate on any OS without any manual path construction. No in-app affordance to reveal the path
+(considered, rejected) — this is a development-time concern for whoever is running the dev build,
+not something an end user (who won't have this feature at all — see release-build gating above)
+ever needs surfaced. First command in `desktop/tauri-app/src/steam/` that needs an `AppHandle`
+parameter — every existing command is a plain argument-less-or-appid-only function; worth noting
+as a small new pattern for this module, not just "another command."
+
+### Bake-time fold-in
+
+A new `scripts/fold-contributions.sh` (Step 2.4), reading every present contribution file and
+applying it as a patch onto `app-details.json.gz`, gzipping back over the same path — the same
+`jq`-based read/patch/write shape `bake-f2p-artwork.sh` already uses for `undesirable_for_demo`.
 
 ### Why bash, not Node/TS, for the repack step
 
