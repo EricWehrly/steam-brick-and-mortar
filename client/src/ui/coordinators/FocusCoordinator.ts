@@ -6,6 +6,11 @@
  * gain: resumes. Emits AppEventTypes.VisibilityChanged for any other systems
  * that need to respond (e.g. PerformanceMonitorUI pausing its own RAF loop).
  *
+ * With ?diagnostics=1, focus-loss transitions are suppressed entirely — an
+ * unattended capture session (e.g. a backgrounded automation/preview pane)
+ * would otherwise have its render loop paused and every frame-time sample
+ * would read zero.
+ *
  * Visual feedback on blur:
  * A frosted-glass / VHS-scanline overlay over the Three.js canvas could go here.
  * The CSS hook point is setBlurOverlay(true/false); window.toggleSceneBlur()
@@ -18,6 +23,7 @@ import { Logger } from '../../utils/Logger'
 import { EventManager } from '../../core/EventManager'
 import { AppEventTypes } from '../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../types/InteractionEvents'
+import { UrlUtils } from '../../utils/UrlUtils'
 
 const BLUR_CLASS = 'scene-blurred'
 const BLUR_OVERLAY_ID = 'scene-blur-overlay'
@@ -28,10 +34,16 @@ export class FocusCoordinator {
     private readonly eventManager = EventManager.getInstance()
     private isFocused: boolean = !document.hidden
     private readonly blurOverlay: HTMLElement
+    // A backgrounded automation/preview pane never composites frames, which makes
+    // document.hidden report true even while a capture is actively driving the app —
+    // pausing the render loop there would silently zero out every frame-time sample.
+    // Diagnostics captures need the loop to keep running regardless of tab visibility.
+    private readonly keepRunningWhenHidden = UrlUtils.isDiagnosticsEnabled()
 
     private readonly onVisibilityChange = (): void => {
         const nowFocused = !document.hidden
         if (nowFocused === this.isFocused) return
+        if (!nowFocused && this.keepRunningWhenHidden) return
         this.isFocused = nowFocused
         this.handleFocusChanged(nowFocused, 'visibilitychange')
     }
@@ -44,6 +56,7 @@ export class FocusCoordinator {
 
     private readonly onWindowBlur = (): void => {
         if (!this.isFocused) return
+        if (this.keepRunningWhenHidden) return
         this.isFocused = false
         this.handleFocusChanged(false, 'window-blur')
     }

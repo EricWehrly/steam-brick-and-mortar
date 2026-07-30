@@ -17,4 +17,14 @@ export class UrlUtils {
             return url
         }
     }
+
+    /**
+     * Whether ?diagnostics=1 is present on the current page URL. Gates
+     * RenderLoopDiagnostics and anything else that needs frames to keep
+     * rendering during an unattended capture — see FocusCoordinator, which
+     * uses this to skip pausing the render loop on tab/window blur.
+     */
+    static isDiagnosticsEnabled(): boolean {
+        return new URLSearchParams(window.location.search).get('diagnostics') === '1'
+    }
 }
