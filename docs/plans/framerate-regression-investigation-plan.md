@@ -1,6 +1,8 @@
 # Plan: Framerate Regression Investigation
 
-**Status**: Capture tool + settings-sweep methodology designed, not yet built — no measurement or root cause confirmed yet
+**Status**: Root cause confirmed and fixed — SSAO (N8AO) was the dominant cost; the settings-sweep
+methodology below is still useful for the remaining tiers/settings but is no longer blocking. See
+"Findings (2026-07-29)".
 **Priority**: High — parallel track alongside [Input System](../features/input-system.md); no hard
 dependency between the two, safe to run concurrently
 **Related tech debt**: [`shadow-default-policy-evaluation`](../tech-debt.md#id-shadow-default-policy-evaluation)
@@ -372,38 +374,127 @@ This repo already has a convention for exactly this: `docs/scratch/` (untracked)
 investigation-scoped, non-reviewed material already lives. The orchestrator and presets go there as
 a plain script, not into `client/src/`.
 
-## Candidate mitigation direction (flagged, not in scope for this doc)
+## Findings (2026-07-29)
 
-If the capture tool confirms SSAO and/or shadows as a dominant, ambient cost: both currently only
-have a *global* quality knob (`shadowQuality` in `LightingRenderer.ts`, N8AO's
-`setQualityMode()`/`QUALITY_LEVEL` in `RenderPipelineManager.ts`) — one setting, applied uniformly
-regardless of what's actually in view or how far it is from the camera. There's no distance- or
-importance-based LOD that reduces cost for, say, signage far from the player or outside the AO
-radius's useful range. Worth considering once contribution is confirmed: could shadow-casting and
-AO sampling fall off with distance/relevance the way a mesh LOD would, to "normalize" the per-frame
-cost instead of paying the same rate everywhere all the time. This is a fix-direction hypothesis to
-record now so it isn't lost — not a design to implement here (see "Explicitly out of scope" below)
-— and it's the same seam as
-[`shadow-default-policy-evaluation`](../tech-debt.md#id-shadow-default-policy-evaluation), so if
-adopted it should fold into that debt item's centralized-policy work rather than becoming a third
-parallel shadow/AO mechanism.
+Diagnosis, not the full sweep — the capture tool (RenderLoopDiagnostics.startCapture()/report(),
+GpuTimerQuery) was enough to find and confirm the dominant cause directly, before the settings
+sweep matrix was ever run. Captures below: idle scene, default settings unless noted, on a machine
+whose display was later found to be power-limited to 60Hz (see the live perf-widget cross-check —
+frame time floors out at ~16.7ms even at minimal settings, confirming a 60Hz cap, not a 165Hz one).
+
+1. **The capture tool itself needed a correctness fix before any of this was trustworthy.**
+   `avgFrameTime` was originally computed from a CPU-side `performance.now()` span (callback
+   execution through `composer.render()` returning), not real frame cadence — `render()` submits
+   GPU commands and returns quickly, so this measured submission time, not GPU execution + vsync
+   wait. Caught by comparing against the existing perf widget (which measures real rAF-to-rAF
+   deltas): tool reported 3.3ms, widget reported 16.8ms. Fixed by threading `RenderLoopRegistry`'s
+   already-computed real `deltaTime` through `onBeforeFrame` instead of re-deriving a CPU-work span
+   (see the `Fix RenderLoopDiagnostics to measure real frame time` commit). The old CPU-span
+   measurement was kept as a separate `avgWorkTime` metric, not discarded — it's still useful
+   (“how much of the frame is identifiable CPU work vs. idle/GPU-wait”), just not the same number.
+2. **Toggle test isolated SSAO, cleared shadows.** With the fixed tool: baseline (SSAO+shadows on)
+   avgFrameTime ≈ 21.0ms. SSAO off → 16.8ms (essentially the floor). Shadows off alone → 20.7ms
+   (no meaningful change from baseline). SSAO off + shadows off → 16.7ms (same as SSAO off alone).
+   Shadows were never a real contributor here — the earlier suspicion (shadow-casting signage
+   commits, see "What's suspected" above) didn't hold up under measurement.
+3. **The frame-time distribution is bimodal, not smoothly variable** — a 6s capture with SSAO on
+   showed 239 frames at ~16ms (hit vsync) and 60 at ~32–36ms (missed one vsync tick and paid a full
+   extra ~16.7ms, not a proportional overrun). This is the actual shape of the "instability" this
+   doc set out to chase: SSAO's cost is fairly stable frame-to-frame, but borderline enough that
+   ~20% of frames tip over the 16.67ms deadline and pay a full extra vsync interval — not a jittery
+   GPU, a threshold effect.
+4. **CPU-side `pipeline:n8ao` timing was hiding the real cost.** Added real GPU timing via
+   `EXT_disjoint_timer_query_webgl2` (`GpuTimerQuery.ts`, see the GPU-timer-query commit) because
+   CPU submission time (~0.8–1.0ms) couldn't possibly explain a ~18ms frame-time/work-time gap.
+   Real GPU execution time for N8AO: **~14ms average, ~84.5% of the entire 16.67ms frame budget** —
+   a ~17x gap from what CPU timing showed. This fully explains the frame-time/work-time gap and the
+   bimodal vsync-miss pattern (SSAO's GPU cost sits right at the edge of the deadline).
+5. **Distance-based LOD (the original hypothesis from "What's suspected") doesn't fit how SSAO
+   actually works, and was deprioritized before writing any code for it.** SSAO is a full-screen
+   post-process pass — cost is driven by pixel count and samples-per-pixel, not scene distance; it
+   has no native concept of "near vs. far" the way mesh LOD does. Making it distance-aware would
+   mean patching N8AO's shader internals directly: real engineering, real risk, no existing
+   precedent in this codebase. Before committing to that, reading N8AO's own source
+   (`client/node_modules/n8ao/dist/N8AO.js`) surfaced two already-built, already-shipped levers
+   that turned out to matter far more:
+   - Our default (`qualityLevel: 'high'`) mapped to N8AO's `setQualityMode('High')`, which sets
+     **`aoSamples: 64`** — 4–8x more AO samples per pixel than N8AO's own Medium/Low (16) or
+     Performance (8) tiers.
+   - N8AO ships a built-in **`halfRes`** mode (half-resolution AO computation + depth-aware
+     upsampling) that was simply never turned on.
+   - Bonus: N8AO already runs its *own* internal GPU timer query (`pass.lastTime` in its source) —
+     worth knowing about for future cross-checks, though `GpuTimerQuery.ts` remains useful as
+     general-purpose, reusable instrumentation for other passes.
+6. **A/B data across `aoSamples`/`halfRes` combinations** (5s captures each, same idle scene):
+
+   | Config | avgFrameTime | N8AO GPU avg |
+   |---|---|---|
+   | 64 samples, halfRes off (old default) | 23.2ms | 13.8ms |
+   | 16 samples, halfRes off | 15.7ms | 6.4ms |
+   | 8 samples, halfRes off | 12.8ms | 5.1ms |
+   | 64 samples, halfRes **on** | 12.1ms | 4.5ms |
+   | 16 samples, halfRes **on** | 10.5ms | **2.9ms** |
+
+   Dropping to 16 samples alone already pulls frame time under the 16.67ms budget. Combined with
+   `halfRes`, N8AO's real GPU cost drops ~4.8x (13.8ms → 2.9ms), landing comfortably under budget
+   with real margin — enough to expect the vsync-miss pattern to disappear rather than just shrink.
+
+## Decision: config-level SSAO fix over distance-based LOD
+
+Config-level fix (adjust N8AO's `aoSamples`/`halfRes`) chosen over the distance-based LOD idea:
+same or better measured payoff, zero shader/architecture work, uses knobs the library already
+ships, no new maintenance surface. The LOD idea is **not discarded** — recorded here as
+deprioritized, not rejected, since a full-screen post-process effect was always an awkward fit for
+a "distance" concept in the first place. If a future pass needs shadow-specific LOD, that's still
+the seam [`shadow-default-policy-evaluation`](../tech-debt.md#id-shadow-default-policy-evaluation)
+owns — shadows weren't a contributor here (see Finding 2), so that work stays independently
+motivated or not, on its own evidence.
+
+## Implementation: SSAO quality slider
+
+Replaces the old `ssaoEnabled` boolean with `ssaoQuality: number` (index into
+`RenderPipelineManager.SSAO_QUALITY_LEVELS`), a `GraphicsSettingsPanel` range slider mirroring the
+existing `shadowQualityControl` pattern. Levels, ascending measured GPU cost (**not** a simple
+"more samples = higher index" ladder — `halfRes` turned out to matter more than sample count
+alone, see Finding 6):
+
+| Index | Label | aoSamples | halfRes | Measured GPU avg |
+|---|---|---|---|---|
+| 0 | Off | — | — | 0ms |
+| 1 (**default**) | 16 samples (half-res) | 16 | on | 2.9ms |
+| 2 | 64 samples (half-res) | 64 | on | 4.5ms |
+| 3 | 8 samples | 8 | off | 5.1ms |
+| 4 | 16 samples | 16 | off | 6.4ms |
+| 5 | 64 samples | 64 | off | 13.8ms (old default) |
+
+`denoiseSamples`/`denoiseRadius` are left at N8AO's own defaults across every level — only
+`aoSamples`/`halfRes` were varied in testing, so only those are varied here.
+
+**Stretch goal, explicitly deferred** — not part of this implementation: under an "Advanced"
+section, expose `aoSamples` and `halfRes` as two independent controls (rather than the combined
+6-level slider), and reflect a "Custom" value on the main Graphics slider when the advanced values
+don't match one of the six presets. No dependencies blocking it; deferred purely because the
+combined slider already delivers the fix and splitting the controls is UI polish, not a
+performance question.
+
+**Visual quality not yet verified** — lower AO samples and half-res computation are real quality
+trade-offs (more noise, softer contact shadows, less edge precision at object boundaries), offset
+by N8AO's own denoise pass by an unmeasured amount. The default (index 1) was chosen on frame-time
+data alone; a side-by-side visual comparison against the old default (index 5) is still owed before
+calling this fully validated, not just performant.
 
 ## Explicitly out of scope for this doc
 
-- Actually implementing a fix to the regression itself (e.g. disabling/re-tuning shadows or SSAO,
-  building the LOD idea above) — this doc stops at diagnosis and a recommended next step. Building
-  the capture tool and the sweep orchestrator is in scope; it's instrumentation, not a change to
-  render behavior.
 - The already-diagnosed detail-panel draw-call issue (see "Known, separately-tracked" above)
 - Deciding shadow policy centralization — that's `shadow-default-policy-evaluation`'s job; this
-  doc only decides whether shadows are *a* contributor worth centralizing sooner
+  doc found shadows are *not* a contributor here (Finding 2), so no urgency to centralize sooner
 - Cross-system extrapolation (deliverable 2) — needs data from more than one machine, not available
   from this sweep
 - Unifying `qualityLevel` into a single dial that actually drives every setting in the inventory
-  table — a plausible destination for deliverable 1's recommendation, but not a prerequisite for
-  running the sweep, and premature before there's a recommendation to unify around
-- Promoting comparative-cost labels into `GraphicsSettingsPanel`'s UI — downstream of deliverable 1,
-  once numbers exist to label with
+  table — a plausible follow-up, not a prerequisite for anything done here
+- The "Advanced" split-controls stretch goal (see Implementation section above)
+- Visual quality validation of the new SSAO default (see Implementation section above) — numbers
+  say it's fast, nobody's confirmed it still looks right
 
 ## Related
 
@@ -420,6 +511,12 @@ parallel shadow/AO mechanism.
 - `client/node_modules/postprocessing/build/index.cjs` — `EffectComposer`'s `multisampling` option
   (source of the MSAA finding above)
 - `docs/scratch/` — where the throwaway sweep orchestrator and presets belong
+- `client/node_modules/n8ao/dist/N8AO.js` — N8AO's actual config surface (`aoSamples`, `halfRes`,
+  `denoiseSamples`, etc.) and its own built-in GPU timer query (source of Finding 5)
+- `client/src/debug/GpuTimerQuery.ts` — real GPU execution timing via
+  `EXT_disjoint_timer_query_webgl2`, used to measure N8AO's real cost (Finding 4)
+- `client/src/scene/RenderPipelineManager.ts` — `SSAO_QUALITY_LEVELS`, `applySsaoQuality()`,
+  `getN8aoConfiguration()` (a kept debug accessor for future console-driven N8AO A/B testing)
 
 ---
 **Signature**: P1
