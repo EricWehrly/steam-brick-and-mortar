@@ -13,26 +13,18 @@
  * scoped window (per-second buckets, stddev, jitter count, per-stage
  * breakdown — see docs/architecture/frame-budget-capture-tooling.md).
  *
+ * This module only knows about render-loop callbacks and a generic recordTiming(id, ms) sink —
+ * it has no dependency on the render pipeline itself. Per-stage pipeline/shadow-map timing is
+ * wired separately by RenderPipelineManagerDebug (client/src/debug/), which calls recordTiming()
+ * directly; see that file for why the pipeline-specific instrumentation lives there instead.
+ *
  * Usage:
  *   // At app startup, BEFORE render loop starts:
  *   RenderLoopDiagnostics.initialize({ enabled: true })
  */
 
-import type * as THREE from 'three'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import type { RenderLoopCallback } from '../scene/RenderLoopRegistry'
-import type { RenderPipelineManager, DiagnosticsRenderTarget } from '../scene/RenderPipelineManager'
-import { GpuTimerQuery } from './GpuTimerQuery'
-
-/** Three.js runs the shadow-map pass inside renderer.render(), which pmndrs RenderPass
- *  calls internally — so this stage's time is a subset of pipeline:renderPass, not a
- *  sibling cost. Don't sum stage totals expecting them to equal the frame total. */
-const SHADOW_MAP_STAGE_ID = 'pipeline:shadowMap'
-
-/** Stage ids that also get a real GPU timer query (see GpuTimerQuery), recorded under
- *  `${id}:gpu` alongside the existing CPU submission-time entry. Narrow on purpose —
- *  extend only when a specific pass's real GPU cost is actually in question. */
-const GPU_TIMED_STAGE_IDS = new Set<string>(['pipeline:n8ao'])
 
 /** How far a frame's delta must move from the previous frame's delta to count as a
  *  jitter event — distinct from frameTimeWarnThreshold's absolute-budget check. */
@@ -124,8 +116,6 @@ export class RenderLoopDiagnostics {
 
     private static longTaskObserver: PerformanceObserver | null = null
     private static longTaskCount = 0
-    private static instrumentedTargets = new WeakSet<object>()
-    private static gpuTimerQuery: GpuTimerQuery | null = null
 
     private static captureStartTime: number | null = null
     private static captureSlowFrameBaseline = 0
@@ -196,54 +186,6 @@ export class RenderLoopDiagnostics {
     }
 
     /**
-     * Wires per-stage timing onto the composer passes and the shadow-map render, so
-     * endFrame()'s previously-opaque "full frame" number breaks down into which stage
-     * costs what. No-ops when diagnostics are disabled — call after initialize().
-     */
-    public static attachRenderPipeline(
-        renderPipelineManager: RenderPipelineManager,
-        renderer: THREE.WebGLRenderer
-    ): void {
-        if (!this.config.enabled) {
-            return
-        }
-
-        const gl = renderer.getContext()
-        if (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext) {
-            this.gpuTimerQuery = new GpuTimerQuery(gl)
-            if (!this.gpuTimerQuery.isSupported) {
-                console.warn('🔧 [RenderLoopDiagnostics] EXT_disjoint_timer_query_webgl2 unavailable — GPU-side timing skipped, CPU submission time still recorded')
-            }
-        }
-
-        renderPipelineManager.setPassInstrumentor(this.instrumentRenderStage.bind(this))
-        this.instrumentRenderStage(SHADOW_MAP_STAGE_ID, renderer.shadowMap as unknown as DiagnosticsRenderTarget)
-    }
-
-    private static instrumentRenderStage(id: string, target: DiagnosticsRenderTarget): void {
-        if (this.instrumentedTargets.has(target)) {
-            return
-        }
-        const originalRender = target.render.bind(target)
-        const gpuTimed = GPU_TIMED_STAGE_IDS.has(id)
-        target.render = (...args: unknown[]) => {
-            const start = performance.now()
-            let result: unknown
-            if (gpuTimed && this.gpuTimerQuery?.isSupported) {
-                this.gpuTimerQuery.measure(
-                    () => { result = originalRender(...args) },
-                    (gpuMs) => this.recordTiming(`${id}:gpu`, gpuMs)
-                )
-            } else {
-                result = originalRender(...args)
-            }
-            this.recordTiming(id, performance.now() - start)
-            return result
-        }
-        this.instrumentedTargets.add(target)
-    }
-
-    /**
      * Called at the very start of each frame (onBeforeFrame hook) with the same now/deltaTime
      * RenderLoopRegistry.executeAll() received. deltaTime is real wall-clock frame time —
      * SceneManager computes it once as now-minus-lastTime, which is the actual cadence between
@@ -253,7 +195,6 @@ export class RenderLoopDiagnostics {
     private static beginFrame(now: number, deltaTime: number): void {
         this.isFirstCallbackInFrame = true
         this.stats.workStartTime = now
-        this.gpuTimerQuery?.poll()
 
         this.stats.frameCount++
         if (deltaTime > this.stats.peakFrameTime) {
@@ -293,11 +234,14 @@ export class RenderLoopDiagnostics {
     }
 
     /**
-     * Shared timing sink for render-loop callbacks, composer passes, and the shadow-map
-     * render — all recorded under the same id-keyed structures so getStats()/report() see
-     * a uniform set of "things that cost work time," not a callback-only view.
+     * Shared timing sink, keyed by an arbitrary id, feeding both getStats() and report()'s
+     * per-stage breakdown. Used internally for render-loop callbacks; also the public entry
+     * point for anything outside this module recording its own timings — see
+     * RenderPipelineManagerDebug (client/src/debug/), which wraps the composer passes and
+     * shadow-map render and calls this directly rather than this module reaching into the
+     * render pipeline itself.
      */
-    private static recordTiming(id: string, duration: number): void {
+    public static recordTiming(id: string, duration: number): void {
         // Track rolling window for periodic averages
         if (!this.stats.callbackTimes.has(id)) {
             this.stats.callbackTimes.set(id, [])
@@ -376,8 +320,9 @@ export class RenderLoopDiagnostics {
 
     /**
      * Begin a capture window: report() will summarize everything recorded since this call.
-     * Safe to call again to restart the window: attachRenderPipeline()'s wrapping stays
-     * installed across restarts since it's a one-time setup, not part of the capture state.
+     * Safe to call again to restart the window — any external instrumentation feeding
+     * recordTiming() (e.g. RenderPipelineManagerDebug) keeps running across restarts since
+     * it's a one-time setup, not part of the capture state.
      */
     public static startCapture(): void {
         this.captureStartTime = performance.now()
@@ -533,9 +478,6 @@ export class RenderLoopDiagnostics {
         this.longTaskObserver?.disconnect()
         this.longTaskObserver = null
         this.longTaskCount = 0
-        this.instrumentedTargets = new WeakSet<object>()
-        this.gpuTimerQuery?.dispose()
-        this.gpuTimerQuery = null
         this.captureStartTime = null
         this.captureSlowFrameBaseline = 0
         this.captureLongTaskBaseline = 0

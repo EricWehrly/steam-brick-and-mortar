@@ -210,32 +210,4 @@ describe('RenderPipelineManager', () => {
         pipeline.dispose()
         expect(capturedComposer!.dispose).toHaveBeenCalledOnce()
     })
-
-    it('setPassInstrumentor() applies to all 4 passes immediately', () => {
-        const instrumentor = vi.fn()
-        pipeline.setPassInstrumentor(instrumentor)
-
-        expect(instrumentor).toHaveBeenCalledTimes(4)
-        const ids = instrumentor.mock.calls.map(call => call[0])
-        expect(ids).toEqual(
-            expect.arrayContaining(['pipeline:renderPass', 'pipeline:n8ao', 'pipeline:toneMapping', 'pipeline:smaa'])
-        )
-    })
-
-    it('setPassInstrumentor(null) detaches without throwing', () => {
-        pipeline.setPassInstrumentor(vi.fn())
-        expect(() => pipeline.setPassInstrumentor(null)).not.toThrow()
-    })
-
-    it('re-applies the instrumentor to the rebuilt SMAA pass when smaaPreset changes', () => {
-        const instrumentor = vi.fn()
-        pipeline.setPassInstrumentor(instrumentor)
-        instrumentor.mockClear()
-
-        emitSettingChanged('smaaPreset', 'low')
-
-        const smaaCalls = instrumentor.mock.calls.filter(call => call[0] === 'pipeline:smaa')
-        expect(smaaCalls).toHaveLength(1)
-        expect(smaaCalls[0][1]).toBe(capturedEffectPasses[capturedEffectPasses.length - 1])
-    })
 })

@@ -100,29 +100,16 @@ const MSAA_SAMPLE_MAP: Record<QualityLevel, number> = {
     [QUALITY_LEVEL.ULTRA]: 8,
 }
 
-/** Structural type for a render stage's timing wrapper — Pass instances and
- *  THREE.WebGLShadowMap both satisfy this without a shared base type. */
-export interface DiagnosticsRenderTarget {
-    render: (...args: unknown[]) => unknown
-}
-
-export type PassInstrumentor = (id: string, target: DiagnosticsRenderTarget) => void
-
-export const PIPELINE_STAGE_IDS = {
-    RENDER_PASS: 'pipeline:renderPass',
-    N8AO: 'pipeline:n8ao',
-    TONE_MAPPING: 'pipeline:toneMapping',
-    SMAA: 'pipeline:smaa',
-} as const
-
 export class RenderPipelineManager {
     private readonly composer: EffectComposer
-    private readonly renderPass: RenderPass
-    private readonly n8aoPass: N8AOPostPass
-    private readonly toneMappingPass: EffectPass
+    /** protected, not private: RenderPipelineManagerDebug (client/src/debug/) wraps these
+     *  passes' render() methods directly for per-stage timing — see that class for why the
+     *  instrumentation seam lives there instead of a callback field on this class. */
+    protected readonly renderPass: RenderPass
+    protected readonly n8aoPass: N8AOPostPass
+    protected readonly toneMappingPass: EffectPass
     private readonly camera: THREE.PerspectiveCamera
-    private smaaPass: EffectPass
-    private passInstrumentor: PassInstrumentor | null = null
+    protected smaaPass: EffectPass
 
     constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
         this.camera = camera
@@ -173,22 +160,6 @@ export class RenderPipelineManager {
         this.n8aoPass.configuration.depthAwareUpsampling = level.halfRes
     }
 
-    /**
-     * Wires a timing wrapper onto each composer pass for diagnostics — pass null to detach.
-     * Re-applies automatically when a pass is rebuilt (see rebuildSmaaPass) so a mid-session
-     * settings change doesn't silently drop out of the instrumented set.
-     */
-    public setPassInstrumentor(instrumentor: PassInstrumentor | null): void {
-        this.passInstrumentor = instrumentor
-        if (!instrumentor) {
-            return
-        }
-        instrumentor(PIPELINE_STAGE_IDS.RENDER_PASS, this.renderPass as unknown as DiagnosticsRenderTarget)
-        instrumentor(PIPELINE_STAGE_IDS.N8AO, this.n8aoPass as unknown as DiagnosticsRenderTarget)
-        instrumentor(PIPELINE_STAGE_IDS.TONE_MAPPING, this.toneMappingPass as unknown as DiagnosticsRenderTarget)
-        instrumentor(PIPELINE_STAGE_IDS.SMAA, this.smaaPass as unknown as DiagnosticsRenderTarget)
-    }
-
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
         const { settingName, value } = event.detail
         if (settingName === 'ssaoQuality') {
@@ -202,7 +173,9 @@ export class RenderPipelineManager {
         }
     }
 
-    private rebuildSmaaPass(quality: QualityLevel): void {
+    /** protected, not private: RenderPipelineManagerDebug overrides this to re-wrap the new
+     *  smaaPass instance after a rebuild, since the old wrapped reference is discarded here. */
+    protected rebuildSmaaPass(quality: QualityLevel): void {
         const idx = this.composer.passes.indexOf(this.smaaPass as unknown as Pass)
         if (idx !== -1) {
             this.smaaPass.dispose()
@@ -210,10 +183,6 @@ export class RenderPipelineManager {
         }
         this.smaaPass = new EffectPass(this.camera, new SMAAEffect({ preset: SMAA_PRESET_MAP[quality] }))
         this.composer.addPass(this.smaaPass)
-
-        if (this.passInstrumentor) {
-            this.passInstrumentor(PIPELINE_STAGE_IDS.SMAA, this.smaaPass as unknown as DiagnosticsRenderTarget)
-        }
     }
 
     render(): void {
