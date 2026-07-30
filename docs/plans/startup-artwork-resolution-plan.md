@@ -4,15 +4,17 @@
 (persistent dead-path field on `AppDetailsCache`, network-artwork readiness gate) are in, tested,
 and now confirmed working against a real desktop session (see Decisions, below). `PixelDataCache`
 was instrumented, measured against a real session, then the instrumentation itself was reverted
-(redundant with existing tooling) — the measurement revealed a likely URL-key timestamp-instability
-bug, not yet fixed. **Standing rule going forward**: don't extend `AppDetailsCache`'s public
-contract for debug-logging purposes alone — this happened twice in one session
+(redundant with existing tooling) — the measurement revealed a URL-key timestamp-instability bug,
+**fixed 2026-07-29** (`UrlUtils.stripQueryParam`, applied to both `PixelDataCache` keys and
+`artwork_dead_paths` matching). **Standing rule going forward**: don't extend `AppDetailsCache`'s
+public contract for debug-logging purposes alone — this happened twice in one session
 (`PixelDataCache.logStatsSummary`, then `AppDetailsCache.getDeadArtworkPathStats`), both reverted.
 Use ephemeral/inline code for one-off diagnostics, or the existing console-command idiom
 (`registerConsoleCommands()` in `LodArtworkOrchestratorDebug.ts`) if something needs to be
 repeatable; don't grow the cache class's API surface for it. Local `librarycache` disk read
-(Problem 2's actual fix, not a stopgap) and the concurrency cap are not started. Iterate on this
-doc as each piece resolves.
+(Problem 2's actual fix, not a stopgap) has a build plan proposed 2026-07-29, awaiting sign-off
+(see new section under Root Cause D, below) — not yet implemented. Concurrency cap not started.
+Iterate on this doc as each piece resolves.
 **Related**: [`cors-blocked-local-scan-artwork`](../tech-debt.md#id-cors-blocked-local-scan-artwork)
 (the tech-debt entry this plan supersedes/absorbs), [Image/Texture Pipeline](../architecture/image-texture-pipeline.md),
 [Desktop Offline-First Plan](desktop-offline-first-plan.md), [Multi-Layer Caching](../features/multi-layer-caching.md)
@@ -202,9 +204,140 @@ can, but only from local disk, not from any API (confirmed in Root Cause A: `app
 Cause A's fix) still matters for `header`/`capsule`/`background`, which *do* have a real API
 source — it was never going to solve `library` on its own.
 
-Not yet designed: the Tauri-side read. Same shape as `read_local_app_metadata`/`read_steam_playtimes`
-(a new `invoke()`-able command), but the return shape (raw bytes over IPC vs. something else) isn't
-decided.
+**Follow-up investigation, 2026-07-29 — hash→CDN-URL theory tested against 20 real appids, not
+just the single BALL x PIT sample above.** Two separate questions, tested separately:
+
+1. *Does the local hash dir name match the CDN hash the live Steam API reports right now?* Sampled
+   20 appids from this install's 389 hash-convention entries, live-fetched each via
+   `store.steampowered.com/api/appdetails`, compared hashes:
+   - `header_image` hash: matched the local `library_header.jpg` hash-dir in **8/17** cases where
+     the API returned a header at all (3/20 had no `header_image` in the response). Mismatches are
+     real, not a bug — the local cache is only as fresh as the last time the Steam client rendered
+     that app's library/store page, while Valve periodically re-renders header art (sales,
+     seasonal banners). **Confirmed the mismatched hash still resolves on the CDN anyway** (tested
+     appId 1003590: both the stale local hash and the current live-API hash return `200`) — Akamai
+     doesn't appear to garbage-collect superseded asset revisions, so a stale local hash is *never
+     observed to 404*, only to potentially serve an older (still real) art revision.
+   - `capsule_image` hash: matched **0/20**. Not staleness — local `library_capsule.jpg` is a
+     different asset than the Store API's `capsule_image`/`capsule_imagev5` (231×87/184×69 store
+     listing thumbnails) entirely; the local file is the Library-grid capsule, which the public API
+     has no field for. Don't treat local `library_capsule.jpg` as a stand-in for the API's capsule
+     fields — unverified as anything beyond "some capsule-shaped local asset."
+2. *Does the CDN actually serve content at `apps/{appid}/{local-hash}/library_600x900.jpg` — the
+   field the Steam API has no equivalent for at all, so there's no API hash to compare against in
+   the first place?* Constructed that URL from 7 different appids' local hash-dir names (including
+   BALL x PIT) and issued a real `curl -I`: **7/7 returned `200`**. Negative control: the same URL
+   shape with a bogus all-zero hash returned `404` on 3/3 tries — confirms the CDN actually
+   validates the hash rather than ignoring it, so a `200` here is a genuine, specific confirmation,
+   not a coincidence of a permissive CDN.
+
+**Conclusion**: for the format we actually care about (`library`), the local hash is not just
+"probably right" — every locally-observed hash tested resolved to real content, and even a
+provably out-of-date hash for a *different* field (`header`) never came back dead, only
+potentially-older. This is strong enough to treat local-hash-derived `library_600x900.jpg` and
+`library_header.jpg` CDN URLs as legitimate, submittable candidates (see build plan below) — not
+merely a same-session read shortcut.
+
+Not yet designed in detail: the Tauri-side read and the CDN-URL discovery/backfill path — see
+**Build plan**, immediately below, written 2026-07-29 for sign-off before implementation.
+
+## Build plan: local librarycache read + CDN URL discovery (Root Cause D)
+
+**Status**: Proposed 2026-07-29, awaiting sign-off. Two distinct deliverables sharing one Rust
+read: (1) render from local bytes directly, zero network; (2) turn a locally-observed CDN hash
+into a real candidate URL the normal resolution/dead-path pipeline can try and validate, so it can
+also flow into `AppDetailsCache` (and from there, the existing bake pipeline) for the benefit of
+sessions/builds that have no local disk to read from at all.
+
+### On-disk shape (confirmed across ~25 real appids this session, both conventions)
+
+```
+librarycache/<appid>/library_600x900.jpg              legacy: flat, no hash
+librarycache/<appid>/header.jpg                        legacy: flat, no hash
+librarycache/<appid>/library_hero.jpg (+_blur)         legacy: flat, no hash
+librarycache/<appid>/logo.png                          legacy: flat, no hash
+
+librarycache/<appid>/<hash40>/library_600x900.jpg      hash-migrated: our `library` format
+librarycache/<appid>/<hash40>/library_header.jpg       hash-migrated: our `header` format
+librarycache/<appid>/<hash40>/library_capsule.jpg      hash-migrated: unverified, not our `capsule` field (see above) — skip
+librarycache/<appid>/<hash40>/library_hero.jpg (+_blur) hash-migrated: not currently rendered, out of scope
+librarycache/<appid>/<hash40>/logo.png                 hash-migrated: not currently rendered, out of scope
+librarycache/<appid>/<hash40>.jpg                      small icon, distinct slot again — out of scope
+```
+
+One hash-dir per asset "slot" (never mixed). Legacy convention has no capsule file at all and no
+hash to construct anything from — bytes-read is the only benefit there (the guessed flat CDN URL
+already works for legacy-convention titles, which is presumably *why* they're still legacy).
+
+### Deliverable 1 — read bytes directly (zero network)
+
+New `desktop/tauri-app/src/steam/librarycache.rs`, following `screenshots.rs`'s established
+two-command shape (index command returns metadata only; a second, `..`-guarded command returns
+bytes lazily):
+
+- `find_local_library_art(appids: Vec<u32>) -> Vec<LocalLibraryArtEntry>` — **batched**, one IPC
+  round-trip for the whole candidate set (same batching shape as `read_local_app_metadata`), called
+  once during the same local-scan pass as `read_local_app_metadata`/`read_steam_playtimes`. Pure
+  directory listing (`librarycache/<appid>/`, no per-user resolution needed — this lives under
+  `steam_root` directly, not `userdata/<id>/`, so it's simpler than `screenshots.rs`). For each
+  appid, reports whichever of `library`/`header` are available, each with: a relative path (for the
+  bytes call) and, for the hash-migrated convention, the hash string itself (needed for Deliverable
+  2 without a second disk touch).
+- `read_local_library_art_bytes(appid: u32, relative_path: String) -> Vec<u8>` — lazy, one call per
+  format actually rendered (not the whole discovered set) — mirrors `read_local_screenshot_bytes`'s
+  `..`-traversal guard, re-anchored under `librarycache/<appid>/` specifically (not `steam_root`
+  broadly) so an approved appid still can't be used to escape that folder.
+
+TS side: `GameArtworkProvider`/`GameArtworkRequest` gain a local-disk tier ahead of every URL
+candidate — if the startup index has a matching slot for this appid+format, fetch bytes via the
+lazy command, decode through the same worker pipeline `TextureWorker` already uses for blobs
+(skip `fetchImage()`'s network fetch, pass the bytes straight to `createImageBitmap` via a `Blob`),
+store into `PixelDataCache` keyed the same as any other resolution, return. Falls through to the
+existing URL-strategy behavior unchanged if the local index has nothing for this appid+format, or
+if the read fails for any reason.
+
+### Deliverable 2 — turn a local hash into a real candidate URL (and cache entry)
+
+`AppDetailsData['artwork']` gains `library: string | null` (it currently has no `library` slot at
+all — matches Root Cause A's finding that the Steam API doesn't either). When
+`find_local_library_art` reports a hash-migrated slot, construct
+`https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/{hash}/{filename}`.
+
+**Updated 2026-07-29** (superseding this section's original "let it fail naturally" design): the
+constructed URL is validated with a real check *before* it's merged into `AppDetailsCache` at
+all — never written as a trusted `artwork.library`/`artwork.header` value on spec. See
+[Release Pipeline Step 2.4](release-pipeline-plan.md#step-24-proposed-2026-07-29-folding-in-desktop-discovered-contributions)
+for the validation queue design (rate-limited, skips hashes already validated, writes the merge on
+success and a normal `markArtworkPathDead` entry on failure) — that section owns this mechanism
+now, since it's shared with the contribution-file write. Dev-build-only, triggered manually from a
+settings-menu action rather than running automatically as part of the local scan — not something
+that fires just from normal app usage. This is also the concrete mechanism for
+the earlier "how do we get real artwork paths into the baked/S3 cache" question — a validated
+merge into `AppDetailsCache` benefits this session immediately, and the same discovery, written to
+`data/contributions/library-art-urls.ndjson`, is what Step 2.4's bake-time fold-in picks up for
+every future build. What this plan does **not** cover: getting a desktop client's local discoveries
+back to the *shared* Lambda-backed cache for other users/builds to benefit from at runtime (as
+opposed to at the next bake) — that needs a new write surface (an endpoint, trust/validation
+questions) and stays out of scope, per Release Pipeline Step 2.4's own scope note.
+
+### Explicitly out of scope for this pass
+
+- `library_capsule.jpg` → not wired to anything; unverified against the API's capsule fields.
+- `library_hero`/`logo`/icon slots → not currently rendered by anything, no consumer yet.
+- Pushing discovered URLs to the *shared* Lambda cache (only the local `AppDetailsCache` write is
+  in scope) — separate decision, separate scope.
+- Legacy-convention (flat, no hash) appids get the bytes-read benefit only — nothing to backfill to
+  the remote cache from a convention that has no hash to begin with.
+
+### Risks / things to confirm before or during implementation
+
+- Coverage is inherently partial (999/1846 appids on this install have `library_600x900.jpg` at
+  all) — this sits *ahead of* the existing guess/network fallback, never replaces it.
+- Per-format IPC bytes copy (hero images observed up to ~600KB) only fires for formats actually
+  rendered, lazily — same cost profile as the network fetch it replaces, not a new cost.
+- `capabilities/default.json` currently grants only `core:default`; `screenshots.rs`/`appinfo.rs`
+  needed nothing beyond that for their own `std::fs` reads, so the new commands likely need no
+  capability changes either — confirm during implementation rather than assuming.
 
 ### E. S3/Lambda cache write durability — confirmed safe, out of scope for this plan
 
@@ -304,26 +437,28 @@ existing AppDetailsCache TTL gap, not duplicated here.)
 `artwork_network_checked`, per the note left here during review.
 
 1. **Tauri-side read for the local `librarycache` folder — the priority to circle back to soon.**
-   New `invoke()`-able command, same shape as `read_local_app_metadata`/`read_steam_playtimes`.
-   Return shape undecided: raw bytes over IPC (straightforward, but copies potentially-large JPEGs
-   through the bridge) vs. some other approach. Needs the Steam install path resolution
-   `appinfo.rs` already has for the other local reads. **Not started.** Explicitly the fix that
-   matters most: field observation from this pass is that a real share of titles either have no
-   artwork at all, or don't have it at the paths we predict — this is the one piece that replaces
-   guessing with a deterministic answer instead of managing guesses better, and is what everything
-   else in this doc is a stopgap around.
-2. **URL-key normalization for `PixelDataCache` / `artwork_dead_paths`** — strip the volatile
-   `?t=<timestamp>` (or the whole query string) before using a URL as a cache key. Motivated by
-   real numbers (Root Cause C): desktop hit rate is 3% against 2106 already-persisted entries,
-   most likely because real Steam hint URLs carry a timestamp that isn't stable, silently
-   orphaning previously-cached decodes. Not yet implemented.
-3. **One-time bake-time backfill** — capture real artwork paths (Steam API + whatever desktop/local
-   harvesting can contribute, now including the local librarycache find) into the baked/S3 cache
-   ahead of time, so individual clients hit the gap-fill path less often. Avenue not yet scoped.
+   **Build plan proposed 2026-07-29** — see the new section under Root Cause D, above. Awaiting
+   sign-off before implementation. Explicitly the fix that matters most: field observation from
+   this pass is that a real share of titles either have no artwork at all, or don't have it at the
+   paths we predict — this is the one piece that replaces guessing with a deterministic answer
+   instead of managing guesses better, and is what everything else in this doc is a stopgap around.
+2. ~~URL-key normalization for `PixelDataCache` / `artwork_dead_paths`~~ **Resolved 2026-07-29** —
+   `UrlUtils.stripQueryParam(url, 't')`, applied at both `PixelDataCache`'s cache-key construction
+   (`GameArtworkProvider.fetchPixels`/`isPixelsCached`) and `artwork_dead_paths`'
+   storage/lookup (`AppDetailsCache.markArtworkPathDead`, `GameArtworkRequest.fetchFromStrategy`).
+   The actual network fetch still uses the untouched original URL — only cache keys changed.
+3. ~~One-time bake-time backfill~~ **Superseded 2026-07-29** — scoped as [Release Pipeline Step
+   2.4](release-pipeline-plan.md#step-24-proposed-2026-07-29-folding-in-desktop-discovered-contributions)
+   (design decided 2026-07-29, awaiting implementation): desktop-discovered dead-paths and
+   validated local-librarycache-derived real URLs get written to two separate NDJSON contribution
+   files, folded into `app-details.json.gz` at bake time (before F2P baking, which now prefers a
+   folded-in real URL over its own guess) — developer-workflow scope for now (a developer copies
+   the files in manually before a release), not a live end-user submission pipeline. Answers this
+   session's earlier "how do we get real artwork paths into the baked cache" question concretely.
 4. **Concurrency cap shape**: a semaphore-style limit on `ArtworkPrefetchCoordinator.prefetchBatch`,
    a priority split (disk-cache-eligible games placed before any network-bound ones queue), or
-   both. Deliberately not designed yet — item 2 changes what "cache-eligible" even means on
-   desktop, so this should follow that, not precede it.
+   both. Deliberately not designed yet — item 1 (local disk read) changes what "cache-eligible"
+   even means on desktop, so this should follow that, not precede it.
 ~~`artwork_dead_paths` baked-bundle half~~ **Resolved by the 2026-07-25 rework** — living on
 `AppDetailsData` means the bake/repack scripts pick it up automatically, the same way they already
 pick up every other field on that type. No separate mechanism needed.
@@ -352,13 +487,15 @@ dimensions, rather than any image over 300px wide).
       (Root cause C), not the standing log line (redundant with existing `diagnose()`)
 - [x] Field-test the dead-path mechanism against a real session — confirmed working, ephemeral
       logging reverted afterward (see Decisions, above)
-- [ ] Design + implement the Tauri local `librarycache` read for `library` art (Root cause D) —
-      the actual priority; everything else here is a stopgap around not having this yet
-- [ ] Normalize the `PixelDataCache`/`artwork_dead_paths` cache key (strip `?t=`) — Root cause C
-- [ ] Scope the concurrency cap / priority split for `ArtworkPrefetchCoordinator`, after the key
-      normalization above changes the baseline
+- [x] Normalize the `PixelDataCache`/`artwork_dead_paths` cache key (strip `?t=`) — Root cause C
+- [ ] Get sign-off on, then implement, the Tauri local `librarycache` read + CDN URL discovery
+      build plan (Root cause D) — the actual priority; everything else here is a stopgap around
+      not having this yet
+- [ ] Scope the concurrency cap / priority split for `ArtworkPrefetchCoordinator`, after the local
+      disk read above changes the baseline
 - [ ] Scope the one-time bake-time backfill avenue (now simpler — dead paths discovered live
-      already land somewhere the bake pipeline can read back)
+      already land somewhere the bake pipeline can read back); partly overlaps the local
+      librarycache plan's out-of-scope shared-cache-push item — scope together
 
 ---
-*— A1*
+*— A1 / P1*
