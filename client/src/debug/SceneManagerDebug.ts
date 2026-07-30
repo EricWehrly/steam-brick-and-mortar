@@ -6,6 +6,7 @@
  *
  * Exposes on window:
  *   window.sceneManager.drawCallReport() → DrawCallReport
+ *   window.sceneManager.getN8aoConfiguration() → live N8AO config (see RenderPipelineManager)
  */
 
 import * as THREE from 'three'
@@ -96,6 +97,7 @@ export class SceneManagerDebug extends SceneManager {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(window as any).sceneManager = {
             drawCallReport: () => this.drawCallReport(),
+            getN8aoConfiguration: () => this.getRenderPipelineManager().getN8aoConfiguration(),
         }
     }
 }

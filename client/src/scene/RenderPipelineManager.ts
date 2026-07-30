@@ -61,12 +61,34 @@ const SMAA_PRESET_MAP: Record<QualityLevel, SMAAPreset> = {
     [QUALITY_LEVEL.ULTRA]: SMAAPreset.ULTRA,
 }
 
-const N8AO_QUALITY_MAP: Record<QualityLevel, 'Low' | 'Medium' | 'High' | 'Ultra'> = {
-    [QUALITY_LEVEL.LOW]: 'Low',
-    [QUALITY_LEVEL.MEDIUM]: 'Medium',
-    [QUALITY_LEVEL.HIGH]: 'High',
-    [QUALITY_LEVEL.ULTRA]: 'Ultra',
+export interface SsaoQualityLevel {
+    readonly label: string
+    readonly enabled: boolean
+    readonly aoSamples: number
+    readonly halfRes: boolean
 }
+
+/**
+ * SSAO (N8AO) quality/cost levels, ascending GPU cost — index 0 is "Off". Values and ordering
+ * come from measured GPU timer-query data (EXT_disjoint_timer_query_webgl2), not guessed:
+ * halfRes turned out to be a bigger lever than sample count alone, so the ladder isn't a simple
+ * "more samples = higher index" progression. denoiseSamples/denoiseRadius are left at n8ao's own
+ * defaults throughout — only aoSamples/halfRes were varied in testing, so only those are varied
+ * here. See docs/plans/framerate-regression-investigation-plan.md's dated Findings section for
+ * the full before/after numbers.
+ */
+export const SSAO_QUALITY_LEVELS: readonly SsaoQualityLevel[] = [
+    { label: 'Off', enabled: false, aoSamples: 16, halfRes: true },
+    { label: '16 samples (half-res)', enabled: true, aoSamples: 16, halfRes: true },
+    { label: '64 samples (half-res)', enabled: true, aoSamples: 64, halfRes: true },
+    { label: '8 samples', enabled: true, aoSamples: 8, halfRes: false },
+    { label: '16 samples', enabled: true, aoSamples: 16, halfRes: false },
+    { label: '64 samples', enabled: true, aoSamples: 64, halfRes: false },
+] as const
+
+/** Default lands on the cheapest non-off tier (measured ~2.9ms GPU vs. ~13.8ms for the old
+ *  64-samples/no-half-res default) — see the Findings section referenced above. */
+export const DEFAULT_SSAO_QUALITY_INDEX = 1
 
 /** Hardware MSAA sample count on EffectComposer's shared render targets — see the class doc
  *  comment above for why this is pricier than SMAA here and how the two relate. 'low' maps to
@@ -118,9 +140,7 @@ export class RenderPipelineManager {
         this.n8aoPass.configuration.intensity = 2.5
         this.n8aoPass.configuration.distanceFalloff = 1.0
         this.n8aoPass.configuration.gammaCorrection = false
-        const aoQuality = AppSettings.get('qualityLevel') as QualityLevel
-        this.n8aoPass.setQualityMode(N8AO_QUALITY_MAP[aoQuality])
-        this.n8aoPass.enabled = AppSettings.get('ssaoEnabled') as boolean
+        this.applySsaoQuality(AppSettings.get('ssaoQuality') as number)
         // N8AOPostPass extends Three.js Pass, not pmndrs Pass — interface is identical at runtime
         this.composer.addPass(this.n8aoPass as unknown as Pass)
 
@@ -134,6 +154,23 @@ export class RenderPipelineManager {
             AppSettingsEventTypes.Changed,
             this.onSettingChanged.bind(this)
         )
+    }
+
+    /**
+     * Live handle on N8AO's own config (aoSamples, halfRes, denoiseSamples, etc. — see
+     * n8ao's own docs) for console-driven A/B testing during the framerate investigation.
+     * Mutating this reconfigures N8AO's passes immediately (it's a reactive Proxy internally).
+     */
+    public getN8aoConfiguration(): N8AOPostPass['configuration'] {
+        return this.n8aoPass.configuration
+    }
+
+    private applySsaoQuality(levelIndex: number): void {
+        const level = SSAO_QUALITY_LEVELS[levelIndex] ?? SSAO_QUALITY_LEVELS[DEFAULT_SSAO_QUALITY_INDEX]
+        this.n8aoPass.enabled = level.enabled
+        this.n8aoPass.configuration.aoSamples = level.aoSamples
+        this.n8aoPass.configuration.halfRes = level.halfRes
+        this.n8aoPass.configuration.depthAwareUpsampling = level.halfRes
     }
 
     /**
@@ -154,8 +191,8 @@ export class RenderPipelineManager {
 
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
         const { settingName, value } = event.detail
-        if (settingName === 'ssaoEnabled') {
-            this.n8aoPass.enabled = value as boolean
+        if (settingName === 'ssaoQuality') {
+            this.applySsaoQuality(value as number)
         }
         if (settingName === 'smaaPreset') {
             this.rebuildSmaaPass(value as QualityLevel)
