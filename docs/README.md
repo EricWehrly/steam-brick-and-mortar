@@ -10,16 +10,24 @@ This directory is structured specifically as a knowledge base and entrypoint for
 publicly-hosted web build — see the act doc's Overview for the full rationale. Web hosting is
 demoted to an Act 3 stretch goal ([`features/static-hosting.md`](features/static-hosting.md)).
 
-Two parallel in-flight threads:
+In-flight thread:
 - **Input System** ([`features/input-system.md`](features/input-system.md)) — most of the
   abstraction and gamepad support already exist; remaining work is a live pause-menu input-leak
   bug, two half-wired camera controls (roll, acceleration), and VR controller routing (Gate 2).
+
+Recently closed out:
 - **Framerate regression investigation**
   ([`plans/framerate-regression-investigation-plan.md`](plans/framerate-regression-investigation-plan.md)) —
-  unstable/reduced framerate suspected from the post-processing pipeline and/or shadow-casting
-  work; not yet root-caused. See
-  [`research/frame-time-diagnostic-tooling-research.md`](research/frame-time-diagnostic-tooling-research.md)
-  for the tooling survey backing the investigation methodology.
+  root-caused 2026-07-29: N8AO (SSAO) was ~84.5% of the 16.67ms frame budget at the old default.
+  Fixed by shipping a measured-cost `ssaoQuality` slider. 2026-07-30: extended into re-implementing
+  the "Renderer Quality Preset" selector as a real unified dial — `RENDER_QUALITY_PRESETS` in
+  `AppSettings.ts` now drives `lightingQuality`/`shadowQuality`/`ssaoQuality`/`smaaPreset`/
+  `msaaLevel`/`pixelRatioScale` together per tier, built from a fresh settings sweep (`PerfSweep.ts`,
+  `?sweep=1`) plus the existing SSAO data. The capture tool and settings-sweep methodology are
+  documented separately — see
+  [`architecture/frame-budget-capture-tooling.md`](architecture/frame-budget-capture-tooling.md).
+  Visual-quality validation of both the SSAO default and the new preset tiers is still owed (not yet
+  done).
 
 Still open from the prior thread (desktop local data pipeline, PR 141): `autoLoadProfile` isn't
 wired to the startup waterfall yet
