@@ -18,22 +18,38 @@ export class UrlUtils {
         }
     }
 
-    /**
-     * Whether ?diagnostics=1 is present on the current page URL. Gates
-     * RenderLoopDiagnostics and anything else that needs frames to keep
-     * rendering during an unattended capture — see FocusCoordinator, which
-     * uses this to skip pausing the render loop on tab/window blur.
-     */
-    static isDiagnosticsEnabled(): boolean {
-        return new URLSearchParams(window.location.search).get('diagnostics') === '1'
+    /** Empty params (all flag checks below read false) when window/window.location isn't
+     *  available — some test environments mock `window` as a bare object with no `location`. */
+    private static getSearchParams(): URLSearchParams {
+        if (typeof window === 'undefined' || !window.location) {
+            return new URLSearchParams()
+        }
+        return new URLSearchParams(window.location.search)
     }
 
     /**
-     * Whether ?sweep=1 is present — triggers PerfSweep.run() once the scene reaches steady
-     * state. Implies diagnostics (see SteamBrickAndMortarApp.startRenderLoop): the sweep
-     * needs RenderLoopDiagnostics' capture API, so a bare ?sweep=1 is enough on its own.
+     * Whether frame-timing diagnostics should be active: ?diagnostics=1 directly, or ?sweep=1
+     * (PerfSweep needs RenderLoopDiagnostics' capture API, so requesting a sweep implies this
+     * too — checked here, not composed at each call site, so every diagnostics consumer agrees
+     * on what "enabled" means). Gates RenderLoopDiagnostics, RenderPipelineManagerDebug, and
+     * anything else that needs frames to keep rendering during an unattended capture — see
+     * FocusCoordinator, which uses this to skip pausing the render loop on tab/window blur.
      */
+    static isDiagnosticsEnabled(): boolean {
+        return UrlUtils.getSearchParams().get('diagnostics') === '1' || UrlUtils.isPerfSweepEnabled()
+    }
+
+    /** Whether ?sweep=1 is present — triggers PerfSweep.run() once the scene reaches steady state. */
     static isPerfSweepEnabled(): boolean {
-        return new URLSearchParams(window.location.search).get('sweep') === '1'
+        return UrlUtils.getSearchParams().get('sweep') === '1'
+    }
+
+    /**
+     * Whether ?debug=true is present — sets Logger's global level to DEBUG on load
+     * (see Logger.ts). A separate concern from isDiagnosticsEnabled(): this controls console
+     * log verbosity, not whether frame-timing instrumentation runs.
+     */
+    static isDebugLoggingEnabled(): boolean {
+        return UrlUtils.getSearchParams().get('debug') === 'true'
     }
 }
