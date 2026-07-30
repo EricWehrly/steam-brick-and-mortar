@@ -17,6 +17,8 @@
  *   Logger.setRuntimeLogging(true)                                // Enable runtime logs
  */
 
+import { UrlUtils } from './UrlUtils'
+
 export enum LogLevel {
   ERROR = 0,
   WARN = 1,
@@ -53,7 +55,7 @@ export class Logger {
   private constructor() {
     // Global default is INFO - classes must opt-in for DEBUG via setContextLevel
     // Can be overridden via URL param for full debugging
-    if (typeof window !== 'undefined' && window.location?.search?.includes('debug=true')) {
+    if (typeof window !== 'undefined' && UrlUtils.isDebugLoggingEnabled()) {
       this.globalLevel = LogLevel.DEBUG
     } else if (typeof globalThis !== 'undefined' && (globalThis as { vi?: unknown }).vi) {
       this.globalLevel = LogLevel.WARN // Only warnings and errors during tests
