@@ -162,9 +162,12 @@ specific to Liminal and will be picked up when that work starts.
   a separate list here — see that doc for what's next after the current story completes.
 - **Games visibly arrive after shelves, both on initial build and on recycle.** Shelves are pure
   procedural geometry with no network dependency; game artwork must be fetched, decoded, and
-  uploaded, which is inherently slower. Not something to eliminate here — the fix is the
-  [Loading placeholder boxes](../acts/act2-ready-for-friends.md) idea (Act 2, not yet designed),
-  which closes this gap for every layout, not just liminal.
+  uploaded, which is inherently slower. Not something to fix here — it's owned by
+  [Loading Placeholder Boxes](loading-placeholder-boxes.md) (Act 2, designed 2026-07-30), which
+  closes the gap for every layout rather than special-casing liminal. That work also carries a
+  liminal-specific improvement: its Story 6 replaces Story 5's "leave the previous occupant in
+  place" fallback (for a recycled box whose new game has no prefetched artwork) with a repoint to
+  the placeholder — showing "loading" instead of a confidently wrong game.
 
 ## Related
 
