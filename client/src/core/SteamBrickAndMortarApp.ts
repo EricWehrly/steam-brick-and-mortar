@@ -26,6 +26,7 @@ import { GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../ty
 import { AppSettings } from './AppSettings'
 
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
+import { UrlUtils } from '../utils/UrlUtils'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
 import { HeapMemoryReporter } from '../debug/HeapMemoryReporter'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
@@ -319,8 +320,7 @@ export class SteamBrickAndMortarApp {
         // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1)
         // This MUST happen before startRenderLoop() - decision is made once, zero per-frame overhead when disabled
         // TODO: set appsettings from url, have diagnostics class set up at this phase?
-        const urlParams = new URLSearchParams(window.location.search)
-        const diagnosticsEnabled = urlParams.get('diagnostics') === '1'
+        const diagnosticsEnabled = UrlUtils.isDiagnosticsEnabled()
         this.diagnosticsEnabled = diagnosticsEnabled
         RenderLoopDiagnostics.initialize({
             enabled: diagnosticsEnabled,
