@@ -26,8 +26,11 @@ Recently closed out:
   `?sweep=1`) plus the existing SSAO data. The capture tool and settings-sweep methodology are
   documented separately — see
   [`architecture/frame-budget-capture-tooling.md`](architecture/frame-budget-capture-tooling.md).
-  Visual-quality validation of both the SSAO default and the new preset tiers is still owed (not yet
-  done).
+  A separate follow-up (recurring frame-time spikes noticed while re-measuring) was traced via a
+  captured Chrome DevTools Performance trace to Chrome's own compositor scheduling — not GC, not app
+  JS, not GPU work, not SSAO — and closed as not app-actionable; no lever exists in a web app to fix
+  it. Visual-quality validation of both the SSAO default and the new preset tiers is still owed (not
+  yet done).
 
 Still open from the prior thread (desktop local data pipeline, PR 141): `autoLoadProfile` isn't
 wired to the startup waterfall yet
