@@ -42,13 +42,7 @@
     <section class="setting-section">
       <div class="setting-group">
         {{shadowQualityControl}}
-        <div class="setting-row">
-          <label class="checkbox-container ui-checkbox-row">
-            <input type="checkbox" class="ui-checkbox" id="ssao-enabled" {{#ssaoEnabled}}checked{{/ssaoEnabled}}>
-            Enable SSAO
-          </label>
-          <p class="ui-component-description">Contact shadows and crevice darkening.</p>
-        </div>
+        {{ssaoQualityControl}}
         {{smaaPresetControl}}
         {{msaaLevelControl}}
       </div>

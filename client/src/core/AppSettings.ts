@@ -43,7 +43,7 @@ export const Setting = {
     LightingQuality: 'lightingQuality',
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
-    SsaoEnabled: 'ssaoEnabled',
+    SsaoQuality: 'ssaoQuality',
     SmaaPreset: 'smaaPreset',
     MsaaLevel: 'msaaLevel',
     ToneMappingExposure: 'toneMappingExposure',
@@ -107,7 +107,7 @@ export const SettingCategory = {
         Setting.LightingQuality,
         Setting.ShadowQuality,
         Setting.ShadowMapEnabled,
-        Setting.SsaoEnabled,
+        Setting.SsaoQuality,
         Setting.SmaaPreset,
         Setting.MsaaLevel,
         Setting.ToneMappingExposure,
@@ -141,7 +141,9 @@ export interface ApplicationSettings {
     lightingQuality: LightingQuality
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
-    ssaoEnabled: boolean
+    /** Index into RenderPipelineManager.SSAO_QUALITY_LEVELS (0 = Off, ascending measured GPU
+     *  cost from there) — see that array's doc comment for why it isn't a simple linear scale. */
+    ssaoQuality: number
     smaaPreset: QualityLevel
     /** Hardware MSAA sample count on the composer's own render targets (EffectComposer.multisampling),
      *  independent of SMAA — see docs/plans/framerate-regression-investigation-plan.md for why these
@@ -483,7 +485,7 @@ export class AppSettings {
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
-            ssaoEnabled: true,
+            ssaoQuality: 1, // index into RenderPipelineManager.SSAO_QUALITY_LEVELS — 16 samples, half-res
             smaaPreset: 'high',
             msaaLevel: 'low', // 'low' maps to 0 samples (off) - matches pre-existing behavior
             toneMappingExposure: 0.25,
@@ -572,7 +574,7 @@ export class AppSettings {
             'verboseLogging', 'showDebugInfo', 'showCompassRose',
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
-            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled',
+            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled',
             'antialias', 'inputMouseLockEnabled', 'inputGamepadReticleEnabled',
             'inputLookInvertMouse', 'inputLookInvertGamepad'
         ]

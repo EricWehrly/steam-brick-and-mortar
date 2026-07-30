@@ -13,6 +13,7 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
 import { AppSettings, LIGHTING_QUALITY, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
+import { SSAO_QUALITY_LEVELS } from '../../../scene/RenderPipelineManager'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
 import { AppSettingsEventTypes, CeilingEventTypes } from '../../../types/InteractionEvents'
@@ -96,11 +97,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const msaaLevel = this.appSettings.getSetting('msaaLevel')
         const shadowQuality = this.appSettings.getSetting('shadowQuality')
         const pixelRatioScale = this.appSettings.getSetting('pixelRatioScale')
+        const ssaoQuality = this.appSettings.getSetting('ssaoQuality')
 
         return renderTemplate(graphicsSettingsPanelTemplate, {
             fullscreenEnabled: !!document.fullscreenElement,
             shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
-            ssaoEnabled: this.appSettings.getSetting('ssaoEnabled'),
             enableLighting: this.appSettings.getSetting('enableLighting'),
             showLightingDebug: this.appSettings.getSetting('showLightingDebug'),
             showCeiling: this.appSettings.getSetting('showCeiling'),
@@ -152,6 +153,19 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                 value: shadowQuality,
                 formatDisplay: (v) => this.getShadowQualityLabel(v),
                 trackLabels: ['Off', 'Low', 'Medium', 'High', 'Ultra']
+            }).render(),
+
+            ssaoQualityControl: new RangeControl({
+                id: 'ssao-quality',
+                label: '💫 SSAO (Ambient Occlusion)',
+                description: 'Contact shadows and crevice darkening. Off disables it entirely; levels are ordered by measured GPU cost, not just sample count — see the label for what each one actually does.',
+                hint: { text: '✨ instant', kind: 'instant' },
+                min: 0,
+                max: SSAO_QUALITY_LEVELS.length - 1,
+                step: 1,
+                value: ssaoQuality,
+                formatDisplay: (v) => this.getSsaoQualityLabel(v),
+                trackLabels: ['Off', SSAO_QUALITY_LEVELS[SSAO_QUALITY_LEVELS.length - 1].label]
             }).render(),
 
             smaaPresetControl: new SelectControl({
@@ -333,10 +347,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             {
                 toggleId: 'shadow-map-enabled',
                 onChange: (checked) => this.updateSetting('shadowMapEnabled', checked)
-            },
-            {
-                toggleId: 'ssao-enabled',
-                onChange: (checked) => this.updateSetting('ssaoEnabled', checked)
             }
         ])
     }
@@ -348,6 +358,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                 valueDisplayId: 'shadow-quality-value',
                 formatDisplay: (v) => this.getShadowQualityLabel(v),
                 onInput: (value) => this.updateSetting('shadowQuality', value)
+            },
+            {
+                sliderId: 'ssao-quality',
+                valueDisplayId: 'ssao-quality-value',
+                formatDisplay: (v) => this.getSsaoQualityLabel(v),
+                onInput: (value) => this.updateSetting('ssaoQuality', value)
             },
             {
                 sliderId: 'ceiling-height',
@@ -496,6 +512,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         }
     }
 
+    private getSsaoQualityLabel(level: number): string {
+        return SSAO_QUALITY_LEVELS[level]?.label ?? SSAO_QUALITY_LEVELS[0].label
+    }
+
     private updateSetting<K extends keyof ApplicationSettings>(
         key: K, 
         value: ApplicationSettings[K]
@@ -552,10 +572,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             shadowMapToggle.checked = this.appSettings.getSetting('shadowMapEnabled')
         }
 
-        const ssaoToggle = document.getElementById('ssao-enabled') as HTMLInputElement
-        if (ssaoToggle) {
-            ssaoToggle.checked = this.appSettings.getSetting('ssaoEnabled')
-        }
+        UIComponentUtils.updateSliderValue(
+            document.body, 'ssao-quality', 'ssao-quality-value',
+            this.appSettings.getSetting('ssaoQuality'),
+            (v) => this.getSsaoQualityLabel(v)
+        )
 
         const smaaPresetSelect = document.getElementById('smaa-preset') as HTMLSelectElement
         if (smaaPresetSelect) {

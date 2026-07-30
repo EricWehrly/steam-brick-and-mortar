@@ -20,6 +20,18 @@ let capturedN8aoPass: {
     dispose: ReturnType<typeof vi.fn>
 } | null = null
 
+const DEFAULT_MOCK_SETTINGS: Record<string, unknown> = {
+    msaaLevel: 'low',
+    smaaPreset: 'high',
+    ssaoQuality: 1,
+}
+
+function mockAppSettingsGet(overrides: Record<string, unknown> = {}): void {
+    vi.spyOn(AppSettings, 'get').mockImplementation(
+        (key: string) => (overrides[key] ?? DEFAULT_MOCK_SETTINGS[key]) as never
+    )
+}
+
 let capturedEffectPasses: { dispose: ReturnType<typeof vi.fn> }[] = []
 
 vi.mock('postprocessing', () => ({
@@ -98,18 +110,34 @@ describe('RenderPipelineManager', () => {
         expect(capturedComposer!.addPass).toHaveBeenCalledTimes(4)
     })
 
-    it('initializes N8AOPostPass.enabled from AppSettings (default: true)', () => {
+    it('initializes N8AOPostPass from AppSettings ssaoQuality (default level 1: 16 samples, half-res)', () => {
         expect(capturedN8aoPass!.enabled).toBe(true)
+        expect(capturedN8aoPass!.configuration.aoSamples).toBe(16)
+        expect(capturedN8aoPass!.configuration.halfRes).toBe(true)
     })
 
-    it('initializes N8AOPostPass.enabled false when ssaoEnabled setting is false', () => {
+    it('initializes N8AOPostPass.enabled false when ssaoQuality is level 0 (Off)', () => {
         capturedN8aoPass = null
         capturedEffectPasses = []
         AppSettings['instance'] = undefined as unknown as AppSettings
-        vi.spyOn(AppSettings, 'get').mockReturnValue(false as never)
+        mockAppSettingsGet({ ssaoQuality: 0 })
 
         const p = new RenderPipelineManager(renderer, scene, camera)
         expect(capturedN8aoPass!.enabled).toBe(false)
+        p.dispose()
+        vi.restoreAllMocks()
+    })
+
+    it('applies the highest ssaoQuality level (64 samples, no half-res)', () => {
+        capturedN8aoPass = null
+        capturedEffectPasses = []
+        AppSettings['instance'] = undefined as unknown as AppSettings
+        mockAppSettingsGet({ ssaoQuality: 5 })
+
+        const p = new RenderPipelineManager(renderer, scene, camera)
+        expect(capturedN8aoPass!.enabled).toBe(true)
+        expect(capturedN8aoPass!.configuration.aoSamples).toBe(64)
+        expect(capturedN8aoPass!.configuration.halfRes).toBe(false)
         p.dispose()
         vi.restoreAllMocks()
     })
@@ -129,12 +157,19 @@ describe('RenderPipelineManager', () => {
         expect(capturedN8aoPass!.setSize).not.toHaveBeenCalled()
     })
 
-    it('toggles N8AOPostPass.enabled when ssaoEnabled setting changes', () => {
-        emitSettingChanged('ssaoEnabled', false)
+    it('applies enabled/aoSamples/halfRes together when ssaoQuality setting changes', () => {
+        emitSettingChanged('ssaoQuality', 0)
         expect(capturedN8aoPass!.enabled).toBe(false)
 
-        emitSettingChanged('ssaoEnabled', true)
+        emitSettingChanged('ssaoQuality', 5)
         expect(capturedN8aoPass!.enabled).toBe(true)
+        expect(capturedN8aoPass!.configuration.aoSamples).toBe(64)
+        expect(capturedN8aoPass!.configuration.halfRes).toBe(false)
+
+        emitSettingChanged('ssaoQuality', 1)
+        expect(capturedN8aoPass!.enabled).toBe(true)
+        expect(capturedN8aoPass!.configuration.aoSamples).toBe(16)
+        expect(capturedN8aoPass!.configuration.halfRes).toBe(true)
     })
 
     it('initializes composer.multisampling from AppSettings msaaLevel (default: low = 0 samples)', () => {
