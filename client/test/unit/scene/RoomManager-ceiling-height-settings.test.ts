@@ -22,11 +22,14 @@ describe('RoomManager ceilingHeight AppSettings integration', () => {
 
         const scene = new THREE.Scene()
         const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
-        camera.position.set(0, 1.6, 0)
+        const cameraRig = new THREE.Group()
+        cameraRig.add(camera)
+        cameraRig.position.set(0, 1.6, 0)
 
         const dataManager = DataManager.getInstance()
         dataManager.set(DataKey.MainScene, scene, { domain: DataDomain.Scene })
         dataManager.set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        dataManager.set(DataKey.MainCameraRig, cameraRig, { domain: DataDomain.Scene })
 
         roomManager = new RoomManager()
     })

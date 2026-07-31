@@ -111,7 +111,7 @@ export class InputManager {
         )
     }
 
-    updateCameraMovement(camera: THREE.Camera): void {
+    updateCameraMovement(camera: THREE.Object3D): void {
         // updateFrame() always runs, paused or not - global actions (OpenMenu) still need to
         // resolve every frame so a press can be detected and close the menu again.
         this.updateFrame()
@@ -128,7 +128,7 @@ export class InputManager {
         )
     }
 
-    updateCameraRotation(camera: THREE.Camera): void {
+    updateCameraRotation(camera: THREE.Object3D): void {
         if (this.isPaused) {
             return
         }

@@ -7,8 +7,14 @@ export class CameraInputApplier {
     private static readonly ROLL_RADIANS_PER_FRAME = 0.02
     private static readonly MAX_PITCH_RADIANS = THREE.MathUtils.degToRad(89)
 
+    /**
+     * Takes an Object3D, not specifically a Camera - callers pass the camera's parent rig (see
+     * SceneManager's cameraRig doc comment), never the camera directly. Only translateX/Y/Z and
+     * position/rotation are used here, all plain Object3D members, so the wider type is accurate,
+     * not a workaround.
+     */
     updateMovement(
-        camera: THREE.Camera,
+        camera: THREE.Object3D,
         actionResolver: InputActionResolver,
         options: MovementOptions,
         sprintActive: boolean
@@ -30,7 +36,7 @@ export class CameraInputApplier {
         if (down > 0) camera.translateY(-(options.speed * down * sprintMultiplier))
     }
 
-    updateRotation(camera: THREE.Camera, actionResolver: InputActionResolver, options: MovementOptions): void {
+    updateRotation(camera: THREE.Object3D, actionResolver: InputActionResolver, options: MovementOptions): void {
         if (actionResolver.isActionPressed(InputAction.ResetCamera)) {
             camera.rotation.set(0, 0, 0)
             return

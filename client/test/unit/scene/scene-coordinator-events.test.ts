@@ -35,8 +35,11 @@ describe('Scene Coordinator Event Registration', () => {
         // SceneCoordinator creates SkyboxManager which reads MainScene from DataManager
         const mockScene = new THREE.Scene()
         const mockCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
+        const mockCameraRig = new THREE.Group()
+        mockCameraRig.add(mockCamera)
         DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
         DataManager.getInstance().set(DataKey.MainCamera, mockCamera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.MainCameraRig, mockCameraRig, { domain: DataDomain.Scene })
     })
 
     it('should emit SceneReady event when basic environment is set up', () => {

@@ -12,11 +12,12 @@
  */
 
 import * as THREE from 'three'
-import type { 
-    TexturePerformanceConfig, 
-    GameBoxPerformanceData, 
-    PerformanceStats 
+import type {
+    TexturePerformanceConfig,
+    GameBoxPerformanceData,
+    PerformanceStats
 } from './types/PerformanceTypes'
+import { getCameraWorldPosition } from '../../utils/CameraWorldPosition'
 
 export class GameBoxPerformanceManager {
     private performanceConfig: TexturePerformanceConfig
@@ -24,6 +25,7 @@ export class GameBoxPerformanceManager {
     private gameBoxPerformanceData: Map<string, GameBoxPerformanceData> = new Map()
     private frustum: THREE.Frustum = new THREE.Frustum()
     private cameraMatrix: THREE.Matrix4 = new THREE.Matrix4()
+    private readonly tmpCameraWorldPos = new THREE.Vector3()
 
     constructor(config: Partial<TexturePerformanceConfig> = {}) {
         // Initialize performance configuration with sensible defaults
@@ -70,11 +72,13 @@ export class GameBoxPerformanceManager {
             child.userData?.isGameBox && child instanceof THREE.Mesh
         ) as THREE.Mesh[]
 
+        const cameraWorldPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
+
         for (const gameBox of gameBoxes) {
             const gameId = gameBox.userData.gameId?.toString() ?? gameBox.userData.name ?? 'unknown'
-            
+
             // Calculate distance from camera
-            const distance = camera.position.distanceTo(gameBox.position)
+            const distance = cameraWorldPos.distanceTo(gameBox.position)
             
             // Check if object is in camera frustum
             const isVisible = this.frustum.containsPoint(gameBox.position)

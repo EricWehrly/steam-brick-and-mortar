@@ -36,6 +36,23 @@ import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
+    /**
+     * The camera's parent - movement/rotation must be applied here, never to the camera
+     * directly. Three.js's WebXRManager overwrites camera.position/quaternion from the headset
+     * pose every frame once presenting (confirmed against three/src/renderers/webxr/
+     * WebXRManager.js's updateUserCamera) when the camera has no parent, discarding any
+     * translateX/Y/Z applied earlier that frame - this is why player movement felt like it had
+     * no effect in VR. Parenting the camera under this rig and moving/rotating the rig instead
+     * composes correctly with the headset pose in Three.js's own XR camera math (parent.matrixWorld
+     * is what gets combined with the tracked pose), and is a no-op change in desktop mode (camera's
+     * local transform under the rig stays identity, so world transform === rig transform, same as
+     * moving the camera directly used to produce).
+     *
+     * camera.position/rotation are therefore always local-to-rig (effectively always identity) -
+     * never read them expecting a world position; use camera.getWorldPosition()/getWorldDirection()
+     * or read this rig directly instead. See src/utils/CameraWorldPosition.ts.
+     */
+    private cameraRig: THREE.Group
     private renderer: THREE.WebGLRenderer
     private renderPipelineManager: RenderPipelineManager
     private propRenderer: PropRenderer | null = null
@@ -71,6 +88,14 @@ export class SceneManager {
         const CAMERA_FAR_DIST = 1000
         this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
         DataManager.getInstance().set(DataKey.MainCamera, this.camera, { domain: DataDomain.Scene })
+
+        // See this.cameraRig's own doc comment for why the camera is parented here rather than
+        // moved/rotated directly.
+        this.cameraRig = new THREE.Group()
+        this.cameraRig.name = 'camera-rig'
+        this.cameraRig.add(this.camera)
+        this.scene.add(this.cameraRig)
+        DataManager.getInstance().set(DataKey.MainCameraRig, this.cameraRig, { domain: DataDomain.Scene })
 
         // Swap ThreeWebGLRendererDebug ↔ THREE.WebGLRenderer to toggle shader-compile
         // logging and slow-frame warnings. Both are identical at the type level.
@@ -129,8 +154,8 @@ export class SceneManager {
     }
 
     private setupCamera() {
-        // >>> REVIEW: camera.position set here on initial scene setup
-        this.camera.position.set(0, 1.6, 0)
+        // Sets the RIG's position, not the camera's - see this.cameraRig's doc comment.
+        this.cameraRig.position.set(0, 1.6, 0)
     }
 
     private setupEventListeners() {
@@ -232,6 +257,12 @@ export class SceneManager {
 
     public getCamera(): THREE.PerspectiveCamera {
         return this.camera
+    }
+
+    /** The camera's parent - see its own doc comment (on the private field) for why movement/
+     *  rotation must be applied here instead of to the camera directly. */
+    public getCameraRig(): THREE.Group {
+        return this.cameraRig
     }
 
     public getRenderer(): THREE.WebGLRenderer {

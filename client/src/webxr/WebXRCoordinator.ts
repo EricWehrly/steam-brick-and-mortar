@@ -21,7 +21,11 @@ import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import { AppSettings } from '../core/AppSettings'
 
 export interface WebXRCoordinatorConfig {
-    camera: THREE.Camera
+    /**
+     * The camera's parent rig, not the camera itself - see SceneManager's cameraRig doc comment
+     * for why movement/rotation must be applied here instead of to the camera directly.
+     */
+    cameraRig: THREE.Object3D
 }
 
 /**
@@ -32,10 +36,10 @@ export class WebXRCoordinator {
     private inputManager: InputManager
     private eventManager: EventManager
     private renderLoopRegistry: RenderLoopRegistry
-    private camera: THREE.Camera
+    private cameraRig: THREE.Object3D
 
     constructor(config: WebXRCoordinatorConfig) {
-        this.camera = config.camera
+        this.cameraRig = config.cameraRig
         this.eventManager = EventManager.getInstance()
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
@@ -76,7 +80,7 @@ export class WebXRCoordinator {
      * Update camera movement - called every frame by render loop registry
      */
     private updateCamera(_now: number, _deltaTime: number): void {
-        this.updateCameraMovement(this.camera)
+        this.updateCameraMovement(this.cameraRig)
     }
 
     /**
@@ -92,16 +96,21 @@ export class WebXRCoordinator {
     }
 
     /**
-     * Update camera movement and rotation using input manager
-     * Call this from the render loop
+     * Update camera movement and rotation using input manager. Call this from the render loop.
+     *
+     * Both apply to the camera's parent rig, never the camera itself (see SceneManager's
+     * cameraRig doc comment for why - Three.js overwrites camera.position/quaternion from the
+     * headset pose every XR frame for a parentless camera). Movement always runs, VR or desktop -
+     * moving the rig composes correctly with the tracked headset pose in Three.js's own XR camera
+     * math, so no session-active branch is needed here. Rotation is skipped entirely during an
+     * active XR session: view rotation must come only from the headset, not mouse/keyboard input.
      */
-    updateCameraMovement(camera: THREE.Camera): void {
-        // Handle keyboard movement
-        // we should ABSOLUTELY NOT update the camera in VR this way (from keybinds rather than headset data)
-        this.inputManager.updateCameraMovement(camera)
+    updateCameraMovement(cameraRig: THREE.Object3D): void {
+        this.inputManager.updateCameraMovement(cameraRig)
 
-        // Mouse-drag look is intentionally disabled; camera rotation now relies on other input paths.
-        this.inputManager.updateCameraRotation(camera)
+        if (!this.webxrManager.isSessionActive()) {
+            this.inputManager.updateCameraRotation(cameraRig)
+        }
     }
 
     /**
@@ -142,6 +151,19 @@ export class WebXRCoordinator {
 
     private handleSessionStart(): void {
         console.log('✅ WebXR session started!')
+
+        // The headset's tracked pose is a full absolute orientation (relative to the XR reference
+        // space), not a delta - Three.js composes it with the rig's rotation every frame
+        // (parent.matrixWorld in WebXRManager.updateCamera). Any residual rig rotation left over
+        // from desktop mode (e.g. RoomManager's initial lookAt() aiming the flat camera at the
+        // store) would silently add an unwanted rotation on top of the real headset orientation -
+        // before this reset, that's exactly what caused the reported "camera facing into
+        // geometry/skybox only" bug once movement started actually composing correctly. Desktop
+        // mode never hit this: a parentless camera had its rotation wholesale discarded by the
+        // XR pose each frame, so a stale rotation never actually mattered until parenting made it
+        // compose for real.
+        this.cameraRig.quaternion.identity()
+
         this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
     }
