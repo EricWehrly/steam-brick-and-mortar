@@ -87,8 +87,7 @@ import {
     computeUnitTransform,
     type CorridorSide,
 } from './LiminalCorridorLayout'
-import { LiminalEventTypes, type BoundaryCrossedEvent } from './LiminalEvents'
-import { computeSlotIndexForWorldZ } from './LiminalBoundaryTracker'
+import { LiminalEventTypes, type BoundaryCrossedEvent, computeSlotIndexForWorldZ } from './LiminalBoundaryTracker'
 
 const LIMINAL_WINDOW_SECTION_ID = 'liminal-window'
 

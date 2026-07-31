@@ -11,8 +11,9 @@ import {
     computeSlotIndexForWorldZ,
     BOUNDARY_CHECK_FRAME_INTERVAL,
     BOUNDARY_HYSTERESIS_SLOT_FRACTION,
+    LiminalEventTypes,
+    type BoundaryCrossedEvent,
 } from '../../../../src/scene/liminal/LiminalBoundaryTracker'
-import { LiminalEventTypes, type BoundaryCrossedEvent } from '../../../../src/scene/liminal/LiminalEvents'
 import type { MockFn } from '../../../utils/test-types'
 import { CORRIDOR_FIRST_SLOT_OFFSET_Z, CORRIDOR_UNIT_SPACING_Z } from '../../../../src/scene/liminal/LiminalCorridorLayout'
 
@@ -193,11 +194,16 @@ describe('LiminalBoundaryTracker', () => {
         })
     })
 
-    it('does nothing when the camera is not available in DataManager', () => {
-        DataManager.getInstance().set(DataKey.MainCamera, null as unknown as THREE.Camera, { domain: DataDomain.Scene })
-        emitLayoutRequested('liminal')
-        expect(() => tick()).not.toThrow()
-        expect(crossedSpy).not.toHaveBeenCalled()
+})
+
+describe('LiminalBoundaryTracker construction', () => {
+    it('throws if constructed before the camera is published to DataManager', () => {
+        // The camera is grabbed once at construction (SceneManager has already
+        // published it by then in production, same guarantee RoomManager's
+        // constructor relies on) rather than re-resolved every check — so a
+        // missing camera is a startup-contract violation, not a per-frame no-op.
+        DataManager.getInstance().set(DataKey.MainCamera, undefined as unknown as THREE.Camera, { domain: DataDomain.Scene })
+        expect(() => new LiminalBoundaryTracker()).toThrow()
     })
 })
 

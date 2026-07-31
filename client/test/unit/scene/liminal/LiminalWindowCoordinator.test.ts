@@ -23,8 +23,7 @@ import {
     CORRIDOR_FIRST_SLOT_OFFSET_Z,
     CORRIDOR_UNIT_SPACING_Z,
 } from '../../../../src/scene/liminal/LiminalCorridorLayout'
-import { LiminalEventTypes, type BoundaryCrossedEvent } from '../../../../src/scene/liminal/LiminalEvents'
-import { computeSlotIndexForWorldZ } from '../../../../src/scene/liminal/LiminalBoundaryTracker'
+import { LiminalEventTypes, type BoundaryCrossedEvent, computeSlotIndexForWorldZ } from '../../../../src/scene/liminal/LiminalBoundaryTracker'
 import { computeSlotsPerShelf } from '../../../../src/scene/props/shared/StockStrategy'
 import { RowStockStrategy } from '../../../../src/scene/props/shared/RowLayoutUtils'
 import { DEFAULT_SHELF_CONFIG } from '../../../../src/scene/props/shared/SharedPropsTypes'
