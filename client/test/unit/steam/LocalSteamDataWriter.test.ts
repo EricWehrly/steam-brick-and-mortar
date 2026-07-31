@@ -322,6 +322,33 @@ describe('LocalSteamDataWriter', () => {
             expect(entries.get(620)?.user_collections).toBeUndefined()
         })
 
+        // Regression test: a machine where active_userdata_dir() can't resolve (e.g. the
+        // multi-account edge case identity/paths.rs guards against) used to throw uncaught here
+        // and crash the whole startup waterfall before it could fall through to demo - see
+        // LocalSteamDataWriter.readPlaytimes's doc comment.
+        it('proceeds without playtime data when read_steam_playtimes fails, still resolving via collections', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.reject(new Error('no active Steam identity found in loginusers.vdf'))
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([{ id: 'from-tag-Ze Done', name: 'Ze Done', appids: [620] }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(entries.get(620)?.name).toBe('Portal 2')
+            expect(entries.get(620)?.user_collections).toEqual([{ id: 'from-tag-Ze Done', name: 'Ze Done' }])
+        })
+
         it('emits TaxonomyDataReady with source local-scan after a successful write', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string) => {

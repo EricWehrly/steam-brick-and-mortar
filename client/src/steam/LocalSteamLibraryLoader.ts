@@ -68,7 +68,7 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
         logger.debug('No local Steam identity found, proceeding without one:', error)
     }
 
-    const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
+    const playtimes = await LocalSteamDataWriter.readPlaytimes()
     const collectionsByAppid = await LocalSteamDataWriter.readCollectionsByAppid()
     const candidateAppids = new Set<number>([...playtimes.map(playtime => playtime.appid), ...collectionsByAppid.keys()])
     if (candidateAppids.size === 0) {

@@ -83,7 +83,7 @@ export class LocalSteamDataWriter {
             return new Map()
         }
 
-        const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
+        const playtimes = await LocalSteamDataWriter.readPlaytimes()
         const collectionsByAppid = await LocalSteamDataWriter.readCollectionsByAppid()
         const appids = [...new Set([...playtimes.map(playtime => playtime.appid), ...collectionsByAppid.keys()])]
         if (appids.length === 0) {
@@ -197,6 +197,21 @@ export class LocalSteamDataWriter {
 
         await AppDetailsCache.mergeMany(entries, Date.now())
         LocalSteamDataWriter.logger.info(`Backfilled user_collections for ${entries.size} appid(s) resolved outside local appinfo.vdf`)
+    }
+
+    /**
+     * A playtimes-read failure (no active identity resolvable - the same multi-account edge case
+     * `active_userdata_dir()` can hit - or no userdata dir at all) shouldn't crash the startup
+     * waterfall; it should degrade to "no local playtime data" so callers still fall through to
+     * an online fetch or the demo store instead of throwing uncaught mid-startup.
+     */
+    public static async readPlaytimes(): Promise<LocalAppPlaytime[]> {
+        try {
+            return await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
+        } catch (error) {
+            LocalSteamDataWriter.logger.warn('Failed to read Steam playtimes, proceeding without them:', error)
+            return []
+        }
     }
 
     /**

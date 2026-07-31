@@ -15,17 +15,19 @@ const { writeLocalAppMetadataMock, mergeCollectionsForAppidsMock } = vi.hoisted(
     mergeCollectionsForAppidsMock: vi.fn(),
 }))
 
-// readCollectionsByAppid is kept real (not mocked) - it just calls the already-mocked `invoke`,
-// and LocalSteamLibraryLoader now depends on its actual Map-building behavior, not just a stub.
+// readCollectionsByAppid/readPlaytimes are kept real (not mocked) - they just call the
+// already-mocked `invoke`, and LocalSteamLibraryLoader now depends on their actual behavior
+// (Map-building, degrading to [] on failure), not just a stub.
 vi.mock('../../../src/steam/LocalSteamDataWriter', async (importOriginal) => {
     // Class methods are non-enumerable, so {...actual.LocalSteamDataWriter} silently drops them -
-    // reference readCollectionsByAppid explicitly instead of trying to spread the class.
+    // reference readCollectionsByAppid/readPlaytimes explicitly instead of trying to spread the class.
     const actual = await importOriginal<typeof import('../../../src/steam/LocalSteamDataWriter')>()
     return {
         LocalSteamDataWriter: {
             writeLocalAppMetadata: writeLocalAppMetadataMock,
             mergeCollectionsForAppids: mergeCollectionsForAppidsMock,
             readCollectionsByAppid: actual.LocalSteamDataWriter.readCollectionsByAppid,
+            readPlaytimes: actual.LocalSteamDataWriter.readPlaytimes,
         },
     }
 })
@@ -148,6 +150,24 @@ describe('LocalSteamLibraryLoader', () => {
             expect(writeLocalAppMetadataMock).not.toHaveBeenCalled()
             expect(result.library).toBeNull()
             expect(result.steamId).toBe('1')
+        })
+
+        // Regression test: this used to throw uncaught (read_steam_playtimes had no try/catch),
+        // crashing SteamIntegration's whole startup waterfall before it could fall through to an
+        // online fetch or the demo store - see LocalSteamDataWriter.readPlaytimes's doc comment.
+        it('returns a null library instead of throwing when read_steam_playtimes fails outright', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_identity') return Promise.reject(new Error('no active Steam identity found in loginusers.vdf'))
+                if (command === 'read_steam_playtimes') return Promise.reject(new Error('no active Steam identity found in loginusers.vdf'))
+                if (command === 'read_steam_collections') return Promise.resolve([])
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const result = await loadLocalSteamLibrary()
+
+            expect(result.library).toBeNull()
+            expect(result.steamId).toBeUndefined()
         })
 
         it('includes a collection-only appid (no playtime) once network-resolved', async () => {
