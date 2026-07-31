@@ -266,6 +266,7 @@ function mergeAppDetails(
             capsule_v5: prefer(incoming.artwork.capsule_v5, existing.artwork.capsule_v5, isDefined) ?? null,
             background: prefer(incoming.artwork.background, existing.artwork.background, isDefined) ?? null,
             background_raw: prefer(incoming.artwork.background_raw, existing.artwork.background_raw, isDefined) ?? null,
+            library: prefer(incoming.artwork.library, existing.artwork.library, isDefined),
         },
         developers: prefer(incoming.developers, existing.developers, isNonEmptyArray),
         publishers: prefer(incoming.publishers, existing.publishers, isNonEmptyArray),

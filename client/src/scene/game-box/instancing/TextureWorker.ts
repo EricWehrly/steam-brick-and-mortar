@@ -8,6 +8,7 @@
 import type {
     TextureProcessingMessage,
     TextureFetchMessage,
+    TextureLocalBlobMessage,
     TextureProcessingResult,
     TextureProcessingError,
     ArtworkPackDecodeMessage,
@@ -42,7 +43,7 @@ export interface FetchAndProcessOptions {
     timeout?: number
 }
 
-type TWIn = TextureProcessingMessage | TextureFetchMessage | ArtworkPackDecodeMessage
+type TWIn = TextureProcessingMessage | TextureFetchMessage | TextureLocalBlobMessage | ArtworkPackDecodeMessage
 type TWOut = TextureProcessingResult | TextureProcessingError | ArtworkPackDecodeResult
 
 export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
@@ -135,6 +136,45 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
         } catch (err) {
             this.includeBlobFor.delete(messageId)
             throw err
+        }
+    }
+
+    /**
+     * Process image bytes already read from local disk (Tauri, not the network) - same flexible
+     * dimensions/native-size handling as fetchAndProcessWithOptions, minus the network fetch.
+     * `formatHint` (e.g. "library_600x900.jpg") stands in for a URL in the worker's high-res-check
+     * filename match, since there's no real URL for a local file.
+     */
+    public async processLocalBytes(
+        bytes: Uint8Array<ArrayBuffer>,
+        formatHint: string,
+        textureIndex: number,
+        gameName: string,
+        options: FetchAndProcessOptions = {}
+    ): Promise<FetchAndProcessResult> {
+        const messageId = this.nextMsgId(`local_${textureIndex}`)
+        const blob = new Blob([bytes])
+        const result = await this.send<TextureProcessingResult>({
+            type: 'PROCESS_LOCAL_BLOB',
+            blob,
+            formatHint,
+            textureWidth: options.textureWidth,
+            textureHeight: options.textureHeight,
+            useNativeSize: options.useNativeSize,
+            textureIndex,
+            messageId,
+            gameName
+        } as TextureLocalBlobMessage)
+
+        if (result.type !== 'TEXTURE_PROCESSED') {
+            throw new Error((result as unknown as TextureProcessingError).error)
+        }
+
+        return {
+            imageData: result.imageData,
+            processingTime: result.processingTime,
+            width: result.width,
+            height: result.height
         }
     }
 

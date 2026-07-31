@@ -46,6 +46,24 @@ export interface TextureFetchMessage {
     timeout?: number
 }
 
+/**
+ * Process a Blob that's already local (read from disk via Tauri, not fetched over the network) -
+ * same flexible-dimensions processing FETCH_AND_PROCESS uses, minus the network fetch.
+ * `formatHint` stands in for `url` in the high-res-check filename match (see
+ * getExpectedNativeWidth) since there's no real URL for a local file.
+ */
+export interface TextureLocalBlobMessage {
+    type: 'PROCESS_LOCAL_BLOB'
+    blob: Blob
+    formatHint: string
+    textureWidth?: number
+    textureHeight?: number
+    useNativeSize?: boolean
+    textureIndex: number
+    messageId: string
+    gameName: string
+}
+
 /** One tile's position within an artwork pack grid image. */
 export interface ArtworkPackEntry {
     appid: number
@@ -105,7 +123,7 @@ export interface TextureProcessingError {
     gameName?: string
 }
 
-export type WorkerMessage = TextureProcessingMessage | TextureFetchMessage | ArtworkPackDecodeMessage
+export type WorkerMessage = TextureProcessingMessage | TextureFetchMessage | TextureLocalBlobMessage | ArtworkPackDecodeMessage
 export type WorkerResponse = TextureProcessingResult | TextureProcessingError | ArtworkPackDecodeResult
 
 // Worker state
@@ -395,6 +413,30 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
             }
             
             // Transfer the ArrayBuffer to avoid copying
+            ctx.postMessage(result, [processed.imageData.buffer])
+
+        } else if (type === 'PROCESS_LOCAL_BLOB') {
+            // Local disk mode: no network fetch, same flexible-dimensions processing otherwise
+            const { blob, formatHint, textureWidth, textureHeight, useNativeSize, textureIndex, gameName } = event.data as TextureLocalBlobMessage
+
+            const processed = (useNativeSize || (textureWidth && textureHeight))
+                ? await processBlobWithDimensions(blob, formatHint, textureWidth, textureHeight, useNativeSize)
+                : await processBlobWithDimensions(blob, formatHint, undefined, undefined, true)
+
+            const processingTime = performance.now() - startTime
+
+            const result: TextureProcessingResult = {
+                type: 'TEXTURE_PROCESSED',
+                imageData: processed.imageData,
+                textureIndex: textureIndex,
+                messageId: messageId,
+                processingTime: processingTime,
+                width: processed.width,
+                height: processed.height,
+                gameName: gameName,
+                blob: blob
+            }
+
             ctx.postMessage(result, [processed.imageData.buffer])
 
         } else if (type === 'DECODE_ARTWORK_PACK') {

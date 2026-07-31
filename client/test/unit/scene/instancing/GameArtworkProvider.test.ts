@@ -39,8 +39,21 @@ vi.mock('../../../../src/scene/game-box/instancing/TextureWorker', () => ({
                 ? Promise.reject(new Error('HTTP 404: Not Found'))
                 : Promise.resolve({ imageData: new Uint8ClampedArray(300 * 450 * 4).fill(128) })
         ),
+        processLocalBytes: vi.fn(() =>
+            Promise.resolve({ imageData: new Uint8ClampedArray(300 * 450 * 4).fill(64), processingTime: 1, width: 300, height: 450 })
+        ),
         dispose: vi.fn()
     } })
+}))
+
+const { readArtBytesMock } = vi.hoisted(() => ({
+    readArtBytesMock: vi.fn(),
+}))
+
+vi.mock('../../../../src/steam/LocalLibraryArtReader', () => ({
+    LocalLibraryArtReader: {
+        readArtBytes: readArtBytesMock,
+    },
 }))
 
 // Mock PixelDataCache
@@ -73,6 +86,7 @@ describe('GameArtworkProvider', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        readArtBytesMock.mockReset().mockResolvedValue(null)
         setupIndexedDBMock()
         AppDetailsCache.resetForTesting()
         DataManager.resetInstance()
@@ -341,6 +355,69 @@ describe('GameArtworkProvider', () => {
             await artwork.getPixelsAtSize(dims.width, dims.height)
 
             expect(await AppDetailsCache.get(999999)).toBeNull()
+        })
+    })
+
+    describe('Local disk art (registerLocalArtIndex / fetchPixelsFromLocalDisk)', () => {
+        it('returns null when nothing is registered for the appId', async () => {
+            const dims = ARTWORK_DIMENSIONS.library
+            const result = await provider.fetchPixelsFromLocalDisk(12345, 'library', dims.width, dims.height)
+            expect(result).toBeNull()
+            expect(readArtBytesMock).not.toHaveBeenCalled()
+        })
+
+        it('returns null for capsule format - no local slot exists for it', async () => {
+            provider.registerLocalArtIndex([
+                { appid: 12345, library: { relative_path: 'library_600x900.jpg' } },
+            ])
+            const dims = ARTWORK_DIMENSIONS.capsule
+            const result = await provider.fetchPixelsFromLocalDisk(12345, 'capsule', dims.width, dims.height)
+            expect(result).toBeNull()
+        })
+
+        it('reads bytes and decodes via the worker when a matching slot is registered', async () => {
+            provider.registerLocalArtIndex([
+                { appid: 12345, library: { relative_path: 'library_600x900.jpg' } },
+            ])
+            readArtBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+
+            const dims = ARTWORK_DIMENSIONS.library
+            const result = await provider.fetchPixelsFromLocalDisk(12345, 'library', dims.width, dims.height)
+
+            expect(readArtBytesMock).toHaveBeenCalledWith(12345, 'library_600x900.jpg')
+            expect(result?.fromCache).toBe(false)
+            expect(result?.width).toBe(dims.width)
+            expect(result?.height).toBe(dims.height)
+        })
+
+        it('falls through to null (not a thrown error) when the disk read fails', async () => {
+            provider.registerLocalArtIndex([
+                { appid: 12345, header: { relative_path: 'header.jpg' } },
+            ])
+            readArtBytesMock.mockRejectedValue(new Error('file moved'))
+
+            const dims = ARTWORK_DIMENSIONS.header
+            const result = await provider.fetchPixelsFromLocalDisk(12345, 'header', dims.width, dims.height)
+
+            expect(result).toBeNull()
+        })
+
+        it('GameArtworkRequest prefers local disk over the network URL strategy', async () => {
+            provider.registerLocalArtIndex([
+                { appid: 12345, library: { relative_path: 'library_600x900.jpg', hash: 'abc123' } },
+            ])
+            readArtBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://example.com/art.jpg' })
+            const dims = ARTWORK_DIMENSIONS.library
+            const result = await artwork.getPixelsAtSize(dims.width, dims.height)
+
+            expect(result.fromCache).toBe(false)
+            expect(readArtBytesMock).toHaveBeenCalled()
+            // Local disk resolution never pins SteamArtworkStateManager's selectedUrl (no real URL
+            // to pin) - unaffected either way, just confirms the network strategy was never reached.
+            const state = SteamArtworkStateManager.getState(12345)
+            expect(state?.selectedUrl).toBeUndefined()
         })
     })
 })

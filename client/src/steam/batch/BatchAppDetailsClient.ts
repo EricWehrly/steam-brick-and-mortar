@@ -26,6 +26,15 @@ export interface AppDetailsData extends SteamGameMetadata {
         capsule_v5: string | null;
         background: string | null;
         background_raw: string | null;
+        /**
+         * Real library-art CDN URL, validated (never a guess) - the Steam Store API has no field
+         * for this at all, so the only source is a locally-discovered librarycache hash (see
+         * desktop/tauri-app/src/steam/librarycache.rs) confirmed live before being written here.
+         * Optional (not `string | null` like the fields above) so the many existing `artwork`
+         * object literals that predate this field don't all need updating - most entries simply
+         * don't have one yet.
+         */
+        library?: string;
     };
     // Additional fields from Steam Store API
     full_data?: Record<string, unknown>;
