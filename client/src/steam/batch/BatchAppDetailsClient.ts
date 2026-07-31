@@ -105,15 +105,52 @@ export interface BatchAppDetailsResult {
 
 import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../../utils/PerformanceMonitor'
+import { circuitBreaker, CircuitState, ConsecutiveBreaker, ExponentialBackoff, handleAll, isBrokenCircuitError, type CircuitBreakerPolicy } from 'cockatiel'
+
+/**
+ * A single 503 from our own Lambda (each failure here already costs a real ~30s round trip -
+ * see fetchSingleBatch's timeout comment) is a clear enough "the backend is unhealthy right now"
+ * signal on its own - no need to pay for a second confirming failure before we stop hammering it.
+ */
+const CIRCUIT_BREAKER_CONSECUTIVE_FAILURES_TO_OPEN = 1;
+/** First retry probe 10s after opening; doubles each further consecutive break, capped at 5min. */
+const CIRCUIT_BREAKER_INITIAL_HALF_OPEN_DELAY_MS = 10_000;
+const CIRCUIT_BREAKER_MAX_HALF_OPEN_DELAY_MS = 5 * 60_000;
 
 export class BatchAppDetailsClient {
     private static readonly logger = Logger.createLogFunctions(BatchAppDetailsClient.name)
     private apiBaseUrl: string;
     private eventManager: EventManager;
+    /**
+     * Shared across every fetchBatch() call on this instance (per cockatiel's own guidance - a
+     * circuit breaker only works if it's reused, not recreated per call) so that once this
+     * backend is known to be unhealthy, later calls in the same session (a manual library
+     * reload, another game's gap-fill) skip straight to failing fast instead of re-discovering
+     * the same outage at full latency cost.
+     */
+    private readonly circuitBreaker: CircuitBreakerPolicy;
 
     constructor(apiBaseUrl: string = 'https://steam-api-dev.wehrly.com', eventManager?: EventManager) {
         this.apiBaseUrl = apiBaseUrl;
         this.eventManager = eventManager || EventManager.getInstance();
+
+        this.circuitBreaker = circuitBreaker(handleAll, {
+            breaker: new ConsecutiveBreaker(CIRCUIT_BREAKER_CONSECUTIVE_FAILURES_TO_OPEN),
+            halfOpenAfter: new ExponentialBackoff({
+                initialDelay: CIRCUIT_BREAKER_INITIAL_HALF_OPEN_DELAY_MS,
+                maxDelay: CIRCUIT_BREAKER_MAX_HALF_OPEN_DELAY_MS,
+            }),
+        });
+        this.circuitBreaker.onBreak(reason => {
+            const detail = 'error' in reason ? String(reason.error) : `isolated`;
+            BatchAppDetailsClient.logger.warn(`Circuit OPEN for ${this.apiBaseUrl} - backend appears unhealthy (${detail}), skipping further requests until it self-heals`);
+        });
+        this.circuitBreaker.onHalfOpen(() => {
+            BatchAppDetailsClient.logger.info(`Circuit HALF-OPEN for ${this.apiBaseUrl} - probing whether the backend has recovered`);
+        });
+        this.circuitBreaker.onReset(() => {
+            BatchAppDetailsClient.logger.info(`Circuit CLOSED for ${this.apiBaseUrl} - backend has recovered, resuming normal requests`);
+        });
     }
 
     /**
@@ -146,19 +183,20 @@ export class BatchAppDetailsClient {
         }
 
         let totalFetched = 0;
-        let consecutiveFailures = 0;
         let lastBatchDuration: number; // Track response time for adaptive delays
-        const MAX_CONSECUTIVE_FAILURES = 3; // Circuit breaker threshold
         const FAST_RESPONSE_THRESHOLD = 2000; // If batch returns in <2s, it's mostly cached
 
         // Process batches sequentially to respect rate limits
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-            // Circuit breaker: stop if too many consecutive failures
-            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                console.error(`🚨 [BatchAppDetails] Circuit breaker triggered after ${consecutiveFailures} consecutive failures. Stopping batch processing.`);
+            // Check before announcing/attempting a batch, not just in the catch block below - an
+            // already-open circuit (this call's own earlier failure, or a still-open break from a
+            // prior fetchBatch() call on this instance) means every remaining batch is doomed;
+            // don't log "Starting batch N" for one we already know we won't attempt.
+            if (this.circuitBreaker.state === CircuitState.Open || this.circuitBreaker.state === CircuitState.Isolated) {
+                BatchAppDetailsClient.logger.warn(`Skipping ${batches.length - batchIndex} remaining batch(es) - circuit is open for ${this.apiBaseUrl}`);
                 break;
             }
-            
+
             const batch = batches[batchIndex];
             const batchMonitor = PerformanceMonitor.start('network-batch', BatchAppDetailsClient.logger, ASYNC_CONTEXT)
             
@@ -172,7 +210,7 @@ export class BatchAppDetailsClient {
             });
             
             try {
-                const batchResult = await this.fetchSingleBatch(batch);
+                const batchResult = await this.circuitBreaker.execute(() => this.fetchSingleBatch(batch));
                 lastBatchDuration = batchMonitor.getElapsed();
                 
                 // Process successful results
@@ -210,29 +248,23 @@ export class BatchAppDetailsClient {
                     BatchAppDetailsClient.logger.warn(`Batch ${batchIndex + 1} had ${batchResult.failed.length} failures: ${batchResult.failed.map(f => `${f.appid}: ${f.error}`).join(', ')}`)
                 }
 
-                consecutiveFailures = 0; // Reset on success
-
                 // Adaptive delay: skip delay if responses are fast (cached), add delay if slow (uncached)
                 if (batchIndex < batches.length - 1) {
-                    if (lastBatchDuration < FAST_RESPONSE_THRESHOLD) {
-                        // Fast response = mostly cached, minimal delay needed
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                    } else {
-                        // Slow response = uncached API calls, add backoff delay
-                        const baseDelay = 200;
-                        const backoffDelay = Math.min(baseDelay * Math.pow(1.5, consecutiveFailures), 2000);
-                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                    }
+                    const delay = lastBatchDuration < FAST_RESPONSE_THRESHOLD ? 50 : 200;
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
 
             } catch (error) {
-                consecutiveFailures++;
+                if (isBrokenCircuitError(error)) {
+                    // The breaker already opened from an earlier failure (this run or a prior
+                    // one on this same client instance) - don't burn another ~30s round trip on
+                    // a request we already know the backend will fail. Whatever's left in
+                    // `appids` stays unresolved this call; the breaker's own half-open probe
+                    // (see constructor) is what retries later, not this loop.
+                    BatchAppDetailsClient.logger.warn(`Stopping batch processing - circuit is open for ${this.apiBaseUrl}, ${batches.length - batchIndex} batch(es) skipped`);
+                    break;
+                }
                 BatchAppDetailsClient.logger.error(`Batch ${batchIndex + 1} failed: ${String(error)}`)
-                
-                // Exponential backoff on failure (max 5 seconds)
-                const backoffDelay = Math.min(1000 * Math.pow(2, consecutiveFailures - 1), 5000);
-                BatchAppDetailsClient.logger.debug(`Waiting ${backoffDelay}ms before next batch due to failure...`)
-                await new Promise(resolve => setTimeout(resolve, backoffDelay));
             }
         }
 
