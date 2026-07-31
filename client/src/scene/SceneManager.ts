@@ -225,10 +225,6 @@ export class SceneManager {
         return this.renderer
     }
 
-    public getRenderPipelineManager(): RenderPipelineManager {
-        return this.renderPipelineManager
-    }
-
     public dispose() {
         this.renderer.setAnimationLoop(null)
         this.renderLoopCallback = null
