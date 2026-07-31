@@ -12,6 +12,16 @@ import * as THREE from 'three'
 import { Logger } from '../utils/Logger'
 // Use global WebXR types from webxr.d.ts
 
+/**
+ * Preference order for `XRReferenceSpaceType`, most-capable first - 'local-floor' gives real
+ * floor-relative tracking, but not every runtime supports it (confirmed: a PICO 4 bridged through
+ * PICO Connect/SteamVR threw `NotSupportedError` on it while still reporting the session itself
+ * as supported). Rather than hardcode one assumption (Three.js's own default is 'local-floor'
+ * with no fallback), probe the actual session for what it supports and use the best available -
+ * letting the runtime's real capabilities drive this instead of us guessing.
+ */
+const REFERENCE_SPACE_FALLBACK_ORDER: ReadonlyArray<XRReferenceSpaceType> = ['local-floor', 'bounded-floor', 'local', 'viewer']
+
 export interface WebXRCapabilities {
     isSupported: boolean
     supportsImmersiveVR: boolean
@@ -118,13 +128,17 @@ export class WebXRManager {
 
         try {
             console.log('🥽 Attempting to start WebXR session...')
-            
+
             const session = await navigator.xr.requestSession('immersive-vr')
             this.currentSession = session
-            
+
+            const referenceSpaceType = await this.determineSupportedReferenceSpaceType(session)
+            WebXRManager.logger.info(`Using XR reference space: ${referenceSpaceType}`)
+            this.renderer.xr.setReferenceSpaceType(referenceSpaceType)
+
             // Set the session on the renderer
             await this.renderer.xr.setSession(session)
-            
+
             // Set up session event listeners
             session.addEventListener('end', () => {
                 console.log('🚪 WebXR session ended')
@@ -140,6 +154,25 @@ export class WebXRManager {
             this.callbacks.onError?.(error as Error)
             throw error
         }
+    }
+
+    /**
+     * Requesting a reference space is non-destructive and repeatable on the same session (per
+     * the WebXR spec), so this probes REFERENCE_SPACE_FALLBACK_ORDER in order and returns the
+     * first type the session actually grants, rather than assuming one always works. Three.js's
+     * own `setSession()` would otherwise request its hardcoded default ('local-floor') once and
+     * throw NotSupportedError with no fallback if the runtime doesn't support it.
+     */
+    private async determineSupportedReferenceSpaceType(session: XRSession): Promise<XRReferenceSpaceType> {
+        for (const referenceSpaceType of REFERENCE_SPACE_FALLBACK_ORDER) {
+            try {
+                await session.requestReferenceSpace(referenceSpaceType)
+                return referenceSpaceType
+            } catch (error) {
+                WebXRManager.logger.debug(`Reference space '${referenceSpaceType}' not supported, trying next fallback:`, error)
+            }
+        }
+        throw new Error(`No supported XR reference space type found (tried: ${REFERENCE_SPACE_FALLBACK_ORDER.join(', ')})`)
     }
 
     /**
