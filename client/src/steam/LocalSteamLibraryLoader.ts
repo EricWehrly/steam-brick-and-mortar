@@ -24,6 +24,8 @@ import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import { LocalSteamDataWriter } from './LocalSteamDataWriter'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import { SteamApiClient } from './SteamApiClient'
+import { LocalLibraryArtReader } from './LocalLibraryArtReader'
+import { GameArtworkProvider } from '../scene/game-box/instancing/GameArtworkProvider'
 import { Logger } from '../utils/Logger'
 
 interface SteamIdentity {
@@ -74,6 +76,7 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
     }
 
     await LocalSteamDataWriter.writeLocalAppMetadata()
+    await registerLocalLibraryArt(candidateAppids)
     await resolveRemainingAppidsFromNetwork(candidateAppids)
     // Covers collection members writeLocalAppMetadata's own pass can't - see its docs.
     await LocalSteamDataWriter.mergeCollectionsForAppids(candidateAppids, collectionsByAppid)
@@ -92,6 +95,29 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
             games,
             provenance: { channel: 'local-scan', capturedAt: new Date().toISOString() },
         },
+    }
+}
+
+/**
+ * Scans Steam's own local librarycache once for the whole candidate set and registers whatever it
+ * finds directly on GameArtworkProvider's singleton - see docs/plans/startup-artwork-resolution-plan.md,
+ * Root Cause D. A direct call, not an event: GameArtworkProvider is accessed via getInstance()
+ * everywhere else in this codebase (never event-driven), and getInstance() is idempotent/lazy, so
+ * there's no ordering hazard to solve regardless of whether the provider singleton already exists
+ * yet - unlike a plain EventManager.emit(), which has no late-subscriber replay (see the TODO in
+ * EventManager.ts) and would silently drop this if the provider hadn't been constructed yet.
+ * Best-effort: a scan failure just means this session gets no local-disk art, same as before this
+ * existed.
+ */
+async function registerLocalLibraryArt(candidateAppids: ReadonlySet<number>): Promise<void> {
+    try {
+        const entries = await LocalLibraryArtReader.findLocalArt([...candidateAppids])
+        GameArtworkProvider.getInstance().registerLocalArtIndex(entries)
+        if (entries.length > 0) {
+            logger.info(`Local librarycache scan: ${entries.length}/${candidateAppids.size} appid(s) have cached art on disk`)
+        }
+    } catch (error) {
+        logger.warn('Failed to scan local librarycache, proceeding without it:', error)
     }
 }
 

@@ -50,9 +50,18 @@ export class GameArtworkRequest implements GameArtwork {
     
     async getPixelsAtSize(width: number, height: number): Promise<PixelDataResult> {
         // If we already loaded and it's the same size, return cached
-        if (this.cachedPixels?.width === width && 
+        if (this.cachedPixels?.width === width &&
             this.cachedPixels.height === height) {
             return this.cachedPixels
+        }
+
+        // Zero-network, ahead of everything else - Steam's own already-validated local art beats
+        // any URL strategy, guessed or hinted. A miss (no local index entry, no matching slot, or
+        // a disk read/decode failure) returns null and falls straight through below - not an error.
+        const localResult = await this.provider.fetchPixelsFromLocalDisk(this.appId, this.format, width, height)
+        if (localResult) {
+            this.cachedPixels = localResult
+            return localResult
         }
 
         const cachedSelection = SteamArtworkStateManager.getState(this.appId)

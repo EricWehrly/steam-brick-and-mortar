@@ -26,6 +26,7 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
+import { LocalLibraryArtReader, type LocalArtSlot, type LocalLibraryArtEntry } from '../../../steam/LocalLibraryArtReader'
 
 // Class-scoped logger will be attached to the class
 
@@ -128,6 +129,7 @@ export class GameArtworkProvider {
     private pixelCache: PixelDataCache | null = null
     private readonly failureCache = new Map<string, RuntimeArtworkCacheEntry>()
     private readonly successCache = new Map<string, RuntimeArtworkCacheEntry>()
+    private readonly localArtIndex = new Map<number, LocalLibraryArtEntry>()
 
     // Skip tracking (per session)
     private skipStats: Map<FailureReason, number> = new Map()
@@ -231,6 +233,82 @@ export class GameArtworkProvider {
         return urls
     }
     
+    /**
+     * Registers this session's local-librarycache scan results (see LocalLibraryArtReader) -
+     * called once from the local-scan startup pass. A no-op call (empty array, or never called at
+     * all on the web build) just means fetchPixelsFromLocalDisk always misses, falling through to
+     * the normal URL strategy - not an error state.
+     */
+    public registerLocalArtIndex(entries: readonly LocalLibraryArtEntry[]): void {
+        for (const entry of entries) {
+            this.localArtIndex.set(entry.appid, entry)
+        }
+    }
+
+    private getLocalArtSlot(appId: number, format: ArtworkFormat): LocalArtSlot | undefined {
+        if (format !== 'library' && format !== 'header') {
+            return undefined
+        }
+        return this.localArtIndex.get(appId)?.[format]
+    }
+
+    /**
+     * Read pixels straight from Steam's own local librarycache, zero network - see
+     * docs/plans/startup-artwork-resolution-plan.md, Root Cause D. Returns null (not a rejected
+     * promise) whenever this isn't available for the appId/format, so callers can fall through to
+     * the normal URL strategy the same way a cache miss would: no local index entry, no matching
+     * slot, or the disk read/decode itself fails for any reason (file moved, permissions, etc.).
+     */
+    public async fetchPixelsFromLocalDisk(
+        appId: number,
+        format: ArtworkFormat,
+        targetWidth: number,
+        targetHeight: number
+    ): Promise<PixelDataResult | null> {
+        const slot = this.getLocalArtSlot(appId, format)
+        if (!slot) {
+            return null
+        }
+
+        // No `?t=` instability here (it's not a real URL) - stable per appId/asset by construction.
+        const cacheKeyUrl = `local://${appId}/${slot.relative_path}`
+        const sizedCacheUrl = `${cacheKeyUrl}@${targetWidth}x${targetHeight}`
+
+        if (this.pixelCache) {
+            const cached = await this.pixelCache.get(sizedCacheUrl)
+            if (cached) {
+                if (cached.width === targetWidth && cached.height === targetHeight) {
+                    return { pixels: cached.pixelData, width: cached.width, height: cached.height, fromCache: true }
+                }
+                const resized = resizePixels(cached.pixelData, cached.width, cached.height, targetWidth, targetHeight)
+                return { pixels: resized, width: targetWidth, height: targetHeight, fromCache: true }
+            }
+        }
+
+        try {
+            const bytes = await LocalLibraryArtReader.readArtBytes(appId, slot.relative_path)
+            if (!bytes) {
+                return null
+            }
+
+            const result = await this.textureWorker.processLocalBytes(
+                bytes, slot.relative_path, 0, `${appId}-${format}`,
+                { textureWidth: targetWidth, textureHeight: targetHeight }
+            )
+
+            if (this.pixelCache) {
+                await this.pixelCache.put(sizedCacheUrl, result.imageData, targetWidth, targetHeight)
+            }
+
+            return { pixels: result.imageData, width: targetWidth, height: targetHeight, fromCache: false }
+        } catch (err) {
+            GameArtworkProvider.logger.warn(
+                `Local disk art read/decode failed for appId ${appId} (${slot.relative_path}), falling back to network:`, err
+            )
+            return null
+        }
+    }
+
     /**
      * Fetch pixel data for a URL, with caching.
      */
