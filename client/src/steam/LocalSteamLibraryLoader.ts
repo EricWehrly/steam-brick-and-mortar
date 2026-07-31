@@ -76,7 +76,6 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
     }
 
     await LocalSteamDataWriter.writeLocalAppMetadata()
-    await registerLocalLibraryArt(candidateAppids)
     await resolveRemainingAppidsFromNetwork(candidateAppids)
     // Covers collection members writeLocalAppMetadata's own pass can't - see its docs.
     await LocalSteamDataWriter.mergeCollectionsForAppids(candidateAppids, collectionsByAppid)
@@ -101,15 +100,21 @@ export async function loadLocalSteamLibrary(): Promise<LocalScanResult> {
 /**
  * Scans Steam's own local librarycache once for the whole candidate set and registers whatever it
  * finds directly on GameArtworkProvider's singleton - see docs/plans/startup-artwork-resolution-plan.md,
- * Root Cause D. A direct call, not an event: GameArtworkProvider is accessed via getInstance()
- * everywhere else in this codebase (never event-driven), and getInstance() is idempotent/lazy, so
- * there's no ordering hazard to solve regardless of whether the provider singleton already exists
- * yet - unlike a plain EventManager.emit(), which has no late-subscriber replay (see the TODO in
+ * Root Cause D. Called from SteamIntegration.applyLibrary(), not from loadLocalSteamLibrary() above
+ * - the startup waterfall's far more common case is a persisted-library cache hit, which returns
+ * before loadLocalSteamLibrary() ever runs, and this needs to fire for every source (cache,
+ * local-scan, online), not just the one-time local-scan branch, or the index stays empty on every
+ * subsequent launch. Exported for that reason; not just an internal step of this file's own function.
+ *
+ * A direct call, not an event: GameArtworkProvider is accessed via getInstance() everywhere else
+ * in this codebase (never event-driven), and getInstance() is idempotent/lazy, so there's no
+ * ordering hazard to solve regardless of whether the provider singleton already exists yet -
+ * unlike a plain EventManager.emit(), which has no late-subscriber replay (see the TODO in
  * EventManager.ts) and would silently drop this if the provider hadn't been constructed yet.
  * Best-effort: a scan failure just means this session gets no local-disk art, same as before this
  * existed.
  */
-async function registerLocalLibraryArt(candidateAppids: ReadonlySet<number>): Promise<void> {
+export async function registerLocalLibraryArt(candidateAppids: ReadonlySet<number>): Promise<void> {
     try {
         const entries = await LocalLibraryArtReader.findLocalArt([...candidateAppids])
         GameArtworkProvider.getInstance().registerLocalArtIndex(entries)

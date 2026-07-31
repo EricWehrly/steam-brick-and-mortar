@@ -37,6 +37,7 @@ vi.mock('../../../src/steam-integration/LibraryStore', () => ({
 
 vi.mock('../../../src/steam/LocalSteamLibraryLoader', () => ({
     loadLocalSteamLibrary: vi.fn(),
+    registerLocalLibraryArt: vi.fn(),
 }))
 
 vi.mock('../../../src/steam-integration/OnlineLibraryLoader', () => ({
@@ -50,7 +51,7 @@ vi.mock('../../../src/steam-integration/DemoLibraryLoader', () => ({
 
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { loadPersistedLibrary, persistLibrary } from '../../../src/steam-integration/LibraryStore'
-import { loadLocalSteamLibrary } from '../../../src/steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, registerLocalLibraryArt } from '../../../src/steam/LocalSteamLibraryLoader'
 import { loadOnlineLibrary } from '../../../src/steam-integration/OnlineLibraryLoader'
 import { loadDemoLibrary } from '../../../src/steam-integration/DemoLibraryLoader'
 
@@ -82,6 +83,20 @@ describe('SteamIntegration startup waterfall', () => {
         expect(loadDemoLibrary).not.toHaveBeenCalled()
     })
 
+    test('scans the local librarycache even on a persisted-cache hit - the common case loadLocalSteamLibrary never runs for', async () => {
+        // Regression coverage: registerLocalLibraryArt used to live inside loadLocalSteamLibrary,
+        // which this branch never calls - the local-art index silently stayed empty on every
+        // subsequent launch (confirmed against a real desktop session's log). Moved to
+        // applyLibrary() specifically so every source scans, not just a fresh local-scan.
+        vi.mocked(loadPersistedLibrary).mockReturnValue(makeLibrary({
+            games: [{ appid: 440, name: 'Team Fortress 2', playtimeForever: 100 }, { appid: 620, name: 'Portal 2', playtimeForever: 50 }],
+        }))
+
+        await steamIntegration['handleGameStart']()
+
+        expect(registerLocalLibraryArt).toHaveBeenCalledWith(new Set([440, 620]))
+    })
+
     test('falls to local disk scan when no cache, persists the resolved library, and skips online/demo', async () => {
         vi.mocked(loadPersistedLibrary).mockReturnValue(null)
         const scannedLibrary = makeLibrary()
@@ -92,6 +107,7 @@ describe('SteamIntegration startup waterfall', () => {
         expect(persistLibrary).toHaveBeenCalledWith(scannedLibrary)
         expect(loadOnlineLibrary).not.toHaveBeenCalled()
         expect(loadDemoLibrary).not.toHaveBeenCalled()
+        expect(registerLocalLibraryArt).toHaveBeenCalledWith(new Set([440]))
     })
 
     test('falls to an online fetch when local scan resolves an identity but no games, without calling demo directly', async () => {
