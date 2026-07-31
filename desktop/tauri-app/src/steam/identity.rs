@@ -14,6 +14,9 @@ pub struct SteamIdentity {
     pub account_name: String,
     pub persona_name: String,
     pub most_recent: bool,
+    /// Unix timestamp, seconds - last time this entry was logged into. Used to pick the active
+    /// identity when no entry is flagged `most_recent` (see `active_identity`'s doc comment).
+    pub timestamp: Option<i64>,
 }
 
 pub fn parse_identities(raw: &str) -> Result<Vec<SteamIdentity>, String> {
@@ -41,12 +44,17 @@ pub fn parse_identities(raw: &str) -> Result<Vec<SteamIdentity>, String> {
             .and_then(|v| v.as_str())
             .map(|s| s == "1")
             .unwrap_or(false);
+        let timestamp = entry
+            .get("Timestamp")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<i64>().ok());
 
         identities.push(SteamIdentity {
             steamid64: steamid64.clone(),
             account_name,
             persona_name,
             most_recent,
+            timestamp,
         });
     }
     Ok(identities)
@@ -58,12 +66,20 @@ pub fn read_identity_from_file(path: &Path) -> Result<Vec<SteamIdentity>, String
     parse_identities(&raw)
 }
 
-/// The identity the Steam client would treat as "currently logged in": the `MostRecent`
-/// entry if one is flagged, otherwise the only entry if there's exactly one.
+/// The identity the Steam client would treat as "currently logged in":
+///
+/// 1. The `MostRecent` entry if one is flagged - older Steam clients write this explicitly.
+/// 2. Otherwise, whichever entry has the highest `Timestamp` (last-login time) - newer Steam
+///    clients have been observed to stop writing `MostRecent` at all once a machine accumulates
+///    several logins, leaving every entry unflagged even though `Timestamp` is still present and
+///    still updated on each login.
+/// 3. Otherwise (no entry has a parseable `Timestamp` either), the only entry if there's exactly
+///    one, since a single-account file sometimes has neither field populated.
 pub fn active_identity(identities: &[SteamIdentity]) -> Option<&SteamIdentity> {
     identities
         .iter()
         .find(|i| i.most_recent)
+        .or_else(|| identities.iter().filter(|i| i.timestamp.is_some()).max_by_key(|i| i.timestamp))
         .or_else(|| if identities.len() == 1 { identities.first() } else { None })
 }
 
@@ -128,12 +144,14 @@ mod tests {
                 account_name: "old".into(),
                 persona_name: "Old".into(),
                 most_recent: false,
+                timestamp: Some(2_000_000_000),
             },
             SteamIdentity {
                 steamid64: "2".into(),
                 account_name: "new".into(),
                 persona_name: "New".into(),
                 most_recent: true,
+                timestamp: Some(1),
             },
         ];
         assert_eq!(active_identity(&identities).unwrap().steamid64, "2");
@@ -146,8 +164,40 @@ mod tests {
             account_name: "only".into(),
             persona_name: "Only".into(),
             most_recent: false,
+            timestamp: None,
         }];
         assert_eq!(active_identity(&identities).unwrap().steamid64, "1");
+    }
+
+    /// Real-world case that motivated this fallback: a machine with several accounts logged in
+    /// over time where none carries `MostRecent` at all (observed on a newer Steam client) -
+    /// the highest `Timestamp` (most recent login) should win instead of giving up.
+    #[test]
+    fn active_identity_falls_back_to_highest_timestamp_when_none_flagged_most_recent() {
+        let identities = vec![
+            SteamIdentity {
+                steamid64: "1".into(),
+                account_name: "oldest".into(),
+                persona_name: "Oldest".into(),
+                most_recent: false,
+                timestamp: Some(1_699_134_826),
+            },
+            SteamIdentity {
+                steamid64: "2".into(),
+                account_name: "newest".into(),
+                persona_name: "Newest".into(),
+                most_recent: false,
+                timestamp: Some(1_785_381_380),
+            },
+            SteamIdentity {
+                steamid64: "3".into(),
+                account_name: "middle".into(),
+                persona_name: "Middle".into(),
+                most_recent: false,
+                timestamp: Some(1_759_889_993),
+            },
+        ];
+        assert_eq!(active_identity(&identities).unwrap().steamid64, "2");
     }
 
     #[test]
