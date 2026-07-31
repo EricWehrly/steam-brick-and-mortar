@@ -2,6 +2,7 @@ pub mod appinfo;
 pub mod collections;
 pub mod identity;
 pub mod keyvalues;
+pub mod librarycache;
 pub mod localization;
 pub mod paths;
 pub mod playtime;
