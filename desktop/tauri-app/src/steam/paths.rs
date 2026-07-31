@@ -174,10 +174,29 @@ fn from_start_menu_shortcut() -> Option<PathBuf> {
     None
 }
 
+/// The 64-bit-to-32-bit offset baked into every individual (non-anonymous, non-group) SteamID64 -
+/// `userdata/<accountid>` directories are named with the 32-bit account id, not the full
+/// steamid64 `loginusers.vdf` keys its entries by, so callers must subtract this before looking
+/// the directory up.
+const STEAMID64_INDIVIDUAL_ACCOUNT_BASE: u64 = 76_561_197_960_265_728;
+
+/// Converts a `loginusers.vdf`-style steamid64 string to the short account id Steam names
+/// `userdata` directories with (e.g. `"76561197984589530"` -> `"24323802"`).
+fn steamid64_to_account_id(steamid64: &str) -> Option<String> {
+    let id: u64 = steamid64.parse().ok()?;
+    id.checked_sub(STEAMID64_INDIVIDUAL_ACCOUNT_BASE)
+        .map(|account_id| account_id.to_string())
+}
+
 /// The active user's `userdata/<accountid>` directory, chosen via `loginusers.vdf`'s
-/// `MostRecent` flag (same signal Steam's own client uses to pick who's "logged in").
-/// Falls back to the only userdata folder present if there's exactly one, since a
-/// single-account machine's `loginusers.vdf` sometimes has no `MostRecent` flag set at all.
+/// `MostRecent` flag (or, failing that, the highest `Timestamp` - see
+/// `identity::active_identity`'s doc comment) - the same signal Steam's own client effectively
+/// uses to pick who's "logged in". Falls back to the only userdata folder present if there's
+/// exactly one, since a single-account machine's `loginusers.vdf` sometimes has neither field
+/// populated.
+///
+/// `most_recent_account_id`, if given, must be the short 32-bit account id (see
+/// `steamid64_to_account_id`), not the full steamid64 - that's how the directories are named.
 pub fn find_active_userdata_dir(steam_root: &Path, most_recent_account_id: Option<&str>) -> Option<PathBuf> {
     let userdata = steam_root.join("userdata");
     if !userdata.is_dir() {
@@ -214,7 +233,10 @@ pub fn active_userdata_dir() -> Result<PathBuf, String> {
     )?;
     let active = super::identity::active_identity(&identities)
         .ok_or("no active Steam identity found in loginusers.vdf")?;
-    find_active_userdata_dir(&steam_root, Some(&active.steamid64))
+    let account_id = steamid64_to_account_id(&active.steamid64).ok_or_else(|| {
+        format!("could not derive a userdata account id from steamid64 {}", active.steamid64)
+    })?;
+    find_active_userdata_dir(&steam_root, Some(&account_id))
         .ok_or_else(|| format!("no userdata directory found for steamid {}", active.steamid64))
 }
 
@@ -227,6 +249,22 @@ mod tests {
     #[test]
     fn checks_both_conventional_program_files_locations() {
         assert_eq!(WINDOWS_RELATIVE_CANDIDATES.len(), 2);
+    }
+
+    /// Regression check for a bug caught on a multi-account machine: `userdata` directories are
+    /// named with the short 32-bit account id, not the full steamid64 `loginusers.vdf` uses.
+    /// Values are real (account, userdata-folder) pairs observed on that machine.
+    #[test]
+    fn steamid64_to_account_id_matches_real_userdata_folder_names() {
+        assert_eq!(steamid64_to_account_id("76561197984589530").as_deref(), Some("24323802"));
+        assert_eq!(steamid64_to_account_id("76561198054514251").as_deref(), Some("94248523"));
+        assert_eq!(steamid64_to_account_id("76561197980086744").as_deref(), Some("19821016"));
+    }
+
+    #[test]
+    fn steamid64_to_account_id_rejects_unparseable_or_too_small_input() {
+        assert_eq!(steamid64_to_account_id("not-a-number"), None);
+        assert_eq!(steamid64_to_account_id("1"), None);
     }
 
     /// Real-machine check: only meaningful with Steam actually installed, so it's `#[ignore]`d
