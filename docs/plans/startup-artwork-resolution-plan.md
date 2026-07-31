@@ -309,9 +309,10 @@ all — never written as a trusted `artwork.library`/`artwork.header` value on s
 [Release Pipeline Step 2.4](release-pipeline-plan.md#step-24-proposed-2026-07-29-folding-in-desktop-discovered-contributions)
 for the validation queue design (rate-limited, skips hashes already validated, writes the merge on
 success and a normal `markArtworkPathDead` entry on failure) — that section owns this mechanism
-now, since it's shared with the contribution-file write. Dev-build-only, triggered manually from a
-settings-menu action rather than running automatically as part of the local scan — not something
-that fires just from normal app usage. This is also the concrete mechanism for
+now, since it's shared with the contribution-file write. Triggered manually from a settings-menu
+action (present in every desktop build, gated on `isTauri()` so it doesn't render on web) rather
+than running automatically as part of the local scan — not something that fires just from normal
+app usage. This is also the concrete mechanism for
 the earlier "how do we get real artwork paths into the baked/S3 cache" question — a validated
 merge into `AppDetailsCache` benefits this session immediately, and the same discovery, written to
 `data/contributions/library-art-urls.ndjson`, is what Step 2.4's bake-time fold-in picks up for

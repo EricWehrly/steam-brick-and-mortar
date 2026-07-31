@@ -2,7 +2,7 @@
 
 **Parent features**: [Static Hosting](../features/static-hosting.md) · [Native Desktop App](../features/desktop-app.md)
 **Act**: 2
-**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls raw S3 objects and repacks them into one client-ready bundle: `app-details.json.gz` (1361 games, ~3.4 MiB), via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) filters `is_free == true` from that bundle itself, bakes F2P artwork, and writes an `undesirable_for_demo` flag back onto any appid whose artwork 404'd — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). (2026-07-12: the earlier F2P/rest bundle split was removed — see "Split" section below, superseded.) Steps 3-5 (build/pack) still stubbed. **Step 2.4 proposed 2026-07-29, design decided, not yet implemented** — folding desktop-discovered dead-artwork-URLs and local-librarycache-derived real URLs back into the baked bundle (runs before Step 2.5, which now prefers a folded-in real URL over its own guess), developer-workflow scope for now: dev-build-only (`#[cfg(debug_assertions)]` + `import.meta.env.DEV`, absent entirely from release builds), triggered manually from a settings-menu action rather than running automatically. See section below.
+**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls raw S3 objects and repacks them into one client-ready bundle: `app-details.json.gz` (1361 games, ~3.4 MiB), via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) filters `is_free == true` from that bundle itself, bakes F2P artwork, and writes an `undesirable_for_demo` flag back onto any appid whose artwork 404'd — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). (2026-07-12: the earlier F2P/rest bundle split was removed — see "Split" section below, superseded.) Steps 3-5 (build/pack) still stubbed. **Step 2.4 proposed 2026-07-29, design decided, not yet implemented** — folding desktop-discovered dead-artwork-URLs and local-librarycache-derived real URLs back into the baked bundle (runs before Step 2.5, which now prefers a folded-in real URL over its own guess), developer-workflow scope for now: present in every desktop build (dev and release alike, gated on `isTauri()` so it doesn't render on web, not on build mode), triggered manually from a settings-menu action rather than running automatically. See section below.
 
 ## Why this exists (the actual goal)
 
@@ -101,27 +101,29 @@ over a guess, full stop. `bake-f2p-artwork.sh`'s per-appid loop needs a correspo
 `.data.artwork.library` first, only fall back to the existing guess-and-download behavior when
 that's absent.
 
-### Dev-only, manually triggered — not automatic, not present in release builds (decided 2026-07-29)
+### Manually triggered, in every desktop build — gated on Tauri presence, not dev/release (revised 2026-07-29)
 
-This whole mechanism only exists for the developer gathering data ahead of a release — never for
-an end user's shipped copy of the app. Two gates, not one, so a release build simply has nothing
-to accidentally run:
+**Reversed from the original "dev-build-only" decision** (same day): both files are safe to
+produce in a release build too — the dead-paths file is a pure local IndexedDB read (no network at
+all), and the library-URL export is already rate-limited and only ever runs when the user
+deliberately clicks it, so there's nothing "release builds need protecting from" the way there
+would be for something that ran automatically. No `#[cfg(debug_assertions)]`, no
+`import.meta.env.DEV` — the command exists and the settings-menu entry can render in every desktop
+build.
 
-- **Rust side**: the write/validate command(s) are `#[cfg(debug_assertions)]`-gated (same idiom
-  `main.rs` already uses for the Windows console subsystem) — the capability doesn't exist in the
-  compiled release binary at all, not just "exists but is hidden."
-- **TS side**: the settings-menu entry that triggers it is gated behind `import.meta.env.DEV`
-  (Vite's build-mode flag — already the established convention, see `AppSettings.ts`'s
-  `getDefaultSettings()`, chosen there specifically so prod/dev behavior is "tied to the build, not
-  a runtime hostname check").
+**Still needs a real gate, just a different one**: the settings-menu action only makes sense on the
+desktop (Tauri) build at all — the web build has no `invoke()`, no local Steam install to read, and
+no filesystem to write a contribution file to. A button that's visible but does nothing (or throws)
+on web would be worse than no button. Gated on **`isTauri()`** — the exact idiom
+`LocalSteamLibraryLoader.ts`/`LocalSteamDataWriter.ts` already use for "can this process actually
+make Tauri calls," not a build-mode flag — so the entry **doesn't render at all** on web, present
+on both dev and release desktop builds. Reuses an existing pattern rather than inventing a new one.
 
-Runs **on demand from a settings-menu action**, not automatically on every local-scan — the
-earlier design (queue validation checks the moment `find_local_library_art` discovers a new
-candidate, every session) would mean network calls firing passively just from normal use, which is
-exactly the "not blast a bunch of requests" concern this is trying to avoid, not just at any single
-moment but as standing background behavior. A manual trigger means the developer decides when to
-spend that budget, and there's no automatic code path left for a release build to need disabling in
-the first place — belt and suspenders with the two gates above.
+Still runs **on demand from a settings-menu action**, not automatically on every local-scan — the
+earlier automatic-queue design would mean network calls firing passively just from normal use,
+which is exactly the "not blast a bunch of requests" concern this is trying to avoid as standing
+background behavior, not a one-time cost. A manual trigger means whoever's using the desktop build
+decides when to spend that budget.
 
 ### Two separate contribution files, both exported on demand (decided 2026-07-29)
 
@@ -192,11 +194,11 @@ Resolved via Tauri's own `app_handle.path().app_data_dir()` (Tauri v2's official
 path API), the same spirit as `paths.rs`'s existing "resolve, don't hardcode" approach to finding
 *Steam's* install — except here it's our own app's data dir, which Tauri already knows how to
 locate on any OS without any manual path construction. No in-app affordance to reveal the path
-(considered, rejected) — this is a development-time concern for whoever is running the dev build,
-not something an end user (who won't have this feature at all — see release-build gating above)
-ever needs surfaced. First command in `desktop/tauri-app/src/steam/` that needs an `AppHandle`
-parameter — every existing command is a plain argument-less-or-appid-only function; worth noting
-as a small new pattern for this module, not just "another command."
+(considered, rejected) — whoever clicks the settings-menu action to gather contribution data
+already knows this is a desktop-app-data-dir concept and can find it the normal way for their OS;
+doesn't need it surfaced inside the app. First command in `desktop/tauri-app/src/steam/` that needs
+an `AppHandle` parameter — every existing command is a plain argument-less-or-appid-only function;
+worth noting as a small new pattern for this module, not just "another command."
 
 ### Bake-time fold-in
 
