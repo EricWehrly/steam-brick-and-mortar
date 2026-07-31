@@ -290,9 +290,12 @@ orchestrator and presets go there as a plain script, not into `client/src/`.
   the original tooling survey this design is built on
 - `docs/agent-context/performance-metrics.md` — general perf metrics reference (draw calls, startup
   timing, memory), separate from this frame-budget-specific tooling
-- `client/src/debug/RenderLoopDiagnostics.ts`, `client/src/debug/GpuTimerQuery.ts`
-- `client/src/scene/RenderPipelineManager.ts` — `setPassInstrumentor()`, `SSAO_QUALITY_LEVELS`,
-  `getN8aoConfiguration()` (a kept debug accessor for console-driven N8AO A/B testing)
+- `client/src/debug/RenderLoopDiagnostics.ts`, `client/src/debug/GpuTimerQuery.ts` — general
+  timing collection; `recordTiming()` is the public entry point anything external feeds through
+- `client/src/debug/RenderPipelineManagerDebug.ts` — wraps the composer passes and shadow map for
+  per-stage timing; separated out of `RenderPipelineManager.ts` 2026-07-30 so the production
+  pipeline class carries no diagnostic-specific surface
+- `client/src/scene/RenderPipelineManager.ts` — `SSAO_QUALITY_LEVELS`
 
 ---
 *A1*
