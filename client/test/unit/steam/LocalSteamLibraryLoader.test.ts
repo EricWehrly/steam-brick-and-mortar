@@ -78,7 +78,7 @@ vi.mock('../../../src/scene/game-box/instancing/GameArtworkProvider', () => ({
     },
 }))
 
-import { loadLocalSteamLibrary, buildLibraryGames } from '../../../src/steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, buildLibraryGames, registerLocalLibraryArt } from '../../../src/steam/LocalSteamLibraryLoader'
 import type { AppDetailsData } from '../../../src/steam/batch/BatchAppDetailsClient'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
@@ -250,44 +250,6 @@ describe('LocalSteamLibraryLoader', () => {
             expect(result.library!.owner.steamId).toBeUndefined()
         })
 
-        it('registers the local librarycache scan results on GameArtworkProvider', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-            const entries = [{ appid: 620, library: { relative_path: 'library_600x900.jpg' } }]
-            findLocalArtMock.mockResolvedValue(entries)
-
-            await loadLocalSteamLibrary()
-
-            expect(findLocalArtMock).toHaveBeenCalledWith(expect.arrayContaining([620]))
-            expect(registerLocalArtIndexMock).toHaveBeenCalledWith(entries)
-        })
-
-        it('proceeds without local art when the librarycache scan fails', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_identity') return Promise.resolve({ steamid64: '1', account_name: 'a', persona_name: 'A', most_recent: true })
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_steam_collections') return Promise.resolve([])
-                throw new Error(`unexpected command ${command}`)
-            })
-            getManyMock.mockResolvedValue(new Map<number, AppDetailsData>([[620, makeEntry('Portal 2')]]))
-            findLocalArtMock.mockRejectedValue(new Error('scan failed'))
-
-            const result = await loadLocalSteamLibrary()
-
-            expect(result.library).not.toBeNull()
-            expect(registerLocalArtIndexMock).not.toHaveBeenCalled()
-        })
 
         it('returns a null library when no candidate appid ends up with a resolved entry', async () => {
             isTauriMock.mockReturnValue(true)
@@ -305,6 +267,30 @@ describe('LocalSteamLibraryLoader', () => {
 
             expect(result.library).toBeNull()
             expect(result.steamId).toBe('1')
+        })
+    })
+
+    describe('registerLocalLibraryArt', () => {
+        // Exported and called directly from SteamIntegration.applyLibrary() rather than from
+        // loadLocalSteamLibrary() above - the startup waterfall's most common case (a persisted-
+        // library cache hit) never runs loadLocalSteamLibrary() at all, so testing this via that
+        // function would miss the case that actually matters on a returning user's launch.
+        it('scans local librarycache for the given appids and registers whatever is found', async () => {
+            const entries = [{ appid: 620, library: { relative_path: 'library_600x900.jpg' } }]
+            findLocalArtMock.mockResolvedValue(entries)
+
+            await registerLocalLibraryArt(new Set([620, 440]))
+
+            expect(findLocalArtMock).toHaveBeenCalledWith(expect.arrayContaining([620, 440]))
+            expect(registerLocalArtIndexMock).toHaveBeenCalledWith(entries)
+        })
+
+        it('proceeds without throwing when the librarycache scan fails', async () => {
+            findLocalArtMock.mockRejectedValue(new Error('scan failed'))
+
+            await expect(registerLocalLibraryArt(new Set([620]))).resolves.toBeUndefined()
+
+            expect(registerLocalArtIndexMock).not.toHaveBeenCalled()
         })
     })
 })

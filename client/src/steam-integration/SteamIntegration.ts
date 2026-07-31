@@ -35,7 +35,7 @@ import type {
 import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
 import { DataManager, DataDomain } from '../core/data'
 import '../scene/batch/BatchCoordinator'
-import { loadLocalSteamLibrary } from '../steam/LocalSteamLibraryLoader'
+import { loadLocalSteamLibrary, registerLocalLibraryArt } from '../steam/LocalSteamLibraryLoader'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
 
@@ -255,6 +255,14 @@ export class SteamIntegration {
      */
     private async applyLibrary(library: Library): Promise<boolean> {
         try {
+            // Every real source (cache, local-scan, online) funnels through here - the startup
+            // waterfall's most common case is a persisted-library cache hit, which never runs
+            // loadLocalSteamLibrary() at all, so this can't live there (see
+            // registerLocalLibraryArt's own doc comment). Awaited before anything else below so
+            // GameArtworkProvider's local-art index is populated before placement starts
+            // requesting textures, not racing it.
+            await registerLocalLibraryArt(new Set(library.games.map(g => g.appid)))
+
             const currentGames = this.gameLibrary.getState().userData?.games
             if (currentGames?.length) {
                 const diff = computeLibraryDiff(library.games, currentGames)
