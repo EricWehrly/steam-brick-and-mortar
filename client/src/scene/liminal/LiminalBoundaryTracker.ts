@@ -120,22 +120,46 @@ export class LiminalBoundaryTracker {
         this.hasBaseline = true
     }
 
-    /**
-     * Usually resolves to a single crossing; the counts below only exceed 1
-     * when the infrequent check above has let several slots' worth of
-     * movement (unusually fast movement, or a longer interval) pass between
-     * checks. advanceForward()/advanceBackward() always shift their own
-     * threshold by exactly one slot width regardless of hysteresis state, so
-     * how many boundaries were passed is a plain division, not a search.
-     */
+    /** The cheap gate: has either trip point actually been reached? */
     private resolveCrossings(z: number): void {
-        if (z <= this.forwardTripZ) {
-            const crossings = Math.floor((this.forwardTripZ - z) / CORRIDOR_UNIT_SPACING_Z) + 1
-            for (let i = 0; i < crossings; i++) this.advanceForward()
-        } else if (z >= this.backwardTripZ) {
-            const crossings = Math.floor((z - this.backwardTripZ) / CORRIDOR_UNIT_SPACING_Z) + 1
-            for (let i = 0; i < crossings; i++) this.advanceBackward()
+        if (this.hasCrossedForward(z)) {
+            this.advanceForwardPast(z)
+        } else if (this.hasCrossedBackward(z)) {
+            this.advanceBackwardPast(z)
         }
+    }
+
+    private hasCrossedForward(z: number): boolean {
+        return z <= this.forwardTripZ
+    }
+
+    private hasCrossedBackward(z: number): boolean {
+        return z >= this.backwardTripZ
+    }
+
+    /**
+     * Usually exactly one crossing; more only when the infrequent check above
+     * has let several slots' worth of movement (unusually fast movement, or a
+     * longer interval) pass since the last one.
+     */
+    private advanceForwardPast(z: number): void {
+        const crossings = this.countCrossings(this.forwardTripZ - z)
+        for (let i = 0; i < crossings; i++) this.advanceForward()
+    }
+
+    private advanceBackwardPast(z: number): void {
+        const crossings = this.countCrossings(z - this.backwardTripZ)
+        for (let i = 0; i < crossings; i++) this.advanceBackward()
+    }
+
+    /**
+     * advanceForward()/advanceBackward() always shift their own threshold by
+     * exactly one slot width regardless of hysteresis state, so how many
+     * boundaries a given overshoot represents is a plain division, not a
+     * search.
+     */
+    private countCrossings(distancePastTripPoint: number): number {
+        return Math.floor(distancePastTripPoint / CORRIDOR_UNIT_SPACING_Z) + 1
     }
 
     private advanceForward(): void {
