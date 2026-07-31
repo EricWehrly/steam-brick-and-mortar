@@ -45,9 +45,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# DevTools Performance recordings (large, investigation-scoped, not source)
-Trace-*.json.gz
-
 test-results
 
 CURRENT_WORK.md
