@@ -143,15 +143,6 @@ export class RenderPipelineManager {
         )
     }
 
-    /**
-     * Live handle on N8AO's own config (aoSamples, halfRes, denoiseSamples, etc. — see
-     * n8ao's own docs) for console-driven A/B testing during the framerate investigation.
-     * Mutating this reconfigures N8AO's passes immediately (it's a reactive Proxy internally).
-     */
-    public getN8aoConfiguration(): N8AOPostPass['configuration'] {
-        return this.n8aoPass.configuration
-    }
-
     private applySsaoQuality(levelIndex: number): void {
         const level = SSAO_QUALITY_LEVELS[levelIndex] ?? SSAO_QUALITY_LEVELS[DEFAULT_SSAO_QUALITY_INDEX]
         this.n8aoPass.enabled = level.enabled

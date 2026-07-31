@@ -445,8 +445,10 @@ lever, left as an optional follow-up rather than a next step — see "Explicitly
 - `docs/features/postprocessing-effects.md`
 - `client/node_modules/n8ao/dist/N8AO.js` — N8AO's actual config surface (`aoSamples`, `halfRes`,
   `denoiseSamples`, etc.) and its own built-in GPU timer query (source of Finding 5)
-- `client/src/scene/RenderPipelineManager.ts` — `SSAO_QUALITY_LEVELS`, `applySsaoQuality()`,
-  `getN8aoConfiguration()` (a kept debug accessor for future console-driven N8AO A/B testing)
+- `client/src/scene/RenderPipelineManager.ts` — `SSAO_QUALITY_LEVELS`, `applySsaoQuality()`.
+  (`getN8aoConfiguration()`, the console A/B accessor this investigation used, was removed
+  2026-07-30 once nothing referenced it anymore — the SSAO_QUALITY_LEVELS slider and PerfSweep
+  superseded the need for ad hoc console poking.)
 - `client/src/debug/PerfSweep.ts` — the self-driving sweep behind `?sweep=1`, source of the
   2026-07-30 findings; kept (not throwaway) since a query-param-triggered sweep needs no external
   driver and this is the second time this investigation has needed one
