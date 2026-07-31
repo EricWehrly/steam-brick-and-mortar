@@ -15,7 +15,7 @@ import {
     type BoundaryCrossedEvent,
 } from '../../../../src/scene/liminal/LiminalBoundaryTracker'
 import type { MockFn } from '../../../utils/test-types'
-import { CORRIDOR_FIRST_SLOT_OFFSET_Z, CORRIDOR_UNIT_SPACING_Z } from '../../../../src/scene/liminal/LiminalCorridorLayout'
+import { CORRIDOR_FIRST_SLOT_OFFSET_Z, CORRIDOR_UNIT_SPACING_Z, LIMINAL_DEPTH_SLOTS } from '../../../../src/scene/liminal/LiminalCorridorLayout'
 
 function emitLayoutRequested(layoutMode: string): void {
     EventManager.getInstance().emit<LayoutRequestedEvent>(UIEventTypes.LayoutRequested, { layoutMode: layoutMode as any })
@@ -107,6 +107,23 @@ describe('LiminalBoundaryTracker', () => {
         tickThroughCheckInterval()
 
         expect(crossedSpy).toHaveBeenCalledTimes(3)
+        crossedSpy.mock.calls.forEach(call => expect(call[0]).toEqual(expect.objectContaining({ direction: 'forward' })))
+    })
+
+    it('emits every crossing for a jump bigger than the whole resident window (2.5x its scope), not just the ones within one window', () => {
+        emitLayoutRequested('liminal')
+        camera.position.z = -CORRIDOR_FIRST_SLOT_OFFSET_Z
+        tick() // baseline at slot 0
+
+        // The resident window spans LIMINAL_DEPTH_SLOTS slots (its whole recycled
+        // scope) — jump comfortably past 2.5x that in one gap between checks, e.g.
+        // a teleport, a hitch, or just unusually fast movement. resolveCrossings()
+        // must not silently cap out at whatever fits in one window.
+        const slotsBeyondTwoAndAHalfWindows = Math.ceil(2.5 * LIMINAL_DEPTH_SLOTS) + 1
+        camera.position.z -= slotsBeyondTwoAndAHalfWindows * CORRIDOR_UNIT_SPACING_Z
+        tickThroughCheckInterval()
+
+        expect(crossedSpy).toHaveBeenCalledTimes(slotsBeyondTwoAndAHalfWindows)
         crossedSpy.mock.calls.forEach(call => expect(call[0]).toEqual(expect.objectContaining({ direction: 'forward' })))
     })
 
