@@ -84,7 +84,9 @@ export function computeRoomEnvelopeFromShelfBounds(
 
 export class RoomManager {
     private scene: THREE.Scene
-    private camera: THREE.PerspectiveCamera
+    /** Positioned/oriented here, not on the camera directly - see SceneManager's cameraRig doc
+     *  comment for why. */
+    private cameraRig: THREE.Object3D
     private materialManager: SharedMaterialManager
     private eventManager: EventManager
     private appSettings: AppSettings
@@ -127,7 +129,7 @@ export class RoomManager {
     constructor() {
         const dataManager = DataManager.getInstance()
         this.scene = dataManager.getOrThrow<THREE.Scene>(DataKey.MainScene)
-        this.camera = dataManager.getOrThrow<THREE.PerspectiveCamera>(DataKey.MainCamera)
+        this.cameraRig = dataManager.getOrThrow<THREE.Object3D>(DataKey.MainCameraRig)
         
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
@@ -263,8 +265,8 @@ export class RoomManager {
             if (!this.hasPositionedCamera) {
                 this.hasPositionedCamera = true
                 const targetZ = appliedZ - (dimensions.depth / 2)
-                this.camera.position.set(0, 1.6, 0)
-                this.camera.lookAt(0, 1.6, targetZ)
+                this.cameraRig.position.set(0, 1.6, 0)
+                this.cameraRig.lookAt(0, 1.6, targetZ)
                 console.debug(`📷 Camera initial position set to face store center at Z=${targetZ.toFixed(1)}`)
             }
 

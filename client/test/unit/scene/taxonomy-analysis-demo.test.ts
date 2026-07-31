@@ -48,9 +48,12 @@ describe('Taxonomy Analysis Demo', () => {
         // SceneCoordinator creates SkyboxManager which reads MainScene from DataManager
         const mockScene = new THREE.Scene()
         const mockCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
-        mockCamera.position.set(0, 1.6, 3)
+        const mockCameraRig = new THREE.Group()
+        mockCameraRig.add(mockCamera)
+        mockCameraRig.position.set(0, 1.6, 3)
         DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
         DataManager.getInstance().set(DataKey.MainCamera, mockCamera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.MainCameraRig, mockCameraRig, { domain: DataDomain.Scene })
 
         eventManager = EventManager.getInstance()
         sceneManager = new SceneManager()

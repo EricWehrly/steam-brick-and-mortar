@@ -20,6 +20,7 @@ import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
 import { Logger } from '../../../utils/Logger'
+import { getCameraWorldPosition } from '../../../utils/CameraWorldPosition'
 import { HighTextureCache, HighTextureState } from './HighTextureCache'
 
 export interface PrewarmingConfig {
@@ -96,6 +97,7 @@ export class SpatialPrewarmingManager {
     // TODO: Don't use these, they're brittle and problematic
     private readonly tmpVec = new THREE.Vector3()
     private readonly tmpDir = new THREE.Vector3()
+    private readonly tmpCameraWorldPos = new THREE.Vector3()
     
     private isRegistered = false
     
@@ -131,7 +133,7 @@ export class SpatialPrewarmingManager {
         // Initialize camera position
         const camera = this.dataManager.get<THREE.Camera>(DataKey.MainCamera)
         if (camera) {
-            this.lastCameraPos.copy(camera.position)
+            this.lastCameraPos.copy(getCameraWorldPosition(camera, this.tmpCameraWorldPos))
         }
         
         SpatialPrewarmingManager.logger.lifecycle(`Started with ${this.gamePositions.size} registered games`)
@@ -174,7 +176,7 @@ export class SpatialPrewarmingManager {
      * Update the estimated movement direction based on velocity samples
      */
     private updateMovementDirection(camera: THREE.Camera): void {
-        const currentPos = camera.position
+        const currentPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
         
         // Calculate velocity this frame
         this.tmpVec.copy(currentPos).sub(this.lastCameraPos)

@@ -16,7 +16,13 @@ export const SceneManagerMock = vi.fn().mockImplementation(() => {
         rotation: { x: 0, y: 0, z: 0 },
         lookAt: vi.fn()
     }
-    
+
+    const mockCameraRig = {
+        position: { x: 0, y: 5, z: 10 },
+        rotation: { x: 0, y: 0, z: 0 },
+        lookAt: vi.fn()
+    }
+
     const mockRenderer = {
         setSize: vi.fn(),
         setPixelRatio: vi.fn(),
@@ -30,6 +36,7 @@ export const SceneManagerMock = vi.fn().mockImplementation(() => {
     return {
         getScene: vi.fn().mockReturnValue(mockScene),
         getCamera: vi.fn().mockReturnValue(mockCamera),
+        getCameraRig: vi.fn().mockReturnValue(mockCameraRig),
         getRenderer: vi.fn().mockReturnValue(mockRenderer),
         startRenderLoop: vi.fn(),
         stopRenderLoop: vi.fn(),

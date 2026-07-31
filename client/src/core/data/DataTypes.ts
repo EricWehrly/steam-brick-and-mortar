@@ -26,6 +26,9 @@ export enum DataDomain {
 export enum DataKey {
     MainScene = 'core.mainScene',
     MainCamera = 'core.mainCamera',
+    /** The camera's parent Object3D - see SceneManager's own doc comment for why movement/
+     *  rotation must apply here instead of to the camera directly. */
+    MainCameraRig = 'core.mainCameraRig',
     Renderer = 'core.renderer',
     InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
     InstancedLabelMetadata = 'renderer.instancedLabelMetadata',

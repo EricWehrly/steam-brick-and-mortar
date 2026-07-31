@@ -13,6 +13,9 @@ import { GameFinder } from './GameFinder'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
+import { getCameraWorldPosition } from '../utils/CameraWorldPosition'
 import vertexShader from './shaders/spotlight-beam.vert?raw'
 import fragmentShader from './shaders/spotlight-beam.frag?raw'
 
@@ -71,8 +74,9 @@ export class GameSpotlight {
                 this.spotlightPool.push(spotlight)
             }
 
-            // Get camera reference for distance calculations
-            this.camera = this.scene.children.find(child => child instanceof THREE.Camera) as THREE.Camera || null
+            // Get camera reference for distance calculations. Not a scene.children search - the
+            // camera is nested under SceneManager's cameraRig, not a direct scene child.
+            this.camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
         } catch (error) {
             console.error('Failed to initialize GameSpotlight:', error)
         }
@@ -337,7 +341,7 @@ export class GameSpotlight {
             if (baseIntensity === undefined) continue
 
             // Calculate distance from camera to spotlight
-            const distance = this.camera.position.distanceTo(spotlight.position)
+            const distance = getCameraWorldPosition(this.camera).distanceTo(spotlight.position)
             
             // Distance-based intensity scaling
             // Close (0-5m): 2.0x base, Far (15m+): 5.0x base

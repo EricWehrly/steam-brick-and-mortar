@@ -18,6 +18,7 @@ vi.mock('../../../src/scene/SceneManager', () => ({
         getRenderer: vi.fn().mockReturnValue({}),
         getRenderPipelineManager: vi.fn().mockReturnValue({ setPassInstrumentor: vi.fn() }),
         getCamera: vi.fn().mockReturnValue({}),
+        getCameraRig: vi.fn().mockReturnValue({}),
         getScene: vi.fn().mockReturnValue({
             getObjectByName: vi.fn().mockReturnValue(null),
             children: [],
@@ -35,6 +36,7 @@ vi.mock('../../../src/debug/SceneManagerDebug', () => ({
         getRenderer: vi.fn().mockReturnValue({}),
         getRenderPipelineManager: vi.fn().mockReturnValue({ setPassInstrumentor: vi.fn() }),
         getCamera: vi.fn().mockReturnValue({}),
+        getCameraRig: vi.fn().mockReturnValue({}),
         getScene: vi.fn().mockReturnValue({
             getObjectByName: vi.fn().mockReturnValue(null),
             children: [],

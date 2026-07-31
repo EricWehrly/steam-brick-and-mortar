@@ -102,7 +102,7 @@ export class SteamBrickAndMortarApp {
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating WebXRCoordinator')
         this.webxrCoordinator = new WebXRCoordinator({
-            camera: this.sceneManager.getCamera()
+            cameraRig: this.sceneManager.getCameraRig()
         })
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating UIManager')
