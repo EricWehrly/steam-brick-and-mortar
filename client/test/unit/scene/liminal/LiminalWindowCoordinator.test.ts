@@ -337,6 +337,43 @@ describe('LiminalWindowCoordinator', () => {
             expect(byShelf.get(8)?.position).toEqual(expectedLeft.position)
         })
 
+        it('keeps every physical unit\'s rank correct across a burst of crossings bigger than the whole window (2.5x its scope)', () => {
+            emitLayoutRequested('liminal')
+            seedShelfMetadata()
+            seedWindow(200)
+
+            // A single LiminalBoundaryTracker check can resolve many crossings at
+            // once (a teleport, a hitch, or just fast movement) — each one calls
+            // advance() in turn. This burst is bigger than the resident window's
+            // entire depth-slot scope (2.5x it, +1), so every physical unit gets
+            // recycled more than twice before the burst ends.
+            const crossingCount = Math.ceil(2.5 * LIMINAL_DEPTH_SLOTS) + 1
+            for (let i = 0; i < crossingCount; i++) emitBoundaryCrossed('forward')
+
+            expect(repositionSpy).toHaveBeenCalledTimes(crossingCount * 2)
+
+            // Recycling always retargets the current lowest-rank unit to one past
+            // the current highest rank — round-robin across the LIMINAL_DEPTH_SLOTS
+            // physical units, in order. Derived independently from that rule (not
+            // from the coordinator's own bookkeeping) as this test's ground truth.
+            const expectedFinalRankByUnit = new Map<number, number>()
+            for (let k = 1; k <= crossingCount; k++) {
+                const unit = (k - 1) % LIMINAL_DEPTH_SLOTS
+                const rank = (LIMINAL_DEPTH_SLOTS - 1) + k
+                expectedFinalRankByUnit.set(unit, rank)
+            }
+
+            const lastPositionByShelf = new Map<number, THREE.Vector3>()
+            repositionSpy.mock.calls.forEach(([detail]) => lastPositionByShelf.set(detail.shelfIndex, detail.position as THREE.Vector3))
+
+            for (const [unit, expectedRank] of expectedFinalRankByUnit) {
+                const leftShelfIndex = unit * 2
+                const rightShelfIndex = unit * 2 + 1
+                expect(lastPositionByShelf.get(leftShelfIndex)).toEqual(computeUnitTransform(expectedRank, 'left').position)
+                expect(lastPositionByShelf.get(rightShelfIndex)).toEqual(computeUnitTransform(expectedRank, 'right').position)
+            }
+        })
+
         it('emits no repoint events for a shelf with no classified instances (e.g. artwork not yet settled)', () => {
             emitLayoutRequested('liminal')
             // Empty metadata (not just "unset" — DataManager is a real singleton that
