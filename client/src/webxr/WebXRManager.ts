@@ -22,15 +22,6 @@ import { Logger } from '../utils/Logger'
  */
 const REFERENCE_SPACE_FALLBACK_ORDER: ReadonlyArray<XRReferenceSpaceType> = ['local-floor', 'bounded-floor', 'local', 'viewer']
 
-/**
- * Only these report a native origin actually anchored to the floor plane, so the pose's own Y
- * already represents real head-above-floor height. 'local' and 'viewer' anchor their origin to
- * the viewer's own starting position instead - the pose's Y near session start is close to 0
- * regardless of the user's real height, so nothing in it supplies a floor-relative height to
- * avoid double-counting against a desktop-mode eye-height stand-in.
- */
-const FLOOR_RELATIVE_REFERENCE_SPACE_TYPES: ReadonlySet<XRReferenceSpaceType> = new Set(['local-floor', 'bounded-floor'])
-
 export interface WebXRCapabilities {
     isSupported: boolean
     supportsImmersiveVR: boolean
@@ -51,7 +42,6 @@ export class WebXRManager {
     private static readonly logger = Logger.createLogFunctions(WebXRManager.name)
     private renderer: THREE.WebGLRenderer | null = null
     private currentSession: XRSession | null = null
-    private currentReferenceSpaceType: XRReferenceSpaceType | null = null
     private capabilities: WebXRCapabilities = {
         isSupported: false,
         supportsImmersiveVR: false,
@@ -144,7 +134,6 @@ export class WebXRManager {
 
             const referenceSpaceType = await this.determineSupportedReferenceSpaceType(session)
             WebXRManager.logger.info(`Using XR reference space: ${referenceSpaceType}`)
-            this.currentReferenceSpaceType = referenceSpaceType
             this.renderer.xr.setReferenceSpaceType(referenceSpaceType)
 
             // Set the session on the renderer
@@ -154,7 +143,6 @@ export class WebXRManager {
             session.addEventListener('end', () => {
                 console.log('🚪 WebXR session ended')
                 this.currentSession = null
-                this.currentReferenceSpaceType = null
                 this.callbacks.onSessionEnd?.()
             })
             
@@ -211,17 +199,6 @@ export class WebXRManager {
      */
     isSessionActive(): boolean {
         return this.currentSession !== null
-    }
-
-    /**
-     * Whether the active session's negotiated reference space reports a real floor-anchored
-     * height (see FLOOR_RELATIVE_REFERENCE_SPACE_TYPES) - false (including when there's no
-     * active session) for 'local'/'viewer', whose origin is anchored to the viewer's own
-     * starting position instead of the floor.
-     */
-    isUsingFloorRelativeReferenceSpace(): boolean {
-        return this.currentReferenceSpaceType !== null
-            && FLOOR_RELATIVE_REFERENCE_SPACE_TYPES.has(this.currentReferenceSpaceType)
     }
 
     /**

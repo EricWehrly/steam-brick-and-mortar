@@ -8,7 +8,6 @@ const { webXRManagerMock, inputManagerMock, capturedWebXRManagerCallbacks } = vi
         startVRSession: vi.fn().mockResolvedValue(undefined),
         endVRSession: vi.fn().mockResolvedValue(undefined),
         isSessionActive: vi.fn().mockReturnValue(false),
-        isUsingFloorRelativeReferenceSpace: vi.fn().mockReturnValue(false),
         getCurrentSession: vi.fn().mockReturnValue(null),
         dispose: vi.fn(),
     },
@@ -48,7 +47,6 @@ describe('WebXRCoordinator', () => {
         vi.clearAllMocks()
         capturedWebXRManagerCallbacks.length = 0
         webXRManagerMock.isSessionActive.mockReturnValue(false)
-        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(false)
         cameraRig = new THREE.Object3D()
         coordinator = new WebXRCoordinator({ cameraRig })
     })
@@ -121,39 +119,21 @@ describe('WebXRCoordinator', () => {
     })
 
     // Regression test: RoomManager.position.y = 1.6 is a desktop-only eye-height stand-in with no
-    // real head tracking behind it. Only a floor-relative reference space ('local-floor'/
-    // 'bounded-floor') reports a pose Y that's already real head-above-floor height - stacking
-    // our own +1.6 under that real measurement placed the camera around 3.2-3.4m, at/inside the
-    // default 3.5m ceiling. Reported as "strong black obstruction everywhere, only slivers at
-    // extreme peek angles." X/Z (real horizontal room placement) must survive the reset - only Y
-    // is a desktop-only artifact, and only when the active reference space actually supplies a
-    // real replacement for it.
-    it('zeroes the rig Y position (but not X/Z) when a floor-relative reference space is active', () => {
-        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(true)
+    // real head tracking behind it. An earlier version of this fix only zeroed Y for reference
+    // spaces documented as floor-anchored ('local-floor'/'bounded-floor'), assuming 'local'
+    // reports a pose Y near 0. Logged diagnostics from a real PICO 4 / PICO Connect / SteamVR
+    // session that negotiated 'local' falsified that: its pose Y consistently contributed real
+    // height (~1.1-1.2m) on its own, so stacking our +1.6 on top overshot regardless of the
+    // reference-space label. Zero unconditionally instead of trying to infer this from the
+    // negotiated type. X/Z (real horizontal room placement) must survive the reset - only Y is a
+    // desktop-only artifact.
+    it('zeroes the rig Y position (but not X/Z) when a real XR session starts', () => {
         cameraRig.position.set(3, 1.6, -7) // desktop placement: eye height + real room position
 
         const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
         onSessionStart?.()
 
         expect(cameraRig.position.y).toBe(0)
-        expect(cameraRig.position.x).toBe(3)
-        expect(cameraRig.position.z).toBe(-7)
-    })
-
-    // Regression test: a confirmed real-world runtime (PICO 4 via PICO Connect/SteamVR) fell all
-    // the way back to 'local', whose origin is anchored to the viewer's own starting position
-    // rather than the floor - its pose Y near session start is close to 0 regardless of the
-    // user's real height. Zeroing the rig's Y in that case (as an earlier, unconditional version
-    // of this fix did) put the camera at floor level instead of eye level - the desktop-mode
-    // eye-height stand-in must survive when nothing in the pose replaces it.
-    it('leaves the rig Y position alone when the reference space is not floor-relative', () => {
-        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(false)
-        cameraRig.position.set(3, 1.6, -7)
-
-        const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
-        onSessionStart?.()
-
-        expect(cameraRig.position.y).toBe(1.6)
         expect(cameraRig.position.x).toBe(3)
         expect(cameraRig.position.z).toBe(-7)
     })

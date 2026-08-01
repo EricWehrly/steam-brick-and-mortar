@@ -167,20 +167,20 @@ export class WebXRCoordinator {
         this.cameraRig.quaternion.identity()
 
         // RoomManager's rig.position.y = 1.6 is a desktop-only stand-in for eye height - there's
-        // no real head tracking in desktop mode to supply it. Only a floor-relative reference
-        // space ('local-floor'/'bounded-floor') reports a pose Y that's already real
-        // head-above-floor height - stacking our own +1.6 under that would land the camera
-        // around 3.2-3.4m, at/inside the ceiling (default 3.5m, fixtures ~3.1m), which is exactly
-        // "black obstruction everywhere, only slivers at extreme angles." A confirmed real-world
-        // case (PICO 4 via PICO Connect/SteamVR) fell all the way back to 'local', whose origin is
-        // anchored to the viewer's own starting position rather than the floor - its pose Y near
-        // session start is close to 0 regardless of the user's real height, so the stand-in must
-        // stay in that case or the rig would sit at floor level instead. X/Z are always left
-        // alone: they represent real horizontal room placement, which should carry over into VR
-        // the same as desktop mode regardless of which reference space is active.
-        if (this.webxrManager.isUsingFloorRelativeReferenceSpace()) {
-            this.cameraRig.position.y = 0
-        }
+        // no real head tracking in desktop mode to supply it. An earlier version of this fix only
+        // zeroed Y for reference spaces officially documented as floor-anchored ('local-floor'/
+        // 'bounded-floor'), on the assumption that 'local' reports a pose Y near 0 (anchored to
+        // the viewer's own starting position, not the floor). Logged diagnostics
+        // (SceneManager.logXRDiagnosticsIfDue) from a real PICO 4 / PICO Connect / SteamVR session
+        // that negotiated 'local' falsified that assumption: the pose's local Y consistently
+        // contributed ~1.1-1.2m on its own, landing the camera around 2.7-2.9m once stacked on top
+        // of our own +1.6 - not colliding with the ceiling this time (ceilingHeight was raised to
+        // rule that out), but still real height data we shouldn't be adding our own guess on top
+        // of. SteamVR appears to report real height under 'local' in practice regardless of the
+        // spec's generic description of that type. Zero unconditionally instead of trying to
+        // infer from the reference-space label - X/Z are left alone, they represent real
+        // horizontal room placement, which should carry over into VR same as desktop mode.
+        this.cameraRig.position.y = 0
 
         this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
