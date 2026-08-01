@@ -11,10 +11,21 @@ public contract for debug-logging purposes alone — this happened twice in one 
 (`PixelDataCache.logStatsSummary`, then `AppDetailsCache.getDeadArtworkPathStats`), both reverted.
 Use ephemeral/inline code for one-off diagnostics, or the existing console-command idiom
 (`registerConsoleCommands()` in `LodArtworkOrchestratorDebug.ts`) if something needs to be
-repeatable; don't grow the cache class's API surface for it. Local `librarycache` disk read
-(Problem 2's actual fix, not a stopgap) has a build plan proposed 2026-07-29, awaiting sign-off
-(see new section under Root Cause D, below) — not yet implemented. Concurrency cap not started.
-Iterate on this doc as each piece resolves.
+repeatable; don't grow the cache class's API surface for it. **Local `librarycache` disk read
+implemented and field-confirmed 2026-07-31** (Problem 2's actual fix, not a stopgap) — PR #149,
+scoped deliberately to just the disk read (`find_local_library_art`/`read_local_library_art_bytes`,
+wired into `GameArtworkProvider`/`GameArtworkRequest`, registered from `SteamIntegration.applyLibrary()`
+so it runs regardless of which startup-waterfall source supplies the library). Two bugs caught and
+fixed against real sessions during that same pass: the registration call originally lived where the
+common cache-hit path never reached it (fixed in `91d31d85`), and the bytes command initially
+returned `Vec<u8>` over Tauri's default JSON IPC, which measurably dominated startup time once it
+ran per placed game box - fixed by switching to a raw `tauri::ipc::Response` (`d7cf5945`). Dead-path
+skip separately reconfirmed against the same session: 56/56 failed resolutions fully skipped via
+the known-dead cache, zero wasted network attempts. **Concurrency cap is real, not yet started** -
+see Root Cause B and Open Question 4, below, both updated 2026-07-31 with a concrete finding
+(`GameArtworkProvider` funnels every decode, local or network, through a single shared
+`TextureWorker` with no pool) and a new requirement (distance-to-player priority). Deliberately the
+next PR, not bundled into this one. Iterate on this doc as each piece resolves.
 **Related**: [`cors-blocked-local-scan-artwork`](../tech-debt.md#id-cors-blocked-local-scan-artwork)
 (the tech-debt entry this plan supersedes/absorbs), [Image/Texture Pipeline](../architecture/image-texture-pipeline.md),
 [Desktop Offline-First Plan](desktop-offline-first-plan.md), [Multi-Layer Caching](../features/multi-layer-caching.md)
@@ -127,6 +138,29 @@ each of which checks `PixelDataCache` then, on miss, round-trips through the sin
 `TextureWorker`. The 972-peak-concurrency, 592ms-median-for-successes numbers above are the direct
 result — even a disk-cache-eligible fetch is competing in the same unthrottled scrum as everything
 else, including guesses that are about to burn a real (if fast) failed round trip.
+
+**Confirmed 2026-07-31, after local-disk read landed (PR #149) and a real session still showed a
+~35s stall between placement and completion**: `GameArtworkProvider` holds exactly one
+`TextureWorker`, which wraps exactly one `Worker` (`ManagedWorker` has no pooling - checked its
+source directly). Every image decode - local disk *or* network, doesn't matter which - funnels
+through that single worker's serial message queue, processed one at a time. This is the actual
+mechanism behind "stall then accelerate," a better match than network concurrency for the
+"starved thread pool" symptom this whole investigation started from: hundreds of requests fire at
+once (per the no-cap behavior above), but they all queue up behind one thread's `onmessage` loop
+regardless of how fast the underlying bytes arrived. Local-disk reads made the *bytes* fast; they
+didn't touch the *decode* bottleneck at all.
+
+Also noted in the same pass: `PixelDataCache` keys lookups by exact size (`@{width}x{height}`), so
+a MID-tier request and a later HIGH-tier request for the same source image never share a decode -
+each pays its own full read + JPEG-decode + canvas-readback, even though decoding once at native
+resolution and resizing down for the smaller tier would be cheaper. Pre-existing pattern (present
+in the network path already; the local-disk path just inherited it), not introduced by PR #149,
+but worth fixing alongside the worker pool since both live in the same code path.
+
+**New requirement, 2026-07-31**: whatever replaces the no-cap/no-priority behavior above must
+prioritize games nearest the player - those should be scheduled first, not just whichever games
+happen to iterate first in `prefetchBatch()`'s loop. Distinct axis from the disk-vs-network
+priority split already noted in Open Question 4 below; both apply.
 
 ### C. `PixelDataCache`'s actual purpose, and real numbers on its startup role (Problem 3) — measured 2026-07-25, root cause identified, not yet fixed
 
@@ -437,12 +471,10 @@ existing AppDetailsCache TTL gap, not duplicated here.)
 `findMissingArtwork()` requires both a fetchable URL to exist *and* the entry to lack
 `artwork_network_checked`, per the note left here during review.
 
-1. **Tauri-side read for the local `librarycache` folder — the priority to circle back to soon.**
-   **Build plan proposed 2026-07-29** — see the new section under Root Cause D, above. Awaiting
-   sign-off before implementation. Explicitly the fix that matters most: field observation from
-   this pass is that a real share of titles either have no artwork at all, or don't have it at the
-   paths we predict — this is the one piece that replaces guessing with a deterministic answer
-   instead of managing guesses better, and is what everything else in this doc is a stopgap around.
+1. ~~Tauri-side read for the local `librarycache` folder~~ **Resolved 2026-07-31** — implemented,
+   field-tested, and confirmed against real sessions (PR #149): 999/1845 cached appids on the test
+   machine have a library slot; local reads verifiably engage (native 600×900 decode signature);
+   the JSON-IPC transport bug that briefly made things *slower* than before this landed is fixed.
 2. ~~URL-key normalization for `PixelDataCache` / `artwork_dead_paths`~~ **Resolved 2026-07-29** —
    `UrlUtils.stripQueryParam(url, 't')`, applied at both `PixelDataCache`'s cache-key construction
    (`GameArtworkProvider.fetchPixels`/`isPixelsCached`) and `artwork_dead_paths`'
@@ -456,10 +488,20 @@ existing AppDetailsCache TTL gap, not duplicated here.)
    folded-in real URL over its own guess) — developer-workflow scope for now (a developer copies
    the files in manually before a release), not a live end-user submission pipeline. Answers this
    session's earlier "how do we get real artwork paths into the baked cache" question concretely.
-4. **Concurrency cap shape**: a semaphore-style limit on `ArtworkPrefetchCoordinator.prefetchBatch`,
-   a priority split (disk-cache-eligible games placed before any network-bound ones queue), or
-   both. Deliberately not designed yet — item 1 (local disk read) changes what "cache-eligible"
-   even means on desktop, so this should follow that, not precede it.
+4. **Concurrency cap shape — now the actual priority, explicitly the next PR/changeset, not
+   bundled into #149.** Local disk read landing changed what "cache-eligible" means on desktop
+   (item 1, resolved) and surfaced the real bottleneck underneath it (see Root Cause B's
+   2026-07-31 update): a single shared `TextureWorker` serializing every decode, local or network,
+   with no pool. Scope for that next pass:
+   - A small worker pool (not just one `TextureWorker`) so decode work actually parallelizes
+     across cores instead of queueing on one thread.
+   - A semaphore-style concurrency cap in front of `ArtworkPrefetchCoordinator.prefetchBatch`.
+   - **Priority order, two axes**: disk-cache-eligible games ahead of network-bound ones (already
+     noted), *and*, new 2026-07-31, games nearest the player scheduled first within whatever tier
+     they fall into - not just iteration order.
+   - Fix `PixelDataCache`'s per-exact-size keying so a MID request doesn't force its own full
+     decode when a HIGH decode of the same source either already happened or will (Root Cause B's
+     2026-07-31 note).
 ~~`artwork_dead_paths` baked-bundle half~~ **Resolved by the 2026-07-25 rework** — living on
 `AppDetailsData` means the bake/repack scripts pick it up automatically, the same way they already
 pick up every other field on that type. No separate mechanism needed.
@@ -489,11 +531,13 @@ dimensions, rather than any image over 300px wide).
 - [x] Field-test the dead-path mechanism against a real session — confirmed working, ephemeral
       logging reverted afterward (see Decisions, above)
 - [x] Normalize the `PixelDataCache`/`artwork_dead_paths` cache key (strip `?t=`) — Root cause C
-- [ ] Get sign-off on, then implement, the Tauri local `librarycache` read + CDN URL discovery
-      build plan (Root cause D) — the actual priority; everything else here is a stopgap around
-      not having this yet
-- [ ] Scope the concurrency cap / priority split for `ArtworkPrefetchCoordinator`, after the local
-      disk read above changes the baseline
+- [x] Implement the Tauri local `librarycache` read (Root cause D) — PR #149, field-confirmed
+      2026-07-31 (999/1845 appids have a library slot; dead-path skip separately reconfirmed at
+      56/56 in the same session). CDN URL discovery/validation (Deliverable 2 of the build plan)
+      not included in #149 — still open, not yet scheduled.
+- [ ] **Next PR/changeset**: worker pool + concurrency cap + priority queue for
+      `ArtworkPrefetchCoordinator` (see Root Cause B and Open Question 4, both updated 2026-07-31).
+      Must prioritize by distance to player, not just iteration order.
 - [ ] Scope the one-time bake-time backfill avenue (now simpler — dead paths discovered live
       already land somewhere the bake pipeline can read back); partly overlaps the local
       librarycache plan's out-of-scope shared-cache-push item — scope together
