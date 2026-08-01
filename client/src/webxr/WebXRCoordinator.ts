@@ -88,7 +88,11 @@ export class WebXRCoordinator {
      */
     async handleWebXRToggle(): Promise<void> {
         try {
-            await this.webxrManager.startVRSession()
+            if (this.webxrManager.isSessionActive()) {
+                await this.webxrManager.endVRSession()
+            } else {
+                await this.webxrManager.startVRSession()
+            }
         } catch (error) {
             // Error handling is done in the WebXRManager callbacks
             console.debug('WebXR toggle failed:', error)
@@ -163,15 +167,20 @@ export class WebXRCoordinator {
         this.cameraRig.quaternion.identity()
 
         // RoomManager's rig.position.y = 1.6 is a desktop-only stand-in for eye height - there's
-        // no real head tracking in desktop mode to supply it. A real XR pose already reports the
-        // user's actual height (floor-relative for 'local-floor', session-start-relative for
-        // 'local' - either way, a real measurement, not a guess), and Three.js adds it on top of
-        // the rig's Y same as everything else. Stacking our own +1.6 under a real ~1.6-1.8m
-        // reported height landed the camera around 3.2-3.4m - at or inside the ceiling (default
-        // 3.5m, fixtures around 3.1m) - which is exactly "black obstruction everywhere, only
-        // slivers at extreme angles." X/Z are left alone: they represent real horizontal
-        // room placement, which should carry over into VR same as in desktop mode.
-        this.cameraRig.position.y = 0
+        // no real head tracking in desktop mode to supply it. Only a floor-relative reference
+        // space ('local-floor'/'bounded-floor') reports a pose Y that's already real
+        // head-above-floor height - stacking our own +1.6 under that would land the camera
+        // around 3.2-3.4m, at/inside the ceiling (default 3.5m, fixtures ~3.1m), which is exactly
+        // "black obstruction everywhere, only slivers at extreme angles." A confirmed real-world
+        // case (PICO 4 via PICO Connect/SteamVR) fell all the way back to 'local', whose origin is
+        // anchored to the viewer's own starting position rather than the floor - its pose Y near
+        // session start is close to 0 regardless of the user's real height, so the stand-in must
+        // stay in that case or the rig would sit at floor level instead. X/Z are always left
+        // alone: they represent real horizontal room placement, which should carry over into VR
+        // the same as desktop mode regardless of which reference space is active.
+        if (this.webxrManager.isUsingFloorRelativeReferenceSpace()) {
+            this.cameraRig.position.y = 0
+        }
 
         this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
