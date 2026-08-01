@@ -156,13 +156,22 @@ export class WebXRCoordinator {
         // space), not a delta - Three.js composes it with the rig's rotation every frame
         // (parent.matrixWorld in WebXRManager.updateCamera). Any residual rig rotation left over
         // from desktop mode (e.g. RoomManager's initial lookAt() aiming the flat camera at the
-        // store) would silently add an unwanted rotation on top of the real headset orientation -
-        // before this reset, that's exactly what caused the reported "camera facing into
-        // geometry/skybox only" bug once movement started actually composing correctly. Desktop
-        // mode never hit this: a parentless camera had its rotation wholesale discarded by the
-        // XR pose each frame, so a stale rotation never actually mattered until parenting made it
-        // compose for real.
+        // store) would silently add an unwanted rotation on top of the real headset orientation.
+        // Desktop mode never hit this: a parentless camera had its rotation wholesale discarded
+        // by the XR pose each frame, so a stale rotation never actually mattered until parenting
+        // made it compose for real.
         this.cameraRig.quaternion.identity()
+
+        // RoomManager's rig.position.y = 1.6 is a desktop-only stand-in for eye height - there's
+        // no real head tracking in desktop mode to supply it. A real XR pose already reports the
+        // user's actual height (floor-relative for 'local-floor', session-start-relative for
+        // 'local' - either way, a real measurement, not a guess), and Three.js adds it on top of
+        // the rig's Y same as everything else. Stacking our own +1.6 under a real ~1.6-1.8m
+        // reported height landed the camera around 3.2-3.4m - at or inside the ceiling (default
+        // 3.5m, fixtures around 3.1m) - which is exactly "black obstruction everywhere, only
+        // slivers at extreme angles." X/Z are left alone: they represent real horizontal
+        // room placement, which should carry over into VR same as in desktop mode.
+        this.cameraRig.position.y = 0
 
         this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
