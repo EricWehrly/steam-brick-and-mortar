@@ -116,14 +116,24 @@ fn is_hash_dirname(name: &str) -> bool {
 /// relative to `appcache/librarycache/<appid>/`) - rejects any path containing `..` so this
 /// command can't be used to escape that folder, same guard `read_local_screenshot_bytes` uses for
 /// the same reason.
+///
+/// Returns a raw `tauri::ipc::Response`, not `Vec<u8>` directly - a plain `Vec<u8>` return goes
+/// over Tauri's default JSON IPC as an array of numbers (confirmed as a real, measured bottleneck:
+/// this command runs on a genuinely hot path, up to one call per placed game box per session, and
+/// JSON-encoding/decoding a ~50-90KB JPEG as a comma-separated number array is dramatically more
+/// expensive than the disk read itself - see docs/plans/startup-artwork-resolution-plan.md).
+/// `Response` sends the bytes as a raw ArrayBuffer instead, same idiom LocalScreenshotReader.ts's
+/// own doc comment already flagged this concern for (screenshots stayed on JSON IPC deliberately -
+/// small N, loaded once - this command doesn't have that luxury).
 #[tauri::command]
-pub fn read_local_library_art_bytes(appid: u32, relative_path: String) -> Result<Vec<u8>, String> {
+pub fn read_local_library_art_bytes(appid: u32, relative_path: String) -> Result<tauri::ipc::Response, String> {
     if relative_path.contains("..") {
         return Err(format!("rejected suspicious library art path: {relative_path}"));
     }
     let steam_root = super::paths::find_steam_root().ok_or("Steam install not found")?;
     let path = librarycache_dir(&steam_root).join(appid.to_string()).join(&relative_path);
-    fs::read(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))
+    let bytes = fs::read(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[cfg(test)]
@@ -217,8 +227,11 @@ mod tests {
 
     #[test]
     fn rejects_traversal_in_relative_path() {
-        let err = read_local_library_art_bytes(440, "../../../etc/passwd".to_string()).unwrap_err();
-        assert!(err.contains("rejected"));
+        // Not unwrap_err() - tauri::ipc::Response (the Ok side) doesn't implement Debug.
+        match read_local_library_art_bytes(440, "../../../etc/passwd".to_string()) {
+            Err(err) => assert!(err.contains("rejected")),
+            Ok(_) => panic!("expected the traversal attempt to be rejected"),
+        }
     }
 
     /// Real-machine check - `#[ignore]`d by default. Discovers the Steam root at test time
@@ -248,8 +261,13 @@ mod tests {
 
         let first_with_library = found.iter().find(|e| e.library.is_some()).expect("expected at least one library slot");
         let slot = first_with_library.library.as_ref().unwrap();
-        let bytes = read_local_library_art_bytes(first_with_library.appid, slot.relative_path.clone())
+        let response = read_local_library_art_bytes(first_with_library.appid, slot.relative_path.clone())
             .expect("expected to read the first discovered library art's bytes");
+        let body = tauri::ipc::IpcResponse::body(response).expect("expected a readable response body");
+        let bytes = match body {
+            tauri::ipc::InvokeResponseBody::Raw(bytes) => bytes,
+            tauri::ipc::InvokeResponseBody::Json(_) => panic!("expected a raw byte response, got JSON"),
+        };
         assert!(!bytes.is_empty());
         // JPEG magic bytes - every library_600x900.jpg observed on this machine was a .jpg.
         assert_eq!(&bytes[0..2], &[0xFF, 0xD8], "expected a JPEG file");
