@@ -116,4 +116,21 @@ describe('WebXRCoordinator', () => {
 
         expect(cameraRig.quaternion.equals(new THREE.Quaternion())).toBe(true)
     })
+
+    // Regression test: RoomManager.position.y = 1.6 is a desktop-only eye-height stand-in with no
+    // real head tracking behind it. A real XR pose reports actual height and Three.js adds it on
+    // top of the rig's Y same as everything else - stacking our own +1.6 under that real
+    // measurement placed the camera around 3.2-3.4m, at/inside the default 3.5m ceiling. Reported
+    // as "strong black obstruction everywhere, only slivers at extreme peek angles." X/Z (real
+    // horizontal room placement) must survive the reset - only Y is a desktop-only artifact.
+    it('zeroes the rig Y position (but not X/Z) when a real XR session starts', () => {
+        cameraRig.position.set(3, 1.6, -7) // desktop placement: eye height + real room position
+
+        const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
+        onSessionStart?.()
+
+        expect(cameraRig.position.y).toBe(0)
+        expect(cameraRig.position.x).toBe(3)
+        expect(cameraRig.position.z).toBe(-7)
+    })
 })
