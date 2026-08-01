@@ -28,11 +28,18 @@ export class LocalLibraryArtReader {
         return invoke<LocalLibraryArtEntry[]>('find_local_library_art', { appids })
     }
 
+    /**
+     * The Rust side returns a raw `tauri::ipc::Response` (an ArrayBuffer here), not JSON - a
+     * plain `Vec<u8>` return goes over Tauri's default JSON IPC as a comma-separated array of
+     * numbers, which measurably dominated startup time on a real desktop session once this ran
+     * once per placed game box (see the Rust command's own doc comment, and
+     * docs/plans/startup-artwork-resolution-plan.md).
+     */
     public static async readArtBytes(appid: number, relativePath: string): Promise<Uint8Array<ArrayBuffer> | null> {
         if (!isTauri()) {
             return null
         }
-        const bytes = await invoke<number[]>('read_local_library_art_bytes', { appid, relativePath })
+        const bytes = await invoke<ArrayBuffer>('read_local_library_art_bytes', { appid, relativePath })
         return new Uint8Array(bytes)
     }
 }

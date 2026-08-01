@@ -228,6 +228,22 @@ function getExpectedNativeWidth(url: string): number | undefined {
     return undefined
 }
 
+// Fires once per matching image, and every local-librarycache read is one of these by
+// construction (Steam's own library_600x900.jpg files are genuinely 600×900, not the CDN's
+// downscaled 300×450) - one line per occurrence would mean one line per placed game box.
+// Logged as a running count instead of per-occurrence noise.
+const HIGH_RES_LOG_INTERVAL = 25
+let highResImageCount = 0
+
+function logHighResImageIfDue(nativeWidth: number, nativeHeight: number, expectedWidth: number): void {
+    highResImageCount++
+    if (highResImageCount % HIGH_RES_LOG_INTERVAL !== 0) return
+    console.debug(
+        `[TextureWorker] High-res CDN image detected ${highResImageCount} times so far ` +
+        `(most recent: native ${nativeWidth}×${nativeHeight}, expected ~${expectedWidth}px wide for this artwork type)`
+    )
+}
+
 async function processBlobWithDimensions(
     blob: Blob,
     url: string,
@@ -258,7 +274,7 @@ async function processBlobWithDimensions(
 
     const expectedNativeWidth = getExpectedNativeWidth(url)
     if (expectedNativeWidth !== undefined && imageBitmap.width > expectedNativeWidth) {
-        console.debug(`[TextureWorker] High-res CDN image detected: native ${imageBitmap.width}×${imageBitmap.height} (expected ~${expectedNativeWidth}px wide for this artwork type)`)
+        logHighResImageIfDue(imageBitmap.width, imageBitmap.height, expectedNativeWidth)
     }
     
     ensureCanvas(width, height)
