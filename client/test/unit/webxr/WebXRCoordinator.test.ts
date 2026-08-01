@@ -6,7 +6,9 @@ const { webXRManagerMock, inputManagerMock, capturedWebXRManagerCallbacks } = vi
         setRenderer: vi.fn(),
         checkCapabilities: vi.fn().mockResolvedValue({ isSupported: true, supportsImmersiveVR: true, hasNavigatorXR: true }),
         startVRSession: vi.fn().mockResolvedValue(undefined),
+        endVRSession: vi.fn().mockResolvedValue(undefined),
         isSessionActive: vi.fn().mockReturnValue(false),
+        isUsingFloorRelativeReferenceSpace: vi.fn().mockReturnValue(false),
         getCurrentSession: vi.fn().mockReturnValue(null),
         dispose: vi.fn(),
     },
@@ -46,6 +48,7 @@ describe('WebXRCoordinator', () => {
         vi.clearAllMocks()
         capturedWebXRManagerCallbacks.length = 0
         webXRManagerMock.isSessionActive.mockReturnValue(false)
+        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(false)
         cameraRig = new THREE.Object3D()
         coordinator = new WebXRCoordinator({ cameraRig })
     })
@@ -118,12 +121,15 @@ describe('WebXRCoordinator', () => {
     })
 
     // Regression test: RoomManager.position.y = 1.6 is a desktop-only eye-height stand-in with no
-    // real head tracking behind it. A real XR pose reports actual height and Three.js adds it on
-    // top of the rig's Y same as everything else - stacking our own +1.6 under that real
-    // measurement placed the camera around 3.2-3.4m, at/inside the default 3.5m ceiling. Reported
-    // as "strong black obstruction everywhere, only slivers at extreme peek angles." X/Z (real
-    // horizontal room placement) must survive the reset - only Y is a desktop-only artifact.
-    it('zeroes the rig Y position (but not X/Z) when a real XR session starts', () => {
+    // real head tracking behind it. Only a floor-relative reference space ('local-floor'/
+    // 'bounded-floor') reports a pose Y that's already real head-above-floor height - stacking
+    // our own +1.6 under that real measurement placed the camera around 3.2-3.4m, at/inside the
+    // default 3.5m ceiling. Reported as "strong black obstruction everywhere, only slivers at
+    // extreme peek angles." X/Z (real horizontal room placement) must survive the reset - only Y
+    // is a desktop-only artifact, and only when the active reference space actually supplies a
+    // real replacement for it.
+    it('zeroes the rig Y position (but not X/Z) when a floor-relative reference space is active', () => {
+        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(true)
         cameraRig.position.set(3, 1.6, -7) // desktop placement: eye height + real room position
 
         const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
@@ -132,5 +138,45 @@ describe('WebXRCoordinator', () => {
         expect(cameraRig.position.y).toBe(0)
         expect(cameraRig.position.x).toBe(3)
         expect(cameraRig.position.z).toBe(-7)
+    })
+
+    // Regression test: a confirmed real-world runtime (PICO 4 via PICO Connect/SteamVR) fell all
+    // the way back to 'local', whose origin is anchored to the viewer's own starting position
+    // rather than the floor - its pose Y near session start is close to 0 regardless of the
+    // user's real height. Zeroing the rig's Y in that case (as an earlier, unconditional version
+    // of this fix did) put the camera at floor level instead of eye level - the desktop-mode
+    // eye-height stand-in must survive when nothing in the pose replaces it.
+    it('leaves the rig Y position alone when the reference space is not floor-relative', () => {
+        webXRManagerMock.isUsingFloorRelativeReferenceSpace.mockReturnValue(false)
+        cameraRig.position.set(3, 1.6, -7)
+
+        const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
+        onSessionStart?.()
+
+        expect(cameraRig.position.y).toBe(1.6)
+        expect(cameraRig.position.x).toBe(3)
+        expect(cameraRig.position.z).toBe(-7)
+    })
+
+    // Regression test: the "Exit VR" button emits the same WebXREventTypes.Toggle as "Enter VR"
+    // (see WebXRUIPanel's single click handler) - handleWebXRToggle must branch on session state
+    // itself. It used to always call startVRSession(), which no-ops with a console warning when a
+    // session is already active - the button could never actually end a session.
+    it('ends the active session instead of starting a new one when toggled while active', async () => {
+        webXRManagerMock.isSessionActive.mockReturnValue(true)
+
+        await coordinator.handleWebXRToggle()
+
+        expect(webXRManagerMock.endVRSession).toHaveBeenCalled()
+        expect(webXRManagerMock.startVRSession).not.toHaveBeenCalled()
+    })
+
+    it('starts a new session when toggled while inactive', async () => {
+        webXRManagerMock.isSessionActive.mockReturnValue(false)
+
+        await coordinator.handleWebXRToggle()
+
+        expect(webXRManagerMock.startVRSession).toHaveBeenCalled()
+        expect(webXRManagerMock.endVRSession).not.toHaveBeenCalled()
     })
 })
