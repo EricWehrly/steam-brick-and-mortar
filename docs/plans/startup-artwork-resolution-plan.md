@@ -21,11 +21,10 @@ common cache-hit path never reached it (fixed in `91d31d85`), and the bytes comm
 returned `Vec<u8>` over Tauri's default JSON IPC, which measurably dominated startup time once it
 ran per placed game box - fixed by switching to a raw `tauri::ipc::Response` (`d7cf5945`). Dead-path
 skip separately reconfirmed against the same session: 56/56 failed resolutions fully skipped via
-the known-dead cache, zero wasted network attempts. **Concurrency cap is real, not yet started** -
-see Root Cause B and Open Question 4, below, both updated 2026-07-31 with a concrete finding
-(`GameArtworkProvider` funnels every decode, local or network, through a single shared
-`TextureWorker` with no pool) and a new requirement (distance-to-player priority). Deliberately the
-next PR, not bundled into this one. Iterate on this doc as each piece resolves.
+the known-dead cache, zero wasted network attempts. **Concurrency cap now has a full build plan**
+(2026-07-31, under Root Cause B — worker pool, concurrency cap, `PixelDataCache` dedup fix, and a
+priority-queue design fork awaiting sign-off), on its own branch (`act2/artwork-loading-concurrency`,
+based on the merged #149), not yet implemented. Iterate on this doc as each piece resolves.
 **Related**: [`cors-blocked-local-scan-artwork`](../tech-debt.md#id-cors-blocked-local-scan-artwork)
 (the tech-debt entry this plan supersedes/absorbs), [Image/Texture Pipeline](../architecture/image-texture-pipeline.md),
 [Desktop Offline-First Plan](desktop-offline-first-plan.md), [Multi-Layer Caching](../features/multi-layer-caching.md)
@@ -150,17 +149,93 @@ once (per the no-cap behavior above), but they all queue up behind one thread's 
 regardless of how fast the underlying bytes arrived. Local-disk reads made the *bytes* fast; they
 didn't touch the *decode* bottleneck at all.
 
-Also noted in the same pass: `PixelDataCache` keys lookups by exact size (`@{width}x{height}`), so
-a MID-tier request and a later HIGH-tier request for the same source image never share a decode -
-each pays its own full read + JPEG-decode + canvas-readback, even though decoding once at native
-resolution and resizing down for the smaller tier would be cheaper. Pre-existing pattern (present
-in the network path already; the local-disk path just inherited it), not introduced by PR #149,
-but worth fixing alongside the worker pool since both live in the same code path.
+Also noted in the same pass, and corrected after reading `LodArtworkOrchestrator.fetchAndCachePixels`
+directly: `buildAppSettingsConfig` (the only config production actually instantiates) sets
+`lazyHighTextures: true`, so the initial prefetch wave only ever fetches MID (150×225) - HIGH
+(300×450) is deferred and requested individually, later, as a game gets promoted (camera proximity
+via `LodDistanceManager`, or an explicit `preloadNearestGames()` call). So this isn't "every
+prefetch decodes twice" as first suspected - it's narrower: **every game that ever gets promoted to
+HIGH pays for a second full decode of the same source image**, because `PixelDataCache` keys
+lookups by exact size (`@{width}x{height}`), so the HIGH request can't reuse the MID decode that
+already happened. Decoding once at native resolution (or the largest tier actually used) and
+resizing down for smaller tiers would be cheaper. Pre-existing pattern (present in the network path
+already; the local-disk path just inherited it), not introduced by PR #149, but worth fixing
+alongside the worker pool since both live in the same code path.
 
 **New requirement, 2026-07-31**: whatever replaces the no-cap/no-priority behavior above must
 prioritize games nearest the player - those should be scheduled first, not just whichever games
 happen to iterate first in `prefetchBatch()`'s loop. Distinct axis from the disk-vs-network
-priority split already noted in Open Question 4 below; both apply.
+priority split already noted in Open Question 4 below; both apply. See the build plan immediately
+below for why this isn't as simple as "sort by distance before firing" - `BatchReadyForPlacementEvent`
+(what triggers prefetch) carries no position data at all.
+
+## Build plan: worker pool, concurrency cap, and priority queue (Root Cause B)
+
+**Status**: Proposed 2026-07-31, awaiting sign-off. Scoped as its own PR/changeset, branched from
+the merged PR #149 (`act2/artwork-loading-concurrency`) - deliberately not bundled with the local
+disk read.
+
+### Confirmed findings (code-read, not assumption)
+
+- **One worker, not a pool.** `GameArtworkProvider` constructs exactly one `TextureWorker`
+  ([GameArtworkProvider.ts:137](../../client/src/scene/game-box/instancing/GameArtworkProvider.ts)),
+  which wraps exactly one `Worker` via `ManagedWorker`
+  ([ManagedWorker.ts](../../client/src/utils/ManagedWorker.ts)) - no pooling anywhere in that
+  chain. Every decode (`createImageBitmap` + canvas draw + `getImageData`), from local disk or
+  network, serializes through that one worker's message queue.
+- **No concurrency cap upstream, confirmed unchanged.** `ArtworkPrefetchCoordinator.prefetchBatch()`
+  ([ArtworkPrefetchCoordinator.ts:73-90](../../client/src/scene/spawning/ArtworkPrefetchCoordinator.ts))
+  still fires every game's `prefetchArtwork()` with no `await`, no queue, no cap - same as Root
+  Cause B originally described, still true after the local-disk-read PR.
+- **No position data at prefetch time.** `BatchReadyForPlacementEvent`
+  ([PropsEvents.ts:78-82](../../client/src/scene/props/PropsEvents.ts)) carries only
+  `games`/`batchIndex`/`totalBatches` - no shelf, section, or world position. Individual game
+  positions aren't known until placement runs, which happens after/alongside prefetch, not before
+  it. A "sort by distance before firing" approach can't work as stated; see the open question below.
+- **A working distance-priority pattern already exists, just not for this.**
+  `LodDistanceManager.preloadNearestGames()`
+  ([LodDistanceManager.ts:376-414](../../client/src/scene/game-box/instancing/LodDistanceManager.ts))
+  already sorts placed instances by squared distance to camera and promotes the nearest N to HIGH -
+  proven, tested code for exactly the "nearest first" ranking this plan needs, but it runs *after*
+  `AllBatchesComplete`, on already-placed instances, as an occasional boost
+  (`window.preloadNearest()`) - not as the ordering for the initial prefetch wave itself.
+
+### Proposed shape
+
+1. **Worker pool.** Replace the single `TextureWorker` with a small pool (candidate size:
+   `navigator.hardwareConcurrency`-derived, capped low - exact number TBD during implementation,
+   not a documented decision yet) so decode work actually parallelizes across cores instead of
+   queueing on one thread.
+2. **Concurrency cap.** A semaphore-style limit in front of dispatch, sized independently of the
+   pool (still needed even with a pool - Tauri IPC calls and network fetches both have overhead
+   unbounded concurrency would still strain).
+3. **`PixelDataCache` dedup fix.** Cache the decode at the largest tier actually requested (or
+   native resolution) once; derive smaller tiers via the existing `resizePixels` instead of a
+   fresh disk-read + decode per tier. Removes the double-decode-on-HIGH-promotion cost identified
+   above. Scoped here because it's the same code path, not because it's blocking the pool/cap work.
+4. **Priority queue** - shape still open, see below.
+
+### Open question: what "nearest the player first" actually means, given prefetch has no position data
+
+Three ways to reconcile "prioritize by distance" with "prefetch fires before placement knows
+positions" - not decided yet, need your call:
+
+- **(a) Reorder the pipeline** so prefetch waits for (or runs interleaved with) placement, trading
+  away today's "start fetching before we know exactly where things go" latency-hiding for exact
+  position-based ordering from the start. Biggest change of the three.
+- **(b) Queue now, re-sort as positions arrive.** Keep firing prefetch early (preserve the
+  latency-hiding), but through a real queue rather than fire-and-forget - as placement assigns each
+  game a position, it can jump the queue if it's near the player, the same way
+  `preloadNearestGames()` already re-prioritizes HIGH promotion after the fact. Smallest change;
+  reuses an already-proven pattern instead of inventing a new one.
+- **(c) Cruder proxy signal, no waiting.** Use whatever coarse ordering *is* available at prefetch
+  time (batch order, section assignment order) as an approximate stand-in for distance, accepting
+  it won't be exact. Simplest to build, weakest guarantee.
+
+Leaning toward (b) - it's the smallest change, keeps the existing latency-hiding property, and
+extends a pattern (`preloadNearestGames`) already validated in production rather than introducing
+a new one - but this is a real design fork, not a detail, so flagging rather than deciding
+unilaterally.
 
 ### C. `PixelDataCache`'s actual purpose, and real numbers on its startup role (Problem 3) — measured 2026-07-25, root cause identified, not yet fixed
 
@@ -488,20 +563,11 @@ existing AppDetailsCache TTL gap, not duplicated here.)
    folded-in real URL over its own guess) — developer-workflow scope for now (a developer copies
    the files in manually before a release), not a live end-user submission pipeline. Answers this
    session's earlier "how do we get real artwork paths into the baked cache" question concretely.
-4. **Concurrency cap shape — now the actual priority, explicitly the next PR/changeset, not
-   bundled into #149.** Local disk read landing changed what "cache-eligible" means on desktop
-   (item 1, resolved) and surfaced the real bottleneck underneath it (see Root Cause B's
-   2026-07-31 update): a single shared `TextureWorker` serializing every decode, local or network,
-   with no pool. Scope for that next pass:
-   - A small worker pool (not just one `TextureWorker`) so decode work actually parallelizes
-     across cores instead of queueing on one thread.
-   - A semaphore-style concurrency cap in front of `ArtworkPrefetchCoordinator.prefetchBatch`.
-   - **Priority order, two axes**: disk-cache-eligible games ahead of network-bound ones (already
-     noted), *and*, new 2026-07-31, games nearest the player scheduled first within whatever tier
-     they fall into - not just iteration order.
-   - Fix `PixelDataCache`'s per-exact-size keying so a MID request doesn't force its own full
-     decode when a HIGH decode of the same source either already happened or will (Root Cause B's
-     2026-07-31 note).
+4. ~~Concurrency cap shape~~ **Scoped as a full build plan, 2026-07-31** — see "Build plan: worker
+   pool, concurrency cap, and priority queue" under Root Cause B, above. Awaiting sign-off on the
+   priority-queue design fork specifically (three options laid out there); worker pool, concurrency
+   cap, and the `PixelDataCache` dedup fix are otherwise ready to implement. Own PR/changeset,
+   branched from the merged #149 as `act2/artwork-loading-concurrency`.
 ~~`artwork_dead_paths` baked-bundle half~~ **Resolved by the 2026-07-25 rework** — living on
 `AppDetailsData` means the bake/repack scripts pick it up automatically, the same way they already
 pick up every other field on that type. No separate mechanism needed.
@@ -535,9 +601,10 @@ dimensions, rather than any image over 300px wide).
       2026-07-31 (999/1845 appids have a library slot; dead-path skip separately reconfirmed at
       56/56 in the same session). CDN URL discovery/validation (Deliverable 2 of the build plan)
       not included in #149 — still open, not yet scheduled.
-- [ ] **Next PR/changeset**: worker pool + concurrency cap + priority queue for
-      `ArtworkPrefetchCoordinator` (see Root Cause B and Open Question 4, both updated 2026-07-31).
-      Must prioritize by distance to player, not just iteration order.
+- [ ] Get sign-off on the priority-queue design fork (three options, see the build plan under
+      Root Cause B), then implement worker pool + concurrency cap + priority queue +
+      `PixelDataCache` dedup fix — branch `act2/artwork-loading-concurrency`, own PR, not bundled
+      with #149. Must prioritize by distance to player, not just iteration order.
 - [ ] Scope the one-time bake-time backfill avenue (now simpler — dead paths discovered live
       already land somewhere the bake pipeline can read back); partly overlaps the local
       librarycache plan's out-of-scope shared-cache-push item — scope together
