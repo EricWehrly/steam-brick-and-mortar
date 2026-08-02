@@ -57,7 +57,7 @@ export class CanvasSignRenderer implements ISignRenderer {
         this.renderer = new SignageRenderer()
     }
 
-    setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
+    setSign(request: SignRequest, scene: THREE.Object3D): THREE.Object3D {
         const text = request.text ?? ''
         const style = { ...CanvasSignRenderer.defaults, ...(request.style ?? {}) }
         const padding = parsePadding(style.padding)
@@ -103,7 +103,7 @@ export class CanvasSignRenderer implements ISignRenderer {
 
     private createSign(
         request: SignRequest,
-        scene: THREE.Scene,
+        scene: THREE.Object3D,
         text: string,
         backgroundColor: number,
         textColor: number,
@@ -125,11 +125,13 @@ export class CanvasSignRenderer implements ISignRenderer {
         return mesh
     }
 
-    removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean {
+    removeSign(uniqueIdentifier: string, _scene: THREE.Object3D): boolean {
         const entry = this.signs.get(uniqueIdentifier)
         if (!entry) return false
 
-        scene.remove(entry.mesh)
+        // Removes from whatever container the mesh actually lives under, which may differ
+        // from _scene — signs can be anchored to the room frame, not just the scene root.
+        entry.mesh.parent?.remove(entry.mesh)
         const mat = entry.mesh.material as THREE.MeshStandardMaterial
         mat.map?.dispose()
         mat.dispose()
@@ -138,13 +140,13 @@ export class CanvasSignRenderer implements ISignRenderer {
         return true
     }
 
-    clearAll(scene: THREE.Scene): void {
+    clearAll(scene: THREE.Object3D): void {
         for (const uniqueIdentifier of [...this.signs.keys()]) {
             this.removeSign(uniqueIdentifier, scene)
         }
     }
 
-    dispose(scene: THREE.Scene): void {
+    dispose(scene: THREE.Object3D): void {
         this.clearAll(scene)
         this.renderer.dispose()
     }

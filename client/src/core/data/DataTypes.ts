@@ -28,7 +28,14 @@ export enum DataKey {
     MainCamera = 'core.mainCamera',
     Renderer = 'core.renderer',
     InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
-    InstancedLabelMetadata = 'renderer.instancedLabelMetadata'
+    InstancedLabelMetadata = 'renderer.instancedLabelMetadata',
+    /**
+     * RoomManager's roomGroup — the room frame. Anything anchored to the room (rather than a
+     * shelf) parents to this instead of the scene root, so it inherits the room's own transform
+     * (resize, and the liminal per-frame camera-follow) for free. See
+     * docs/plans/placement-anchor-system-plan.md.
+     */
+    RoomFrame = 'core.roomFrame'
 }
 
 /**

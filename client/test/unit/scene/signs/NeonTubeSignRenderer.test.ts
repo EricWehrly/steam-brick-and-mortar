@@ -59,11 +59,15 @@ vi.mock('../../../../src/utils/workers/neon-geometry.worker?worker', () => ({ de
 import { NeonTubeSignRenderer } from '../../../../src/scene/signs/NeonTubeSignRenderer'
 import type { SignRequest } from '../../../../src/scene/signs/ISignRenderer'
 
+// Mirrors THREE.Object3D.add()'s real contract (sets child.parent) — removeSign() now
+// removes via entry.group.parent?.remove(entry.group) rather than the scene argument
+// directly, so the fake must actually wire up parent/child like the real API does.
 function makeScene() {
-    return {
-        add: vi.fn(),
+    const scene = {
+        add: vi.fn((child: { parent?: unknown }) => { child.parent = scene }),
         remove: vi.fn(),
-    } as unknown as THREE.Scene
+    }
+    return scene as unknown as THREE.Scene
 }
 
 function makeRequest(overrides?: Partial<SignRequest>): SignRequest {

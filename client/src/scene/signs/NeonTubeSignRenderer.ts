@@ -43,7 +43,7 @@ export class NeonTubeSignRenderer implements ISignRenderer {
         this.worker = new NeonGeometryWorker()
     }
 
-    setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
+    setSign(request: SignRequest, scene: THREE.Object3D): THREE.Object3D {
         this.removeSign(request.uniqueIdentifier, scene)
 
         const style = { ...NeonTubeSignRenderer.defaults, ...(request.style ?? {}) }
@@ -122,11 +122,13 @@ export class NeonTubeSignRenderer implements ISignRenderer {
 
     }
 
-    removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean {
+    removeSign(uniqueIdentifier: string, _scene: THREE.Object3D): boolean {
         const entry = this.entries.get(uniqueIdentifier)
         if (!entry) return false
         this.entries.delete(uniqueIdentifier)
-        scene.remove(entry.group)
+        // Removes from whatever container the group actually lives under, which may differ
+        // from _scene — signs can be anchored to the room frame, not just the scene root.
+        entry.group.parent?.remove(entry.group)
         entry.group.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 child.geometry.dispose()
@@ -137,13 +139,13 @@ export class NeonTubeSignRenderer implements ISignRenderer {
         return true
     }
 
-    clearAll(scene: THREE.Scene): void {
+    clearAll(scene: THREE.Object3D): void {
         for (const uniqueIdentifier of [...this.entries.keys()]) {
             this.removeSign(uniqueIdentifier, scene)
         }
     }
 
-    dispose(scene: THREE.Scene): void {
+    dispose(scene: THREE.Object3D): void {
         this.clearAll(scene)
         this.worker.dispose()
     }

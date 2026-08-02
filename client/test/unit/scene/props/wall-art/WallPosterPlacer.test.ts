@@ -61,6 +61,18 @@ async function flushMicrotasks(times = 15): Promise<void> {
     }
 }
 
+/**
+ * Posters are room-frame anchored (see docs/plans/placement-anchor-system-plan.md) — mirrors
+ * RoomManager.buildRoom's real roomGroup publication so WallPosterPlacer has somewhere to attach.
+ */
+async function publishRoomFrame(scene: THREE.Scene): Promise<THREE.Group> {
+    const { DataManager, DataKey, DataDomain } = await import('../../../../../src/core/data')
+    const roomFrame = new THREE.Group()
+    scene.add(roomFrame)
+    DataManager.getInstance().set(DataKey.RoomFrame, roomFrame, { domain: DataDomain.RoomManager })
+    return roomFrame
+}
+
 function resizeEvent(width: number, depth = 16): CustomEvent<RoomResizedEvent> {
     return new CustomEvent(RoomEventTypes.Resized, {
         detail: {
@@ -88,6 +100,7 @@ describe('WallPosterPlacer', () => {
 
         const scene = new THREE.Scene()
         DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        const roomFrame = await publishRoomFrame(scene)
         WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
@@ -101,7 +114,7 @@ describe('WallPosterPlacer', () => {
         resizeHandler(resizeEvent(22))
         await flushMicrotasks()
 
-        expect(scene.children).toHaveLength(2)
+        expect(roomFrame.children).toHaveLength(2)
     })
 
     it('spaces placed frames by the 3-frame-width gap pitch, centered on the wall', async () => {
@@ -111,6 +124,7 @@ describe('WallPosterPlacer', () => {
 
         const scene = new THREE.Scene()
         DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        const roomFrame = await publishRoomFrame(scene)
         WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
@@ -122,7 +136,7 @@ describe('WallPosterPlacer', () => {
         resizeHandler(resizeEvent(22))
         await flushMicrotasks()
 
-        const xs = scene.children.map(child => child.position.x).sort((a, b) => a - b)
+        const xs = roomFrame.children.map(child => child.position.x).sort((a, b) => a - b)
         expect(xs[1] - xs[0]).toBeCloseTo(10.8)
     })
 
@@ -134,6 +148,7 @@ describe('WallPosterPlacer', () => {
 
         const scene = new THREE.Scene()
         DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        await publishRoomFrame(scene)
         WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
@@ -165,6 +180,7 @@ describe('WallPosterPlacer', () => {
 
         const scene = new THREE.Scene()
         DataManager.getInstance().set('core.mainScene', scene, { domain: DataDomain.Scene })
+        const roomFrame = await publishRoomFrame(scene)
         WallPosterPlacer.getInstance()
         await flushMicrotasks()
 
@@ -177,8 +193,8 @@ describe('WallPosterPlacer', () => {
         resizeHandler(resizeEvent(22, 16))
         await flushMicrotasks()
 
-        expect(scene.children).toHaveLength(4)
-        const rotationsY = scene.children.map(child => child.rotation.y)
+        expect(roomFrame.children).toHaveLength(4)
+        const rotationsY = roomFrame.children.map(child => child.rotation.y)
         expect(rotationsY.filter(y => Math.abs(y) < 1e-6)).toHaveLength(2)
         expect(rotationsY.some(y => Math.abs(y - Math.PI / 2) < 1e-6)).toBe(true)
         expect(rotationsY.some(y => Math.abs(y + Math.PI / 2) < 1e-6)).toBe(true)
