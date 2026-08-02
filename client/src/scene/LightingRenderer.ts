@@ -28,6 +28,8 @@ import type { SceneLight } from '../lighting/SceneLight'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { GameSpotlight } from '../debug/GameSpotlight'
+import { DataManager, DataKey } from '../core/data'
+import { RoomConstants } from './RoomManager'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -126,7 +128,7 @@ export class LightingRenderer {
 
         // Listen for room resizing events to update lighting, including initial room build.
         this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
-            this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout, event.detail.centerOffset) 
+            this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout)
         })
 
         // Observe store-props lifecycle to drive lighting phases.
@@ -488,11 +490,19 @@ export class LightingRenderer {
         return previousWidth !== width || previousDepth !== depth
     }
 
-    private applyLightingGroupOffset(centerOffset?: { x: number; y: number; z: number }): void {
-        if (centerOffset) {
-            this.lightingGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
-            LightingRenderer.logger.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
+    /**
+     * Reparents the lighting group onto the room frame on first opportunity (it starts as a
+     * direct scene child, since lights are added before any room exists — see the constructor)
+     * and positions it there with a deliberate, permanent -STORE_FRONT_OFFSET local nudge. That
+     * offset predates this migration and is intentionally preserved verbatim, not normalized to
+     * (0,0,0) — see docs/plans/placement-anchor-system-plan.md, finding (a).
+     */
+    private applyLightingGroupOffset(): void {
+        const roomFrame = DataManager.getInstance().get<THREE.Group>(DataKey.RoomFrame)
+        if (roomFrame && this.lightingGroup.parent !== roomFrame) {
+            roomFrame.add(this.lightingGroup)
         }
+        this.lightingGroup.position.set(0, 0, -RoomConstants.STORE_FRONT_OFFSET)
     }
 
     private refreshFixturesAndShadowFrustum(
@@ -524,8 +534,7 @@ export class LightingRenderer {
 
     private updateRoomDimensions(
         dimensions: { width: number; depth: number; height: number },
-        shelfLayout?: { rows: number; shelvesPerRow?: number },
-        centerOffset?: { x: number; y: number; z: number }
+        shelfLayout?: { rows: number; shelvesPerRow?: number }
     ): void {
         LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
@@ -544,7 +553,7 @@ export class LightingRenderer {
             LightingRenderer.logger.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
         }
         
-        this.applyLightingGroupOffset(centerOffset)
+        this.applyLightingGroupOffset()
         this.refreshFixturesAndShadowFrustum(ceilingHeightChanged, roomFootprintChanged, shelfLayout)
     }
 

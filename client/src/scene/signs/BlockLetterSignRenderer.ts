@@ -50,7 +50,7 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         return this.fontLoadPromise
     }
 
-    setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
+    setSign(request: SignRequest, scene: THREE.Object3D): THREE.Object3D {
         this.removeSign(request.uniqueIdentifier, scene)
 
         const text = request.text ?? ''
@@ -120,23 +120,25 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         })
     }
 
-    removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean {
+    removeSign(uniqueIdentifier: string, _scene: THREE.Object3D): boolean {
         const entry = this.entries.get(uniqueIdentifier)
         if (!entry) return false
         this.entries.delete(uniqueIdentifier)
-        scene.remove(entry.group)
+        // Removes from whatever container the group actually lives under, which may differ
+        // from _scene — signs can be anchored to the room frame, not just the scene root.
+        entry.group.parent?.remove(entry.group)
         this.disposeEntryGeometry(entry)
         entry.material.dispose()
         return true
     }
 
-    clearAll(scene: THREE.Scene): void {
+    clearAll(scene: THREE.Object3D): void {
         for (const uniqueIdentifier of [...this.entries.keys()]) {
             this.removeSign(uniqueIdentifier, scene)
         }
     }
 
-    dispose(scene: THREE.Scene): void {
+    dispose(scene: THREE.Object3D): void {
         this.clearAll(scene)
         this.font = null
         this.fontLoadPromise = null

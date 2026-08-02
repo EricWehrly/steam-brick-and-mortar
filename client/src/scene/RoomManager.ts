@@ -15,7 +15,7 @@ import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
 import { type CeilingToggleEvent } from '../types/LightingEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
-import { DataKey } from '../core/data/DataTypes'
+import { DataKey, DataDomain } from '../core/data/DataTypes'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { Logger } from '../utils/Logger'
 import { LayoutModes } from '../types/LayoutTypes'
@@ -252,6 +252,7 @@ export class RoomManager {
             this.roomGroup = new THREE.Group()
             this.roomGroup.name = 'room-structure'
             this.scene.add(this.roomGroup)
+            DataManager.getInstance().set(DataKey.RoomFrame, this.roomGroup, { domain: DataDomain.RoomManager })
         }
         
         if (centerOffset) {

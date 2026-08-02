@@ -7,6 +7,7 @@ import { UIEventTypes } from '../../types/InteractionEvents'
 import { DEFAULT_SHELF_CONFIG } from './shared/SharedPropsTypes'
 import modelPosesData from './model-poses.json'
 import { DataManager } from '../../core/data'
+import { ShelfAnchorRegistry, type ShelfTransform } from '../shelves/ShelfAnchorRegistry'
 
 interface BoneRotationDeltaDeg {
     readonly bone: string
@@ -34,11 +35,6 @@ interface ModelPoseConfig {
     readonly legs: readonly BoneRotationDeltaDeg[]
     readonly arms: readonly BoneRotationDeltaDeg[]
     readonly seatOffset?: SeatOffsetMetres
-}
-
-interface ShelfAnchor {
-    readonly position: THREE.Vector3
-    readonly rotationY: number
 }
 
 interface PendingShelfProp {
@@ -108,10 +104,15 @@ export class UserPropPlacer {
     private static instance: UserPropPlacer | null = null
 
     private readonly propsGroup: THREE.Group
+    private readonly shelfAnchorRegistry: ShelfAnchorRegistry
 
-    private readonly shelfAnchors = new Map<number, ShelfAnchor>()
     private readonly usedShelfIndices = new Set<number>()
     private pendingShelfProps: PendingShelfProp[] = []
+    // Mirrors what each currently-placed model was queued with, so an invalidation (layout
+    // switch, re-arrange, library reload) can pull every placed model back into
+    // pendingShelfProps and re-place it from scratch once fresh anchors arrive — rather than
+    // leaving it stranded at a position belonging to a layout that no longer exists.
+    private readonly placedShelfProps = new Map<THREE.Group, PendingShelfProp>()
 
     public static getInstance(): UserPropPlacer {
         if (!UserPropPlacer.instance) {
@@ -125,6 +126,11 @@ export class UserPropPlacer {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'UserModelProps'
         scene.add(this.propsGroup)
+
+        // Constructed before this class registers its own ShelfReady handler below, so the
+        // registry's subscription (which populates the transforms this class reads) always
+        // runs first — EventManager dispatches to listeners in registration order.
+        this.shelfAnchorRegistry = ShelfAnchorRegistry.getInstance()
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.UserPropGlbReady,
@@ -153,19 +159,26 @@ export class UserPropPlacer {
     }
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
-        const { shelfIndex, position, rotationY } = event.detail
-        // ShelfLayoutCoordinator emits a contiguous wave per run starting at index 0.
-        if (shelfIndex === 0) {
-            this.shelfAnchors.clear()
+        // ShelfLayoutCoordinator emits a contiguous wave per run starting at index 0 — the
+        // registry has already dropped every prior shelf transform by the time this fires
+        // (see ShelfAnchorRegistry.handleShelfReady), so claims from the old layout are stale.
+        if (event.detail.shelfIndex === 0) {
             this.usedShelfIndices.clear()
         }
-        this.shelfAnchors.set(shelfIndex, { position: (position as THREE.Vector3).clone(), rotationY })
         this.flushPendingShelfProps()
     }
 
+    // Fixes a real gap, not just tidiness: this used to only clear bookkeeping, leaving
+    // already-placed models at positions belonging to a layout that no longer exists. Every
+    // placed model is pulled back out and re-queued with its original placement data, so it
+    // re-places correctly once the next ShelfReady wave republishes anchors.
     private handleShelfAnchorsInvalidated(): void {
-        this.shelfAnchors.clear()
         this.usedShelfIndices.clear()
+        for (const [model, pending] of this.placedShelfProps) {
+            this.propsGroup.remove(model)
+            this.pendingShelfProps.push(pending)
+        }
+        this.placedShelfProps.clear()
     }
 
     public static findSkeleton(model: THREE.Group): THREE.Skeleton | null {
@@ -268,35 +281,40 @@ export class UserPropPlacer {
     // can easily lose the race for the only shelf known when it's placed) — either way it's
     // retried on the next ShelfReady rather than dropped unpositioned.
     private placeOnShelf(model: THREE.Group, box: THREE.Box3 | null, scale: number, seatOffset?: SeatOffsetMetres): void {
-        const anchor = this.claimShelfAnchor()
-        if (!anchor) {
-            this.pendingShelfProps.push({ model, box, scale, seatOffset })
+        const pending: PendingShelfProp = { model, box, scale, seatOffset }
+        const shelfIndex = this.claimShelfIndex()
+        if (shelfIndex === null) {
+            this.pendingShelfProps.push(pending)
             UserPropPlacer.logger.debug('placeOnShelf: no shelf available yet, queued')
             return
         }
-        this.positionModelOnShelf(model, anchor, box, scale, seatOffset)
+        this.attachModelToShelf(model, shelfIndex, box, scale, seatOffset)
         this.propsGroup.add(model)
+        this.placedShelfProps.set(model, pending)
     }
 
     private flushPendingShelfProps(): void {
         if (this.pendingShelfProps.length === 0) return
         const stillPending: PendingShelfProp[] = []
         for (const pending of this.pendingShelfProps) {
-            const anchor = this.claimShelfAnchor()
-            if (!anchor) {
+            const shelfIndex = this.claimShelfIndex()
+            if (shelfIndex === null) {
                 stillPending.push(pending)
                 continue
             }
-            this.positionModelOnShelf(pending.model, anchor, pending.box, pending.scale, pending.seatOffset)
+            this.attachModelToShelf(pending.model, shelfIndex, pending.box, pending.scale, pending.seatOffset)
             this.propsGroup.add(pending.model)
+            this.placedShelfProps.set(pending.model, pending)
         }
         this.pendingShelfProps = stillPending
     }
 
-    // Position and orientation are both derived from the shelf's own rotationY —
-    // the equivalent of parenting the prop to the shelf transform, since shelves are
-    // GPU-instanced and have no individual Object3D to literally parent to (see
-    // GameBoxUtils.buildStockSurfaces, which does the same for game boxes).
+    // Attaches to ShelfAnchorRegistry rather than computing a one-time position: the model then
+    // rides that shelf indefinitely, including through a liminal recycle, instead of being left
+    // behind — see docs/plans/placement-anchor-system-plan.md. The composition math itself
+    // (local offset rotated by the shelf's yaw) now lives in the registry; this method only
+    // supplies the *local* offset and the upright-rotation composition specific to standing/
+    // seated props.
     // Facing matches the Near (player-facing) game-box convention: local +Z, after
     // shelf rotation, points toward the player.
     // Standing props ground on their own bounding-box bottom (the model's local origin
@@ -305,9 +323,9 @@ export class UserPropPlacer {
     // dangling foot ends up, not its hips, so foot-grounding doesn't land the seat on the
     // shelf; seatOffset.y aligns the hips directly, seatOffset.z nudges depth so dangling
     // feet clear the shelf's edge instead of clipping into it.
-    private positionModelOnShelf(
+    private attachModelToShelf(
         model: THREE.Group,
-        anchor: ShelfAnchor,
+        shelfIndex: number,
         box: THREE.Box3 | null,
         scale: number,
         seatOffset?: SeatOffsetMetres
@@ -315,19 +333,21 @@ export class UserPropPlacer {
         const side: ShelfEndSide = Math.random() < 0.5 ? 'left' : 'right'
         const localX = UserPropPlacer.shelfEndLocalX(side)
         const localZ = seatOffset?.z ?? 0
-        const verticalOffset = seatOffset?.y ?? (box ? -box.min.y * scale : 0)
+        const verticalOffset = (seatOffset?.y ?? (box ? -box.min.y * scale : 0)) + DEFAULT_SHELF_CONFIG.height
 
-        const shelfQuat = new THREE.Quaternion().setFromAxisAngle(UserPropPlacer.Y_AXIS, anchor.rotationY)
-        const localOffset = new THREE.Vector3(localX, 0, localZ).applyQuaternion(shelfQuat)
-
-        model.position.set(
-            anchor.position.x + localOffset.x,
-            anchor.position.y + DEFAULT_SHELF_CONFIG.height + verticalOffset,
-            anchor.position.z + localOffset.z,
+        this.shelfAnchorRegistry.attach(
+            shelfIndex,
+            { x: localX, y: verticalOffset, z: localZ },
+            model,
+            UserPropPlacer.applyUprightTransform
         )
+    }
 
+    private static applyUprightTransform(object3D: THREE.Object3D, transform: ShelfTransform): void {
+        object3D.position.copy(transform.position)
+        const shelfQuat = new THREE.Quaternion().setFromAxisAngle(UserPropPlacer.Y_AXIS, transform.rotationY)
         const uprightQuat = new THREE.Quaternion().setFromEuler(UserPropPlacer.UPRIGHT_ROTATION)
-        model.quaternion.multiplyQuaternions(shelfQuat, uprightQuat)
+        object3D.quaternion.multiplyQuaternions(shelfQuat, uprightQuat)
     }
 
     // Weighted, not uniform or round-robin: picks among not-yet-used shelves, favoring
@@ -336,20 +356,22 @@ export class UserPropPlacer {
     // ones already claimed so a handful of props don't cluster onto neighboring shelves by
     // chance. Works from raw shelf position alone so it isn't tied to the arc layout's own
     // row/indexInRow bookkeeping, which ShelfReadyEvent doesn't carry.
-    private claimShelfAnchor(): ShelfAnchor | null {
-        const available = Array.from(this.shelfAnchors.entries()).filter(([index]) => !this.usedShelfIndices.has(index))
+    private claimShelfIndex(): number | null {
+        const allTransforms = this.shelfAnchorRegistry.getAll()
+        const available = Array.from(allTransforms.keys()).filter(index => !this.usedShelfIndices.has(index))
         if (available.length === 0) return null
 
-        const allAnchors = Array.from(this.shelfAnchors.values())
+        const allAnchors = Array.from(allTransforms.values())
         const usedAnchors = Array.from(this.usedShelfIndices)
-            .map(index => this.shelfAnchors.get(index))
-            .filter((anchor): anchor is ShelfAnchor => anchor !== undefined)
+            .map(index => allTransforms.get(index))
+            .filter((anchor): anchor is ShelfTransform => anchor !== undefined)
         const repulsionRadius = UserPropPlacer.spreadRepulsionRadius(allAnchors)
 
-        const weights = available.map(([, anchor]) =>
-            UserPropPlacer.frontCenterWeight(anchor, allAnchors) *
-            UserPropPlacer.spreadWeight(anchor, usedAnchors, repulsionRadius)
-        )
+        const weights = available.map(index => {
+            const anchor = allTransforms.get(index)!
+            return UserPropPlacer.frontCenterWeight(anchor, allAnchors) *
+                UserPropPlacer.spreadWeight(anchor, usedAnchors, repulsionRadius)
+        })
         const totalWeight = weights.reduce((sum, w) => sum + w, 0)
 
         let roll = Math.random() * totalWeight
@@ -362,14 +384,14 @@ export class UserPropPlacer {
             }
         }
 
-        const [shelfIndex, anchor] = available[chosen]
+        const shelfIndex = available[chosen]
         this.usedShelfIndices.add(shelfIndex)
-        return anchor
+        return shelfIndex
     }
 
-    private static frontCenterWeight(anchor: ShelfAnchor, allAnchors: readonly ShelfAnchor[]): number {
-        const radiusOf = (a: ShelfAnchor) => Math.hypot(a.position.x, a.position.z)
-        const angleOf = (a: ShelfAnchor) => Math.abs(Math.atan2(a.position.x, a.position.z))
+    private static frontCenterWeight(anchor: ShelfTransform, allAnchors: readonly ShelfTransform[]): number {
+        const radiusOf = (a: ShelfTransform) => Math.hypot(a.position.x, a.position.z)
+        const angleOf = (a: ShelfTransform) => Math.abs(Math.atan2(a.position.x, a.position.z))
 
         const maxRadius = Math.max(...allAnchors.map(radiusOf), 1e-6)
         const maxAngle = Math.max(...allAnchors.map(angleOf), 1e-6)
@@ -388,7 +410,7 @@ export class UserPropPlacer {
     // anti-clustering pressure below scales with how tightly-packed the shelves actually
     // are — this is the "prop:shelf ratio" adaptiveness, expressed spatially rather than
     // as a fixed shelf-index gap, since ShelfReadyEvent doesn't carry row/index bookkeeping.
-    private static spreadRepulsionRadius(allAnchors: readonly ShelfAnchor[]): number {
+    private static spreadRepulsionRadius(allAnchors: readonly ShelfTransform[]): number {
         const maxRadius = Math.max(...allAnchors.map(a => Math.hypot(a.position.x, a.position.z)), 1e-6)
         return maxRadius / Math.sqrt(allAnchors.length)
     }
@@ -397,8 +419,8 @@ export class UserPropPlacer {
     // pickable even if it happens to sit near a used one) up to 1 once a candidate is at
     // least one repulsion radius from every already-claimed shelf.
     private static spreadWeight(
-        candidate: ShelfAnchor,
-        usedAnchors: readonly ShelfAnchor[],
+        candidate: ShelfTransform,
+        usedAnchors: readonly ShelfTransform[],
         repulsionRadius: number
     ): number {
         if (usedAnchors.length === 0) return 1

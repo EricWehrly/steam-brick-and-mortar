@@ -17,7 +17,6 @@
 import * as THREE from 'three'
 import { EventManager } from '../../../core/EventManager'
 import { RoomEventTypes, type RoomResizedEvent } from '../../../types/InteractionEvents'
-import { RoomConstants } from '../../RoomManager'
 import { LocalScreenshotReader, type LocalScreenshot } from '../../../steam/LocalScreenshotReader'
 import { buildPosterTexture } from './PosterTexture'
 import { buildPosterFrame, getFrameOuterHeight, FRAME_DEPTH_METERS } from './PosterFrameBuilder'
@@ -25,7 +24,7 @@ import { computeWallPosterSlots } from './WallPosterLayout'
 import { WALL_TARGETS, type RoomSpan } from './WallTargets'
 import { selectPosterScreenshots } from './PosterSelection'
 import { Logger } from '../../../utils/Logger'
-import { DataManager } from '../../../core/data'
+import { DataManager, DataKey } from '../../../core/data'
 
 /** Gap between the frame's back and the wall surface - avoids z-fighting with the wall material. */
 const WALL_STANDOFF_METERS = 0.02
@@ -48,8 +47,6 @@ export class WallPosterPlacer {
     private static readonly logger = Logger.createLogFunctions(WallPosterPlacer.name)
     private static instance: WallPosterPlacer | null = null
 
-    private readonly scene: THREE.Scene
-
     private latestDimensions: { width: number; depth: number } | null = null
     private latestCenterOffset: CenterOffset | null = null
     private rawScreenshots: LocalScreenshot[] | null = null
@@ -61,15 +58,12 @@ export class WallPosterPlacer {
 
     public static getInstance(): WallPosterPlacer {
         if (!WallPosterPlacer.instance) {
-            const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
-            WallPosterPlacer.instance = new WallPosterPlacer(scene)
+            WallPosterPlacer.instance = new WallPosterPlacer()
         }
         return WallPosterPlacer.instance
     }
 
-    private constructor(scene: THREE.Scene) {
-        this.scene = scene
-
+    private constructor() {
         EventManager.getInstance().registerEventHandler(
             RoomEventTypes.Resized,
             this.handleRoomResized.bind(this)
@@ -137,13 +131,18 @@ export class WallPosterPlacer {
         if (layoutKey === this.lastLayoutKey) return
         this.lastLayoutKey = layoutKey
 
-        const roomWorldOffsetX = this.latestCenterOffset?.x ?? 0
-        const roomWorldOffsetY = this.latestCenterOffset?.y ?? 0
-        const roomWorldOffsetZ = this.latestCenterOffset
-            ? this.latestCenterOffset.z + RoomConstants.STORE_FRONT_OFFSET
-            : 0
+        const roomFrame = DataManager.getInstance().get<THREE.Group>(DataKey.RoomFrame)
+        if (!roomFrame) {
+            // Fires from RoomResized, which RoomManager only emits after the room frame
+            // exists — absence here means bootstrap ordering broke, not a normal race.
+            WallPosterPlacer.logger.warn('layoutBuiltGroups: room frame not published yet')
+            return
+        }
+
         const clearance = WALL_STANDOFF_METERS + FRAME_DEPTH_METERS
 
+        // Room-local — the room frame already carries the room's world position/offset,
+        // matching how RoomManager builds its own walls (see RoomManager.ensureWalls).
         let groupIndex = 0
         for (const { wall, slots } of this.buildAllWallSlots(dimensions)) {
             for (const slotOffset of slots) {
@@ -154,18 +153,16 @@ export class WallPosterPlacer {
                 const { x, z } = wall.positionXZ(dimensions, slotOffset, clearance)
                 const centerY = POSTER_BOTTOM_CLEARANCE_METERS + getFrameOuterHeight(group) / 2
                 group.rotation.y = wall.rotationY
-                group.position.set(roomWorldOffsetX + x, roomWorldOffsetY + centerY, roomWorldOffsetZ + z)
+                group.position.set(x, centerY, z)
                 if (!group.parent) {
-                    this.scene.add(group)
+                    roomFrame.add(group)
                 }
             }
         }
 
         for (; groupIndex < this.builtGroups.length; groupIndex++) {
             const leftover = this.builtGroups[groupIndex]
-            if (leftover.parent) {
-                this.scene.remove(leftover)
-            }
+            leftover.parent?.remove(leftover)
         }
     }
 }

@@ -70,7 +70,6 @@ export class SceneSignManager {
     private readonly rendererByIdentifier = new Map<string, RenderKind>()
     private roomDepth: number = RoomConstants.DEFAULT_ROOM_DEPTH
     private roomHeight: number = RoomConstants.DEFAULT_ROOM_HEIGHT
-    private roomWorldOffsetZ = 0
     private steamLibraryTitleText = 'STEAM LIBRARY'
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
@@ -132,16 +131,18 @@ export class SceneSignManager {
     private handleRoomResized(detail: RoomResizedEvent): void {
         this.roomDepth = detail.dimensions.depth
         this.roomHeight = detail.dimensions.height
-        if (detail.centerOffset) {
-            this.roomWorldOffsetZ = detail.centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
-        }
         // TODO(layout): replace with layout coordinator invalidation.
         this.syncSteamLibraryBlockSign()
     }
 
-    public placeSign(renderKind: RenderKind, descriptor: SignDescriptor): THREE.Object3D {
+    /**
+     * container defaults to the scene root (shelf-anchored signs, positioned in world
+     * coordinates). Room-anchored signs (e.g. the title sign) pass the room frame instead and
+     * position in room-local coordinates — see docs/plans/placement-anchor-system-plan.md.
+     */
+    public placeSign(renderKind: RenderKind, descriptor: SignDescriptor, container: THREE.Object3D = this.scene): THREE.Object3D {
         const renderer = this.rendererByKind[renderKind]
-        const signObject = renderer.setSign(this.buildSignRequest(renderKind, descriptor), this.scene)
+        const signObject = renderer.setSign(this.buildSignRequest(renderKind, descriptor), container)
         this.rendererByIdentifier.set(descriptor.uniqueIdentifier, renderKind)
         return signObject
     }
@@ -244,10 +245,20 @@ export class SceneSignManager {
      * TODO(layout): position should come from a layout coordinator, not be hardcoded here.
      */
     private syncSteamLibraryBlockSign(): void {
-        // Mounted high on the back wall, facing the player at the entrance.
+        const roomFrame = DataManager.getInstance().get<THREE.Group>(DataKey.RoomFrame)
+        if (!roomFrame) {
+            // Fires from RoomResized, which RoomManager only emits after the room frame
+            // exists — absence here means bootstrap ordering broke, not a normal race.
+            console.warn('[SceneSignManager] syncSteamLibraryBlockSign: room frame not published yet')
+            return
+        }
+
+        // Mounted high on the back wall, facing the player at the entrance. Room-local
+        // coordinates — the room frame already carries the room's world position/offset,
+        // matching how RoomManager builds its own walls (see RoomManager.ensureWalls).
         // Offset by half the sign depth so letters sit flush against the wall surface.
         const SIGN_DEPTH = 0.08
-        const backWallZ   = this.roomWorldOffsetZ - (this.roomDepth / 2) + SIGN_DEPTH / 2
+        const backWallZ   = -(this.roomDepth / 2) + SIGN_DEPTH / 2
         const signHeightY = this.roomHeight - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
@@ -258,7 +269,7 @@ export class SceneSignManager {
                 fontSize: 0.35,
                 depth: SIGN_DEPTH,
             },
-        })
+        }, roomFrame)
     }
 
     private resolvePosition(anchor: THREE.Vector3, mount: SignMount): THREE.Vector3 {

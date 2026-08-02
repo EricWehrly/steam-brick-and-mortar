@@ -78,27 +78,32 @@ export interface SignStyleConfig {
 
 export interface ISignRenderer {
     /**
-     * Create or update a sign in the scene.
-     * Returns the root Object3D that was added.
+     * Create or update a sign, parented under the given container.
+     * Returns the root Object3D that was added. Container is typically the scene root, but
+     * may be any Object3D a sign is anchored to (e.g. the room frame) — see
+     * docs/plans/placement-anchor-system-plan.md.
      */
-    setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D
+    setSign(request: SignRequest, scene: THREE.Object3D): THREE.Object3D
 
     /**
-     * Remove a previously created sign by uniqueIdentifier.
+     * Remove a previously created sign by uniqueIdentifier. Removes from whichever container
+     * the sign actually lives under (tracked internally per-sign), not necessarily the
+     * container argument — signs anchored to different frames (scene root vs. room frame)
+     * can coexist in the same renderer.
      * Returns true if a sign was found and removed.
      */
-    removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean
+    removeSign(uniqueIdentifier: string, scene: THREE.Object3D): boolean
 
     /**
      * Remove all signs managed by this renderer.
      */
-    clearAll(scene: THREE.Scene): void
+    clearAll(scene: THREE.Object3D): void
 
     /**
      * Dispose all GPU resources owned by this renderer.
      * Called when the parent system is torn down.
      */
-    dispose(scene: THREE.Scene): void
+    dispose(scene: THREE.Object3D): void
 }
 
 /**

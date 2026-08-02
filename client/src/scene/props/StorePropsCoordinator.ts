@@ -40,12 +40,11 @@ import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
 import type { LayoutRequestedEvent, GameDataReadyEvent } from '../../types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import { type LayoutMode } from '../../types/LayoutTypes'
-import { DataManager } from '../../core/data'
+import { DataManager, DataKey } from '../../core/data'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
 import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import { PropRenderer, type EntranceMatOptions } from '../PropRenderer'
 import { AISLE_WIDTH_X } from './shared/LayoutAisleWidths'
-import { RoomConstants } from '../RoomManager'
 
 const RUNNER_MIN_DEPTH_METRES = 4.5
 const RUNNER_MARGIN_RATIO_PER_SIDE = 0.01
@@ -71,6 +70,10 @@ export class StorePropsCoordinator {
 
     // Tracks last-seen batch count to detect library switches
     private lastTotalBatches = 0
+
+    // Replaces a position-equality guard that broke once the entrance mat moved to room-local
+    // coordinates (position is now always the same local offset regardless of room size).
+    private lastRoomResizeKey: string | null = null
 
     // Active layout mode - drives ShelfLayoutCoordinator on next batch run
     private activeLayoutMode: LayoutMode = 'arc'
@@ -174,50 +177,49 @@ export class StorePropsCoordinator {
     }
 
     private async handleRoomResized(event: CustomEvent<RoomResizedEvent>): Promise<void> {
-        const { dimensions } = event.detail
-        const roomWorldOffsetX = event.detail.centerOffset?.x ?? 0
-        const roomWorldOffsetY = event.detail.centerOffset?.y ?? 0
-        const roomWorldOffsetZ = event.detail.centerOffset
-            ? event.detail.centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
-            : 0
+        const { dimensions, centerOffset } = event.detail
 
-        if (!this.scene) {
-            this.scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
-        }
-
-        if (!this.scene) {
-            StorePropsCoordinator.logger.warn('Cannot place entrance mat - scene not available')
+        const roomFrame = DataManager.getInstance().get<THREE.Group>(DataKey.RoomFrame)
+        if (!roomFrame) {
+            StorePropsCoordinator.logger.warn('Cannot place entrance mat - room frame not published yet')
             return
         }
 
         // Guard: skip if dimensions haven't changed — avoids creating duplicate
         // PropRenderer instances and leaking materials on repeated room:resized events.
-        if (this.entranceMat?.scale.x === dimensions.width &&
-            this.entranceMat.scale.z === dimensions.depth &&
-            this.entranceMat.position.x === roomWorldOffsetX &&
-            this.entranceMat.position.y === roomWorldOffsetY &&
-            this.entranceMat.position.z === roomWorldOffsetZ) {
+        const resizeKey = JSON.stringify({ dimensions, centerOffset })
+        if (this.entranceMat && resizeKey === this.lastRoomResizeKey) {
             StorePropsCoordinator.logger.debug('Room dimensions unchanged — skipping entrance mat recreation')
             return
         }
+        this.lastRoomResizeKey = resizeKey
 
         if (this.entranceMat) {
-            this.scene.remove(this.entranceMat)
+            roomFrame.remove(this.entranceMat)
             this.entranceMat = null
         }
 
+        if (!this.scene) {
+            this.scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
+        }
+        if (!this.scene) {
+            StorePropsCoordinator.logger.warn('Cannot place entrance mat - scene not available')
+            return
+        }
         if (!this.propRenderer) {
             this.propRenderer = PropRenderer.getInstance(this.scene)
         }
+
         this.entranceMat = this.propRenderer.createEntranceFloorMat(
             dimensions.width,
             dimensions.depth,
             this.buildEntranceMatOptions(dimensions)
         )
-        this.entranceMat.position.set(roomWorldOffsetX, roomWorldOffsetY, roomWorldOffsetZ)
-        this.scene.add(this.entranceMat)
+        // Room-local — the room frame already carries the room's world position/offset,
+        // matching how RoomManager builds its own floor (local origin, no offset added).
+        roomFrame.add(this.entranceMat)
 
-        StorePropsCoordinator.logger.debug('Entrance mat placed at origin')
+        StorePropsCoordinator.logger.debug('Entrance mat placed at room origin')
     }
 
     private buildEntranceMatOptions(dimensions: { width: number; depth: number }): EntranceMatOptions {
@@ -277,9 +279,8 @@ export class StorePropsCoordinator {
     public dispose(): void {
         this.instancedShelfRenderer?.dispose()
 
-        if (this.entranceMat && this.scene) {
-            this.scene.remove(this.entranceMat)
-        }
+        // Removes from its actual parent (the room frame), not this.scene directly.
+        this.entranceMat?.parent?.remove(this.entranceMat)
 
         StorePropsCoordinator.logger.info('Disposed')
     }
