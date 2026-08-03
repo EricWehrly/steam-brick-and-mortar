@@ -1,21 +1,10 @@
 /**
- * HIGH Texture Cache - LRU cache for high-resolution (512px) textures
- * 
- * Memory optimization: Instead of loading all HIGH textures upfront (~512MB for 512 games),
- * we only keep a limited number loaded (~64 textures = ~64MB) and dynamically
- * load/evict based on which games are actually at HIGH LOD.
- * 
- * Key Architecture:
- * - HIGH array has limited slots (e.g., 64)
- * - Games (0 to N) are dynamically mapped to available slots
- * - When a slot is needed: evict LRU, assign slot to new game, notify callback
- * - Shader uses highTextureSlot attribute (0-63 or -1 if not loaded)
- * 
- * Flow:
- * 1. Game added → MID texture loaded immediately (always available)
- * 2. LOD manager sets game to HIGH → Cache loads HIGH texture if slot available
- * 3. Cache full → Evict LRU game, notify via callback, assign slot to new game
- * 4. Evicted game set to HIGH again → Reload from network/disk cache
+ * HIGH Texture Cache - LRU cache for high-resolution textures.
+ *
+ * Memory optimization: instead of loading all HIGH textures upfront (~512MB for 512 games),
+ * only a limited number stay loaded (~64 textures) and are evicted/reloaded by LRU as games
+ * enter and leave HIGH LOD. The shader reads a per-instance highTextureSlot attribute
+ * (0..totalSlots-1, or -1 while not loaded) to know which array layer to sample.
  */
 
 import * as THREE from 'three'
@@ -31,56 +20,44 @@ import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 import { getLodStripeDebugColor, isLodStripeDebugEnabled } from './LodDebugSettings'
 import { HighSlotAllocator } from './HighSlotAllocator'
 
-// Logger will be attached to the class below
-
-/** State of a HIGH texture for a game */
 export enum HighTextureState {
-    /** No HIGH texture loaded for this game */
     EMPTY = 'empty',
     /** Pixel data is being cached in background (stay on MID) */
     CACHING = 'caching',
-    /** HIGH texture is currently being loaded from cache */
     LOADING = 'loading',
-    /** HIGH texture is loaded and ready */
     LOADED = 'loaded',
-    /** Loading failed - will retry on next request (up to maxLoadAttempts) */
+    /** Will retry on next request, up to maxLoadAttempts */
     FAILED = 'failed',
-    /** Permanently failed - will never retry (CORS, 404, etc) */
+    /** CORS, 404, etc - will never retry */
     PERMANENT_FAILURE = 'permanent_failure'
 }
 
 export interface HighTextureCacheConfig {
-    /** Total slots in the HIGH texture array (e.g., 64) */
     totalSlots: number
-    /** Width of HIGH textures (native Steam header = 460) */
     textureWidth: number
-    /** Height of HIGH textures (native Steam header = 215) */
     textureHeight: number
-    /** Maximum concurrent texture loads (throttling) */
+    /** Throttle on simultaneous in-flight texture loads */
     maxConcurrentLoads: number
-    /** Maximum load attempts before permanent failure (default: 2) */
+    /** Default: 2 */
     maxLoadAttempts?: number
 }
 
-/** Callback when a game's HIGH slot assignment changes */
+/** Fired when a game's HIGH slot assignment changes, including eviction (slot -1) */
 export type SlotChangeCallback = (gameIndex: number, slot: number) => void
 
 interface GameEntry {
-    /** Game index (texture index in MID array) */
+    /** Texture index in the MID array - shared identity across LOD tiers */
     gameIndex: number
-    /** Game name for debugging/logging */
     gameName: string
     /** Needed to check Steam's local librarycache and artwork_dead_paths before any network attempt. */
     appid: number
-    /** URL to load HIGH texture from - only consulted when no local art is available */
+    /** Only consulted when no local art is available */
     artworkUrl: string
-    /** Current state */
     state: HighTextureState
-    /** Assigned slot in HIGH array (-1 if not assigned) */
+    /** -1 if not assigned */
     highSlot: number
-    /** Last access timestamp for LRU */
+    /** For LRU eviction */
     lastAccessTime: number
-    /** Load attempt count for retry logic */
     loadAttempts: number
 }
 
@@ -111,26 +88,18 @@ export class HighTextureCache {
 
     private managedArray: ManagedTextureArray | null = null
     private readonly slotAllocator: HighSlotAllocator
-    
-    /** Game entries by game index */
+
     private games: Map<number, GameEntry> = new Map()
-    
-    /** Slot allocation snapshot for debug output */
-    private slotToGame: number[]
-    
-    /** Currently loading game indices (to prevent duplicate loads) */
+
+    /** Games with a load in flight - distinct from loadQueue (waiting) and backgroundCachingGames (no slot yet) */
     private loadingPromises: Map<number, Promise<boolean>> = new Map()
-    
-    /** Queue of game indices waiting to load (throttled) */
     private loadQueue: number[] = []
-    
-    /** Games currently being background-cached (pixel cache warming, no slot allocated yet) */
+
+    /** Games being pixel-cache-warmed in the background - no HIGH slot allocated yet */
     private backgroundCachingGames: Set<number> = new Set()
-    
-    /** Callback to notify when slot assignments change */
+
     private onSlotChange: SlotChangeCallback | null = null
 
-    /** Stats for monitoring */
     private stats = {
         evictions: 0,
         cacheHits: 0,
@@ -139,9 +108,8 @@ export class HighTextureCache {
         pixelCacheMisses: 0
     }
 
-    /** Frame budget scheduler for deferring texture copies */
     private readonly scheduler: FrameBudgetScheduler
-    
+
     constructor(config: Partial<HighTextureCacheConfig> = {}) {
         this.config = {
             totalSlots: config.totalSlots ?? 64,
@@ -151,7 +119,6 @@ export class HighTextureCache {
         }
         
         this.slotAllocator = new HighSlotAllocator(this.config.totalSlots)
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
 
         const debugStripe = isLodStripeDebugEnabled() ? getLodStripeDebugColor(LOD_TIER_NAME.HIGH) : undefined
         this.managedArray = new ManagedTextureArray({
@@ -168,30 +135,19 @@ export class HighTextureCache {
         HighTextureCache.logger.lifecycle(`Initialized: ${this.config.totalSlots} slots, ${this.config.maxConcurrentLoads} concurrent loads (${this.estimateMemoryMB()}MB)`)
     }
     
-    /**
-     * Set callback for slot changes (called by LodArtworkRenderer)
-     */
     public setSlotChangeCallback(callback: SlotChangeCallback): void {
         this.onSlotChange = callback
     }
-    
-    /**
-     * Get the HIGH texture array for passing to the shader uniform.
-     * HighTextureCache owns this texture from construction.
-     */
+
     public getTexture(): THREE.DataArrayTexture {
         return this.managedArray!.texture
     }
 
-    /** Check if texture data has changed and needs GPU upload */
     public needsGpuUpdate(): boolean {
         return this.managedArray!.hasPendingUpdates()
     }
 
-    /**
-     * Flush dirty texture data to GPU using PARTIAL layer updates.
-     * Returns true if an update was performed.
-     */
+    /** Uploads only dirty layers - never the whole array, see DataArrayTexture note in client/CLAUDE.md */
     public flushToGpu(): boolean {
         const count = this.managedArray!.pendingCount
         if (count === 0) return false
@@ -202,13 +158,10 @@ export class HighTextureCache {
         return flushed
     }
     
-    /**
-     * Register a game (called when a game is added)
-     * Does NOT load the HIGH texture - just records that the game exists
-     */
+    /** Does NOT load the HIGH texture - just records that the game exists */
     public registerGame(gameIndex: number, gameName: string, appid: number, artworkUrl: string): void {
         if (this.games.has(gameIndex)) {
-            return // Already registered
+            return
         }
 
         this.games.set(gameIndex, {
@@ -223,10 +176,7 @@ export class HighTextureCache {
         })
     }
     
-    /**
-     * Mark a game as permanently failed (e.g., CORS error during MID loading)
-     * This prevents wasting network requests on artwork we know doesn't exist or isn't accessible
-     */
+    /** e.g. CORS error during MID loading - avoids wasting a network request on the same dead artwork */
     public markAsPermanentlyFailed(gameIndex: number, reason?: string): void {
         const entry = this.games.get(gameIndex)
         if (entry) {
@@ -235,28 +185,20 @@ export class HighTextureCache {
         }
     }
     
-    /**
-     * Unregister a game (e.g., when MID loading fails and we rollback)
-     */
     public unregisterGame(gameIndex: number): void {
         this.games.delete(gameIndex)
     }
 
-    /**
-     * Request HIGH texture for a game
-     * Returns the HIGH slot if loaded, otherwise triggers async load and returns -1
-     * @returns HIGH slot (0-63) if ready, -1 if loading or unavailable
-     */
+    /** @returns HIGH slot if ready, -1 if loading, queued, or unavailable (triggers an async load as a side effect) */
     public requestHighTexture(gameIndex: number): number {
         const entry = this.games.get(gameIndex)
         if (!entry) {
             HighTextureCache.logger.warn(`requestHighTexture: unknown game ${gameIndex}`)
             return -1
         }
-        
-        // Update access time for LRU
+
         entry.lastAccessTime = window.performance.now()
-        
+
         switch (entry.state) {
             case HighTextureState.LOADED:
                 this.stats.cacheHits++
@@ -264,78 +206,57 @@ export class HighTextureCache {
                 return entry.highSlot
                 
             case HighTextureState.LOADING:
-                // Already loading - return -1, caller should use MID for now
                 HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → LOADING (wait)`)
                 return -1
-                
+
             case HighTextureState.CACHING:
-                // Background caching in progress - check if cache is now ready
                 if (this.backgroundCachingGames.has(gameIndex)) {
-                    // Still caching, stay on MID
                     HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHING (wait)`)
                     return -1
                 }
-                // Background caching finished - transition to EMPTY so next request loads from cache
+                // Background caching finished - EMPTY re-triggers a load, now a pixel-cache fast path.
                 entry.state = HighTextureState.EMPTY
-                // Now trigger load which will hit pixel cache (fast path)
                 this.stats.cacheMisses++
                 HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHE READY (triggering fast load)`)
                 this.triggerLoad(entry)
                 return -1
-                
+
             case HighTextureState.PERMANENT_FAILURE:
-                // Permanently failed (CORS, 404, etc) - never retry
                 HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → PERMANENT FAILURE (skipped)`)
                 return -1
-                
+
             case HighTextureState.FAILED:
-                // Check retry limit
                 if (entry.loadAttempts >= (this.config.maxLoadAttempts ?? 2)) {
                     entry.state = HighTextureState.PERMANENT_FAILURE
                     HighTextureCache.logger.info(`Game "${entry.gameName}" exceeded max load attempts (${entry.loadAttempts}), marking as permanent failure`)
                     return -1
                 }
-                // Retry load - fall through to EMPTY handling
                 this.stats.cacheMisses++
                 HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → RETRY (attempt ${entry.loadAttempts + 1})`)
                 this.triggerLoad(entry)
                 return -1
-                
+
             case HighTextureState.EMPTY:
-                // Need to load - trigger async load
                 this.stats.cacheMisses++
                 HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → MISS (triggering load)`)
                 this.triggerLoad(entry)
                 return -1
         }
     }
-    
-    /**
-     * Get the HIGH slot for a game (-1 if not loaded)
-     */
+
     public getHighSlot(gameIndex: number): number {
         return this.games.get(gameIndex)?.highSlot ?? -1
     }
-    
-    /**
-     * Check if HIGH texture is loaded for a game
-     */
+
     public isLoaded(gameIndex: number): boolean {
         return this.games.get(gameIndex)?.state === HighTextureState.LOADED
     }
-    
-    /**
-     * Get current state of a game's HIGH texture
-     */
+
     public getState(gameIndex: number): HighTextureState {
         return this.games.get(gameIndex)?.state ?? HighTextureState.EMPTY
     }
-    
-    /**
-     * Trigger async load for a HIGH texture (throttled)
-     */
+
     private triggerLoad(entry: GameEntry): void {
-        // Already loading or queued?
         if (this.loadingPromises.has(entry.gameIndex)) {
             HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} → already loading, skip`)
             return
@@ -344,48 +265,39 @@ export class HighTextureCache {
             HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} → already queued at position ${this.loadQueue.indexOf(entry.gameIndex)}`)
             return
         }
-        
-        // Check if we're at the concurrent load limit
+
         if (this.loadingPromises.size >= this.config.maxConcurrentLoads) {
-            // Queue for later
             this.loadQueue.push(entry.gameIndex)
             HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → QUEUED (pos ${this.loadQueue.length}, active: ${this.loadingPromises.size})`)
             return
         }
-        
+
         HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → starting load`)
         this.startLoad(entry)
     }
     
-    /**
-     * Actually start loading a texture (called when under concurrent limit)
-     */
+    /** Called when under the concurrent-load limit - see triggerLoad */
     private startLoad(entry: GameEntry): void {
-        // Allocate a slot (may evict if full)
         const slot = this.allocateSlot(entry.gameIndex)
         if (slot < 0) {
             HighTextureCache.logger.warn(`Cannot load HIGH texture ${entry.gameIndex}: no slots available`)
             return
         }
-        
+
         entry.highSlot = slot
         entry.state = HighTextureState.LOADING
         entry.loadAttempts++
-        
+
         const loadPromise = this.loadHighTexture(entry)
         this.loadingPromises.set(entry.gameIndex, loadPromise)
-        
+
         loadPromise.finally(() => {
             this.loadingPromises.delete(entry.gameIndex)
-            // Process next in queue
             this.processQueue()
         })
     }
-    
-    /**
-     * Allocate a slot for a game, evicting LRU if necessary
-     * @returns slot index (0-63), or -1 if allocation failed
-     */
+
+    /** Evicts LRU if the array is full. @returns slot index, or -1 if allocation failed */
     private allocateSlot(gameIndex: number): number {
         const loadedEntries = Array.from(this.games.values())
             .filter(entry => entry.state === HighTextureState.LOADED)
@@ -413,13 +325,9 @@ export class HighTextureCache {
             }
         }
 
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         return slot
     }
-    
-    /**
-     * Process the load queue, starting loads up to the concurrent limit
-     */
+
     private processQueue(): void {
         while (
             this.loadQueue.length > 0 &&
@@ -442,16 +350,14 @@ export class HighTextureCache {
     }
 
     /**
-     * Start background caching for a game (fetch + decode + store in pixel cache)
-     * This runs in the background without blocking HIGH texture loading
-     * When complete, the game will be re-requested and load from pixel cache (fast path)
-     *
+     * Fire-and-forget fetch/decode/pixel-cache-store, so HIGH loading itself isn't blocked.
      * Only reached when GameArtworkProvider has no local-disk art for this appid (see
-     * loadHighTexture) - entry.artworkUrl is always a real network URL here.
+     * resolvePixelSource) - entry.artworkUrl is always a real network URL here. Entry stays in
+     * CACHING state throughout; the next requestHighTexture() detects the cache is ready.
      */
     private async startBackgroundCaching(entry: GameEntry): Promise<void> {
         if (this.backgroundCachingGames.has(entry.gameIndex)) {
-            return // Already caching
+            return
         }
 
         const cacheKeyUrl = this.cacheKeyFor(entry.artworkUrl)
@@ -465,7 +371,6 @@ export class HighTextureCache {
         this.backgroundCachingGames.add(entry.gameIndex)
         HighTextureCache.logger.debug(`BACKGROUND CACHE START ${entry.gameIndex} "${entry.gameName.slice(0, 15)}"`)
 
-        // Fire and forget - fetch, decode to target size, and store in pixel cache
         this.textureWorker.fetchAndProcessWithOptions(
             entry.artworkUrl,
             entry.gameIndex,
@@ -476,7 +381,6 @@ export class HighTextureCache {
                 timeout: 15000
             }
         ).then(async (result) => {
-            // Verify dimensions
             if (result.width !== this.config.textureWidth || result.height !== this.config.textureHeight) {
                 HighTextureCache.logger.warn(`BACKGROUND CACHE: size mismatch for "${entry.gameName}": expected ${this.config.textureWidth}×${this.config.textureHeight}, got ${result.width}×${result.height}`)
                 entry.state = HighTextureState.FAILED
@@ -484,12 +388,10 @@ export class HighTextureCache {
                 return
             }
 
-            // Store in pixel cache
             await this.pixelCache.put(cacheKeyUrl, result.imageData, result.width, result.height)
 
             HighTextureCache.logger.debug(`BACKGROUND CACHE COMPLETE ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${result.width}×${result.height})`)
             this.backgroundCachingGames.delete(entry.gameIndex)
-            // Entry stays in CACHING state - next requestHighTexture() will detect cache ready
         }).catch((err) => {
             const msg = err instanceof Error ? err.message : String(err)
             HighTextureCache.logger.debug(`BACKGROUND CACHE FAILED ${entry.gameIndex} "${entry.gameName.slice(0, 15)}": ${msg}`)
@@ -499,9 +401,6 @@ export class HighTextureCache {
         })
     }
 
-    /**
-     * Actually load a HIGH texture - first checks pixel cache, defers to background on miss
-     */
     private async loadHighTexture(entry: GameEntry): Promise<boolean> {
         if (!this.managedArray) {
             HighTextureCache.logger.warn('Cannot load HIGH texture: texture array not set')
@@ -551,11 +450,9 @@ export class HighTextureCache {
     }
 
     /**
-     * Resolves pixel data for entry: local disk first (zero-network, ahead of everything else -
-     * Steam's own already-validated local art beats any network attempt, same precedence
-     * GameArtworkProvider gives the MID tier), then the pixel cache. On a full miss, releases the
-     * slot and defers to background caching (see startBackgroundCaching), leaving entry in
-     * CACHING state to be re-requested once caching completes - returns null in that case.
+     * Local disk first (zero-network, same precedence GameArtworkProvider gives the MID tier),
+     * then the pixel cache. On a full miss, releases the slot and defers to background caching,
+     * leaving entry in CACHING state to be re-requested once caching completes - returns null.
      */
     private async resolvePixelSource(
         entry: GameEntry
@@ -579,9 +476,6 @@ export class HighTextureCache {
         HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
 
         this.releaseSlot(entry)
-
-        // Start background caching (fire and forget) - may itself resolve to a
-        // known-dead-URL skip, see startBackgroundCaching.
         void this.startBackgroundCaching(entry)
         entry.state = HighTextureState.CACHING
         return null
@@ -597,66 +491,48 @@ export class HighTextureCache {
     }
 
     /**
-     * Schedules the GPU-bound pixel copy + state transition via FrameBudgetScheduler (runs
-     * immediately if there's frame budget, otherwise deferred). Captures gameIndex/slot/gameName
-     * up front rather than reading them off `entry` inside the closure, since eviction
-     * (evictGame/evictAll) can reassign entry's slot while this load is still in flight.
-     * @returns true if the completion ran immediately, false if it was deferred to a later frame.
+     * Runs immediately if there's frame budget, otherwise deferred (see FrameBudgetScheduler).
+     * Captures gameIndex/slot up front rather than reading them off `entry` inside the closure,
+     * since eviction (evictGame/evictAll) can reassign entry's slot while this load is in flight.
+     * @returns true if the completion ran immediately, false if deferred to a later frame.
      */
     private scheduleTextureCompletion(entry: GameEntry, imageData: Uint8ClampedArray): boolean {
         const capturedGameIndex = entry.gameIndex
         const capturedSlot = entry.highSlot
 
         const doTextureCompletion = () => {
-            // Pixel write + dirty-slot tracking + optional debug stripe via ManagedTextureArray
             this.managedArray!.setSlotPixels(capturedSlot, imageData)
-
             entry.state = HighTextureState.LOADED
             entry.lastAccessTime = window.performance.now()
-
-            // Notify callback so renderer can update highTextureSlot attribute
-            if (this.onSlotChange) {
-                this.onSlotChange(capturedGameIndex, capturedSlot)
-            }
+            this.onSlotChange?.(capturedGameIndex, capturedSlot)
         }
 
         return this.scheduler.tryExecuteOrSchedule(doTextureCompletion, {
-            estimatedMs: 0.5,  // Based on profiling: avg 0.2ms, max 1ms
+            estimatedMs: 0.5,  // avg 0.2ms, max 1ms observed
             priority: 'normal',
-            maxDeferMs: 500   // Don't wait more than 500ms (30 frames at 60fps)
+            maxDeferMs: 500   // 30 frames at 60fps
         })
     }
-    
-    /**
-     * Mark a specific game for eviction (e.g., player moved away)
-     * This is a hint - the texture will be evicted when space is needed
-     */
+
+    /** Hint only - the texture is evicted when space is needed, not immediately */
     public markForEviction(gameIndex: number): void {
         const entry = this.games.get(gameIndex)
         if (entry?.state !== HighTextureState.LOADED) {
             return
         }
-        
-        // Set access time to 0 so it's evicted first
         entry.lastAccessTime = 0
         HighTextureCache.logger.debug(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
     }
-    
+
     private getUsedSlotCount(): number {
         return this.slotAllocator.getUsedSlotCount()
     }
-    
-    /**
-     * Estimate memory usage in MB
-     */
+
     private estimateMemoryMB(): number {
         const bytesPerTexture = this.config.textureWidth * this.config.textureHeight * 4
         return (this.config.totalSlots * bytesPerTexture) / (1024 * 1024)
     }
-    
-    /**
-     * Get cache statistics
-     */
+
     public getStats(): HighTextureCacheStats {
         let loaded = 0, loading = 0, failed = 0, empty = 0, caching = 0, permanentFailures = 0
         
@@ -688,9 +564,8 @@ export class HighTextureCache {
     }
 
     /**
-     * Evict all currently loaded HIGH textures, freeing all slots.
-     * Called when the app loses focus for an extended period to release GPU memory.
-     * Games will reload from pixel cache (fast) or network (slow) on next request.
+     * Called when the app loses focus for an extended period, to release GPU memory - games
+     * reload from pixel cache (fast) or network (slow) on next request.
      */
     public evictAll(): number {
         let evictedCount = 0
@@ -704,17 +579,13 @@ export class HighTextureCache {
                 this.onSlotChange?.(gameIndex, -1)
             }
         }
-        // Cancel any pending loads — no point loading while unfocused
-        this.loadQueue = []
+        this.loadQueue = [] // no point loading while unfocused
         if (evictedCount > 0) {
             HighTextureCache.logger.info(`evictAll: released ${evictedCount} HIGH texture slots`)
         }
         return evictedCount
     }
 
-    /**
-     * Force-evict a specific game's HIGH texture
-     */
     public evictGame(gameIndex: number): boolean {
         const entry = this.games.get(gameIndex)
         if (!entry || entry.highSlot < 0) {
@@ -740,7 +611,6 @@ export class HighTextureCache {
             return
         }
         this.slotAllocator.clearSlot(entry.highSlot)
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         entry.highSlot = -1
     }
 
@@ -749,7 +619,6 @@ export class HighTextureCache {
         this.loadingPromises.clear()
         this.loadQueue = []
         this.slotAllocator.clearAll()
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         this.textureWorker.dispose()
         HighTextureCache.logger.lifecycle('Disposed')
     }
