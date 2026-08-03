@@ -57,13 +57,33 @@ Observed cache headers (live):
 
 Endpoint pattern:
 
-`https://steamcommunity.com/id/{customUrl}/screenshots/?appid={appid}&browsefilter=myfiles&view=grid`
+`https://steamcommunity.com/profiles/{steamid64}/screenshots/?appid={appid}&browsefilter=myfiles&view=grid`
 
-Verified HTML signals:
+(`/id/{customUrl}/...` works identically for vanity URLs.)
 
-1. `data-publishedfileid="..."`
-2. `sharedfiles/filedetails/?id=...` links
-3. `profile_media_item` entries
+**Re-verified live 2026-07-14** against a real public profile (Portal 2, appid 620) — precise element
+shape, not just "signals present":
+
+```html
+<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3762514840"
+   onclick="return OnScreenshotClicked( 3762514840 );"
+   class="profile_media_item modalContentLink ugc"
+   data-desired-aspect="1.7777777777778"
+   data-appid="620" data-publishedfileid="3762514840">
+  <div style="background-image: url('https://images.steamusercontent.com/ugc/.../...');"
+       class="imgWallItem" id="imgWallItem_3762514840">
+```
+
+Practical implication: `data-appid` + `data-publishedfileid` + the inline `background-image` URL are
+all present in the **initial static HTML** — no JS execution needed to discover them, and the preview
+CDN URL is usable directly with **zero extra network call** (skip `GetPublishedFileDetails` entirely
+if preview-quality is good enough; only resolve for full-res `file_url`).
+
+Verified HTML signals (updated):
+
+1. `data-publishedfileid="..."` and `data-appid="..."` — both on the same `<a class="profile_media_item">` element
+2. Inline `background-image: url(...)` on the following `.imgWallItem` div — usable as a preview URL with no resolution call
+3. `sharedfiles/filedetails/?id=...` in the same element's `href` (redundant with the data attribute, but a simpler regex target if not parsing attributes)
 
 Pagination:
 
@@ -72,6 +92,16 @@ Pagination:
 Use cases:
 
 1. Pull this user's own screenshots for a selected game.
+
+### Full pipeline re-verified live 2026-07-14 (no auth, no API key)
+
+1. `GET steamcommunity.com/app/620/screenshots/` (community hub, no privacy gate) → extracted
+   `sharedfiles/filedetails/?id=3762514840` via plain regex on raw HTML.
+2. `POST api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/` with
+   `publishedfileids[0]=3762514840` → returned `file_url`, `preview_url`, `consumer_app_id: 620`,
+   `time_created: 1783776965` (2026-07-11) — a current, non-legacy screenshot, not a stale test fixture.
+3. Both calls are plain unauthenticated HTTP (curl), no session cookie, no API key required for either
+   step. Confirms this pipeline is live today, independent of the personal-profile-page shape above.
 
 ## 3. Community/Game Hub Content (friends and public users)
 
