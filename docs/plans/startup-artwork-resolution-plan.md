@@ -21,10 +21,23 @@ common cache-hit path never reached it (fixed in `91d31d85`), and the bytes comm
 returned `Vec<u8>` over Tauri's default JSON IPC, which measurably dominated startup time once it
 ran per placed game box - fixed by switching to a raw `tauri::ipc::Response` (`d7cf5945`). Dead-path
 skip separately reconfirmed against the same session: 56/56 failed resolutions fully skipped via
-the known-dead cache, zero wasted network attempts. **Concurrency cap now has a full build plan**
-(2026-07-31, under Root Cause B — worker pool, concurrency cap, `PixelDataCache` dedup fix, and a
-priority-queue design fork awaiting sign-off), on its own branch (`act2/artwork-loading-concurrency`,
-based on the merged #149), not yet implemented. Iterate on this doc as each piece resolves.
+the known-dead cache, zero wasted network attempts. **Concurrency work planned, re-evaluated for
+player experience, signed off, and implemented, all 2026-07-31** (Root Cause B — prefetch scheduling
+with distance re-sort, worker pool, HIGH-tier correctness fixes, source-bytes reuse across LOD
+tiers), on its own branch (`act2/artwork-loading-concurrency`, based on the merged #149).
+**Field-tested 2026-08-01, caught and fixed a real regression**: the concurrency cap broke an
+implicit timing assumption in MID-texture-atlas compaction, permanently locking the atlas at a tiny
+slot count on every real run and dropping ~96% of the library to labels (or nothing, once label
+capacity also ran out) — see "Field-caught regression" under the build plan below for the full
+mechanism, fix, and the regression test that pins it. Noisy per-occurrence logging surfaced by the
+same field test was also aggregated per direction. Full test suite green (1489 passed) after the
+fix; ready for another real desktop session to confirm. The original build-plan re-evaluation
+corrected three findings from its own first pass — positions *are* available at
+prefetch time (via `PlacementIntentReady`, not `BatchReadyForPlacement`), there are *two*
+`TextureWorker`s rather than one, and a full distance-priority queue already exists in production
+(`SpatialPrewarmingManager`) — and surfaced the defect with the sharpest player impact: local-disk
+artwork never reaches the HIGH tier at all, so walking up to a shelf triggers a network fetch for
+art already on disk. Iterate on this doc as each piece resolves.
 **Related**: [`cors-blocked-local-scan-artwork`](../tech-debt.md#id-cors-blocked-local-scan-artwork)
 (the tech-debt entry this plan supersedes/absorbs), [Image/Texture Pipeline](../architecture/image-texture-pipeline.md),
 [Desktop Offline-First Plan](desktop-offline-first-plan.md), [Multi-Layer Caching](../features/multi-layer-caching.md)
@@ -141,13 +154,16 @@ else, including guesses that are about to burn a real (if fast) failed round tri
 **Confirmed 2026-07-31, after local-disk read landed (PR #149) and a real session still showed a
 ~35s stall between placement and completion**: `GameArtworkProvider` holds exactly one
 `TextureWorker`, which wraps exactly one `Worker` (`ManagedWorker` has no pooling - checked its
-source directly). Every image decode - local disk *or* network, doesn't matter which - funnels
-through that single worker's serial message queue, processed one at a time. This is the actual
-mechanism behind "stall then accelerate," a better match than network concurrency for the
+source directly). Every MID prefetch decode - local disk *or* network, doesn't matter which -
+funnels through that single worker's serial message queue, processed one at a time. This is the
+actual mechanism behind "stall then accelerate," a better match than network concurrency for the
 "starved thread pool" symptom this whole investigation started from: hundreds of requests fire at
 once (per the no-cap behavior above), but they all queue up behind one thread's `onmessage` loop
 regardless of how fast the underlying bytes arrived. Local-disk reads made the *bytes* fast; they
-didn't touch the *decode* bottleneck at all.
+didn't touch the *decode* bottleneck at all. (Refined during the 2026-07-31 re-evaluation: this is
+one worker for the *MID prefetch wave* specifically, not for all decoding - `HighTextureCache`
+constructs a second, independent `TextureWorker` of its own, so HIGH promotion doesn't contend with
+the startup wave. See the build plan's corrected findings.)
 
 Also noted in the same pass, and corrected after reading `LodArtworkOrchestrator.fetchAndCachePixels`
 directly: `buildAppSettingsConfig` (the only config production actually instantiates) sets
@@ -165,77 +181,297 @@ alongside the worker pool since both live in the same code path.
 **New requirement, 2026-07-31**: whatever replaces the no-cap/no-priority behavior above must
 prioritize games nearest the player - those should be scheduled first, not just whichever games
 happen to iterate first in `prefetchBatch()`'s loop. Distinct axis from the disk-vs-network
-priority split already noted in Open Question 4 below; both apply. See the build plan immediately
-below for why this isn't as simple as "sort by distance before firing" - `BatchReadyForPlacementEvent`
-(what triggers prefetch) carries no position data at all.
+priority split already noted in Open Question 4 below; both apply. `BatchReadyForPlacementEvent`
+(what triggers prefetch) carries no position data, which initially looked like a blocker - but
+`PlacementIntentReady` does carry it, and arrives independently, so the ordering signal is
+available. See the build plan immediately below.
 
-## Build plan: worker pool, concurrency cap, and priority queue (Root Cause B)
+## Build plan: prefetch scheduling, worker pool, and HIGH-tier correctness (Root Cause B)
 
-**Status**: Proposed 2026-07-31, awaiting sign-off. Scoped as its own PR/changeset, branched from
-the merged PR #149 (`act2/artwork-loading-concurrency`) - deliberately not bundled with the local
-disk read.
+**Status**: Re-evaluated 2026-07-31 through a player-experience lens after a first pass; the three
+design forks that pass left open are now decided (see Decisions, at the end of this section). Own
+PR/changeset on `act2/artwork-loading-concurrency`, branched from the merged PR #149 - deliberately
+not bundled with the local disk read, but now **does** bundle the HIGH-tier correctness fixes below,
+per direction.
 
-### Confirmed findings (code-read, not assumption)
+### What the player actually experiences (the finding that reframes this whole section)
 
-- **One worker, not a pool.** `GameArtworkProvider` constructs exactly one `TextureWorker`
-  ([GameArtworkProvider.ts:137](../../client/src/scene/game-box/instancing/GameArtworkProvider.ts)),
-  which wraps exactly one `Worker` via `ManagedWorker`
-  ([ManagedWorker.ts](../../client/src/utils/ManagedWorker.ts)) - no pooling anywhere in that
-  chain. Every decode (`createImageBitmap` + canvas draw + `getImageData`), from local disk or
-  network, serializes through that one worker's message queue.
-- **No concurrency cap upstream, confirmed unchanged.** `ArtworkPrefetchCoordinator.prefetchBatch()`
+**No game box of any kind exists until that game's artwork resolves or fails.**
+`RenderIntentCoordinator` ([RenderIntentCoordinator.ts:100-127](../../client/src/scene/game-box/RenderIntentCoordinator.ts))
+holds every `PlacementIntentReady` in `pendingPlacementIntents` until `ArtworkIntentSettled` fires
+for the same appid, and only then emits `PlacementResolved` →
+`GpuGameBoxRenderer.placeResolvedGame()` → `placeInstance()`. The label path
+([GpuGameBoxRenderer.ts:176](../../client/src/scene/game-box/GpuGameBoxRenderer.ts)) is a *failure*
+fallback (`placeInstance()` returned -1), not a progressive placeholder.
+
+Consequence: the decode queue gates box **existence**, not texture quality. Perceived startup time
+*is* decode-queue latency, and the shelves in front of the player read as empty - not as
+placeholder boxes filling in - for as long as arbitrary distant games are ahead in the queue. This
+is the "stall then accelerate" symptom, fully explained.
+
+**Decided (2026-07-31): keep this gate.** Progressive placeholders are wanted eventually, but as
+real placeholder *artwork* - label boxes are explicitly not the answer, and a label→art swap is not
+worth building as an interim. Tracked as a future item, not part of this changeset. The direct
+consequence for this plan: **prefetch ordering is the startup fix itself, not a refinement of it.**
+
+### Corrected findings (superseding this section's first pass)
+
+- **Positions ARE available at prefetch time.** `PlacementIntentReadyEvent`
+  ([InteractionEvents.ts:247-252](../../client/src/types/InteractionEvents.ts)) carries
+  `position: THREE.Vector3` and is emitted independently of prefetch - it is precisely what
+  `RenderIntentCoordinator` sits on while waiting for artwork. The earlier claim ("no position data
+  at prefetch time," derived from `BatchReadyForPlacementEvent` carrying none) looked at the wrong
+  event. This dissolves most of the original three-option fork: option (a) "reorder so prefetch
+  waits for placement" is *circular* - placement already waits on prefetch, so that ordering
+  deadlocks - and option (b) is far cheaper than estimated, because `(appid, position)` already
+  flows through a coordinator whose entire job is rendezvousing these two streams.
+- **Two `TextureWorker` instances, not one.** `GameArtworkProvider`
+  ([GameArtworkProvider.ts:139](../../client/src/scene/game-box/instancing/GameArtworkProvider.ts))
+  and `HighTextureCache`
+  ([HighTextureCache.ts:187](../../client/src/scene/game-box/instancing/HighTextureCache.ts)) each
+  construct their own. MID prefetch and HIGH promotion do **not** contend for the same thread. The
+  startup bottleneck is still exactly one worker serializing ~1400 MID decodes, but a pool sized
+  for that wave does not also have to cover HIGH.
+- **A full priority queue already exists in production.** `SpatialPrewarmingManager`
+  ([SpatialPrewarmingManager.ts](../../client/src/scene/game-box/instancing/SpatialPrewarmingManager.ts))
+  implements movement-direction cone scoring, distance ranking, a 2-concurrent throttle, and
+  behind-player eviction. It serves only the HIGH tier, only after placement - and it is being fed
+  a URL that is wrong for local-disk games (next section). Do not rebuild this; the gap is which
+  tier it serves and what URL it gets, not whether the pattern exists.
+- **No concurrency cap upstream, unchanged.** `ArtworkPrefetchCoordinator.prefetchBatch()`
   ([ArtworkPrefetchCoordinator.ts:73-90](../../client/src/scene/spawning/ArtworkPrefetchCoordinator.ts))
-  still fires every game's `prefetchArtwork()` with no `await`, no queue, no cap - same as Root
-  Cause B originally described, still true after the local-disk-read PR.
-- **No position data at prefetch time.** `BatchReadyForPlacementEvent`
-  ([PropsEvents.ts:78-82](../../client/src/scene/props/PropsEvents.ts)) carries only
-  `games`/`batchIndex`/`totalBatches` - no shelf, section, or world position. Individual game
-  positions aren't known until placement runs, which happens after/alongside prefetch, not before
-  it. A "sort by distance before firing" approach can't work as stated; see the open question below.
-- **A working distance-priority pattern already exists, just not for this.**
-  `LodDistanceManager.preloadNearestGames()`
-  ([LodDistanceManager.ts:376-414](../../client/src/scene/game-box/instancing/LodDistanceManager.ts))
-  already sorts placed instances by squared distance to camera and promotes the nearest N to HIGH -
-  proven, tested code for exactly the "nearest first" ranking this plan needs, but it runs *after*
-  `AllBatchesComplete`, on already-placed instances, as an occasional boost
-  (`window.preloadNearest()`) - not as the ordering for the initial prefetch wave itself.
+  still fires every game's `prefetchArtwork()` with no `await`, no queue, no cap.
+
+### HIGH-tier correctness: local-disk art never reaches it at all
+
+The sharpest player-facing defect, and not previously in this plan. It is invisible in startup logs
+because it only fires when the player walks up to a shelf - the moment that matters most.
+
+`resolveHighArtworkUrl()`
+([LodArtworkOrchestrator.ts:632-642](../../client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts))
+returns an `artworkHints.library` URL or the guessed legacy CDN path - **never** a local path. That
+value is what `LodGameArtworkRenderer` passes to `HighTextureCache.registerGame()`, and
+`loadHighTexture()` looks it up as `pixelCache.get(entry.artworkUrl, 300, 450)`. But MID stored the
+local-disk decode under `local://<appid>/<relative_path>@150x225`
+([GameArtworkProvider.fetchPixelsFromLocalDisk](../../client/src/scene/game-box/instancing/GameArtworkProvider.ts)).
+Different key namespace entirely - a guaranteed miss, every time, for every game resolved from disk.
+
+What the player gets as a result, for a game whose bytes are already on disk: approach the shelf →
+HIGH requested → pixel-cache miss → slot released, state set to `CACHING` → **network fetch of a
+CDN URL** → and if that URL is one of the ~389 appids' known-dead guesses, it fails, retries up to
+`maxLoadAttempts`, and the box stays at MID permanently. `HighTextureCache` consults
+`artwork_dead_paths` nowhere, so PR #149's dead-path skip does not protect this path.
+
+Two adjacent gaps in the same class, both bundled here:
+
+- **`?t=` normalization is missing on the HIGH half.** `HighTextureCache` keys the pixel cache on
+  raw `entry.artworkUrl` at both
+  [:494](../../client/src/scene/game-box/instancing/HighTextureCache.ts) (`put`) and
+  [:532](../../client/src/scene/game-box/instancing/HighTextureCache.ts) (`get`) - no
+  `UrlUtils.stripQueryParam(url, 't')`. Open Question 2's fix landed on the MID path only; this is
+  the unfixed half of the same bug, with the same cross-session cache-orphaning consequence.
+- **A cold HIGH costs two LOD cycles.** `loadHighTexture()` on a pixel-cache miss releases the slot,
+  sets `CACHING`, and returns `false` - the actual load only happens on a *subsequent*
+  `requestHighTexture()`, which arrives via `LodDistanceManager`'s 60-frame `updateFrequency` (~1s)
+  or `SpatialPrewarmingManager`'s 15-frame queue pass. Fetch/decode time is on top of that.
 
 ### Proposed shape
 
-1. **Worker pool.** Replace the single `TextureWorker` with a small pool (candidate size:
-   `navigator.hardwareConcurrency`-derived, capped low - exact number TBD during implementation,
-   not a documented decision yet) so decode work actually parallelizes across cores instead of
-   queueing on one thread.
-2. **Concurrency cap.** A semaphore-style limit in front of dispatch, sized independently of the
-   pool (still needed even with a pool - Tauri IPC calls and network fetches both have overhead
-   unbounded concurrency would still strain).
-3. **`PixelDataCache` dedup fix.** Cache the decode at the largest tier actually requested (or
-   native resolution) once; derive smaller tiers via the existing `resizePixels` instead of a
-   fresh disk-read + decode per tier. Removes the double-decode-on-HIGH-promotion cost identified
-   above. Scoped here because it's the same code path, not because it's blocking the pool/cap work.
-4. **Priority queue** - shape still open, see below.
+1. **Prefetch scheduler with distance re-sort** (the startup fix). `prefetchBatch()` enqueues
+   instead of fire-and-forget; a scheduler drains the queue under a concurrency cap.
+   `PlacementIntentReady` feeds `(appid, position)` in as it arrives, and queued games near the
+   camera jump ahead - the same ranking `LodDistanceManager.preloadNearestGames()`
+   ([:376-414](../../client/src/scene/game-box/instancing/LodDistanceManager.ts)) already performs
+   for HIGH promotion, applied to the initial wave. Games with no intent yet (shelf layout hasn't
+   reached them) drain as a background tier so the worker never idles waiting for positions.
+   **The priority must reach the network path, not just decode dispatch** - with the placement gate
+   kept, a near game that falls through to a slow network candidate leaves a visible hole in the
+   shelf directly in front of the player while distant games have already filled in.
+2. **Worker pool** for `GameArtworkProvider`'s decode path. Size derived from
+   `navigator.hardwareConcurrency`, capped low (exact number TBD during implementation, not a
+   documented decision). Ordering is what the player feels; the pool is what keeps a correctly
+   ordered queue from being needlessly slow. Deliberately second - a small pool is sufficient once
+   the order is right, whereas a large pool on the current arbitrary order still shows the player
+   an empty shelf.
+3. **HIGH-tier correctness fixes** (bundled per direction): give `HighTextureCache` the same
+   local-disk-first path MID has (or register the `local://` key as the artwork URL when a local
+   slot exists), apply `stripQueryParam(url, 't')` to its pixel-cache keys, and have it skip
+   `artwork_dead_paths` candidates instead of burning `maxLoadAttempts` on them.
+4. **`PixelDataCache` dedup fix.** Cache the decode at the largest tier actually requested (or
+   native resolution) once; derive smaller tiers via the existing `resizePixels` instead of a fresh
+   read + decode per tier. With `lazyHighTextures: true` this is specifically the cost the player
+   triggers by walking up to a box, so it belongs with item 3's approach-latency work.
 
-### Open question: what "nearest the player first" actually means, given prefetch has no position data
+### Decisions (2026-07-31, all three forks resolved)
 
-Three ways to reconcile "prioritize by distance" with "prefetch fires before placement knows
-positions" - not decided yet, need your call:
+- **Placement gate stays** - see "What the player actually experiences," above. Placeholder artwork
+  is a separate future item; label boxes are not it.
+- **Ordering shape: a real queue in the prefetch coordinator, re-sorted by `PlacementIntentReady`
+  positions** (the original fork's option (b), now much cheaper given the corrected finding).
+  Explicitly *not* extending `SpatialPrewarmingManager` to cover MID as well - it starts after
+  placement and is tuned for 2-concurrent HIGH loads, and retuning it for a ~1400-item startup wave
+  risks regressing HIGH behavior that currently works. Two schedulers, one per tier, is the
+  intended end state here.
+- **HIGH-tier fixes ship in this same changeset**, not a separate PR.
 
-- **(a) Reorder the pipeline** so prefetch waits for (or runs interleaved with) placement, trading
-  away today's "start fetching before we know exactly where things go" latency-hiding for exact
-  position-based ordering from the start. Biggest change of the three.
-- **(b) Queue now, re-sort as positions arrive.** Keep firing prefetch early (preserve the
-  latency-hiding), but through a real queue rather than fire-and-forget - as placement assigns each
-  game a position, it can jump the queue if it's near the player, the same way
-  `preloadNearestGames()` already re-prioritizes HIGH promotion after the fact. Smallest change;
-  reuses an already-proven pattern instead of inventing a new one.
-- **(c) Cruder proxy signal, no waiting.** Use whatever coarse ordering *is* available at prefetch
-  time (batch order, section assignment order) as an approximate stand-in for distance, accepting
-  it won't be exact. Simplest to build, weakest guarantee.
+### Implemented 2026-07-31 (all four items)
 
-Leaning toward (b) - it's the smallest change, keeps the existing latency-hiding property, and
-extends a pattern (`preloadNearestGames`) already validated in production rather than introducing
-a new one - but this is a real design fork, not a detail, so flagging rather than deciding
-unilaterally.
+1. **Prefetch scheduler** — `ArtworkPrefetchCoordinator` now queues instead of firing every game
+   at once, drains under `MAX_CONCURRENT_PREFETCH` (24 — a real cap independent of the decode pool,
+   generous enough that existing small-batch tests didn't need rewriting), and re-prioritizes the
+   still-queued portion by distance whenever `PlacementIntentReady` reports a position, falling back
+   to FIFO/library order as the background tier. See
+   [ArtworkPrefetchCoordinator.ts](../../client/src/scene/spawning/ArtworkPrefetchCoordinator.ts).
+2. **Worker pool** — new `TextureWorkerPool`
+   ([TextureWorkerPool.ts](../../client/src/scene/game-box/instancing/TextureWorkerPool.ts)), sized
+   `navigator.hardwareConcurrency`-derived (clamped 2–6), routing to whichever pooled `TextureWorker`
+   currently has the fewest pending messages (`ManagedWorker.pendingCount`, already public).
+   `GameArtworkProvider` holds the pool instead of one worker; `HighTextureCache` keeps its own
+   separate single worker unchanged (never was the bottleneck, per the corrected findings above).
+3. **HIGH-tier correctness** — `HighTextureCache.loadHighTexture()` now tries
+   `GameArtworkProvider.fetchPixelsFromLocalDisk()` first (same precedence MID already has),
+   threading `appid` through `AddInstanceParams`/`registerGame`/`GameEntry` (it wasn't available on
+   the HIGH-tier entry before). The network fallback path now strips `?t=` on both cache-key
+   directions and checks `AppDetailsCache.getDeadArtworkPaths()` before firing, skipping known-dead
+   candidates instead of burning `maxLoadAttempts`; a genuinely-failed background fetch now also
+   calls `markArtworkPathDead()`, so future launches benefit even for games that only ever reach
+   HIGH (previously only MID's `fetchFromStrategy` wrote to this cache).
+4. **Source-bytes reuse (supersedes the literal "resizePixels" description above)** — decoding once
+   at the largest tier and *resizing down* turned out to be the wrong direction for the real
+   MID-then-HIGH order: MID's 150×225 decode is smaller than HIGH's 300×450, and upscaling a small
+   decode to serve a bigger request would blur the box the player is looking straight at. The actual
+   fix implemented in `GameArtworkProvider`: cache the **source bytes** (network response body via
+   the worker's already-returned-but-previously-discarded `result.blob`, or the local-disk bytes
+   read via Tauri IPC) in a session-only, size-capped `Map` (`sourceBytesCache`, 200-entry cap,
+   oldest-evicted), keyed the same way as the persisted pixel cache. A later request for the same
+   source at a *different* size decodes from those in-memory bytes via the worker's existing
+   `processLocalBytes` message — this eliminates the second network fetch (or second Tauri IPC
+   round-trip) entirely, which is the dominant cost per the original HAR data (592ms median fetch
+   time vs. worker decode time); the second `createImageBitmap` decode itself still runs, since
+   avoiding that too would require keeping a live `ImageBitmap` alive across worker messages, which
+   is a materially bigger change than this pass's scope. `resizePixels` remains in place and used
+   for its existing purpose (an exact-size pixel-cache miss resizing from a same-URL different-size
+   *persisted* hit) — nothing about that path changed.
+
+### Field-caught regression, 2026-08-01: MID atlas compacted before the concurrency-capped queue had dispatched most of the library
+
+**Symptom**: two real desktop sessions (one with existing caches, one after the user deleted all
+browser stores for a clean run) both showed the vast majority of the library rendering as labels
+or, once label capacity (512) was also exhausted, nothing at all — hundreds of
+`placeInstance: no prefetched texture for "X"` warnings firing in a single-digit-millisecond burst,
+immediately followed by `Failed to add label box` once labels ran out too. Zero
+`GameArtworkRequest`/`GameArtworkProvider` warnings and zero uncaught errors anywhere in either
+session's log — the fast, silent, log-free shape was the tell that resolution was failing before
+ever reaching a fetch attempt, not because of it.
+
+**Root cause**: `LodTextureArrayManager.compactMidTier()` — a memory optimization that shrinks the
+pre-allocated MID texture array down from `maxTextures` (library size + buffer) to the actual
+number of slots used — was called unconditionally from `LodArtworkOrchestrator.handleAllBatchesComplete()`,
+the instant game *data* finished loading. That was safe under the old fire-everything-immediately
+prefetch: by the time all batches' data had streamed in, every game's `prefetchArtwork()` had
+already been *called* (and `allocateSlot()` is the first synchronous thing it does), so
+"data loaded" and "every slot claimed" happened to coincide. The new concurrency-capped queue (this
+same build plan, item 1) broke that coincidence: at `AllBatchesComplete` time, only
+`MAX_CONCURRENT_PREFETCH`-ish games have actually been dispatched to `prefetchArtwork()` — the
+other ~98% are still sitting in `ArtworkPrefetchCoordinator`'s queue, never having called
+`allocateSlot()`. Compaction shrank the array to that tiny in-flight count, permanently — every
+later-dispatched game then failed `allocateSlot()` instantly (no network, no decode, hence zero
+downstream log lines) for the rest of the session, confirmed directly in the second log via
+`[LodTextureArrayManager] WARN MID texture atlas full (64 slots)` immediately followed by
+`[LodArtworkOrchestrator] WARN Atlas full (1570 configured)`.
+
+**Fix**: relocate the `compactMidTierAfterLoad()` call from `handleAllBatchesComplete()` into
+`settleArtwork()`'s existing `inFlightArtworkCount === 0 && allBatchesComplete` gate
+([LodArtworkOrchestrator.ts](../../client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts)) -
+no new signal needed. `inFlightArtworkCount` provably never reaches 0 while the coordinator's queue
+still has work, because `ArtworkPrefetchCoordinator.dispatchPrefetch()`'s `.finally()` decrements its
+own counter and synchronously re-dispatches the next queued item in the same tick, before yielding -
+so this gate was already the correct "everything that will ever be dispatched has settled" signal;
+it just wasn't being used for compaction. Regression test added directly against this failure mode
+(two prefetches in flight when `AllBatchesComplete` fires; a third, dispatched only after the first
+settles, must still get a real slot) - confirmed it fails with `'error'` instead of `'prefetched'`
+when the old unconditional call is restored, and passes with the fix.
+
+**Logging changes made alongside this fix** (per direction: aggregate repeated lines, make the log
+easier to work with): the three per-occurrence log lines that flooded both sessions -
+`LodArtworkOrchestrator.placeInstance`/`setInstanceArtwork`'s "no prefetched texture" warnings,
+`GpuGameBoxRenderer.placeLabelBox`'s "Failed to add label box", and `InstancedLabelRenderer`'s raw
+(un-leveled, always-printed) "No label slots remaining" - are now either downgraded to `.debug()`
+(the first two: redundant with the caller's own outcome handling - `GpuGameBoxRenderer`'s label
+fallback and its `Placement complete: placed=X, artwork=Y, labels=Z, labelFailures=W` run summary,
+or `handlePlacementRepointRequested`'s own warn) or logged once per placement run instead of once
+per occurrence (the label-capacity warnings, guarded the same way `atlasFullLogged` already guards
+the MID-atlas equivalent, reset on `PlacementRunResetRequested`). The aggregate counts these
+replaced were already being computed and logged correctly; only the noisy per-occurrence duplicates
+were removed.
+
+**On the "fall back to a browser cache" question raised alongside this bug report**: the layering
+already does this - `GameArtworkProvider.fetchPixels`/`fetchPixelsFromLocalDisk` check
+`PixelDataCache` (persistent, IndexedDB-backed decoded-pixel cache) before any network/Tauri-IPC
+attempt, for every request, at both call sites. The second session's slow "batches" (6-15s each,
+two of which hit HTTP 503) were `BatchAppDetailsClient` calls fetching *appdetails metadata* (names,
+genres, artwork hint URLs) from the Steam API proxy - a separate pipeline from artwork pixels -
+which legitimately has nothing to read from a freshly-emptied `AppDetailsCache`/`PixelDataCache`
+after "delete all stores." Not a gap in the fallback chain; expected cost of a genuinely cold start
+plus one proxy hiccup, unrelated to the atlas bug above.
+
+### Diagnostic logging added 2026-08-01: verifying the scheduling/source/failure properties directly
+
+After the atlas fix landed, the follow-up question was whether the three properties this build plan
+claims actually hold in a real run - nearest-first, disk-first, and fast short-circuiting of known
+failures - rather than trusting the code reading alone. Added one aggregate `INFO`-level summary
+line per property, each logged once the whole prefetch queue settles (`ArtworkSettled`, now a
+reliable "everything that will ever be dispatched has settled" signal per the fix above), plus
+matching regression coverage:
+
+- **Scheduling**: `ArtworkPrefetchCoordinator.logSchedulingSummary()` - `"N/T dispatched by
+  distance-priority, M/T by FIFO/background"`. If this ratio reads close to 0% distance-priority in
+  a real session, it means `PlacementIntentReady` positions are consistently arriving *after* a
+  game's own dispatch, and the reorder isn't actually engaging - directly answers "do we have the
+  sort by the time we take the priority." Per-dispatch detail (which branch, distance in meters,
+  remaining queue depth) is available at `.debug()` for deeper digging.
+- **Source mix**: `GameArtworkProvider.logRunSummary()` - `"N local-disk, M persisted-cache, K
+  network, J bytes-reused"`. Confirms local-disk-first empirically instead of by code inspection
+  alone.
+- **Failure short-circuiting**: the same summary's second line (failure counts by reason) already
+  existed (`logFailureStats`) but was wired to fire at *construction* time, when nothing has
+  happened yet - always logged nothing. Moved to the same `ArtworkSettled` trigger, so it now
+  reports something real.
+
+**Revised same day, per direction**: debug-level per-occurrence fallbacks for the two failure lines
+were removed entirely rather than kept alongside the aggregate - a specific game's failure reason
+and tried/skipped URLs are already retrievable via `GameArtworkProvider.getFailureReason()` (or the
+existing `window.inspectGameArtwork()` console tool) without a standing log line at any level.
+Removed: `GameArtworkProvider.recordFailure`'s `🚫 Permanent failure...` and
+`GameArtworkRequest.fetchFromStrategy`'s `Artwork resolution failed...`. The pre-existing
+"Artwork fallback summary: N game(s) will use labels" line's name preview was also trimmed from 25
+to 3 examples, matching the "summary plus a couple of examples" shape decided for all of these.
+**Bug caught while wiring the source/failure summary**: `GameArtworkProvider`'s constructor
+registered the new `ArtworkSettled` listener but `dispose()` never deregistered it - every
+constructed/disposed instance (e.g. across tests, or a full library-reload dispose+rebuild) would
+have left a stale handler firing forever. Fixed by storing the bound handler and deregistering it
+in `dispose()`, matching the pattern every other event-subscribing class in this codebase follows.
+
+**Field-confirmed 2026-08-01** against a real session (1470-game library): `MID compacted:
+150×225×1570 → 150×225×1468` (atlas fix holding - no premature truncation), `Artwork sources: 850
+local-disk, 7 persisted-cache, 557 network` (disk-first working as designed), `Prefetch scheduling:
+774/1470 dispatched by distance-priority, 696/1470 by FIFO/background` (reorder demonstrably
+engaging, not degenerating to pure FIFO), `Artwork failures: 54 total, 54 permanent dead-ends
+(NO_ARTWORK: 54)`, `Placement complete: placed=826, artwork=802, labels=24, labelFailures=0` (label
+capacity no longer exhausted). All five aggregate lines now the whole picture - no per-occurrence
+noise alongside them.
+
+**Soft constraint introduced by this scheduler, 2026-07-31**: distance re-sort reads the camera's
+*live* position (`DataKey.MainCamera`) at the moment each queue slot frees up, and assumes that
+position is already the player's real spawn location - not mid-transition. True today (confirmed:
+no startup camera animation exists), so this isn't blocking implementation, but it's a constraint
+worth knowing about before adding one. If a startup camera animation/fly-in is ever added, this
+scheduler would start ranking games by an in-transit camera position rather than the final spawn
+point, silently degrading the "nearest first" guarantee without erroring. A future change here
+would need to either delay this scheduler's distance reads until the camera settles, or feed it
+the camera's *intended* spawn target instead of `camera.position`. Documented in code at
+`ArtworkPrefetchCoordinator`'s class doc comment
+([ArtworkPrefetchCoordinator.ts](../../client/src/scene/spawning/ArtworkPrefetchCoordinator.ts)).
 
 ### C. `PixelDataCache`'s actual purpose, and real numbers on its startup role (Problem 3) — measured 2026-07-25, root cause identified, not yet fixed
 
@@ -563,11 +799,11 @@ existing AppDetailsCache TTL gap, not duplicated here.)
    folded-in real URL over its own guess) — developer-workflow scope for now (a developer copies
    the files in manually before a release), not a live end-user submission pipeline. Answers this
    session's earlier "how do we get real artwork paths into the baked cache" question concretely.
-4. ~~Concurrency cap shape~~ **Scoped as a full build plan, 2026-07-31** — see "Build plan: worker
-   pool, concurrency cap, and priority queue" under Root Cause B, above. Awaiting sign-off on the
-   priority-queue design fork specifically (three options laid out there); worker pool, concurrency
-   cap, and the `PixelDataCache` dedup fix are otherwise ready to implement. Own PR/changeset,
-   branched from the merged #149 as `act2/artwork-loading-concurrency`.
+4. ~~Concurrency cap shape~~ **Scoped, re-evaluated, signed off, and implemented, all 2026-07-31**
+   — see "Build plan: prefetch scheduling, worker pool, and HIGH-tier correctness" under Root Cause
+   B, above. All three design forks resolved (placement gate stays; queue-and-re-sort in the
+   prefetch coordinator; HIGH-tier fixes bundled in). Own PR/changeset, branched from the merged
+   #149 as `act2/artwork-loading-concurrency`; not yet field-tested against a real desktop session.
 ~~`artwork_dead_paths` baked-bundle half~~ **Resolved by the 2026-07-25 rework** — living on
 `AppDetailsData` means the bake/repack scripts pick it up automatically, the same way they already
 pick up every other field on that type. No separate mechanism needed.
@@ -601,10 +837,20 @@ dimensions, rather than any image over 300px wide).
       2026-07-31 (999/1845 appids have a library slot; dead-path skip separately reconfirmed at
       56/56 in the same session). CDN URL discovery/validation (Deliverable 2 of the build plan)
       not included in #149 — still open, not yet scheduled.
-- [ ] Get sign-off on the priority-queue design fork (three options, see the build plan under
-      Root Cause B), then implement worker pool + concurrency cap + priority queue +
-      `PixelDataCache` dedup fix — branch `act2/artwork-loading-concurrency`, own PR, not bundled
-      with #149. Must prioritize by distance to player, not just iteration order.
+- [x] Re-evaluate the concurrency build plan for player experience; resolve its three design forks
+      — done 2026-07-31, see the build plan under Root Cause B (corrected three of its own first-pass
+      findings and surfaced the HIGH-tier local-disk gap)
+- [x] Implement, in order: prefetch scheduler with `PlacementIntentReady` distance re-sort → worker
+      pool for `GameArtworkProvider`'s decode path → HIGH-tier correctness fixes (local-disk path,
+      `?t=` normalization, dead-path skip) → source-bytes reuse across LOD tiers (the dedup fix,
+      shape corrected during implementation — see "Implemented 2026-07-31" under the build plan).
+      Done 2026-07-31 on `act2/artwork-loading-concurrency`; full suite green (1488 passed), not yet
+      bundled into a PR or field-tested against a real desktop session.
+- [ ] Field-test this changeset against a real desktop session before opening the PR — confirm the
+      startup fill-in order visibly favors nearest-to-camera, and that walking up to a shelf no
+      longer triggers a network fetch for a game whose art is already on disk.
+- [ ] Placeholder artwork for games whose art hasn't resolved yet (real placeholder art, not label
+      boxes) — the placement gate stays until this exists. Not scheduled; needs its own scope.
 - [ ] Scope the one-time bake-time backfill avenue (now simpler — dead paths discovered live
       already land somewhere the bake pipeline can read back); partly overlaps the local
       librarycache plan's out-of-scope shared-cache-push item — scope together
