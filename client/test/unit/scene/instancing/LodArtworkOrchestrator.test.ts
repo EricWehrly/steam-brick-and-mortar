@@ -18,6 +18,7 @@ import {
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { EventManager } from '../../../../src/core/EventManager'
+import { GameEventTypes } from '../../../../src/types/InteractionEvents'
 import { GameArtworkProvider } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
 import { SteamArtworkStateManager } from '../../../../src/core/data/SteamArtworkStateManager'
 
@@ -470,6 +471,78 @@ describe('LodArtworkOrchestrator', () => {
 
             const success = orchestrator.setInstanceArtwork(instanceIndex, 999, 'Never Prefetched', new THREE.Vector3())
             expect(success).toBe(false)
+        })
+    })
+
+    describe('MID atlas compaction timing (concurrency-cap regression)', () => {
+        function withScene(): THREE.Scene {
+            const mockScene = new THREE.Scene()
+            mockDataManager.get.mockImplementation((key: DataKey) => {
+                if (key === DataKey.MainScene) return mockScene
+                return null
+            })
+            return mockScene
+        }
+
+        function findRegisteredHandler(eventType: string): () => void {
+            const eventManager = EventManager.getInstance() as unknown as {
+                registerEventHandler: ReturnType<typeof vi.fn>
+            }
+            const entry = eventManager.registerEventHandler.mock.calls.find(
+                ([registeredType]) => registeredType === eventType
+            )
+            expect(entry).toBeDefined()
+            return entry![1] as () => void
+        }
+
+        /**
+         * Regression for the bug this exact fix addresses: compactMidTier() used to run
+         * unconditionally the instant AllBatchesComplete fired, trimming the MID array down to
+         * whatever slot count had been allocated so far. That was harmless when prefetchBatch()
+         * fired every game immediately (AllBatchesComplete always arrived after every game had
+         * already claimed a slot) - but ArtworkPrefetchCoordinator's concurrency-capped queue
+         * (Root Cause B) means most of the library is still queued, not yet dispatched, when
+         * AllBatchesComplete fires. Compacting then permanently locked the atlas at a tiny
+         * fraction of the library, and every later-dispatched game failed allocateSlot() forever.
+         */
+        it('lets a game dispatched while others are still in flight claim a slot, even after AllBatchesComplete fires mid-flight', async () => {
+            withScene()
+            orchestrator = new LodArtworkOrchestrator({ maxTextures: 5, maxInstances: 5, lazyHighTextures: true })
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+
+            let resolveFirst!: (result: { pixels: Uint8ClampedArray; width: number; height: number }) => void
+            let resolveSecond!: (result: { pixels: Uint8ClampedArray; width: number; height: number }) => void
+            const firstPixels = new Promise<{ pixels: Uint8ClampedArray; width: number; height: number }>((r) => { resolveFirst = r })
+            const secondPixels = new Promise<{ pixels: Uint8ClampedArray; width: number; height: number }>((r) => { resolveSecond = r })
+
+            provider.getArtwork
+                .mockReturnValueOnce({ getPixelsAtSize: vi.fn(() => firstPixels) })
+                .mockReturnValueOnce({ getPixelsAtSize: vi.fn(() => secondPixels) })
+
+            // Two games dispatched (slots 0 and 1 allocated), neither resolved yet - the normal
+            // state of the world under a concurrency cap greater than 1.
+            const gameAPromise = orchestrator.prefetchArtwork(1, undefined, 'Game A')
+            const gameBPromise = orchestrator.prefetchArtwork(2, undefined, 'Game B')
+
+            // Data-loading finishes while both are still in flight.
+            findRegisteredHandler(GameEventTypes.AllBatchesComplete)()
+
+            resolveFirst({ pixels: new Uint8ClampedArray(150 * 225 * 4), width: 150, height: 225 })
+            expect(await gameAPromise).toBe('prefetched')
+
+            // Game B is still in flight (inFlightArtworkCount === 1) - the atlas must not have
+            // compacted yet. A third game, dispatched now (as the coordinator's queue would
+            // immediately do once a concurrency slot frees up), must still get a real slot.
+            provider.getArtwork.mockReturnValueOnce({
+                getPixelsAtSize: vi.fn().mockResolvedValue({ pixels: new Uint8ClampedArray(150 * 225 * 4), width: 150, height: 225 }),
+            })
+            expect(await orchestrator.prefetchArtwork(3, undefined, 'Game C')).toBe('prefetched')
+
+            resolveSecond({ pixels: new Uint8ClampedArray(150 * 225 * 4), width: 150, height: 225 })
+            expect(await gameBPromise).toBe('prefetched')
         })
     })
 

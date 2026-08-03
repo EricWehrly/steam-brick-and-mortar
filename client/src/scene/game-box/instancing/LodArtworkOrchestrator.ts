@@ -262,7 +262,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     private handleAllBatchesComplete(): void {
         this.allBatchesComplete = true
-        this.compactMidTierAfterLoad()
         this.settleArtwork()
     }
 
@@ -417,8 +416,21 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         }
     }
 
+    /**
+     * Gated on inFlightArtworkCount reaching 0, not just AllBatchesComplete firing - with
+     * ArtworkPrefetchCoordinator's concurrency-capped queue (Root Cause B), most of the library
+     * is still queued (not yet dispatched to prefetchArtwork(), and thus not yet counted here)
+     * when AllBatchesComplete fires. Compacting on that raw signal alone shrank the MID texture
+     * array down to whatever handful of slots had been allocated so far, permanently - every
+     * later-dispatched game then failed allocateSlot() instantly for the rest of the session.
+     * inFlightArtworkCount only reaches 0 once the whole queue has actually drained, because the
+     * coordinator's dispatch loop refills synchronously (decrement and re-dispatch happen in the
+     * same tick), so this is the correct place for both the settlement event and the compaction
+     * that used to fire unconditionally in handleAllBatchesComplete().
+     */
     private settleArtwork(): void {
         if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
+            this.compactMidTierAfterLoad()
             EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
         }
     }
