@@ -82,6 +82,8 @@ export interface AddInstanceParams {
     position: THREE.Vector3
     textureIndex: number
     gameName: string
+    /** Needed by HighTextureCache to try Steam's local librarycache before any network fallback. */
+    appid?: number
     highArtworkUrl?: string
     lodLevel?: LodLevel
     highTextureSlot?: number
@@ -363,6 +365,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         position,
         textureIndex,
         gameName,
+        appid,
         highArtworkUrl,
         lodLevel = this.config.defaultLod,
         highTextureSlot = -1,
@@ -402,12 +405,12 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         
         // Register with HIGH texture cache if lazy loading
         if (this.lazyHighTextures && this.highTextureCache && highArtworkUrl) {
-            this.highTextureCache.registerGame(textureIndex, gameName, highArtworkUrl)
+            this.highTextureCache.registerGame(textureIndex, gameName, appid ?? 0, highArtworkUrl)
         }
-        
+
         // Register position for spatial prewarming
         this.spatialPrewarming?.registerGamePosition(textureIndex, gameName, position)
-        
+
         this.pendingAttributeUpdate = true
         return instanceIndex
     }
@@ -422,6 +425,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         position,
         textureIndex,
         gameName,
+        appid,
         highArtworkUrl,
         lodLevel = this.config.defaultLod,
         highTextureSlot = -1,
@@ -480,7 +484,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         this.textureIndexToInstance.set(textureIndex, instanceIndex)
 
         if (this.lazyHighTextures && this.highTextureCache && highArtworkUrl) {
-            this.highTextureCache.registerGame(textureIndex, gameName, highArtworkUrl)
+            this.highTextureCache.registerGame(textureIndex, gameName, appid ?? 0, highArtworkUrl)
         }
         this.spatialPrewarming?.registerGamePosition(textureIndex, gameName, position)
 
