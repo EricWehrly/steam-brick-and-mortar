@@ -22,7 +22,10 @@
 
 import { Logger } from '../../../utils/Logger'
 import { UrlUtils } from '../../../utils/UrlUtils'
-import { TextureWorker } from './TextureWorker'
+import { EventManager } from '../../../core/EventManager'
+import { GameEventTypes } from '../../../types/InteractionEvents'
+import { TextureWorkerPool } from './TextureWorkerPool'
+import type { FetchAndProcessResult } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
@@ -89,6 +92,15 @@ const CDN_PATTERNS: Record<CdnArtworkType, string> = {
     header: 'header.jpg'
 }
 
+/**
+ * Cap on the session-only source-bytes cache (see GameArtworkProvider.sourceBytesCache) - bounds
+ * memory for very large libraries. Only games promoted to HIGH benefit from a hit (bounded by
+ * HighSlotAllocator's slot count, typically dozens), so this is generous headroom, not a tight
+ * budget. Oldest entry evicted first (Map insertion order) once full - not true LRU, but sufficient
+ * for a session-scoped optimization cache, not a source of truth.
+ */
+const MAX_SOURCE_BYTES_CACHE_ENTRIES = 200
+
 type ArtworkHintType = 'library' | 'header'
 
 const STRATEGY_BY_FORMAT: Record<ArtworkFormat, {
@@ -125,20 +137,43 @@ export class GameArtworkProvider {
     private static instance: GameArtworkProvider | null = null
     public static logger = Logger.createLogFunctions(GameArtworkProvider.name)
     
-    private textureWorker: TextureWorker
+    private textureWorkerPool: TextureWorkerPool
     private pixelCache: PixelDataCache | null = null
     private readonly failureCache = new Map<string, RuntimeArtworkCacheEntry>()
     private readonly successCache = new Map<string, RuntimeArtworkCacheEntry>()
     private readonly localArtIndex = new Map<number, LocalLibraryArtEntry>()
 
+    /**
+     * Session-only cache of raw source bytes (network response body or local-disk file), keyed
+     * the same way as the persisted pixel cache below. When a later request for the same source
+     * arrives at a DIFFERENT size - the normal MID-then-HIGH-promotion sequence - this lets the
+     * decode run against bytes already in memory instead of paying for a second network fetch or
+     * Tauri IPC round-trip. The decode itself (createImageBitmap) still runs again; only the
+     * fetch/IPC cost is avoidable this way without keeping a live ImageBitmap across worker
+     * messages, which is out of scope here.
+     */
+    private readonly sourceBytesCache = new Map<string, Uint8Array<ArrayBuffer>>()
+
     // Skip tracking (per session)
     private skipStats: Map<FailureReason, number> = new Map()
     private skippedGames: Array<{ appId: number; gameName: string; reason: FailureReason }> = []
 
+    /** Source-mix counters (per session) - see logRunSummary(). */
+    private localDiskHits = 0
+    private persistedPixelCacheHits = 0
+    private networkFetches = 0
+    private sourceBytesReuses = 0
+
+    private readonly boundLogRunSummary: () => void
+
     private constructor() {
-        this.textureWorker = new TextureWorker()
+        this.textureWorkerPool = new TextureWorkerPool()
         this.initPixelCache()
-        this.logFailureStats()
+        this.boundLogRunSummary = this.logRunSummary.bind(this)
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundLogRunSummary
+        )
     }
 
     public static getInstance(): GameArtworkProvider {
@@ -155,6 +190,16 @@ export class GameArtworkProvider {
         } catch (err) {
             GameArtworkProvider.logger.warn('PixelDataCache init failed:', err)
         }
+    }
+
+    private cacheSourceBytes(key: string, bytes: Uint8Array<ArrayBuffer>): void {
+        if (this.sourceBytesCache.size >= MAX_SOURCE_BYTES_CACHE_ENTRIES && !this.sourceBytesCache.has(key)) {
+            const oldestKey = this.sourceBytesCache.keys().next().value
+            if (oldestKey !== undefined) {
+                this.sourceBytesCache.delete(oldestKey)
+            }
+        }
+        this.sourceBytesCache.set(key, bytes)
     }
 
     /**
@@ -277,6 +322,7 @@ export class GameArtworkProvider {
         if (this.pixelCache) {
             const cached = await this.pixelCache.get(sizedCacheUrl)
             if (cached) {
+                this.localDiskHits++
                 if (cached.width === targetWidth && cached.height === targetHeight) {
                     return { pixels: cached.pixelData, width: cached.width, height: cached.height, fromCache: true }
                 }
@@ -286,12 +332,17 @@ export class GameArtworkProvider {
         }
 
         try {
-            const bytes = await LocalLibraryArtReader.readArtBytes(appId, slot.relative_path)
+            let bytes = this.sourceBytesCache.get(cacheKeyUrl)
             if (!bytes) {
-                return null
+                const readBytes = await LocalLibraryArtReader.readArtBytes(appId, slot.relative_path)
+                if (!readBytes) {
+                    return null
+                }
+                bytes = readBytes
+                this.cacheSourceBytes(cacheKeyUrl, bytes)
             }
 
-            const result = await this.textureWorker.processLocalBytes(
+            const result = await this.textureWorkerPool.processLocalBytes(
                 bytes, slot.relative_path, 0, `${appId}-${format}`,
                 { textureWidth: targetWidth, textureHeight: targetHeight }
             )
@@ -300,6 +351,7 @@ export class GameArtworkProvider {
                 await this.pixelCache.put(sizedCacheUrl, result.imageData, targetWidth, targetHeight)
             }
 
+            this.localDiskHits++
             return { pixels: result.imageData, width: targetWidth, height: targetHeight, fromCache: false }
         } catch (err) {
             GameArtworkProvider.logger.warn(
@@ -329,6 +381,7 @@ export class GameArtworkProvider {
         if (this.pixelCache) {
             const cached = await this.pixelCache.get(sizedCacheUrl)
             if (cached) {
+                this.persistedPixelCacheHits++
                 // If cached at different size, we may need to resize
                 if (cached.width === targetWidth && cached.height === targetHeight) {
                     return {
@@ -351,24 +404,54 @@ export class GameArtworkProvider {
                 }
             }
         }
-        
-        // Fetch from network
-        const result = await this.textureWorker.fetchAndProcessWithOptions(
-            url, 0, cacheKey,
-            { textureWidth: targetWidth, textureHeight: targetHeight, timeout: 10000 }
-        )
-        
+
+        // Same source already fetched this session at a different size (the normal MID-then-HIGH
+        // sequence) - decode from those bytes instead of fetching over the network again.
+        const cachedBytes = this.sourceBytesCache.get(cacheKeyUrl)
+        if (cachedBytes) this.sourceBytesReuses++
+        const result = cachedBytes
+            ? await this.textureWorkerPool.processLocalBytes(
+                cachedBytes, url, 0, cacheKey,
+                { textureWidth: targetWidth, textureHeight: targetHeight }
+            )
+            : await this.fetchAndCacheSourceBytes(url, cacheKeyUrl, cacheKey, targetWidth, targetHeight)
+
         // Always store using size-qualified key
         if (this.pixelCache) {
             await this.pixelCache.put(sizedCacheUrl, result.imageData, targetWidth, targetHeight)
         }
-        
+
         return {
             pixels: result.imageData,
             width: targetWidth,
             height: targetHeight,
             fromCache: false
         }
+    }
+
+    /**
+     * Network fetch + decode, and caches the response bytes for a later differently-sized
+     * request of the same source (see sourceBytesCache).
+     */
+    private async fetchAndCacheSourceBytes(
+        url: string,
+        cacheKeyUrl: string,
+        cacheKey: string,
+        targetWidth: number,
+        targetHeight: number
+    ): Promise<FetchAndProcessResult> {
+        this.networkFetches++
+        const result = await this.textureWorkerPool.fetchAndProcessWithOptions(
+            url, 0, cacheKey,
+            { textureWidth: targetWidth, textureHeight: targetHeight, timeout: 10000 }
+        )
+
+        if (result.blob) {
+            const bytes = new Uint8Array(await result.blob.arrayBuffer())
+            this.cacheSourceBytes(cacheKeyUrl, bytes)
+        }
+
+        return result
     }
     
     /**
@@ -413,13 +496,9 @@ export class GameArtworkProvider {
             attemptCount,
             isPermanent
         })
-        
-        // Log permanent failures clearly
-        if (isPermanent) {
-            GameArtworkProvider.logger.info(
-                `🚫 Permanent failure for appId ${appId}: ${reason} (will skip future attempts)`
-            )
-        }
+        // No per-occurrence log here - logRunSummary() reports the aggregate once the whole
+        // prefetch queue settles; a specific game's failure reason is already inspectable via
+        // getFailureReason()/window.inspectGameArtwork() without a standing log line.
     }
     
     /**
@@ -573,28 +652,47 @@ export class GameArtworkProvider {
     }
 
     /**
-     * Log failure statistics summary at startup.
+     * One-line source-mix and failure summary, logged once the whole prefetch queue has settled
+     * (GameEventTypes.ArtworkSettled - see ArtworkPrefetchCoordinator/LodArtworkOrchestrator.settleArtwork)
+     * instead of at construction, when nothing has happened yet. Replaces what used to be a
+     * per-occurrence log line for every permanent failure (see recordFailure) with the aggregate -
+     * counters accumulate across the whole session, so a library reload's summary reflects
+     * everything resolved so far, not just the latest run.
      */
-    private logFailureStats(): void {
+    private logRunSummary(): void {
+        const sourceParts: string[] = []
+        if (this.localDiskHits > 0) sourceParts.push(`${this.localDiskHits} local-disk`)
+        if (this.persistedPixelCacheHits > 0) sourceParts.push(`${this.persistedPixelCacheHits} persisted-cache`)
+        if (this.networkFetches > 0) sourceParts.push(`${this.networkFetches} network`)
+        if (this.sourceBytesReuses > 0) sourceParts.push(`${this.sourceBytesReuses} bytes-reused`)
+
+        if (sourceParts.length > 0) {
+            GameArtworkProvider.logger.info(`📊 Artwork sources: ${sourceParts.join(', ')}`)
+        }
+
         const stats = this.getFailureStats()
         if (stats.total === 0) return
-        
+
         const reasons: string[] = []
         for (const [reason, count] of Object.entries(stats)) {
             if (reason !== 'total' && reason !== 'permanent' && count > 0) {
                 reasons.push(`${reason}: ${count}`)
             }
         }
-        
+
         if (reasons.length > 0) {
             GameArtworkProvider.logger.info(
                 `📊 Artwork failures: ${stats.total} total, ${stats.permanent} permanent dead-ends (${reasons.join(', ')})`
             )
         }
     }
-    
+
     public dispose(): void {
-        this.textureWorker.dispose()
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundLogRunSummary
+        )
+        this.textureWorkerPool.dispose()
         GameArtworkProvider.instance = null
         GameArtworkProvider.logger.lifecycle('Disposed')
     }

@@ -11,6 +11,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setupIndexedDBMock } from '../../../mocks/indexeddb.mock'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataDomain } from '../../../../src/core/data/DataTypes'
+import { EventManager } from '../../../../src/core/EventManager'
+import { GameEventTypes } from '../../../../src/types/InteractionEvents'
 import { SteamArtworkStateManager } from '../../../../src/core/data/SteamArtworkStateManager'
 import { SteamDataManager } from '../../../../src/core/data/SteamDataManager'
 import {
@@ -22,6 +24,8 @@ import {
 import { AppDetailsCache } from '../../../../src/steam/cache/AppDetailsCache'
 import type { AppDetailsData } from '../../../../src/steam/batch/BatchAppDetailsClient'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
+import { TextureWorker } from '../../../../src/scene/game-box/instancing/TextureWorker'
+import { Logger, LogLevel } from '../../../../src/utils/Logger'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
     header: null, capsule: null, capsule_v5: null, background: null, background_raw: null,
@@ -105,6 +109,7 @@ describe('GameArtworkProvider', () => {
 
     afterEach(() => {
         provider.dispose()
+        Logger.clearContextLevel('GameArtworkProvider')
     })
 
     describe('Singleton', () => {
@@ -264,11 +269,33 @@ describe('GameArtworkProvider', () => {
 
         it('should fetch pixels at custom size', async () => {
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
-            
+
             const result = await artwork.getPixelsAtSize(150, 225)
-            
+
             expect(result.width).toBe(150)
             expect(result.height).toBe(225)
+        })
+
+        it('decodes from cached response bytes instead of a second network fetch when the same resolved URL is requested at a different size (MID-then-HIGH promotion)', async () => {
+            const firstWorker = vi.mocked(TextureWorker).mock.results[0].value
+            const fakeBlob = { arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) } as unknown as Blob
+            firstWorker.fetchAndProcessWithOptions.mockResolvedValueOnce({
+                imageData: new Uint8ClampedArray(300 * 450 * 4).fill(128),
+                width: 300,
+                height: 450,
+                blob: fakeBlob,
+            })
+
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library')
+            await artwork.getPixelsAtSize(300, 450)
+
+            expect(firstWorker.fetchAndProcessWithOptions).toHaveBeenCalledTimes(1)
+            expect(firstWorker.processLocalBytes).not.toHaveBeenCalled()
+
+            await artwork.getPixelsAtSize(150, 225)
+
+            expect(firstWorker.fetchAndProcessWithOptions).toHaveBeenCalledTimes(1)
+            expect(firstWorker.processLocalBytes).toHaveBeenCalledTimes(1)
         })
 
         it('should support full retry cycle: cache → clear → re-resolve', async () => {
@@ -402,6 +429,25 @@ describe('GameArtworkProvider', () => {
             expect(result).toBeNull()
         })
 
+        it('reuses already-read bytes for a second, differently-sized request instead of a second Tauri IPC read (MID-then-HIGH promotion)', async () => {
+            provider.registerLocalArtIndex([
+                { appid: 12345, library: { relative_path: 'library_600x900.jpg' } },
+            ])
+            readArtBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+
+            const midDims = { width: 150, height: 225 }
+            await provider.fetchPixelsFromLocalDisk(12345, 'library', midDims.width, midDims.height)
+            expect(readArtBytesMock).toHaveBeenCalledTimes(1)
+
+            const highDims = ARTWORK_DIMENSIONS.library
+            const secondResult = await provider.fetchPixelsFromLocalDisk(12345, 'library', highDims.width, highDims.height)
+
+            // Same appid+slot at a different size - bytes already in memory, no second IPC read.
+            expect(readArtBytesMock).toHaveBeenCalledTimes(1)
+            expect(secondResult?.width).toBe(highDims.width)
+            expect(secondResult?.height).toBe(highDims.height)
+        })
+
         it('GameArtworkRequest prefers local disk over the network URL strategy', async () => {
             provider.registerLocalArtIndex([
                 { appid: 12345, library: { relative_path: 'library_600x900.jpg', hash: 'abc123' } },
@@ -418,6 +464,31 @@ describe('GameArtworkProvider', () => {
             // to pin) - unaffected either way, just confirms the network strategy was never reached.
             const state = SteamArtworkStateManager.getState(12345)
             expect(state?.selectedUrl).toBeUndefined()
+        })
+    })
+
+    describe('Run summary logging (ArtworkSettled)', () => {
+        it('logs a source-mix summary once the prefetch queue settles, not at construction', async () => {
+            Logger.setContextLevel('GameArtworkProvider', LogLevel.INFO)
+            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+            provider.registerLocalArtIndex([
+                { appid: 12345, library: { relative_path: 'library_600x900.jpg' } },
+            ])
+            readArtBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+
+            const dims = ARTWORK_DIMENSIONS.library
+            await provider.fetchPixelsFromLocalDisk(12345, 'library', dims.width, dims.height)
+
+            // Nothing logged yet - the summary is tied to ArtworkSettled, not to individual fetches.
+            expect(consoleSpy.mock.calls.some((args) => args.join(' ').includes('Artwork sources'))).toBe(false)
+
+            EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
+
+            const loggedLines = consoleSpy.mock.calls.map((args) => args.join(' '))
+            expect(loggedLines.some((line) => line.includes('Artwork sources') && line.includes('1 local-disk'))).toBe(true)
+
+            consoleSpy.mockRestore()
         })
     })
 })
