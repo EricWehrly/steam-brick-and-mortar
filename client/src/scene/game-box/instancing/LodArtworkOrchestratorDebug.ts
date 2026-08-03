@@ -8,7 +8,6 @@
  */
 
 import { LodArtworkOrchestrator, type LodArtworkConfig } from './LodArtworkOrchestrator'
-import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes, GameRenderEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
@@ -411,7 +410,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     }
 
     public logHighTextureCacheStats(): void {
-        const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+        const cache = this.getHighTextureCache()
         if (!cache) {
             console.log('❌ HIGH texture cache not enabled (lazyHighTextures=false)')
             return
@@ -449,7 +448,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         
         const cache = this.getHighTextureCache()
         if (cache) {
-            const stats = (cache as HighTextureCacheDebug).getStats()
+            const stats = cache.getStats()
             console.log(`HIGH cache - Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
         }
         

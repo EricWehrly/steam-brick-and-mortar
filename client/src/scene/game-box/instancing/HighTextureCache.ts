@@ -129,7 +129,7 @@ export class HighTextureCache {
     
     /** Callback to notify when slot assignments change */
     private onSlotChange: SlotChangeCallback | null = null
-    
+
     /** Stats for monitoring */
     private stats = {
         evictions: 0,
@@ -138,35 +138,7 @@ export class HighTextureCache {
         pixelCacheHits: 0,
         pixelCacheMisses: 0
     }
-    
-    /** Timing samples for diagnostics (circular buffer, most recent 100 loads) */
-    private timingSamples: Array<{
-        gameIndex: number
-        gameName: string
-        fetchTime: number
-        processTime: number
-        copyTime: number
-        totalTime: number
-        timestamp: number
-        pixelCacheHit: boolean
-    }> = []
-    private readonly MAX_TIMING_SAMPLES = 100
-    
-    /** Detailed profiling samples (optional, for deep analysis) */
-    private profilingSamples: Array<{
-        gameIndex: number
-        gameName: string
-        workerRoundTrip: number
-        arrayBufferCopy: number
-        textureArrayCopy: number
-        callbackTime: number
-        totalMainThread: number
-        pixelCacheHit: boolean
-        timestamp: number
-    }> = []
-    private profilingEnabled = false
-    private readonly MAX_PROFILING_SAMPLES = 50
-    
+
     /** Frame budget scheduler for deferring texture copies */
     private readonly scheduler: FrameBudgetScheduler
     
@@ -536,169 +508,123 @@ export class HighTextureCache {
             entry.state = HighTextureState.FAILED
             return false
         }
-        
+
         if (entry.highSlot < 0) {
             HighTextureCache.logger.warn('Cannot load HIGH texture: no slot assigned')
             entry.state = HighTextureState.FAILED
             return false
         }
-        
+
         const loadStart = window.performance.now()
-        let workerRoundTrip = 0
-        let arrayBufferCopyTime = 0
-        
+
         try {
             HighTextureCache.logger.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
 
-            const fetchStart = window.performance.now()
-
-            // Zero-network, ahead of everything else - Steam's own already-validated local art
-            // beats any network attempt, same precedence GameArtworkProvider gives the MID tier
-            // (see fetchPixelsFromLocalDisk's own doc comment). A miss here (no local slot for
-            // this appid, or the read/decode itself fails) falls straight through to the existing
-            // pixel-cache/background-caching path below - not an error.
-            const localResult = await GameArtworkProvider.getInstance().fetchPixelsFromLocalDisk(
-                entry.appid, 'library', this.config.textureWidth, this.config.textureHeight
-            )
-
-            let imageData: Uint8ClampedArray
-            let processTime = 0
-            let pixelCacheHit: boolean
-
-            if (localResult) {
-                workerRoundTrip = window.performance.now() - fetchStart
-                imageData = localResult.pixels
-                pixelCacheHit = localResult.fromCache
-                HighTextureCache.logger.debug(`LOCAL DISK HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${localResult.width}×${localResult.height})`)
-            } else {
-                // First, check the pixel cache for decoded RGBA data
-                const cachedPixels = await this.pixelCache.get(this.cacheKeyFor(entry.artworkUrl), this.config.textureWidth, this.config.textureHeight)
-                workerRoundTrip = window.performance.now() - fetchStart
-
-                if (cachedPixels) {
-                    // Pixel cache HIT - schedule the processing to avoid frame spikes
-                    // when multiple worker responses arrive in the same frame
-                    this.stats.pixelCacheHits++
-                    pixelCacheHit = true
-
-                    // Measure time to access the transferred ArrayBuffer data
-                    const bufferAccessStart = window.performance.now()
-                    imageData = cachedPixels.pixelData
-                    // Force array access to measure actual time (not just reference assignment)
-                    const _len = imageData.length
-                    arrayBufferCopyTime = window.performance.now() - bufferAccessStart
-
-                    processTime = 0 // No decode needed
-                    HighTextureCache.logger.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
-                } else {
-                    // Pixel cache MISS - defer to background caching to avoid main thread lag
-                    // Release the slot and set CACHING state so we don't block
-                    this.stats.pixelCacheMisses++
-                    HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
-
-                    // Release the allocated slot
-                    if (entry.highSlot >= 0) {
-                        this.slotAllocator.clearSlot(entry.highSlot)
-                        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
-                        entry.highSlot = -1
-                    }
-
-                    // Start background caching (fire and forget) - may itself resolve to a
-                    // known-dead-URL skip, see startBackgroundCaching.
-                    void this.startBackgroundCaching(entry)
-
-                    // Set state to CACHING - will be re-requested when cache is ready
-                    entry.state = HighTextureState.CACHING
-                    return false
-                }
+            const resolved = await this.resolvePixelSource(entry)
+            if (!resolved) {
+                // resolvePixelSource already moved entry to CACHING and released its slot.
+                return false
             }
 
-            const fetchTime = window.performance.now() - fetchStart
-            
-            // Verify size matches texture array expectations
-            const expectedSize = this.config.textureWidth * this.config.textureHeight * 4
-            if (imageData.length !== expectedSize) {
-                HighTextureCache.logger.warn(`HIGH texture data size mismatch for "${entry.gameName}": expected ${expectedSize}, got ${imageData.length}`)
+            if (!this.isExpectedPixelSize(resolved.imageData, entry.gameName)) {
                 entry.state = HighTextureState.FAILED
                 return false
             }
-            
-            // Schedule the texture copy to run when we have frame budget
-            const capturedGameIndex = entry.gameIndex
-            const capturedSlot = entry.highSlot
-            const capturedGameName = entry.gameName
-            
-            // Schedule entire completion: copy + state update + callback
-            const doTextureCompletion = () => {
-                const copyStart = window.performance.now()
-                // Pixel write + dirty-slot tracking + optional debug stripe via ManagedTextureArray
-                this.managedArray!.setSlotPixels(capturedSlot, imageData)
-                const copyTime = window.performance.now() - copyStart
-                
-                // State updates happen in the scheduled task
-                entry.state = HighTextureState.LOADED
-                entry.lastAccessTime = window.performance.now()
-                
-                // Notify callback so renderer can update highTextureSlot attribute
-                if (this.onSlotChange) {
-                    this.onSlotChange(capturedGameIndex, capturedSlot)
-                }
-                
-                // Record profiling if enabled
-                if (this.profilingEnabled) {
-                    this.recordProfilingSample({
-                        gameIndex: capturedGameIndex,
-                        gameName: capturedGameName,
-                        workerRoundTrip,
-                        arrayBufferCopy: arrayBufferCopyTime,
-                        textureArrayCopy: copyTime,
-                        callbackTime: 0,
-                        totalMainThread: arrayBufferCopyTime + copyTime,
-                        pixelCacheHit,
-                        timestamp: window.performance.now()
-                    })
-                }
-            }
-            
-            // Use tryExecuteOrSchedule: runs immediately if we have budget, otherwise schedules
-            const executedImmediately = this.scheduler.tryExecuteOrSchedule(doTextureCompletion, {
-                estimatedMs: 0.5,  // Based on profiling: avg 0.2ms, max 1ms
-                priority: 'normal',
-                maxDeferMs: 500   // Don't wait more than 500ms (30 frames at 60fps)
-            })
-            
+
+            const executedImmediately = this.scheduleTextureCompletion(entry, resolved.imageData)
+
             const totalTime = window.performance.now() - loadStart
             const inFlight = this.loadingPromises.size - 1  // -1 because this one is about to complete
-            const cacheStatus = pixelCacheHit ? '🟢 PIXEL HIT' : '🔴 PIXEL MISS'
+            const cacheStatus = resolved.pixelCacheHit ? '🟢 PIXEL HIT' : '🔴 PIXEL MISS'
             const scheduled = executedImmediately ? 'immediate' : 'scheduled'
-            HighTextureCache.logger.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${capturedSlot} "${capturedGameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, copy: ${scheduled}) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
-            
-            // Record timing sample for diagnostics (copyTime tracked separately in scheduler callback)
-            this.recordTimingSample({
-                gameIndex: entry.gameIndex,
-                gameName: entry.gameName,
-                fetchTime,
-                processTime,
-                copyTime: 0,  // Now measured in scheduler callback
-                totalTime,
-                timestamp: window.performance.now(),
-                pixelCacheHit
-            })
-            
+            HighTextureCache.logger.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (copy: ${scheduled}) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
+
             return true
-            
+
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error)
             HighTextureCache.logger.debug(`Failed to load HIGH texture "${entry.gameName}": ${msg}`)
             entry.state = HighTextureState.FAILED
-            // Free the slot since we failed
-            if (entry.highSlot >= 0) {
-                this.slotAllocator.clearSlot(entry.highSlot)
-                this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
-                entry.highSlot = -1
-            }
+            this.releaseSlot(entry)
             return false
         }
+    }
+
+    /**
+     * Resolves pixel data for entry: local disk first (zero-network, ahead of everything else -
+     * Steam's own already-validated local art beats any network attempt, same precedence
+     * GameArtworkProvider gives the MID tier), then the pixel cache. On a full miss, releases the
+     * slot and defers to background caching (see startBackgroundCaching), leaving entry in
+     * CACHING state to be re-requested once caching completes - returns null in that case.
+     */
+    private async resolvePixelSource(
+        entry: GameEntry
+    ): Promise<{ imageData: Uint8ClampedArray; pixelCacheHit: boolean } | null> {
+        const localResult = await GameArtworkProvider.getInstance().fetchPixelsFromLocalDisk(
+            entry.appid, 'library', this.config.textureWidth, this.config.textureHeight
+        )
+        if (localResult) {
+            HighTextureCache.logger.debug(`LOCAL DISK HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${localResult.width}×${localResult.height})`)
+            return { imageData: localResult.pixels, pixelCacheHit: localResult.fromCache }
+        }
+
+        const cachedPixels = await this.pixelCache.get(this.cacheKeyFor(entry.artworkUrl), this.config.textureWidth, this.config.textureHeight)
+        if (cachedPixels) {
+            this.stats.pixelCacheHits++
+            HighTextureCache.logger.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
+            return { imageData: cachedPixels.pixelData, pixelCacheHit: true }
+        }
+
+        this.stats.pixelCacheMisses++
+        HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
+
+        this.releaseSlot(entry)
+
+        // Start background caching (fire and forget) - may itself resolve to a
+        // known-dead-URL skip, see startBackgroundCaching.
+        void this.startBackgroundCaching(entry)
+        entry.state = HighTextureState.CACHING
+        return null
+    }
+
+    private isExpectedPixelSize(imageData: Uint8ClampedArray, gameName: string): boolean {
+        const expectedSize = this.config.textureWidth * this.config.textureHeight * 4
+        if (imageData.length === expectedSize) {
+            return true
+        }
+        HighTextureCache.logger.warn(`HIGH texture data size mismatch for "${gameName}": expected ${expectedSize}, got ${imageData.length}`)
+        return false
+    }
+
+    /**
+     * Schedules the GPU-bound pixel copy + state transition via FrameBudgetScheduler (runs
+     * immediately if there's frame budget, otherwise deferred). Captures gameIndex/slot/gameName
+     * up front rather than reading them off `entry` inside the closure, since eviction
+     * (evictGame/evictAll) can reassign entry's slot while this load is still in flight.
+     * @returns true if the completion ran immediately, false if it was deferred to a later frame.
+     */
+    private scheduleTextureCompletion(entry: GameEntry, imageData: Uint8ClampedArray): boolean {
+        const capturedGameIndex = entry.gameIndex
+        const capturedSlot = entry.highSlot
+
+        const doTextureCompletion = () => {
+            // Pixel write + dirty-slot tracking + optional debug stripe via ManagedTextureArray
+            this.managedArray!.setSlotPixels(capturedSlot, imageData)
+
+            entry.state = HighTextureState.LOADED
+            entry.lastAccessTime = window.performance.now()
+
+            // Notify callback so renderer can update highTextureSlot attribute
+            if (this.onSlotChange) {
+                this.onSlotChange(capturedGameIndex, capturedSlot)
+            }
+        }
+
+        return this.scheduler.tryExecuteOrSchedule(doTextureCompletion, {
+            estimatedMs: 0.5,  // Based on profiling: avg 0.2ms, max 1ms
+            priority: 'normal',
+            maxDeferMs: 500   // Don't wait more than 500ms (30 frames at 60fps)
+        })
     }
     
     /**
@@ -762,74 +688,6 @@ export class HighTextureCache {
     }
 
     /**
-     * Log cache statistics
-     */
-    public logStats(): void {
-        const stats = this.getStats()
-        HighTextureCache.logger.info(`HIGH Texture Cache: ${stats.loaded}/${stats.totalSlots} loaded, ${stats.loading} loading, ${stats.failed} failed, ${stats.evictions} evictions, ${stats.cacheHits}/${stats.cacheHits + stats.cacheMisses} cache hits`)
-    }
-
-    // ========================================================================
-    // Protected getters for debug class access
-    // ========================================================================
-
-    protected getGames(): Map<number, GameEntry> {
-        return this.games
-    }
-
-    protected getSlotToGame(): number[] {
-        return this.slotToGame
-    }
-
-    protected getLoadQueue(): number[] {
-        return this.loadQueue
-    }
-
-    protected getLoadingPromises(): Map<number, Promise<boolean>> {
-        return this.loadingPromises
-    }
-
-    protected getConfig(): HighTextureCacheConfig {
-        return this.config
-    }
-
-    protected getInternalStats(): typeof this.stats {
-        return this.stats
-    }
-
-    protected getDataArrayTexture(): THREE.DataArrayTexture {
-        return this.managedArray!.texture
-    }
-
-    protected getTimingSamples(): typeof this.timingSamples {
-        return this.timingSamples
-    }
-
-    protected getMaxTimingSamples(): number {
-        return this.MAX_TIMING_SAMPLES
-    }
-
-    protected getProfilingSamples(): typeof this.profilingSamples {
-        return this.profilingSamples
-    }
-
-    protected isProfilingEnabled(): boolean {
-        return this.profilingEnabled
-    }
-
-    protected setProfilingEnabled(enabled: boolean): void {
-        this.profilingEnabled = enabled
-    }
-
-    protected clearProfilingSamples(): void {
-        this.profilingSamples = []
-    }
-
-    protected clearTimingSamplesInternal(): void {
-        this.timingSamples = []
-    }
-
-    /**
      * Evict all currently loaded HIGH textures, freeing all slots.
      * Called when the app loses focus for an extended period to release GPU memory.
      * Games will reload from pixel cache (fast) or network (slow) on next request.
@@ -838,19 +696,16 @@ export class HighTextureCache {
         let evictedCount = 0
         for (const entry of this.games.values()) {
             if (entry.state === HighTextureState.LOADED && entry.highSlot >= 0) {
-                this.slotAllocator.clearSlot(entry.highSlot)
+                const gameIndex = entry.gameIndex
+                this.releaseSlot(entry)
                 entry.state = HighTextureState.EMPTY
-                entry.highSlot = -1
                 this.stats.evictions++
                 evictedCount++
-                if (this.onSlotChange) {
-                    this.onSlotChange(entry.gameIndex, -1)
-                }
+                this.onSlotChange?.(gameIndex, -1)
             }
         }
         // Cancel any pending loads — no point loading while unfocused
         this.loadQueue = []
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         if (evictedCount > 0) {
             HighTextureCache.logger.info(`evictAll: released ${evictedCount} HIGH texture slots`)
         }
@@ -865,19 +720,28 @@ export class HighTextureCache {
         if (!entry || entry.highSlot < 0) {
             return false
         }
-        
-        const freedSlot = entry.highSlot
-        this.slotAllocator.clearSlot(freedSlot)
+
+        this.releaseSlot(entry)
         entry.state = HighTextureState.EMPTY
-        entry.highSlot = -1
         this.stats.evictions++
-        
-        if (this.onSlotChange) {
-            this.onSlotChange(entry.gameIndex, -1)
-        }
-        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+        this.onSlotChange?.(gameIndex, -1)
 
         return true
+    }
+
+    /**
+     * Releases a slot this entry currently holds back to the allocator and clears its own
+     * bookkeeping. Only valid when the entry itself still owns the slot - allocateSlot()'s
+     * internal eviction-during-allocation branch is a different case (the allocator has already
+     * reassigned the slot there, so calling this would clear the NEW owner's slot instead).
+     */
+    private releaseSlot(entry: GameEntry): void {
+        if (entry.highSlot < 0) {
+            return
+        }
+        this.slotAllocator.clearSlot(entry.highSlot)
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+        entry.highSlot = -1
     }
 
     public dispose(): void {
@@ -888,39 +752,6 @@ export class HighTextureCache {
         this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         this.textureWorker.dispose()
         HighTextureCache.logger.lifecycle('Disposed')
-    }
-    
-    private recordTimingSample(sample: {
-        gameIndex: number
-        gameName: string
-        fetchTime: number
-        processTime: number
-        copyTime: number
-        totalTime: number
-        timestamp: number
-        pixelCacheHit: boolean
-    }): void {
-        this.timingSamples.push(sample)
-        if (this.timingSamples.length > this.MAX_TIMING_SAMPLES) {
-            this.timingSamples.shift()
-        }
-    }
-    
-    private recordProfilingSample(sample: {
-        gameIndex: number
-        gameName: string
-        workerRoundTrip: number
-        arrayBufferCopy: number
-        textureArrayCopy: number
-        callbackTime: number
-        totalMainThread: number
-        pixelCacheHit: boolean
-        timestamp: number
-    }): void {
-        this.profilingSamples.push(sample)
-        if (this.profilingSamples.length > this.MAX_PROFILING_SAMPLES) {
-            this.profilingSamples.shift()
-        }
     }
 }
 
