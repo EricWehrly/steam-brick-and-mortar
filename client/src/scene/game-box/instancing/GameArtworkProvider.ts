@@ -298,6 +298,15 @@ export class GameArtworkProvider {
     }
 
     /**
+     * Whether fetchPixelsFromLocalDisk(appId, format) would resolve without touching the network -
+     * lets callers that decide fetch ORDER (see ArtworkPrefetchCoordinator) prefer cheap, fast
+     * disk-backed games without needing to attempt the fetch first.
+     */
+    public hasLocalArt(appId: number, format: ArtworkFormat): boolean {
+        return this.getLocalArtSlot(appId, format) !== undefined
+    }
+
+    /**
      * Read pixels straight from Steam's own local librarycache, zero network - see
      * docs/plans/startup-artwork-resolution-plan.md, Root Cause D. Returns null (not a rejected
      * promise) whenever this isn't available for the appId/format, so callers can fall through to

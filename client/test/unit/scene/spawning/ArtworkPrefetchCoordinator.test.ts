@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 
 import { EventManager } from '../../../../src/core/EventManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
+import { GameArtworkProvider } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
 import { ArtworkPrefetchCoordinator, type PrefetchResult } from '../../../../src/scene/spawning/ArtworkPrefetchCoordinator'
 import {
     GameEventTypes,
@@ -45,6 +46,12 @@ describe('ArtworkPrefetchCoordinator', () => {
         EventManager.getInstance().removeAllListeners(GameRenderEventTypes.ArtworkIntentSettled)
         EventManager.getInstance().removeAllListeners(GameRenderEventTypes.PlacementIntentReady)
         vi.clearAllMocks()
+    })
+
+    afterEach(() => {
+        // Coordinator reads GameArtworkProvider's local-art index (see the local-disk tier
+        // test below) - dispose so each test starts from a fresh, empty index.
+        GameArtworkProvider.getInstance().dispose()
     })
 
     it('emits ArtworkIntentSettled once per game while delegating all prefetch decisions to renderer', async () => {
@@ -211,6 +218,51 @@ describe('ArtworkPrefetchCoordinator', () => {
         coordinator.dispose()
     })
 
+    it('prefers a local-disk-backed game over plain FIFO when neither has a known position yet', async () => {
+        GameArtworkProvider.getInstance().registerLocalArtIndex([
+            { appid: 2, library: { relative_path: '2/library.jpg' } },
+        ])
+
+        const coordinator = new ArtworkPrefetchCoordinator({ maxConcurrentPrefetch: 1 })
+        const deferreds = new Map<number, ReturnType<typeof createDeferred<PrefetchResult>>>(
+            [0, 1, 2].map((appid) => [appid, createDeferred<PrefetchResult>()])
+        )
+        const renderer = {
+            prefetchArtwork: vi.fn((appid: number) => deferreds.get(appid)!.promise),
+        } as any
+        // None of these have a known position - appid 2 is the only one with local art.
+        const games = [0, 1, 2].map((appid) => ({ appid, name: `Game ${appid}`, artwork: undefined }))
+
+        coordinator.prefetchBatch(games as any[], renderer)
+
+        // Cap of 1: appid 2 (local-disk-backed) jumps the queue ahead of 0 and 1, despite being enqueued last.
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(1)
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(1, 2, undefined, 'Game 2')
+
+        deferreds.get(2)!.resolve('prefetched')
+        await deferreds.get(2)!.promise
+        await Promise.resolve()
+        await Promise.resolve()
+
+        // Remaining games fall back to plain FIFO order.
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(2)
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 0, undefined, 'Game 0')
+
+        deferreds.get(0)!.resolve('prefetched')
+        await deferreds.get(0)!.promise
+        await Promise.resolve()
+        await Promise.resolve()
+
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(3)
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(3, 1, undefined, 'Game 1')
+
+        deferreds.get(1)!.resolve('prefetched')
+        await deferreds.get(1)!.promise
+        await Promise.resolve()
+
+        coordinator.dispose()
+    })
+
     it('logs a scheduling summary on ArtworkSettled reflecting how many dispatches were distance-priority vs FIFO/background', async () => {
         const camera = new THREE.PerspectiveCamera()
         camera.position.set(0, 0, 0)
@@ -254,7 +306,7 @@ describe('ArtworkPrefetchCoordinator', () => {
         EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
 
         expect(mockInfo).toHaveBeenCalledWith(
-            expect.stringContaining('Prefetch scheduling: 2/3 dispatched by distance-priority, 1/3 by FIFO/background')
+            expect.stringContaining('Prefetch scheduling: 2/3 by distance-priority, 0/3 by local-disk (no known position yet), 1/3 by plain FIFO')
         )
 
         coordinator.dispose()
