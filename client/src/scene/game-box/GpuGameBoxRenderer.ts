@@ -71,6 +71,8 @@ export class GpuGameBoxRenderer {
     private resolvedArtworkPlacements = 0
     private resolvedLabelPlacements = 0
     private failedLabelPlacements = 0
+    /** Logged once per placement run - failedLabelPlacements already tallies the total for the run summary. */
+    private labelCapacityWarningLogged = false
 
     constructor(
         textureCapacity: number,
@@ -143,6 +145,7 @@ export class GpuGameBoxRenderer {
         this.resolvedArtworkPlacements = 0
         this.resolvedLabelPlacements = 0
         this.failedLabelPlacements = 0
+        this.labelCapacityWarningLogged = false
     }
 
     private placeResolvedGame(
@@ -189,7 +192,13 @@ export class GpuGameBoxRenderer {
         }
 
         this.failedLabelPlacements++
-        GpuGameBoxRenderer.logger.warn(`Failed to add label box for "${game.name}" (label instance limit reached?)`)
+        if (!this.labelCapacityWarningLogged) {
+            GpuGameBoxRenderer.logger.warn(
+                `Failed to add label box for "${game.name}" (label instance limit reached?) - ` +
+                `further failures this run are counted, not logged individually (see run summary)`
+            )
+            this.labelCapacityWarningLogged = true
+        }
     }
 
     /**

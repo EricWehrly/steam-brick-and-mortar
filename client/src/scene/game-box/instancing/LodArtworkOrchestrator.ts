@@ -472,7 +472,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     ): number {
         const textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
-            LodArtworkOrchestrator.logger.warn(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid})`)
+            // Expected/routine fallback path, no log here - GpuGameBoxRenderer.placeResolvedGame
+            // falls through to a label box and its own run summary aggregates the true count.
             return -1
         }
 
@@ -507,7 +508,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     ): boolean {
         const textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
-            LodArtworkOrchestrator.logger.warn(`setInstanceArtwork: no prefetched texture for "${gameName}" (appId ${appid})`)
+            // GpuGameBoxRenderer.handlePlacementRepointRequested already warns on repoint failure.
             return false
         }
 
