@@ -159,14 +159,9 @@ export class GameArtworkRequest implements GameArtwork {
         this.provider.recordFailure(this.appId, this.format, this.failureReason, [...triedUrls, ...skippedDeadUrls])
         this.setArtworkSelection('label')
 
-        // rawError= is included because reason= can't discriminate CORS from 404 on Chromium
-        // (both surface as an identical TypeError) - see categorizeError().
-        GameArtworkRequest.logger.warn(
-            `Artwork resolution failed for appId ${this.appId} (${this.gameName}). ` +
-            `reason=${this.failureReason}; rawError=${rawErrorMessage}; tried=${triedUrls.join(' -> ')}` +
-            (skippedDeadUrls.length > 0 ? `; skipped(known-dead)=${skippedDeadUrls.join(' -> ')}` : '')
-        )
-
+        // No per-occurrence log here - GameArtworkProvider.logRunSummary() reports the aggregate
+        // once the whole prefetch queue settles; recordFailure() just above already stores
+        // triedUrls/skippedDeadUrls for a specific game's own inspection.
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
     }
 

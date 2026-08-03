@@ -37,6 +37,8 @@ export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase 
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
     private readonly boundHandleArtworkSettled: () => void
     private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
+    /** Logged once per placement run instead of once per failed addLabelInstance() call. */
+    private capacityWarningLogged: boolean = false
 
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
@@ -89,7 +91,10 @@ export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase 
 
         const index = this.allocateInstanceIndex()
         if (index < 0) {
-            console.warn(`No label slots remaining (${this.maxInstances})`)
+            if (!this.capacityWarningLogged) {
+                console.warn(`No label slots remaining (${this.maxInstances}) - further games this run will be dropped`)
+                this.capacityWarningLogged = true
+            }
             return -1
         }
 
@@ -277,6 +282,7 @@ export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase 
     private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
         this.resetForPlacementRun()
         this.publishLabelMetadataReference()
+        this.capacityWarningLogged = false
 
         if (this.instancedMesh) {
             this.invalidateInstancedMesh(this.instancedMesh)
