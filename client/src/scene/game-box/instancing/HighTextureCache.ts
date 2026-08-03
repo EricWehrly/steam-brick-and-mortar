@@ -20,8 +20,11 @@
 
 import * as THREE from 'three'
 import { Logger } from '../../../utils/Logger'
+import { UrlUtils } from '../../../utils/UrlUtils'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
+import { GameArtworkProvider } from './GameArtworkProvider'
+import { AppDetailsCache } from '../../../steam/cache/AppDetailsCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 import { ManagedTextureArray } from './ManagedTextureArray'
 import { LOD_TIER_NAME } from './IGameArtworkPipeline'
@@ -67,7 +70,9 @@ interface GameEntry {
     gameIndex: number
     /** Game name for debugging/logging */
     gameName: string
-    /** URL to load HIGH texture from */
+    /** Needed to check Steam's local librarycache and artwork_dead_paths before any network attempt. */
+    appid: number
+    /** URL to load HIGH texture from - only consulted when no local art is available */
     artworkUrl: string
     /** Current state */
     state: HighTextureState
@@ -229,7 +234,7 @@ export class HighTextureCache {
      * Register a game (called when a game is added)
      * Does NOT load the HIGH texture - just records that the game exists
      */
-    public registerGame(gameIndex: number, gameName: string, artworkUrl: string): void {
+    public registerGame(gameIndex: number, gameName: string, appid: number, artworkUrl: string): void {
         if (this.games.has(gameIndex)) {
             return // Already registered
         }
@@ -237,6 +242,7 @@ export class HighTextureCache {
         this.games.set(gameIndex, {
             gameIndex,
             gameName,
+            appid,
             artworkUrl,
             state: HighTextureState.EMPTY,
             highSlot: -1,
@@ -458,19 +464,35 @@ export class HighTextureCache {
         }
     }
     
+    /** Cache key used for the network-URL path only - local disk art is keyed by GameArtworkProvider itself. */
+    private cacheKeyFor(url: string): string {
+        return UrlUtils.stripQueryParam(url, 't')
+    }
+
     /**
      * Start background caching for a game (fetch + decode + store in pixel cache)
      * This runs in the background without blocking HIGH texture loading
      * When complete, the game will be re-requested and load from pixel cache (fast path)
+     *
+     * Only reached when GameArtworkProvider has no local-disk art for this appid (see
+     * loadHighTexture) - entry.artworkUrl is always a real network URL here.
      */
-    private startBackgroundCaching(entry: GameEntry): void {
+    private async startBackgroundCaching(entry: GameEntry): Promise<void> {
         if (this.backgroundCachingGames.has(entry.gameIndex)) {
             return // Already caching
         }
-        
+
+        const cacheKeyUrl = this.cacheKeyFor(entry.artworkUrl)
+        const deadPaths = await AppDetailsCache.getDeadArtworkPaths(entry.appid)
+        if (deadPaths.has(cacheKeyUrl)) {
+            HighTextureCache.logger.debug(`BACKGROUND CACHE SKIP ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" - known-dead URL`)
+            entry.state = HighTextureState.FAILED
+            return
+        }
+
         this.backgroundCachingGames.add(entry.gameIndex)
         HighTextureCache.logger.debug(`BACKGROUND CACHE START ${entry.gameIndex} "${entry.gameName.slice(0, 15)}"`)
-        
+
         // Fire and forget - fetch, decode to target size, and store in pixel cache
         this.textureWorker.fetchAndProcessWithOptions(
             entry.artworkUrl,
@@ -489,10 +511,10 @@ export class HighTextureCache {
                 this.backgroundCachingGames.delete(entry.gameIndex)
                 return
             }
-            
+
             // Store in pixel cache
-            await this.pixelCache.put(entry.artworkUrl, result.imageData, result.width, result.height)
-            
+            await this.pixelCache.put(cacheKeyUrl, result.imageData, result.width, result.height)
+
             HighTextureCache.logger.debug(`BACKGROUND CACHE COMPLETE ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${result.width}×${result.height})`)
             this.backgroundCachingGames.delete(entry.gameIndex)
             // Entry stays in CACHING state - next requestHighTexture() will detect cache ready
@@ -501,6 +523,7 @@ export class HighTextureCache {
             HighTextureCache.logger.debug(`BACKGROUND CACHE FAILED ${entry.gameIndex} "${entry.gameName.slice(0, 15)}": ${msg}`)
             entry.state = HighTextureState.FAILED
             this.backgroundCachingGames.delete(entry.gameIndex)
+            AppDetailsCache.markArtworkPathDead(entry.appid, entry.artworkUrl).catch(() => { /* best-effort persistence */ })
         })
     }
 
@@ -526,52 +549,70 @@ export class HighTextureCache {
         
         try {
             HighTextureCache.logger.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
-            
-            // First, check the pixel cache for decoded RGBA data
+
             const fetchStart = window.performance.now()
-            const cachedPixels = await this.pixelCache.get(entry.artworkUrl, this.config.textureWidth, this.config.textureHeight)
-            workerRoundTrip = window.performance.now() - fetchStart
-            
+
+            // Zero-network, ahead of everything else - Steam's own already-validated local art
+            // beats any network attempt, same precedence GameArtworkProvider gives the MID tier
+            // (see fetchPixelsFromLocalDisk's own doc comment). A miss here (no local slot for
+            // this appid, or the read/decode itself fails) falls straight through to the existing
+            // pixel-cache/background-caching path below - not an error.
+            const localResult = await GameArtworkProvider.getInstance().fetchPixelsFromLocalDisk(
+                entry.appid, 'library', this.config.textureWidth, this.config.textureHeight
+            )
+
             let imageData: Uint8ClampedArray
             let processTime = 0
-            let pixelCacheHit = false
-            
-            if (cachedPixels) {
-                // Pixel cache HIT - schedule the processing to avoid frame spikes
-                // when multiple worker responses arrive in the same frame
-                this.stats.pixelCacheHits++
-                pixelCacheHit = true
-                
-                // Measure time to access the transferred ArrayBuffer data
-                const bufferAccessStart = window.performance.now()
-                imageData = cachedPixels.pixelData
-                // Force array access to measure actual time (not just reference assignment)
-                const _len = imageData.length
-                arrayBufferCopyTime = window.performance.now() - bufferAccessStart
-                
-                processTime = 0 // No decode needed
-                HighTextureCache.logger.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
+            let pixelCacheHit: boolean
+
+            if (localResult) {
+                workerRoundTrip = window.performance.now() - fetchStart
+                imageData = localResult.pixels
+                pixelCacheHit = localResult.fromCache
+                HighTextureCache.logger.debug(`LOCAL DISK HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${localResult.width}×${localResult.height})`)
             } else {
-                // Pixel cache MISS - defer to background caching to avoid main thread lag
-                // Release the slot and set CACHING state so we don't block
-                this.stats.pixelCacheMisses++
-                HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
-                
-                // Release the allocated slot
-                if (entry.highSlot >= 0) {
-                    this.slotAllocator.clearSlot(entry.highSlot)
-                    this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
-                    entry.highSlot = -1
+                // First, check the pixel cache for decoded RGBA data
+                const cachedPixels = await this.pixelCache.get(this.cacheKeyFor(entry.artworkUrl), this.config.textureWidth, this.config.textureHeight)
+                workerRoundTrip = window.performance.now() - fetchStart
+
+                if (cachedPixels) {
+                    // Pixel cache HIT - schedule the processing to avoid frame spikes
+                    // when multiple worker responses arrive in the same frame
+                    this.stats.pixelCacheHits++
+                    pixelCacheHit = true
+
+                    // Measure time to access the transferred ArrayBuffer data
+                    const bufferAccessStart = window.performance.now()
+                    imageData = cachedPixels.pixelData
+                    // Force array access to measure actual time (not just reference assignment)
+                    const _len = imageData.length
+                    arrayBufferCopyTime = window.performance.now() - bufferAccessStart
+
+                    processTime = 0 // No decode needed
+                    HighTextureCache.logger.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
+                } else {
+                    // Pixel cache MISS - defer to background caching to avoid main thread lag
+                    // Release the slot and set CACHING state so we don't block
+                    this.stats.pixelCacheMisses++
+                    HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
+
+                    // Release the allocated slot
+                    if (entry.highSlot >= 0) {
+                        this.slotAllocator.clearSlot(entry.highSlot)
+                        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+                        entry.highSlot = -1
+                    }
+
+                    // Start background caching (fire and forget) - may itself resolve to a
+                    // known-dead-URL skip, see startBackgroundCaching.
+                    void this.startBackgroundCaching(entry)
+
+                    // Set state to CACHING - will be re-requested when cache is ready
+                    entry.state = HighTextureState.CACHING
+                    return false
                 }
-                
-                // Start background caching (fire and forget)
-                this.startBackgroundCaching(entry)
-                
-                // Set state to CACHING - will be re-requested when cache is ready
-                entry.state = HighTextureState.CACHING
-                return false
             }
-            
+
             const fetchTime = window.performance.now() - fetchStart
             
             // Verify size matches texture array expectations
