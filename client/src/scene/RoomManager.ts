@@ -152,7 +152,7 @@ export class RoomManager {
 
     private onFrame(): void {
         if (!this.isLiminalActive || !this.roomGroup) return
-        this.roomGroup.position.z = this.appliedZAtLastBuild + (this.camera.position.z - this.cameraZAtLastBuild)
+        this.roomGroup.position.z = this.appliedZAtLastBuild + (this.cameraRig.position.z - this.cameraZAtLastBuild)
     }
     
     private async createInitialRoom(): Promise<void> {
@@ -273,7 +273,7 @@ export class RoomManager {
             // Captured after any camera repositioning above, so the liminal
             // follow logic (onFrame) always has an accurate baseline pair.
             this.appliedZAtLastBuild = appliedZ
-            this.cameraZAtLastBuild = this.camera.position.z
+            this.cameraZAtLastBuild = this.cameraRig.position.z
         }
 
         this.emitProgress('Building floor')
