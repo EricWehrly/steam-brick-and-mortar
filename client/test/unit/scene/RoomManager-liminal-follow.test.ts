@@ -11,7 +11,7 @@ import type { LayoutRequestedEvent } from '../../../src/types/EnvironmentEvents'
 
 describe('RoomManager — liminal treadmill follow', () => {
     let roomManager: RoomManager
-    let camera: THREE.PerspectiveCamera
+    let cameraRig: THREE.Object3D
     let eventManager: EventManager
     let frameCallback: (now: number, deltaTime: number) => void
 
@@ -38,11 +38,11 @@ describe('RoomManager — liminal treadmill follow', () => {
         eventManager = EventManager.getInstance()
 
         const scene = new THREE.Scene()
-        camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
-        camera.position.set(0, 1.6, 0)
+        cameraRig = new THREE.Group()
+        cameraRig.position.set(0, 1.6, 0)
 
         DataManager.getInstance().set(DataKey.MainScene, scene, { domain: DataDomain.Scene })
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.MainCameraRig, cameraRig, { domain: DataDomain.Scene })
 
         RenderLoopRegistry.getInstance().unregister('RoomManager')
         roomManager = new RoomManager()
@@ -63,7 +63,7 @@ describe('RoomManager — liminal treadmill follow', () => {
         await Promise.resolve()
         const initialZ = roomGroupZ()
 
-        camera.position.z = -50
+        cameraRig.position.z = -50
         frameCallback(0, 0)
 
         expect(roomGroupZ()).toBe(initialZ)
@@ -73,10 +73,10 @@ describe('RoomManager — liminal treadmill follow', () => {
         emitShelfLayoutDetermined()
         await Promise.resolve()
         const initialZ = roomGroupZ()
-        const initialCameraZ = camera.position.z
+        const initialCameraZ = cameraRig.position.z
 
         emitLayoutRequested('liminal')
-        camera.position.z = initialCameraZ - 12
+        cameraRig.position.z = initialCameraZ - 12
         frameCallback(0, 0)
 
         expect(roomGroupZ()).toBeCloseTo(initialZ - 12)
@@ -86,14 +86,14 @@ describe('RoomManager — liminal treadmill follow', () => {
         emitShelfLayoutDetermined()
         await Promise.resolve()
         const initialZ = roomGroupZ()
-        const initialCameraZ = camera.position.z
+        const initialCameraZ = cameraRig.position.z
         emitLayoutRequested('liminal')
 
-        camera.position.z = initialCameraZ - 5
+        cameraRig.position.z = initialCameraZ - 5
         frameCallback(0, 0)
         expect(roomGroupZ()).toBeCloseTo(initialZ - 5)
 
-        camera.position.z = initialCameraZ - 30
+        cameraRig.position.z = initialCameraZ - 30
         frameCallback(0, 0)
         expect(roomGroupZ()).toBeCloseTo(initialZ - 30)
     })
@@ -102,15 +102,15 @@ describe('RoomManager — liminal treadmill follow', () => {
         emitShelfLayoutDetermined()
         await Promise.resolve()
         const initialZ = roomGroupZ()
-        const initialCameraZ = camera.position.z
+        const initialCameraZ = cameraRig.position.z
         emitLayoutRequested('liminal')
 
-        camera.position.z = initialCameraZ - 10
+        cameraRig.position.z = initialCameraZ - 10
         frameCallback(0, 0)
         expect(roomGroupZ()).toBeCloseTo(initialZ - 10)
 
         emitLayoutRequested('row')
-        camera.position.z = initialCameraZ - 999
+        cameraRig.position.z = initialCameraZ - 999
         frameCallback(0, 0)
 
         // Room stays wherever it was left when liminal deactivated.
@@ -122,7 +122,7 @@ describe('RoomManager — liminal treadmill follow', () => {
         await Promise.resolve()
         emitLayoutRequested('liminal')
 
-        camera.position.z = -40
+        cameraRig.position.z = -40
         frameCallback(0, 0)
         expect(roomGroupZ()).not.toBe(0)
 
