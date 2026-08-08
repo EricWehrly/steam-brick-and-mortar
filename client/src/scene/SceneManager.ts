@@ -152,10 +152,23 @@ export class SceneManager {
 
     private onXrSessionStart(): void {
         this.renderer.toneMapping = THREE.AgXToneMapping
+        // RenderPipelineManager's EffectComposer sets renderer.autoClear = false at construction
+        // (postprocessing's EffectComposer.setRenderer() - it manages clearing itself, per-pass,
+        // inside composer.render()). The XR render path in startRenderLoop() bypasses the composer
+        // entirely and calls this.renderer.render() directly (XR takes over projection;
+        // post-processing is skipped in VR), so with autoClear left false nothing ever clears the
+        // color/depth buffer for the whole session - every frame's draws accumulate on top of
+        // every previous frame's stale depth data. Root cause of the Edge/WebView2 "advancing
+        // darkness" bug (progressive geometry dropout, absent in Chrome - the WebXR spec doesn't
+        // mandate the browser implicitly clear the opaque XR framebuffer per frame, so Chrome's
+        // compositor apparently masks this while Edge/WebView2's doesn't). Restored to false on
+        // session end so the desktop path's composer-driven clearing keeps working correctly.
+        this.renderer.autoClear = true
     }
 
     private onXrSessionEnd(): void {
         this.renderer.toneMapping = THREE.NoToneMapping
+        this.renderer.autoClear = false
     }
 
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {

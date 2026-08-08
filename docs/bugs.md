@@ -98,6 +98,9 @@ implementation)
 
 ## Resolved Bugs
 
+### "Advancing darkness" — progressive geometry dropout in WebXR under Edge/WebView2
+**Status**: 🟢 Fixed 2026-08-07 — `RenderPipelineManager`'s `EffectComposer` sets `renderer.autoClear = false` at construction (it manages clearing itself, per-pass, inside `composer.render()`). The XR render path in `SceneManager.startRenderLoop()` bypasses the composer entirely and calls `renderer.render()` directly (XR takes over projection; post-processing is skipped in VR), so with `autoClear` left `false` nothing ever cleared the color/depth buffer for the whole VR session — every frame's draws accumulated on top of every previous frame's stale depth data, read as progressive geometry occlusion. Content-independent (reproduced with an empty room and even with two trivial boxes), absent in Chrome (the WebXR spec doesn't mandate the browser implicitly clear the opaque XR framebuffer per frame — Chrome's compositor apparently masks this, Edge/WebView2's doesn't). Fixed by toggling `renderer.autoClear` alongside the existing tone-mapping switch in `onXrSessionStart()`/`onXrSessionEnd()`. See `client/src/scene/SceneManager.ts`.
+
 ### Local-scan write silently wipes artwork on every relaunch, not just first launch
 **Status**: 🟢 Fixed 2026-07-15 — `writeLocalAppMetadata()` preserved a hardcoded placeholder over real artwork on every load; fixed by reading existing entries first, then closed structurally by `AppDetailsCache.mergeMany()`'s per-field merge. See `client/src/steam/LocalSteamDataWriter.ts`.
 
