@@ -11,10 +11,17 @@ export const SceneManagerMock = vi.fn().mockImplementation(() => {
         dispose: vi.fn()
     }
     
+    // The camera is parented under the rig in production (see SceneManager's cameraRig doc
+    // comment) - camera.position is always a local offset (identity here, matching reality),
+    // never world position. World placement lives on the rig. Keeping these distinct (instead of
+    // both reporting the same coordinates) means a test that wrongly reads getCamera().position
+    // expecting world coordinates gets an implausible (0,0,0) instead of a plausible-looking wrong
+    // answer from the rig's own position.
     const mockCamera = {
-        position: { x: 0, y: 5, z: 10 },
+        position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
-        lookAt: vi.fn()
+        lookAt: vi.fn(),
+        getWorldPosition: vi.fn((target = { x: 0, y: 5, z: 10 }) => Object.assign(target, { x: 0, y: 5, z: 10 }))
     }
 
     const mockCameraRig = {
