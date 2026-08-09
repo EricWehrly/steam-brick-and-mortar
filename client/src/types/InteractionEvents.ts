@@ -292,6 +292,18 @@ export interface PlacementRepointRequestedEvent extends BaseInteractionEvent {
     rotation: THREE.Quaternion
 }
 
+/**
+ * Emitted when a shelf's content changes to a different section or becomes empty
+ * (liminal mode's treadmill — see docs/plans/liminal-shelf-signs-plan.md §3.2).
+ * Shelf-granular (not instance-granular) signal for dependents that need to
+ * (de)activate or update shelf-level decorations (e.g. shelf signs) when the
+ * shelf's anchored section changes.
+ */
+export interface ShelfSectionRepointedEvent extends BaseInteractionEvent {
+    readonly shelfIndex: number
+    readonly sectionName: string | null
+}
+
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
@@ -446,6 +458,7 @@ export const GameRenderEventTypes = {
     PlacementResolved: 'game-render:placement-resolved',
     PlacementCommitted: 'game-render:placement-committed',
     PlacementRepointRequested: 'game-render:placement-repoint-requested',
+    ShelfSectionRepointed: 'game-render:shelf-section-repointed',
 } as const
 
 export const CeilingEventTypes = {
