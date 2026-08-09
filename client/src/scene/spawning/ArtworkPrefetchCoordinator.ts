@@ -100,6 +100,7 @@ export class ArtworkPrefetchCoordinator {
     private readonly knownPositions: Map<number, THREE.Vector3> = new Map()
     private inFlightCount = 0
     private readonly tmpVec = new THREE.Vector3()
+    private readonly tmpCameraWorldPos = new THREE.Vector3()
 
     /** Scheduling counters (see logSchedulingSummary) - confirms the priority tiers are actually engaging. */
     private dispatchedByDistance = 0
@@ -227,12 +228,16 @@ export class ArtworkPrefetchCoordinator {
             return null
         }
 
+        // camera.position is a local offset from its parent movement rig (see SceneManager's
+        // cameraRig doc comment), not world position - resolve once, outside the loop below.
+        const cameraWorldPos = camera.getWorldPosition(this.tmpCameraWorldPos)
+
         let bestIndex = -1
         let bestDistSq = Infinity
         for (let i = 0; i < this.pendingQueue.length; i++) {
             const position = this.knownPositions.get(this.pendingQueue[i].appid)
             if (!position) continue
-            this.tmpVec.copy(position).sub(camera.position)
+            this.tmpVec.copy(position).sub(cameraWorldPos)
             const distSq = this.tmpVec.lengthSq()
             if (distSq < bestDistSq) {
                 bestDistSq = distSq

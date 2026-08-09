@@ -10,9 +10,14 @@
  * published it to DataManager by then — the same guarantee RoomManager's
  * constructor already relies on), not re-resolved every check. There's no
  * discrete "camera moved" event to hook instead — CameraInputApplier mutates
- * camera.position imperatively every frame with nothing emitted — and
+ * the camera's parent rig imperatively every frame with nothing emitted — and
  * inventing one would add per-frame event-dispatch overhead for no cheaper a
- * cadence than reading the cached reference's .position directly.
+ * cadence than reading the cached reference's world position directly.
+ *
+ * That world position must go through camera.getWorldPosition(), never
+ * camera.position directly: the camera is parented under a movement rig (see
+ * SceneManager's cameraRig doc comment), so camera.position is only ever a
+ * local offset from the rig (effectively always identity), not world Z.
  *
  * onFrame samples position every BOUNDARY_CHECK_FRAME_INTERVAL frames
  * (mirrors LodDistanceManager's existing infrequent-check pattern), against
@@ -64,6 +69,7 @@ export function computeSlotIndexForWorldZ(z: number): number {
 
 export class LiminalBoundaryTracker {
     private readonly camera: THREE.Camera
+    private readonly tmpCameraWorldPos = new THREE.Vector3()
     private isLiminalActive = false
     private hasBaseline = false
     private frameCount = 0
@@ -110,11 +116,11 @@ export class LiminalBoundaryTracker {
         this.frameCount++
         if (this.frameCount % BOUNDARY_CHECK_FRAME_INTERVAL !== 0) return
 
-        this.resolveCrossings(this.camera.position.z)
+        this.resolveCrossings(this.camera.getWorldPosition(this.tmpCameraWorldPos).z)
     }
 
     private establishBaseline(): void {
-        const nearestSlot = computeSlotIndexForWorldZ(this.camera.position.z)
+        const nearestSlot = computeSlotIndexForWorldZ(this.camera.getWorldPosition(this.tmpCameraWorldPos).z)
         this.forwardTripZ = computeSlotWorldZ(nearestSlot + 0.5)
         this.backwardTripZ = computeSlotWorldZ(nearestSlot - 0.5)
         this.hasBaseline = true
