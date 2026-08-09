@@ -69,6 +69,7 @@ import {
     StorePropsEventTypes,
     type PlacementRepointRequestedEvent,
     type ShelfUnitRepositionRequestedEvent,
+    type ShelfSectionRepointedEvent,
 } from '../../types/InteractionEvents'
 import type { SectionsReadyEvent, SectionsReadyForPlacementEvent, LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import type { GroupMode, Section, SortMode } from '../../types/LayoutTypes'
@@ -227,8 +228,12 @@ export class LiminalWindowCoordinator {
             this.repositionShelf(rightShelfIndex, newRank, 'right')
 
             const slotEntries = window.itemsForSlot(newRank)
-            this.repointShelf(leftShelfIndex, 'left', slotEntries.slice(0, this.slotsPerUnit).map(entry => entry.game), zDelta)
-            this.repointShelf(rightShelfIndex, 'right', slotEntries.slice(this.slotsPerUnit).map(entry => entry.game), zDelta)
+            const leftEntries = slotEntries.slice(0, this.slotsPerUnit)
+            const rightEntries = slotEntries.slice(this.slotsPerUnit)
+            this.repointShelf(leftShelfIndex, 'left', leftEntries.map(entry => entry.game), zDelta)
+            this.emitShelfSectionRepointed(leftShelfIndex, leftEntries)
+            this.repointShelf(rightShelfIndex, 'right', rightEntries.map(entry => entry.game), zDelta)
+            this.emitShelfSectionRepointed(rightShelfIndex, rightEntries)
         }
     }
 
@@ -316,11 +321,13 @@ export class LiminalWindowCoordinator {
 
         const window = new LiminalWindow<RingEntry>(this.ringEntries, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
         const slotEntries = window.itemsForSlot(newRank)
-        const leftGames = slotEntries.slice(0, this.slotsPerUnit).map(entry => entry.game)
-        const rightGames = slotEntries.slice(this.slotsPerUnit).map(entry => entry.game)
+        const leftEntries = slotEntries.slice(0, this.slotsPerUnit)
+        const rightEntries = slotEntries.slice(this.slotsPerUnit)
 
-        this.repointShelf(leftShelfIndex, 'left', leftGames, zDelta)
-        this.repointShelf(rightShelfIndex, 'right', rightGames, zDelta)
+        this.repointShelf(leftShelfIndex, 'left', leftEntries.map(entry => entry.game), zDelta)
+        this.emitShelfSectionRepointed(leftShelfIndex, leftEntries)
+        this.repointShelf(rightShelfIndex, 'right', rightEntries.map(entry => entry.game), zDelta)
+        this.emitShelfSectionRepointed(rightShelfIndex, rightEntries)
     }
 
     private indexOfMinRank(): number {
@@ -344,6 +351,14 @@ export class LiminalWindowCoordinator {
         EventManager.getInstance().emit<ShelfUnitRepositionRequestedEvent>(
             StorePropsEventTypes.ShelfUnitRepositionRequested,
             { shelfIndex, position, rotationY }
+        )
+    }
+
+    private emitShelfSectionRepointed(shelfIndex: number, entries: ReadonlyArray<Readonly<RingEntry>>): void {
+        const sectionName = entries.length > 0 ? entries[0].sectionName : null
+        EventManager.getInstance().emit<ShelfSectionRepointedEvent>(
+            GameRenderEventTypes.ShelfSectionRepointed,
+            { shelfIndex, sectionName }
         )
     }
 

@@ -417,6 +417,75 @@ describe('LiminalWindowCoordinator', () => {
             expect(repositionSpy).toHaveBeenCalledTimes(2) // shelves still reposition
             expect(repointSpy).not.toHaveBeenCalled() // nothing to repoint
         })
+
+        it('emits ShelfSectionRepointed for each shelf on advance', () => {
+            emitLayoutRequested('liminal')
+            seedShelfMetadata()
+            const shelfSectionSpy = vi.fn()
+            EventManager.getInstance().registerEventHandler(
+                GameRenderEventTypes.ShelfSectionRepointed,
+                (e: CustomEvent) => shelfSectionSpy(e.detail)
+            )
+
+            seedWindow(200)
+            shelfSectionSpy.mockClear()
+
+            emitBoundaryCrossed('forward')
+
+            // advance() emits for the recycled unit's 2 shelves (0,1)
+            expect(shelfSectionSpy).toHaveBeenCalledTimes(2)
+            // All emitted events should have shelfIndex and sectionName
+            shelfSectionSpy.mock.calls.forEach(([detail]) => {
+                expect(detail.shelfIndex).toBeDefined()
+                expect(detail.sectionName).toBe('Section 0') // all from same single section
+            })
+        })
+
+        it('emits ShelfSectionRepointed with correct section name when a shelf recycles to a new section', () => {
+            emitLayoutRequested('liminal')
+            seedShelfMetadata()
+            const shelfSectionSpy = vi.fn()
+            EventManager.getInstance().registerEventHandler(
+                GameRenderEventTypes.ShelfSectionRepointed,
+                (e: CustomEvent) => shelfSectionSpy(e.detail)
+            )
+
+            seedWindow(200) // appids 1..200, one section, so all shelves show 'Section 0'
+            shelfSectionSpy.mockClear()
+
+            emitBoundaryCrossed('forward')
+
+            // advance() emits for the recycled unit's 2 shelves (0,1)
+            expect(shelfSectionSpy).toHaveBeenCalledTimes(2)
+            const calls = shelfSectionSpy.mock.calls.map(([detail]) => detail)
+            expect(new Set(calls.map(c => c.shelfIndex)).size).toBe(2)
+            expect([...calls.map(c => c.shelfIndex)].sort()).toEqual([0, 1])
+        })
+
+        it('emits ShelfSectionRepointed once per recycled shelf with consistent shelfIndex', () => {
+            emitLayoutRequested('liminal')
+            seedShelfMetadata()
+            const shelfSectionSpy = vi.fn()
+            EventManager.getInstance().registerEventHandler(
+                GameRenderEventTypes.ShelfSectionRepointed,
+                (e: CustomEvent) => shelfSectionSpy(e.detail)
+            )
+
+            seedWindow(200)
+            shelfSectionSpy.mockClear()
+
+            // Advance forward multiple times, recycling different units
+            emitBoundaryCrossed('forward') // unit 0 (shelves 0,1)
+            const firstAdvanceCalls = shelfSectionSpy.mock.calls.length
+            shelfSectionSpy.mockClear()
+
+            emitBoundaryCrossed('forward') // unit 1 (shelves 2,3)
+            const secondAdvanceCalls = shelfSectionSpy.mock.calls.length
+
+            // Each advance() emits for 2 shelves
+            expect(firstAdvanceCalls).toBe(2)
+            expect(secondAdvanceCalls).toBe(2)
+        })
     })
 
     describe('alignWindowToPlayer (initial window centers on the player, not always 5 ahead)', () => {
