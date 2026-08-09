@@ -199,7 +199,9 @@ export class LiminalWindowCoordinator {
         if (!camera) return
 
         const middleUnit = Math.floor(LIMINAL_DEPTH_SLOTS / 2)
-        const desiredCenterRank = computeSlotIndexForWorldZ(camera.position.z)
+        // camera.position is a local offset from its parent movement rig (see SceneManager's
+        // cameraRig doc comment), not world position - must resolve through getWorldPosition().
+        const desiredCenterRank = computeSlotIndexForWorldZ(camera.getWorldPosition(new THREE.Vector3()).z)
         const delta = desiredCenterRank - this.unitRanks[middleUnit]
         if (delta === 0) return
 
