@@ -15,7 +15,6 @@ import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
-import { getCameraWorldPosition } from '../utils/CameraWorldPosition'
 import vertexShader from './shaders/spotlight-beam.vert?raw'
 import fragmentShader from './shaders/spotlight-beam.frag?raw'
 
@@ -45,6 +44,7 @@ export class GameSpotlight {
     private scene: THREE.Scene | null = null
     private readonly DIM_FACTOR = 0.2 // Dim to 20% of original intensity
     private camera: THREE.Camera | null = null
+    private readonly tmpCameraWorldPos = new THREE.Vector3()
     private animationFrameId: number | null = null
     private baseIntensities: Map<THREE.SpotLight, number> = new Map()
     private beamsBySpotlight: Map<THREE.SpotLight, THREE.Mesh> = new Map()
@@ -335,13 +335,14 @@ export class GameSpotlight {
         if (!this.camera || this.spotlights.length === 0) return
 
         const time = Date.now() * 0.001 // Convert to seconds
+        const cameraWorldPos = this.camera.getWorldPosition(this.tmpCameraWorldPos)
 
         for (const spotlight of this.spotlights) {
             const baseIntensity = this.baseIntensities.get(spotlight)
             if (baseIntensity === undefined) continue
 
             // Calculate distance from camera to spotlight
-            const distance = getCameraWorldPosition(this.camera).distanceTo(spotlight.position)
+            const distance = cameraWorldPos.distanceTo(spotlight.position)
             
             // Distance-based intensity scaling
             // Close (0-5m): 2.0x base, Far (15m+): 5.0x base

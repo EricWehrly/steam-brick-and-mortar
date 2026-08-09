@@ -20,7 +20,6 @@ import { AppSettings, Setting, type SettingChangedEvent } from '../../../core/Ap
 import { EventManager } from '../../../core/EventManager'
 import { AppSettingsEventTypes, GameEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
-import { getCameraWorldPosition } from '../../../utils/CameraWorldPosition'
 
 export interface LodDistanceConfig {
     /** Distance threshold: closer than this = HIGH LOD */
@@ -248,7 +247,7 @@ export class LodDistanceManager {
         // TEMPORARY: Time the LOD update
         const updateStart = window.performance.now()
         
-        const cameraPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
+        const cameraPos = camera.getWorldPosition(this.tmpCameraWorldPos)
         let lodChanges = 0
         
         // Check ALL instances (we'll optimize to subset later)
@@ -387,7 +386,7 @@ export class LodDistanceManager {
             return
         }
 
-        const cameraPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
+        const cameraPos = camera.getWorldPosition(this.tmpCameraWorldPos)
 
         // Calculate distances for all instances
         const distances: Array<{ index: number; distSq: number }> = []
@@ -425,7 +424,7 @@ export class LodDistanceManager {
             return
         }
 
-        const cameraPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
+        const cameraPos = camera.getWorldPosition(this.tmpCameraWorldPos)
         console.group(`📍 Nearest ${count} games (camera at ${cameraPos.x.toFixed(1)}, ${cameraPos.y.toFixed(1)}, ${cameraPos.z.toFixed(1)})`)
 
         // Calculate distances for all instances

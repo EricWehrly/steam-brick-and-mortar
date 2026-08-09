@@ -32,7 +32,6 @@ import { AppSettings } from '../core/AppSettings'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
-import { getCameraWorldPosition } from '../utils/CameraWorldPosition'
 
 export class SceneManager {
     private scene: THREE.Scene
@@ -50,8 +49,16 @@ export class SceneManager {
      * moving the camera directly used to produce).
      *
      * camera.position/rotation are therefore always local-to-rig (effectively always identity) -
-     * never read them expecting a world position; use camera.getWorldPosition()/getWorldDirection()
-     * or read this rig directly instead. See src/utils/CameraWorldPosition.ts.
+     * never read them expecting a world position; call camera.getWorldPosition()/getWorldDirection()
+     * directly, or read this rig instead. Note for getWorldPosition()/getWorldDirection() callers
+     * specifically: during an active XR session, camera.position/quaternion (and therefore
+     * matrixWorld) only get resynced to the tracked headset pose inside renderer.render(), which
+     * runs after every per-frame render-loop callback (see startRenderLoop() below) - so a callback
+     * reading camera world position/direction sees the previous frame's pose, about one frame
+     * stale. Reading this.cameraRig.position directly has no such lag, since movement writes to it
+     * synchronously earlier the same frame. In practice this is imperceptible for anything that
+     * doesn't need frame-perfect precision (LOD/culling thresholds, spotlight targeting) - noted
+     * here so it isn't mistaken for a bug if ever noticed.
      */
     private cameraRig: THREE.Group
     private renderer: THREE.WebGLRenderer
@@ -60,10 +67,6 @@ export class SceneManager {
     private skyboxManager: SkyboxManager
     private renderLoopRegistry: RenderLoopRegistry
     private envRenderTarget: THREE.WebGLRenderTarget | null = null
-    private lastXRDiagnosticLogMs = 0
-    private readonly tmpXRDiagnosticWorldPos = new THREE.Vector3()
-    private readonly tmpXRDiagnosticEuler = new THREE.Euler()
-    private readonly tmpXRDiagnosticQuaternion = new THREE.Quaternion()
 
     constructor() {
         RectAreaLightUniformsLib.init()
@@ -229,7 +232,6 @@ export class SceneManager {
 
             // XR takes over projection entirely; post-processing pipeline bypassed in XR.
             if (this.renderer.xr.isPresenting) {
-                this.logXRDiagnosticsIfDue(now)
                 this.renderer.render(this.scene, this.camera)
             } else {
                 this.renderPipelineManager.render()
@@ -237,34 +239,6 @@ export class SceneManager {
             this.renderLoopRegistry.afterRender()
         }
         this.renderer.setAnimationLoop(this.renderLoopCallback)
-    }
-
-    /**
-     * Throttled console.log (not the Logger, which defaults to suppressing debug/lifecycle
-     * output - this must show up in a log capture with no setup) of the real camera world
-     * transform while an XR session is active. Added to diagnose the "flat black obstruction,
-     * no shape, glimpses of shelves that shift as I move" report - a symptom consistent with the
-     * headset being positioned very close to or inside some piece of geometry, but one that
-     * survived ruling out a ceiling collision (raising ceiling height didn't help) and
-     * confirming translation works. Correlating these logged positions/orientations with what the
-     * user is seeing at that moment is the fastest way to pin down which geometry is involved,
-     * without needing to interact with a dev console while wearing the headset.
-     */
-    private logXRDiagnosticsIfDue(nowMs: number): void {
-        const LOG_INTERVAL_MS = 2000
-        if (nowMs - this.lastXRDiagnosticLogMs < LOG_INTERVAL_MS) return
-        this.lastXRDiagnosticLogMs = nowMs
-
-        const worldPos = getCameraWorldPosition(this.camera, this.tmpXRDiagnosticWorldPos)
-        this.tmpXRDiagnosticEuler.setFromQuaternion(this.camera.getWorldQuaternion(this.tmpXRDiagnosticQuaternion))
-        const toDeg = (rad: number) => (rad * 180 / Math.PI).toFixed(1)
-
-        console.log(
-            `🥽 [XR diagnostic] camera world pos=(${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)}) ` +
-            `rot(deg)=(${toDeg(this.tmpXRDiagnosticEuler.x)}, ${toDeg(this.tmpXRDiagnosticEuler.y)}, ${toDeg(this.tmpXRDiagnosticEuler.z)}) ` +
-            `rig pos=(${this.cameraRig.position.x.toFixed(2)}, ${this.cameraRig.position.y.toFixed(2)}, ${this.cameraRig.position.z.toFixed(2)}) ` +
-            `near=${this.camera.near} far=${this.camera.far} fov=${this.camera.fov}`
-        )
     }
 
     private pauseRenderLoop(): void {
