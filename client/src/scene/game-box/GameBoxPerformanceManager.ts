@@ -17,7 +17,6 @@ import type {
     GameBoxPerformanceData,
     PerformanceStats
 } from './types/PerformanceTypes'
-import { getCameraWorldPosition } from '../../utils/CameraWorldPosition'
 
 export class GameBoxPerformanceManager {
     private performanceConfig: TexturePerformanceConfig
@@ -72,7 +71,7 @@ export class GameBoxPerformanceManager {
             child.userData?.isGameBox && child instanceof THREE.Mesh
         ) as THREE.Mesh[]
 
-        const cameraWorldPos = getCameraWorldPosition(camera, this.tmpCameraWorldPos)
+        const cameraWorldPos = camera.getWorldPosition(this.tmpCameraWorldPos)
 
         for (const gameBox of gameBoxes) {
             const gameId = gameBox.userData.gameId?.toString() ?? gameBox.userData.name ?? 'unknown'
