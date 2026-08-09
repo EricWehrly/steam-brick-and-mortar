@@ -1,30 +1,31 @@
-import type { SteamGameData } from '../game-box/types/GameData'
 import { indexAt } from './LibraryRing'
 
-export class LiminalWindow {
+/** Windows a ring of items (e.g. RingEntry) into fixed-size per-slot chunks. Payload-agnostic —
+ *  the indexing math never inspects T, so any ring (games, section-tagged games, etc.) can share it. */
+export class LiminalWindow<T> {
     constructor(
-        private readonly games: ReadonlyArray<Readonly<SteamGameData>>,
+        private readonly items: ReadonlyArray<Readonly<T>>,
         private readonly slotsPerUnit: number,
         private readonly depthSlots: number
     ) {}
 
-    gamesForSlot(depthSlot: number): Readonly<SteamGameData>[] {
-        const length = this.games.length
+    itemsForSlot(depthSlot: number): Readonly<T>[] {
+        const length = this.items.length
         if (length === 0) return []
 
-        const gamesPerSlot = this.slotsPerUnit * 2
-        const base = depthSlot * gamesPerSlot
-        const result: Readonly<SteamGameData>[] = []
-        for (let offset = 0; offset < gamesPerSlot; offset++) {
-            result.push(this.games[indexAt(base, offset, length)])
+        const itemsPerSlot = this.slotsPerUnit * 2
+        const base = depthSlot * itemsPerSlot
+        const result: Readonly<T>[] = []
+        for (let offset = 0; offset < itemsPerSlot; offset++) {
+            result.push(this.items[indexAt(base, offset, length)])
         }
         return result
     }
 
-    allWindowGames(): Readonly<SteamGameData>[] {
-        const result: Readonly<SteamGameData>[] = []
+    allWindowItems(): Readonly<T>[] {
+        const result: Readonly<T>[] = []
         for (let depthSlot = 0; depthSlot < this.depthSlots; depthSlot++) {
-            result.push(...this.gamesForSlot(depthSlot))
+            result.push(...this.itemsForSlot(depthSlot))
         }
         return result
     }
