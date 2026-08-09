@@ -78,6 +78,7 @@ function emitSectionsReadyForPlacement(sections: Section[]): void {
 }
 
 describe('LiminalWindowCoordinator', () => {
+    let coordinator: LiminalWindowCoordinator
     let sectionsReadySpy: MockFn<[SectionsReadyEvent], void>
     let sectionsReadyForPlacementSpy: MockFn<[SectionsReadyForPlacementEvent], void>
 
@@ -92,7 +93,7 @@ describe('LiminalWindowCoordinator', () => {
         // Construct the coordinator first, then register spies — matches production
         // registration order (this class is constructed before ShelfLayoutCoordinator/
         // GameBoxSpawner during bootstrap), which is what makes interception work.
-        new LiminalWindowCoordinator()
+        coordinator = new LiminalWindowCoordinator()
 
         sectionsReadySpy = vi.fn()
         sectionsReadyForPlacementSpy = vi.fn()
@@ -180,6 +181,35 @@ describe('LiminalWindowCoordinator', () => {
 
         expect(sectionsReadySpy).toHaveBeenCalledTimes(2)
         expect(sectionsReadySpy.mock.calls[1][0].sections).toBe(sections)
+    })
+
+    // Story 1 of docs/plans/liminal-shelf-signs-plan.md: section identity must survive the
+    // flatten into the ring, or a later consumer (the shelf-sign planner) shows the wrong
+    // category. ringEntries is private and has no public event yet (that's Story 2), so this
+    // reaches into the instance directly — same pattern already used elsewhere in this suite
+    // for coordinator-internal state.
+    describe('RingEntry section identity (Story 1 — thread section identity through the ring)', () => {
+        it('pairs each windowed game with the section name it actually came from, including uneven section sizes', () => {
+            emitLayoutRequested('liminal')
+            // perSection = ceil(25/3) = 9 -> Section 0: appids 1-9, Section 1: appids 10-18,
+            // Section 2: appids 19-25 (only 7 games — the uneven remainder).
+            const sections = makeSections(25, 3)
+            emitSectionsReadyForPlacement(sections)
+
+            const ringEntries = (coordinator as unknown as {
+                ringEntries: { game: SteamGameData; sectionName: string }[]
+            }).ringEntries
+
+            expect(ringEntries).toHaveLength(25)
+            expect(ringEntries.map(entry => entry.sectionName)).toEqual([
+                ...Array(9).fill('Section 0'),
+                ...Array(9).fill('Section 1'),
+                ...Array(7).fill('Section 2'),
+            ])
+            // Spot-check the boundary itself — an off-by-one in the flatMap would show up here first.
+            expect(ringEntries[8]).toMatchObject({ sectionName: 'Section 0', game: { appid: 9 } })
+            expect(ringEntries[9]).toMatchObject({ sectionName: 'Section 1', game: { appid: 10 } })
+        })
     })
 
     describe('the treadmill (Story 5 — BoundaryCrossed advances the window)', () => {

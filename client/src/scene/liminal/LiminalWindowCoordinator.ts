@@ -98,12 +98,19 @@ interface ClassifiedInstance {
     position: THREE.Vector3
 }
 
+/** A ring slot's game paired with the section it came from, so that identity survives windowing
+ *  instead of being discarded by the flatten — see docs/plans/liminal-shelf-signs-plan.md §3.1. */
+export interface RingEntry {
+    readonly game: Readonly<SteamGameData>
+    readonly sectionName: string
+}
+
 export class LiminalWindowCoordinator {
     private isLiminalActive = false
     private isPublishingWindowedPlacement = false
     private isPublishingWindowedSections = false
 
-    private flatGames: SteamGameData[] = []
+    private ringEntries: RingEntry[] = []
     private slotsPerUnit = 0
     /** Physical unit i's current rank — see LiminalCorridorLayout.computeSlotWorldZ. */
     private unitRanks: number[] = []
@@ -138,7 +145,9 @@ export class LiminalWindowCoordinator {
         const { groupMode, sortMode, sections } = event.detail
         event.stopImmediatePropagation()
 
-        this.flatGames = sections.flatMap(({ section }) => section.games) as SteamGameData[]
+        this.ringEntries = sections.flatMap(({ section }) =>
+            section.games.map(game => ({ game, sectionName: section.name }))
+        )
         this.slotsPerUnit = computeSlotsPerShelf(
             LiminalCorridorLayout.createStockStrategy(),
             ShelfSurfaceUtils.findShelfSurfaces(null, true).length
@@ -206,7 +215,7 @@ export class LiminalWindowCoordinator {
         if (delta === 0) return
 
         const zDelta = -delta * CORRIDOR_UNIT_SPACING_Z
-        const window = new LiminalWindow(this.flatGames, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
+        const window = new LiminalWindow<RingEntry>(this.ringEntries, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
 
         for (let unit = 0; unit < LIMINAL_DEPTH_SLOTS; unit++) {
             const newRank = this.unitRanks[unit] + delta
@@ -217,17 +226,17 @@ export class LiminalWindowCoordinator {
             this.repositionShelf(leftShelfIndex, newRank, 'left')
             this.repositionShelf(rightShelfIndex, newRank, 'right')
 
-            const slotGames = window.gamesForSlot(newRank)
-            this.repointShelf(leftShelfIndex, 'left', slotGames.slice(0, this.slotsPerUnit), zDelta)
-            this.repointShelf(rightShelfIndex, 'right', slotGames.slice(this.slotsPerUnit), zDelta)
+            const slotEntries = window.itemsForSlot(newRank)
+            this.repointShelf(leftShelfIndex, 'left', slotEntries.slice(0, this.slotsPerUnit).map(entry => entry.game), zDelta)
+            this.repointShelf(rightShelfIndex, 'right', slotEntries.slice(this.slotsPerUnit).map(entry => entry.game), zDelta)
         }
     }
 
     private buildWindowedSection(groupMode: GroupMode, sortMode: SortMode): Section {
-        const window = new LiminalWindow(this.flatGames, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
+        const window = new LiminalWindow<RingEntry>(this.ringEntries, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
         return {
             name: '',
-            games: window.allWindowGames(),
+            games: window.allWindowItems().map(entry => entry.game),
             groupMode,
             sortMode,
         }
@@ -235,7 +244,7 @@ export class LiminalWindowCoordinator {
 
     private classifyShelfInstances(): void {
         this.shelfInstances.clear()
-        if (this.flatGames.length === 0) return
+        if (this.ringEntries.length === 0) return
 
         const shelfPositions = this.currentShelfPositions()
         const dataManager = DataManager.getInstance()
@@ -286,7 +295,7 @@ export class LiminalWindowCoordinator {
     }
 
     private handleBoundaryCrossed(event: CustomEvent<BoundaryCrossedEvent>): void {
-        if (!this.isLiminalActive || this.flatGames.length === 0) return
+        if (!this.isLiminalActive || this.ringEntries.length === 0) return
         this.advance(event.detail.direction)
     }
 
@@ -305,10 +314,10 @@ export class LiminalWindowCoordinator {
         this.repositionShelf(leftShelfIndex, newRank, 'left')
         this.repositionShelf(rightShelfIndex, newRank, 'right')
 
-        const window = new LiminalWindow(this.flatGames, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
-        const slotGames = window.gamesForSlot(newRank)
-        const leftGames = slotGames.slice(0, this.slotsPerUnit)
-        const rightGames = slotGames.slice(this.slotsPerUnit)
+        const window = new LiminalWindow<RingEntry>(this.ringEntries, this.slotsPerUnit, LIMINAL_DEPTH_SLOTS)
+        const slotEntries = window.itemsForSlot(newRank)
+        const leftGames = slotEntries.slice(0, this.slotsPerUnit).map(entry => entry.game)
+        const rightGames = slotEntries.slice(this.slotsPerUnit).map(entry => entry.game)
 
         this.repointShelf(leftShelfIndex, 'left', leftGames, zDelta)
         this.repointShelf(rightShelfIndex, 'right', rightGames, zDelta)
