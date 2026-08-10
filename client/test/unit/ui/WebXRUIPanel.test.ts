@@ -26,7 +26,7 @@ describe('WebXRUIPanel VR headset status', () => {
     it('shows the detected VR device name when DevicesChanged reports a VR-kind device', () => {
         emitDevices([
             { id: 'mouse-keyboard', name: 'Mouse + Keyboard', kind: 'mouse-keyboard', connected: true, profileId: 'mouse-keyboard' },
-            { id: 'vr-headset-usb', name: 'VR: PICO 4 (USB)', kind: 'vr', connected: true, profileId: 'vr' },
+            { id: 'vr-session', name: 'VR: PICO 4', kind: 'vr', connected: true, profileId: 'vr' },
         ])
 
         expect(statusEl.classList.contains('hidden')).toBe(false)
@@ -35,7 +35,7 @@ describe('WebXRUIPanel VR headset status', () => {
 
     it('hides the status element when no VR-kind device is present', () => {
         emitDevices([
-            { id: 'vr-headset-usb', name: 'VR: PICO 4 (USB)', kind: 'vr', connected: true, profileId: 'vr' },
+            { id: 'vr-session', name: 'VR: PICO 4', kind: 'vr', connected: true, profileId: 'vr' },
         ])
         expect(statusEl.classList.contains('hidden')).toBe(false)
 
@@ -54,7 +54,7 @@ describe('WebXRUIPanel VR headset status', () => {
         panelWithoutStatusEl.init()
 
         expect(() => emitDevices([
-            { id: 'vr-headset-usb', name: 'VR: PICO 4 (USB)', kind: 'vr', connected: true, profileId: 'vr' },
+            { id: 'vr-session', name: 'VR: PICO 4', kind: 'vr', connected: true, profileId: 'vr' },
         ])).not.toThrow()
     })
 })

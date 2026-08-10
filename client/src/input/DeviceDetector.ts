@@ -25,16 +25,6 @@ interface HidDeviceInfo {
     interface_number: number
 }
 
-/** Mirrors desktop/tauri-app/src/hardware/vr_headsets.rs::ConnectedVrHeadset. */
-interface ConnectedVrHeadset {
-    name: string
-    vendor_id: number
-    product_id: number
-    serial_number: string | null
-}
-
-const VR_HEADSET_USB_DEVICE_ID = 'vr-headset-usb'
-
 export class DeviceDetector {
     private static readonly logger = Logger.createLogFunctions(DeviceDetector.name)
 
@@ -69,24 +59,19 @@ export class DeviceDetector {
         this.pollGamepads()
         this.emitDevicesChanged()
 
-        // Desktop-only, best-effort - see the invoked commands' own doc comments
-        // (hardware/hid_devices.rs, hardware/vr_headsets.rs) for why this exists: the browser has
-        // no reliable signal for "a VR headset is connected" (PICO Connect's controller mouse-
-        // emulation is indistinguishable from a real touch/click once it reaches the DOM, and
-        // navigator.xr reports no supported immersive-vr session for it either), so this asks the
-        // OS's own USB device list instead. Fire-and-forget - a slow/failed probe shouldn't block
+        // Desktop-only, best-effort - see hardware/hid_devices.rs's doc comment for why this
+        // exists: rich per-device data (vendor/product id, usage page/usage) that the browser's
+        // own input APIs don't expose, useful for manually comparing how different physical
+        // devices show up at the OS level. Fire-and-forget - a slow/failed probe shouldn't block
         // startup, matching this class's synchronous start() contract.
-        void this.probeHardwareDevices()
+        void this.probeHidDevices()
     }
 
     /**
-     * Logs the raw HID device enumeration (for manually comparing PICO Connect configurations -
-     * see hardware/hid_devices.rs's doc comment) and registers a device entry when a known VR
-     * headset is found connected over USB (see hardware/vr_headsets.rs). Both invokes are
-     * independently best-effort: a failure in one shouldn't skip the other, and neither should be
-     * treated as fatal - this is diagnostic/enhancement, not required for a working input stack.
+     * Logs the raw HID device enumeration (see hardware/hid_devices.rs's doc comment) for manual
+     * inspection - diagnostic/enhancement only, not required for a working input stack.
      */
-    private async probeHardwareDevices(): Promise<void> {
+    private async probeHidDevices(): Promise<void> {
         if (!isTauri()) {
             return
         }
@@ -103,25 +88,6 @@ export class DeviceDetector {
             ))
         } catch (error) {
             DeviceDetector.logger.warn('Failed to enumerate HID devices:', error)
-        }
-
-        try {
-            const headset = await invoke<ConnectedVrHeadset | null>('detect_connected_vr_headset')
-            if (headset) {
-                DeviceDetector.logger.info(`Detected VR headset over USB: ${headset.name} (vid=0x${headset.vendor_id.toString(16)} pid=0x${headset.product_id.toString(16)})`)
-                this.devices.set(VR_HEADSET_USB_DEVICE_ID, {
-                    id: VR_HEADSET_USB_DEVICE_ID,
-                    name: `VR: ${headset.name} (USB)`,
-                    kind: InputDeviceKind.VR,
-                    connected: true,
-                    profileId: 'vr'
-                })
-                this.emitDevicesChanged()
-            } else {
-                DeviceDetector.logger.info('No known VR headset detected over USB')
-            }
-        } catch (error) {
-            DeviceDetector.logger.warn('Failed to probe for a connected VR headset:', error)
         }
     }
 

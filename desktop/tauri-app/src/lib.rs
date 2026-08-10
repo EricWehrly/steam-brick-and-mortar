@@ -14,8 +14,6 @@ pub fn run() {
             steam::librarycache::find_local_library_art,
             steam::librarycache::read_local_library_art_bytes,
             hardware::hid_devices::list_hid_devices,
-            hardware::usb_devices::list_usb_devices,
-            hardware::vr_headsets::detect_connected_vr_headset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

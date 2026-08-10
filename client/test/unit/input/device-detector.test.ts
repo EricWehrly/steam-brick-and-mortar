@@ -213,57 +213,29 @@ describe('DeviceDetector', () => {
             detector.stop()
         })
 
-        it('registers a VR device when a known headset is detected connected over USB', async () => {
+        it('enumerates HID devices on the desktop build', async () => {
             isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'list_hid_devices') return Promise.resolve([])
-                if (command === 'detect_connected_vr_headset') {
-                    return Promise.resolve({ name: 'PICO 4', vendor_id: 0x2d40, product_id: 0x00b6, serial_number: 'ABC123' })
-                }
-                throw new Error(`unexpected command ${command}`)
-            })
+            invokeMock.mockResolvedValue([
+                { vendor_id: 0x2d40, product_id: 0x00b6, manufacturer: 'PICO', product: 'PICO 4', serial_number: 'ABC123', usage_page: 0x01, usage: 0x05, interface_number: 0 }
+            ])
 
             const detector = new DeviceDetector(EventManager.getInstance())
             detector.start()
 
-            await vi.waitFor(() => {
-                expect(detector.getAvailableDevices().some(device => device.id === 'vr-headset-usb')).toBe(true)
-            })
-
-            const vrDevice = detector.getAvailableDevices().find(device => device.id === 'vr-headset-usb')
-            expect(vrDevice).toMatchObject({ kind: 'vr', profileId: 'vr', connected: true })
-            expect(vrDevice?.name).toContain('PICO 4')
+            await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith('list_hid_devices'))
 
             detector.stop()
         })
 
-        it('registers no VR device when no known headset is detected', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'list_hid_devices') return Promise.resolve([])
-                if (command === 'detect_connected_vr_headset') return Promise.resolve(null)
-                throw new Error(`unexpected command ${command}`)
-            })
-
-            const detector = new DeviceDetector(EventManager.getInstance())
-            detector.start()
-
-            await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith('detect_connected_vr_headset'))
-
-            expect(detector.getAvailableDevices().some(device => device.id === 'vr-headset-usb')).toBe(false)
-            detector.stop()
-        })
-
-        it('proceeds without registering a VR device when both Tauri commands fail', async () => {
+        it('does not throw when the HID probe fails', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockRejectedValue(new Error('IPC failure'))
 
             const detector = new DeviceDetector(EventManager.getInstance())
             detector.start()
 
-            await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith('detect_connected_vr_headset'))
+            await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith('list_hid_devices'))
 
-            expect(detector.getAvailableDevices().some(device => device.id === 'vr-headset-usb')).toBe(false)
             detector.stop()
         })
     })
