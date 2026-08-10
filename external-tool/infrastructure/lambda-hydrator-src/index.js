@@ -21,6 +21,7 @@ async function streamToBuffer(stream) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// TD: lambda-outbound-api-circuit-breaker
 async function fetchSteamSpyData(appid, retryCount = 0, maxRetries = 3) {
   try {
     const url = `https://steamspy.com/api.php?request=appdetails&appid=${appid}`;

@@ -9,12 +9,13 @@ const rateLimiter = new RateLimiter(5, 200); // Max 5 concurrent, 200ms between 
 
 /**
  * Get app details from Steam Store API with caching and retry logic
- * 
+ *
  * @param {string|number} appid - Steam application ID
  * @param {number} retryCount - Current retry attempt (internal use)
  * @param {number} maxRetries - Maximum retry attempts
  * @returns {Promise<Object>} Game details object
  */
+// TD: lambda-outbound-api-circuit-breaker
 async function getAppDetails(appid, retryCount = 0, maxRetries = 3) {
   if (!appid) {
     throw new Error('App ID is required');
