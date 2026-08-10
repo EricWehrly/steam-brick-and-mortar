@@ -13,7 +13,6 @@ export interface SceneClickGameBoxRaycastOptions {
     camera?: THREE.Camera
     maxDistance?: number
     lineColor?: number
-    enableDebugLogs?: boolean
     enableDebugLine?: boolean
 }
 
@@ -31,7 +30,6 @@ export class SceneClickGameBoxRaycast {
     private readonly sceneOption: THREE.Scene | undefined
     private readonly cameraOption: THREE.Camera | undefined
     private readonly maxDistance: number
-    private readonly enableDebugLogs: boolean
     private readonly enableDebugLine: boolean
     private readonly eventManager: EventManager
 
@@ -51,7 +49,6 @@ export class SceneClickGameBoxRaycast {
         this.sceneOption = options.scene
         this.cameraOption = options.camera
         this.maxDistance = options.maxDistance ?? 5
-        this.enableDebugLogs = options.enableDebugLogs ?? false
         this.enableDebugLine = options.enableDebugLine ?? false
         this.eventManager = EventManager.getInstance()
 
@@ -115,10 +112,15 @@ export class SceneClickGameBoxRaycast {
         if (controllerRay) {
             this.raycaster.ray.origin.copy(controllerRay.origin)
             this.raycaster.ray.direction.copy(controllerRay.direction)
+            SceneClickGameBoxRaycast.logger.debug('Using controller ray', {
+                origin: controllerRay.origin.toArray(),
+                direction: controllerRay.direction.toArray()
+            })
         } else {
             this.pointer.x = ndcX
             this.pointer.y = ndcY
             this.raycaster.setFromCamera(this.pointer, camera)
+            SceneClickGameBoxRaycast.logger.debug('Using NDC/camera ray (no controller ray available)', { ndcX, ndcY })
         }
 
         const lineStart = this.raycaster.ray.origin.clone()
@@ -137,9 +139,7 @@ export class SceneClickGameBoxRaycast {
             }
         }
 
-        if (this.enableDebugLogs) {
-            SceneClickGameBoxRaycast.logger.debug('No game box hit', { maxDistance: this.maxDistance })
-        }
+        SceneClickGameBoxRaycast.logger.debug('No game box hit', { maxDistance: this.maxDistance })
     }
 
     private updateDebugLine(start: THREE.Vector3, end: THREE.Vector3, scene: THREE.Scene): void {
@@ -196,29 +196,16 @@ export class SceneClickGameBoxRaycast {
     private highlightHit(hit: SceneGameBoxHit): void {
         const appid = hit.appid
 
-        // Development aid: log resolved hit so appid is visible in console.
-        // Gated on enableDebugLogs — remove gate when raycast is fully stable.
-        if (this.enableDebugLogs) {
-            SceneClickGameBoxRaycast.logger.debug(
-                `hit: name="${hit.name ?? '?'}" appid=${appid ?? 'none'} instanceId=${hit.instanceId ?? '?'} mesh="${hit.object.name}"`
-            )
-        }
+        SceneClickGameBoxRaycast.logger.debug(
+            `hit: name="${hit.name ?? '?'}" appid=${appid ?? 'none'} instanceId=${hit.instanceId ?? '?'} mesh="${hit.object.name}"`
+        )
 
         if (appid !== undefined) {
             this.eventManager.emit<GameSelectedEvent>(GameEventTypes.Selected, {
                 appid
             })
-        } else if (this.enableDebugLogs) {
+        } else {
             SceneClickGameBoxRaycast.logger.debug('Hit had no appid metadata', {
-                instanceId: hit.instanceId
-            })
-        }
-
-        if (this.enableDebugLogs) {
-            SceneClickGameBoxRaycast.logger.debug('Hit game box', {
-                name: hit.name,
-                appid: hit.appid,
-                distance: hit.distance,
                 instanceId: hit.instanceId
             })
         }
