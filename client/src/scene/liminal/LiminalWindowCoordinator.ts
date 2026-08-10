@@ -230,10 +230,8 @@ export class LiminalWindowCoordinator {
             const slotEntries = window.itemsForSlot(newRank)
             const leftEntries = slotEntries.slice(0, this.slotsPerUnit)
             const rightEntries = slotEntries.slice(this.slotsPerUnit)
-            this.repointShelf(leftShelfIndex, 'left', leftEntries.map(entry => entry.game), zDelta)
-            this.emitShelfSectionRepointed(leftShelfIndex, leftEntries)
-            this.repointShelf(rightShelfIndex, 'right', rightEntries.map(entry => entry.game), zDelta)
-            this.emitShelfSectionRepointed(rightShelfIndex, rightEntries)
+            this.repointShelf(leftShelfIndex, 'left', leftEntries, zDelta)
+            this.repointShelf(rightShelfIndex, 'right', rightEntries, zDelta)
         }
     }
 
@@ -324,10 +322,8 @@ export class LiminalWindowCoordinator {
         const leftEntries = slotEntries.slice(0, this.slotsPerUnit)
         const rightEntries = slotEntries.slice(this.slotsPerUnit)
 
-        this.repointShelf(leftShelfIndex, 'left', leftEntries.map(entry => entry.game), zDelta)
-        this.emitShelfSectionRepointed(leftShelfIndex, leftEntries)
-        this.repointShelf(rightShelfIndex, 'right', rightEntries.map(entry => entry.game), zDelta)
-        this.emitShelfSectionRepointed(rightShelfIndex, rightEntries)
+        this.repointShelf(leftShelfIndex, 'left', leftEntries, zDelta)
+        this.repointShelf(rightShelfIndex, 'right', rightEntries, zDelta)
     }
 
     private indexOfMinRank(): number {
@@ -362,23 +358,32 @@ export class LiminalWindowCoordinator {
         )
     }
 
+    /**
+     * Repoints a shelf's game-box instances and announces its new section, in one call so the
+     * two can never drift apart at a call site. The section announcement fires unconditionally
+     * (a shelf sign doesn't depend on instance classification), even when there's nothing to
+     * repoint yet — see "emits no repoint events for a shelf with no classified instances" in
+     * the test suite for why that early return must stay below the announcement, not above it.
+     */
     private repointShelf(
         shelfIndex: number,
         side: CorridorSide,
-        games: ReadonlyArray<Readonly<SteamGameData>>,
+        entries: ReadonlyArray<Readonly<RingEntry>>,
         zDelta: number
     ): void {
+        this.emitShelfSectionRepointed(shelfIndex, entries)
+
         const instances = this.shelfInstances.get(shelfIndex)
         if (!instances) return
 
         const rotationY = side === 'left' ? LEFT_FACING_ROTATION_Y : RIGHT_FACING_ROTATION_Y
         const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotationY)
 
-        const count = Math.min(instances.length, games.length)
+        const count = Math.min(instances.length, entries.length)
         for (let i = 0; i < count; i++) {
             const entry = instances[i]
             entry.position.z += zDelta
-            const game = games[i]
+            const game = entries[i].game
             const appid = typeof game.appid === 'number' ? game.appid : 0
 
             EventManager.getInstance().emit<PlacementRepointRequestedEvent>(GameRenderEventTypes.PlacementRepointRequested, {
