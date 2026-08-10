@@ -17,7 +17,6 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hidapi = "2.6.6"
-nusb = "0.2.5"
 
 [target."cfg(windows)".dependencies]
 parselnk = "0.1.1"
