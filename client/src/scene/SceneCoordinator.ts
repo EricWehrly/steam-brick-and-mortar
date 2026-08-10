@@ -31,6 +31,7 @@ import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SceneSignManager } from './SceneSignManager'
 import { ShelfSignPlanner } from './ShelfSignPlanner'
+import { LiminalShelfSignPlanner } from './LiminalShelfSignPlanner'
 import { LiminalWindowCoordinator } from './liminal/LiminalWindowCoordinator'
 import { LiminalBoundaryTracker } from './liminal/LiminalBoundaryTracker'
 import { GameSorter } from './categorization/GameSorter'
@@ -49,6 +50,7 @@ export class SceneCoordinator {
     private gameSorter: GameSorter
     private sceneSignManager: SceneSignManager
     private shelfSignPlanner: ShelfSignPlanner
+    private liminalShelfSignPlanner: LiminalShelfSignPlanner
     private liminalWindowCoordinator: LiminalWindowCoordinator
     private liminalBoundaryTracker: LiminalBoundaryTracker
 
@@ -70,6 +72,7 @@ export class SceneCoordinator {
         this.gameSorter = new GameSorter()
         this.sceneSignManager = SceneSignManager.instance
         this.shelfSignPlanner = new ShelfSignPlanner()
+        this.liminalShelfSignPlanner = new LiminalShelfSignPlanner()
         this.liminalWindowCoordinator = new LiminalWindowCoordinator()
         this.liminalBoundaryTracker = new LiminalBoundaryTracker()
 
