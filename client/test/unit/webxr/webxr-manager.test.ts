@@ -215,5 +215,25 @@ describe('WebXRManager Unit Tests', () => {
       await expect(manager.startVRSession()).rejects.toThrow('No supported XR reference space type found')
       expect(mockRenderer.xr.setSession).not.toHaveBeenCalled();
     });
+
+    // Regression test: requestReferenceSpace('local-floor'/'bounded-floor') throws
+    // NotSupportedError unless that type was requested as a required/optional feature at
+    // requestSession() time - regardless of whether the runtime actually supports floor
+    // tracking. Without this, the fallback probe above could never succeed on anything but
+    // 'local', which is exactly what was observed on a real PICO 4/SteamVR session before this
+    // fix - not because the runtime lacked floor tracking, but because it was never requested.
+    // Matches Three.js's own VRButton.js (node_modules/three/examples/jsm/webxr/VRButton.js),
+    // which every official WebXR example uses to start a session.
+    it('requires local-floor and optionally requests bounded-floor when starting a session', async () => {
+      const session = createMockSession(['local-floor', 'local']);
+      await primeSupportedSession(session);
+
+      await manager.startVRSession();
+
+      expect((navigator.xr as any).requestSession).toHaveBeenCalledWith('immersive-vr', {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['bounded-floor']
+      });
+    });
   });
 });
