@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js'
 import { DataManager } from '../core/data/DataManager'
 import { DataDomain, DataKey } from '../core/data/DataTypes'
+import { Logger } from '../utils/Logger'
 
 export interface XRControllerRay {
     origin: THREE.Vector3
@@ -32,6 +33,7 @@ const CONTROLLER_FORWARD = new THREE.Vector3(0, 0, -1)
  * WebXRCoordinator, mirroring its existing ownership of WebXRManager/InputManager.
  */
 export class XRControllerManager implements XRControllerRaySource {
+    private static readonly logger = Logger.createLogFunctions(XRControllerManager.name)
     private readonly cameraRig: THREE.Object3D
     private readonly controllerModelFactory = new XRControllerModelFactory()
     private session: XRSession | null = null
@@ -60,8 +62,10 @@ export class XRControllerManager implements XRControllerRaySource {
             // to learn which hand occupies which index, live, per session.
             const onConnected = (event: { data: XRInputSource }): void => {
                 this.handednessByIndex[i] = event.data.handedness
+                XRControllerManager.logger.info(`Controller connected: index=${i} handedness=${event.data.handedness}`)
             }
             const onDisconnected = (): void => {
+                XRControllerManager.logger.info(`Controller disconnected: index=${i} (was ${this.handednessByIndex[i] ?? 'unknown'})`)
                 this.handednessByIndex[i] = null
             }
             controller.addEventListener('connected', onConnected)
