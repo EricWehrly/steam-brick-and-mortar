@@ -250,6 +250,22 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 
 > No active trigger — explicitly deferred, conditional on something else landing first, or indefinite. Revisit when the stated condition is met, not on a schedule.
 
+## id: lambda-outbound-api-circuit-breaker
+**Priority**: Low
+**Effort**: ~1-2 hours (cockatiel is already a proven pattern here — see `client/src/steam/batch/BatchAppDetailsClient.ts` — just needs the Node/Lambda-side equivalent)
+**Context**: `BatchAppDetailsClient.ts` replaced its hand-rolled circuit breaker with cockatiel (2026-07-30) to stop hammering our own Lambda during an outage. A codebase-wide sweep for the same shape of problem while reviewing that change found it on the server side too, one hop closer to the actual flaky third party:
+- `getAppDetails()` in `external-tool/infrastructure/lambda-src/services/steam-api.js` calls the real Steam Store API per-appid (up to 5 concurrent), with hand-rolled retry that only backs off on HTTP 429 — a 5xx, timeout, or connection reset gets no backoff and no shared "stop trying" signal across the batch.
+- `fetchSteamSpyData()` in `external-tool/infrastructure/lambda-hydrator-src/index.js` has the same shape against the SteamSpy API.
+
+**Decision (for now)**: track it, don't fix. Neither Lambda has shown symptoms of this in practice; not worth the churn until one does.
+
+**Done when**:
+- Both functions share a per-process circuit breaker (cockatiel) around their outbound call, opening on any hard failure (not just 429) and skipping remaining concurrent/batch work once open, same shape as `BatchAppDetailsClient`'s fix
+
+**Related files**:
+- `external-tool/infrastructure/lambda-src/services/steam-api.js`
+- `external-tool/infrastructure/lambda-hydrator-src/index.js`
+
 ## id: personal-data-in-git-history
 **Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
 **Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)

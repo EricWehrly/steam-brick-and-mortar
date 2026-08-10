@@ -302,28 +302,4 @@ export class BatchAppDetailsClient {
             clearTimeout(timeoutId);
         }
     }
-
-    /**
-     * Fetch details for a single app (fallback to individual endpoint)
-     */
-    async fetchSingle(appid: number): Promise<AppDetailsResponse | null> {
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/appdetails/${appid}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                BatchAppDetailsClient.logger.warn(`Single fetch failed for ${appid}: ${response.status}`)
-                return null;
-            }
-
-            return await response.json();
-        } catch (error) {
-            BatchAppDetailsClient.logger.error(`Error fetching appid ${appid}: ${String(error)}`)
-            return null;
-        }
-    }
 }
