@@ -11,7 +11,7 @@ import { InputActionResolver } from './InputActionResolver'
 import { InputEventAdapter } from './InputEventAdapter'
 import { InputProfileService } from './InputProfileService'
 import { InputStateTracker } from './InputStateTracker'
-import { InputEventTypes, type GamepadButtonPressedEvent, type XRGamepadButtonPressedEvent } from '../types/InteractionEvents'
+import { InputEventTypes, type GamepadButtonPressedEvent, type XRGamepadButtonPressedEvent, type SprintTogglePressedEvent } from '../types/InteractionEvents'
 
 export type { InputCallbacks, InputState, MovementOptions } from './InputContracts'
 
@@ -27,6 +27,9 @@ export class InputManager {
 
     private isListeningToEvents = false
     private isPaused = false
+    /** Flipped by SprintTogglePressed (currently only VR's left-thumbstick-click) - a discrete
+     *  toggle, distinct from Sprint's hold-based keyboard Shift/gamepad stick-press. */
+    private sprintToggled = false
 
     private readonly eventManager: EventManager
     private readonly stateTracker: InputStateTracker
@@ -54,6 +57,7 @@ export class InputManager {
 
         this.eventManager.registerEventHandler<GamepadButtonPressedEvent>(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
         this.eventManager.registerEventHandler<XRGamepadButtonPressedEvent>(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
+        this.eventManager.registerEventHandler<SprintTogglePressedEvent>(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
 
         InputManager.activeInstance = this
     }
@@ -158,6 +162,10 @@ export class InputManager {
             return true
         }
 
+        if (this.sprintToggled) {
+            return true
+        }
+
         return this.stateTracker.isShiftPressed()
     }
 
@@ -169,6 +177,10 @@ export class InputManager {
         this.actionResolver.handleXRGamepadButtonPress(event.detail.handedness, event.detail.buttonIndex, this.profileService.getEnabledProfiles())
     }
 
+    private readonly handleSprintTogglePressed = (): void => {
+        this.sprintToggled = !this.sprintToggled
+    }
+
     dispose(): void {
         this.stopListening()
         this.stateTracker.clearCallbacks()
@@ -177,6 +189,7 @@ export class InputManager {
         this.actionResolver.dispose()
         this.eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
+        this.eventManager.deregisterEventHandler(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
 
         if (InputManager.activeInstance === this) {
             InputManager.activeInstance = null

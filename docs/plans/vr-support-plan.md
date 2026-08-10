@@ -190,3 +190,35 @@ in `setupWebXR()`; call `.setSession(...)` in `handleSessionStart()`/`handleSess
   pattern this deliberately does NOT touch (game boxes have their own resolved path already);
   worth revisiting together once VR controller raycasting and the interactable-props gap are both
   real
+
+## Addendum (2026-08-10): left-thumbstick movement + sprint toggle + camera-relative movement fix
+
+Real-headset testing (button indices verified: trigger=0, squeeze=1, thumbstick-click=3) surfaced
+a real, pre-existing movement bug this plan's own controller-routing work made acute: since
+`WebXRCoordinator` skips rotation application entirely during an XR session (the headset owns view
+rotation), the camera rig's rotation freezes at whatever it was when the session started.
+`CameraInputApplier.updateMovement()` moved the rig along its own **local** axes
+(`camera.translateZ(...)`), so "forward" meant "the rig's frozen starting orientation," not
+"wherever the headset is actually looking." Fixed by deriving movement direction from the real
+camera's live world orientation instead (resolved via `DataManager`, same lazy-resolve idiom
+`SceneClickGameBoxRaycast` already uses), projected onto the horizontal plane so pitch never tilts
+movement. Confirmed with the user to apply this universally (all devices), not just VR - outside
+XR the rig's rotation already tracked view direction, so this is a no-op there except it also
+fixes a real desktop quirk (looking up/down used to tilt movement into the air/ground).
+
+Also wired, following real VR convention (left stick = move, right stick = turn/comfort, not built
+yet - sub-scope 2):
+- Left thumbstick → `MoveForward`/`MoveBack`/`MoveLeft`/`MoveRight` (`handedness: 'left'` pinned -
+  the first real use of `XRBinding.handedness`, which existed but nothing used until now)
+- Left thumbstick-click → new `InputAction.SprintToggle`, the first toggle-style action (reuses
+  the existing `SPECIFIC_PRESS_EVENTS` discrete-press pipeline from the controller-routing work,
+  composes with hold-based `Sprint` in `InputManager.isSprintActive()`)
+- Right thumbstick re-pinned to `LookHorizontal`/`LookVertical` (`handedness: 'right'`) so it no
+  longer overlaps with left-stick movement, even though Look stays a no-op in-session by design
+- `XRBinding` gained `direction?: AxisDirection`; `BindingResolver.resolveXRComponentValue` gained
+  a dead zone (mirrors `resolveGamepadAxisValue`'s, prevents thumbstick drift creep)
+
+Files touched: `CameraInputApplier.ts`, `InputProfile.ts`, `BindingResolver.ts`, `InputActions.ts`,
+`InteractionEvents.ts`, `InputActionResolver.ts`, `InputManager.ts`. New tests:
+`camera-input-applier-movement.test.ts`, plus extensions to `binding-resolver-xr.test.ts` and a new
+`input-manager-sprint-toggle.test.ts`.

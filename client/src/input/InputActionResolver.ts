@@ -8,11 +8,13 @@ import type { InputProfileDefinition } from './InputProfile'
 
 // The only button actions that need "trigger once per press" dispatch, mapped to the specific
 // event each means - Sprint/RollLeft/RollRight/ResetCamera are deliberately absent, since those
-// are correctly read continuously via isActionPressed() instead.
+// are correctly read continuously via isActionPressed() instead. SprintToggle DOES need this
+// (unlike Sprint) - it's a discrete flip, not a hold.
 const SPECIFIC_PRESS_EVENTS: Partial<Record<string, string>> = {
     [InputAction.OpenMenu]: InputEventTypes.OpenMenuPressed,
     [InputAction.Interact]: InputEventTypes.InteractPressed,
-    [InputAction.Cancel]: InputEventTypes.CancelPressed
+    [InputAction.Cancel]: InputEventTypes.CancelPressed,
+    [InputAction.SprintToggle]: InputEventTypes.SprintTogglePressed
 }
 
 export interface InputActionSnapshot {

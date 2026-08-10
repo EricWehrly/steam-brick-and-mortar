@@ -175,6 +175,15 @@ export interface InteractPressedEvent extends BaseInteractionEvent {}
 export interface CancelPressedEvent extends BaseInteractionEvent {}
 
 /**
+ * Fired by InputActionResolver the moment SprintToggle is pressed - currently only the VR left
+ * thumbstick's click, since holding a thumbstick-click down while also tilting the same stick to
+ * move is awkward on real hardware, unlike keyboard Shift/gamepad stick-press (which stay
+ * hold-based). InputManager flips its own toggle state on each press; this event carries no data
+ * (which way it flipped) since InputManager alone owns that state.
+ */
+export interface SprintTogglePressedEvent extends BaseInteractionEvent {}
+
+/**
  * Fired by DeviceDetector the frame it detects a gamepad button transitioning from released to
  * pressed - the Gamepad API has no native press event, so this is the one place that has to poll
  * and diff, right next to where gamepad state is already read. This is a raw, unresolved signal -
@@ -429,7 +438,8 @@ export const InputEventTypes = {
     InteractPressed: 'input:interact-pressed',
     CancelPressed: 'input:cancel-pressed',
     GamepadButtonPressed: 'input:gamepad-button-pressed',
-    XRGamepadButtonPressed: 'input:xr-gamepad-button-pressed'
+    XRGamepadButtonPressed: 'input:xr-gamepad-button-pressed',
+    SprintTogglePressed: 'input:sprint-toggle-pressed'
 } as const
 
 export const UIEventTypes = {
