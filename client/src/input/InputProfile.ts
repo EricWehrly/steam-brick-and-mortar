@@ -70,6 +70,10 @@ export interface XRBinding {
     type: 'xr-component'
     handedness?: 'left' | 'right' | 'none'
     componentPath: string
+    /** For an axis component (e.g. thumbstick-x/y) bound to a directional action (MoveForward/
+     *  MoveLeft/...), same role as GamepadAxisBinding's direction: split the signed axis value
+     *  into a clamped positive-only magnitude for that one direction. */
+    direction?: AxisDirection
     label?: string
 }
 
@@ -236,8 +240,16 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
         bindings: {
             [InputAction.Interact]: [{ type: 'xr-component', componentPath: 'trigger', label: 'Trigger' }],
             [InputAction.OpenMenu]: [{ type: 'xr-component', componentPath: 'menu', label: 'Menu Button' }],
-            [InputAction.LookHorizontal]: [{ type: 'xr-component', componentPath: 'thumbstick-x', label: 'Thumbstick X' }],
-            [InputAction.LookVertical]: [{ type: 'xr-component', componentPath: 'thumbstick-y', label: 'Thumbstick Y' }]
+            // Left thumbstick = movement, right = look/turn - real VR convention, and keeps each
+            // stick single-purpose (left no longer double-claimed by Look, which is a no-op
+            // in-session anyway per WebXRCoordinator's rotation-skip - see its own doc comment).
+            [InputAction.MoveForward]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-y', direction: 'negative', label: 'Left Thumbstick Up' }],
+            [InputAction.MoveBack]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-y', direction: 'positive', label: 'Left Thumbstick Down' }],
+            [InputAction.MoveLeft]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-x', direction: 'negative', label: 'Left Thumbstick Left' }],
+            [InputAction.MoveRight]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-x', direction: 'positive', label: 'Left Thumbstick Right' }],
+            [InputAction.SprintToggle]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-click', label: 'Left Thumbstick Click' }],
+            [InputAction.LookHorizontal]: [{ type: 'xr-component', handedness: 'right', componentPath: 'thumbstick-x', label: 'Right Thumbstick X' }],
+            [InputAction.LookVertical]: [{ type: 'xr-component', handedness: 'right', componentPath: 'thumbstick-y', label: 'Right Thumbstick Y' }]
         }
     }
 ]

@@ -11,6 +11,7 @@ export const InputAction = {
     RollRight: 'roll-right',
     ResetCamera: 'reset-camera',
     Sprint: 'sprint',
+    SprintToggle: 'sprint-toggle',
     Interact: 'interact',
     OpenMenu: 'open-menu',
     Cancel: 'cancel'
@@ -53,6 +54,7 @@ export const INPUT_ACTION_DEFINITIONS: ReadonlyArray<InputActionDefinition> = [
     { id: InputAction.RollRight, label: 'Roll Right', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.ResetCamera, label: 'Reset Camera View', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.Sprint, label: 'Sprint', type: InputActionType.Button, context: InputContext.Scene },
+    { id: InputAction.SprintToggle, label: 'Toggle Sprint', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.Interact, label: 'Interact', type: InputActionType.Button, context: InputContext.Scene },
     { id: InputAction.OpenMenu, label: 'Open Menu', type: InputActionType.Button, context: InputContext.Global },
     { id: InputAction.Cancel, label: 'Cancel / Close', type: InputActionType.Button, context: InputContext.Global }

@@ -141,10 +141,15 @@ const XR_STANDARD_COMPONENT_MAP: Readonly<Record<string, XRComponentMapEntry>> =
     'thumbstick-y': { kind: 'axis', index: 3 }
 }
 
+/** Same default as resolveGamepadAxisValue's dead zone - real thumbsticks report small nonzero
+ *  values at rest, and without this a bound movement/look action would slowly creep. */
+const XR_AXIS_DEAD_ZONE = 0.15
+
 /**
  * Loops all connected XR controllers and keeps the strongest match - same shape as
  * resolveGamepadAxisValue/resolveGamepadButtonValue - so a binding with no handedness pinned
- * (every builtin VR binding today) resolves from either hand for free.
+ * (Interact/OpenMenu/right-thumbstick look) resolves from either hand for free, while a pinned
+ * binding (left-thumbstick movement/sprint-toggle) only ever matches its own hand.
  */
 function resolveXRComponentValue(binding: XRBinding, xrGamepads: ReadonlyArray<XRGamepadState>): number {
     const component = XR_STANDARD_COMPONENT_MAP[binding.componentPath]
@@ -158,9 +163,18 @@ function resolveXRComponentValue(binding: XRBinding, xrGamepads: ReadonlyArray<X
             continue
         }
 
-        const value = component.kind === 'button'
+        let value = component.kind === 'button'
             ? gamepad.buttons[component.index]?.value ?? 0
             : gamepad.axes[component.index] ?? 0
+
+        if (component.kind === 'axis') {
+            value = normalizeGamepadAxis(value, XR_AXIS_DEAD_ZONE)
+            if (binding.direction === 'positive') {
+                value = Math.max(value, 0)
+            } else if (binding.direction === 'negative') {
+                value = Math.max(-value, 0)
+            }
+        }
 
         if (Math.abs(value) > Math.abs(bestValue)) {
             bestValue = value

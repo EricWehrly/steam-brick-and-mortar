@@ -53,13 +53,16 @@ describe('BindingResolver xr-component resolution', () => {
         const resolver = new BindingResolver()
         const vrProfile = getProfile(InputProfileId.VR)
 
+        // Full deflection (±1), not a partial value - resolveXRComponentValue now applies a dead
+        // zone (same as gamepad-axis, see BindingResolver's XR_AXIS_DEAD_ZONE), so a partial raw
+        // value wouldn't survive unchanged; full deflection still clamps to exactly ±1 either way.
         const state = resolver.resolve(vrProfile, {
             ...baseRawState,
-            xrGamepads: [createXRGamepad('right', [], [0, 0, 0.6, -0.3])]
+            xrGamepads: [createXRGamepad('right', [], [0, 0, 1, -1])]
         })
 
-        expect(state.axes.get(InputAction.LookHorizontal)).toBeCloseTo(0.6)
-        expect(state.axes.get(InputAction.LookVertical)).toBeCloseTo(-0.3)
+        expect(state.axes.get(InputAction.LookHorizontal)).toBeCloseTo(1)
+        expect(state.axes.get(InputAction.LookVertical)).toBeCloseTo(-1)
     })
 
     it('resolves no interaction when no XR gamepad is connected', () => {
@@ -119,6 +122,67 @@ describe('BindingResolver xr-component resolution', () => {
     })
 })
 
+describe('BindingResolver left-thumbstick movement bindings', () => {
+    it('resolves MoveForward/MoveLeft from the left thumbstick, at full deflection', () => {
+        const resolver = new BindingResolver()
+        const vrProfile = getProfile(InputProfileId.VR)
+
+        // xr-standard axes[2]/[3] = thumbstick x/y. Forward is bound to negative Y (stick up),
+        // left is bound to negative X (stick left) - matches the GamepadStandard convention.
+        const state = resolver.resolve(vrProfile, {
+            ...baseRawState,
+            xrGamepads: [createXRGamepad('left', [], [-1, 0, -1, -1])]
+        })
+
+        expect(state.axes.get(InputAction.MoveForward)).toBeCloseTo(1)
+        expect(state.axes.get(InputAction.MoveBack)).toBeCloseTo(0)
+        expect(state.axes.get(InputAction.MoveLeft)).toBeCloseTo(1)
+        expect(state.axes.get(InputAction.MoveRight)).toBeCloseTo(0)
+    })
+
+    it('does not resolve movement from the right thumbstick - handedness is pinned to left', () => {
+        const resolver = new BindingResolver()
+        const vrProfile = getProfile(InputProfileId.VR)
+
+        const state = resolver.resolve(vrProfile, {
+            ...baseRawState,
+            xrGamepads: [createXRGamepad('right', [], [-1, 0, -1, -1])]
+        })
+
+        expect(state.axes.get(InputAction.MoveForward)).toBe(0)
+        expect(state.axes.get(InputAction.MoveLeft)).toBe(0)
+    })
+
+    it('applies a dead zone so small left-thumbstick drift does not creep into movement', () => {
+        const resolver = new BindingResolver()
+        const vrProfile = getProfile(InputProfileId.VR)
+
+        const state = resolver.resolve(vrProfile, {
+            ...baseRawState,
+            xrGamepads: [createXRGamepad('left', [], [0, 0, 0, -0.05])]
+        })
+
+        expect(state.axes.get(InputAction.MoveForward)).toBe(0)
+    })
+
+    it('resolves SprintToggle only from the left thumbstick click (button 3)', () => {
+        const resolver = new BindingResolver()
+        const vrProfile = getProfile(InputProfileId.VR)
+
+        const leftState = resolver.resolve(vrProfile, {
+            ...baseRawState,
+            xrGamepads: [createXRGamepad('left', [{ pressed: false, value: 0 }, { pressed: false, value: 0 }, { pressed: false, value: 0 }, { pressed: true, value: 1 }])]
+        })
+        expect(leftState.buttons.get(InputAction.SprintToggle)).toBe(true)
+
+        const rightState = resolver.resolve(vrProfile, {
+            ...baseRawState,
+            xrGamepads: [createXRGamepad('right', [{ pressed: false, value: 0 }, { pressed: false, value: 0 }, { pressed: false, value: 0 }, { pressed: true, value: 1 }])]
+        })
+        expect(rightState.buttons.get(InputAction.SprintToggle)).toBe(false)
+    })
+})
+
 describe('BindingResolver.matchesXRButtonPress', () => {
     it('matches the VR profile Interact binding to trigger (button 0) presses', () => {
         const resolver = new BindingResolver()
@@ -142,5 +206,14 @@ describe('BindingResolver.matchesXRButtonPress', () => {
         const keyboardBinding = { type: 'keyboard-button' as const, code: 'Enter' }
 
         expect(resolver.matchesXRButtonPress(keyboardBinding, 'right', 0)).toBe(false)
+    })
+
+    it('matches the VR profile SprintToggle binding to thumbstick-click (button 3), left hand only', () => {
+        const resolver = new BindingResolver()
+        const sprintToggleBinding = getProfile(InputProfileId.VR).bindings[InputAction.SprintToggle]![0]
+
+        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'left', 3)).toBe(true)
+        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'right', 3)).toBe(false)
+        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'left', 0)).toBe(false)
     })
 })
