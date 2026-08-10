@@ -560,7 +560,7 @@ export class AppSettings {
             artworkFresnelPower: 4.0,
             shadowContactBias: -0.001,
             shadowContactNormalBias: 0.005,
-            ceilingHeight: 4.2,
+            ceilingHeight: 6.4,
             enableLighting: true,
             showLightingDebug: false,
             showCeiling: true,

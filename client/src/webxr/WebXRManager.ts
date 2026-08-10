@@ -14,11 +14,14 @@ import { Logger } from '../utils/Logger'
 
 /**
  * Preference order for `XRReferenceSpaceType`, most-capable first - 'local-floor' gives real
- * floor-relative tracking, but not every runtime supports it (confirmed: a PICO 4 bridged through
- * PICO Connect/SteamVR threw `NotSupportedError` on it while still reporting the session itself
- * as supported). Rather than hardcode one assumption (Three.js's own default is 'local-floor'
- * with no fallback), probe the actual session for what it supports and use the best available -
- * letting the runtime's real capabilities drive this instead of us guessing.
+ * floor-relative tracking. A session must actually request 'local-floor'/'bounded-floor' as a
+ * required/optional feature at requestSession() time (see startVRSession()) or
+ * requestReferenceSpace() throws NotSupportedError for them regardless of whether the runtime
+ * supports floor tracking - a PICO 4 bridged through PICO Connect/SteamVR was previously observed
+ * falling all the way back to 'local' for exactly this reason (the feature was never requested),
+ * not because the runtime lacks floor tracking. Even with the feature requested, a given runtime
+ * may still not grant it, so this fallback probe stays as a safety net rather than assuming
+ * success - letting the runtime's real capabilities drive this instead of us guessing.
  */
 const REFERENCE_SPACE_FALLBACK_ORDER: ReadonlyArray<XRReferenceSpaceType> = ['local-floor', 'bounded-floor', 'local', 'viewer']
 
@@ -129,7 +132,24 @@ export class WebXRManager {
         try {
             console.log('🥽 Attempting to start WebXR session...')
 
-            const session = await navigator.xr.requestSession('immersive-vr')
+            // requestReferenceSpace('local-floor'/'bounded-floor') throws NotSupportedError
+            // unless that type was requested here at session-creation time, in requiredFeatures
+            // or optionalFeatures - regardless of whether the runtime actually supports floor
+            // tracking (confirmed against Three.js's own VRButton.js, which every official WebXR
+            // example uses to start a session - it requests exactly these as optionalFeatures).
+            // We were requesting neither, so determineSupportedReferenceSpaceType() below could
+            // never succeed on anything but 'local' - not because this PICO 4/SteamVR runtime
+            // lacks floor tracking, but because we never asked for it.
+            //
+            // requiredFeatures: ['local-floor'] - TEMP, diagnosing the Edge/WebView2 WebXR bug.
+            // A-Frame's default session config (src/systems/webxr.js) requires 'local-floor'
+            // rather than merely requesting it optionally; matching that exactly in case Edge's
+            // session/feature negotiation path behaves differently for required vs. optional.
+            // Low-confidence guess - revert if it doesn't change anything.
+            const session = await navigator.xr.requestSession('immersive-vr', {
+                requiredFeatures: ['local-floor'],
+                optionalFeatures: ['bounded-floor']
+            })
             this.currentSession = session
 
             const referenceSpaceType = await this.determineSupportedReferenceSpaceType(session)
