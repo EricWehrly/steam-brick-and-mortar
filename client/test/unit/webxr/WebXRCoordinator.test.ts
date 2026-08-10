@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
 
-const { webXRManagerMock, inputManagerMock, capturedWebXRManagerCallbacks } = vi.hoisted(() => ({
+const { webXRManagerMock, inputManagerMock, xrControllerManagerMock, capturedWebXRManagerCallbacks } = vi.hoisted(() => ({
     webXRManagerMock: {
         setRenderer: vi.fn(),
         checkCapabilities: vi.fn().mockResolvedValue({ isSupported: true, supportsImmersiveVR: true, hasNavigatorXR: true }),
@@ -20,10 +20,16 @@ const { webXRManagerMock, inputManagerMock, capturedWebXRManagerCallbacks } = vi
         resume: vi.fn(),
         dispose: vi.fn(),
     },
+    xrControllerManagerMock: {
+        setup: vi.fn(),
+        setSession: vi.fn(),
+        getPrimaryControllerRay: vi.fn().mockReturnValue(null),
+        dispose: vi.fn(),
+    },
     // WebXRCoordinator's constructor passes its onSessionStart/onSessionEnd/etc. callbacks to
     // `new WebXRManager(callbacks)` - capture them here so tests can fire onSessionStart directly,
     // the same way the real WebXRManager would after a real session actually starts.
-    capturedWebXRManagerCallbacks: [] as Array<{ onSessionStart?: () => void }>,
+    capturedWebXRManagerCallbacks: [] as Array<{ onSessionStart?: () => void; onSessionEnd?: () => void }>,
 }))
 
 vi.mock('../../../src/webxr/WebXRManager', () => ({
@@ -35,6 +41,10 @@ vi.mock('../../../src/webxr/WebXRManager', () => ({
 
 vi.mock('../../../src/input/InputManager', () => ({
     InputManager: vi.fn().mockImplementation(function () { return inputManagerMock }),
+}))
+
+vi.mock('../../../src/webxr/XRControllerManager', () => ({
+    XRControllerManager: vi.fn().mockImplementation(function () { return xrControllerManagerMock }),
 }))
 
 import { WebXRCoordinator } from '../../../src/webxr/WebXRCoordinator'
@@ -89,6 +99,24 @@ describe('WebXRCoordinator', () => {
         expect(webXRManagerMock.setRenderer).toHaveBeenCalledWith(renderer)
         expect(webXRManagerMock.checkCapabilities).toHaveBeenCalled()
         expect(inputManagerMock.startListening).toHaveBeenCalled()
+        expect(xrControllerManagerMock.setup).toHaveBeenCalledWith(renderer)
+    })
+
+    it('forwards the real XR session to the controller manager on session start/end', () => {
+        webXRManagerMock.getCurrentSession.mockReturnValue('fake-session' as unknown as XRSession)
+
+        const onSessionStart = capturedWebXRManagerCallbacks[0]?.onSessionStart
+        onSessionStart?.()
+        expect(xrControllerManagerMock.setSession).toHaveBeenCalledWith('fake-session')
+
+        const onSessionEnd = capturedWebXRManagerCallbacks[0]?.onSessionEnd
+        onSessionEnd?.()
+        expect(xrControllerManagerMock.setSession).toHaveBeenCalledWith(null)
+    })
+
+    it('disposes the controller manager on dispose', () => {
+        coordinator.dispose()
+        expect(xrControllerManagerMock.dispose).toHaveBeenCalled()
     })
 
     it('forwards pause/resume to the input manager', () => {

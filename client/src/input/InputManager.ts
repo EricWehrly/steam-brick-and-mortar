@@ -11,7 +11,7 @@ import { InputActionResolver } from './InputActionResolver'
 import { InputEventAdapter } from './InputEventAdapter'
 import { InputProfileService } from './InputProfileService'
 import { InputStateTracker } from './InputStateTracker'
-import { InputEventTypes, type GamepadButtonPressedEvent } from '../types/InteractionEvents'
+import { InputEventTypes, type GamepadButtonPressedEvent, type XRGamepadButtonPressedEvent } from '../types/InteractionEvents'
 
 export type { InputCallbacks, InputState, MovementOptions } from './InputContracts'
 
@@ -53,6 +53,7 @@ export class InputManager {
         this.cameraInputApplier = new CameraInputApplier()
 
         this.eventManager.registerEventHandler<GamepadButtonPressedEvent>(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
+        this.eventManager.registerEventHandler<XRGamepadButtonPressedEvent>(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
 
         InputManager.activeInstance = this
     }
@@ -164,6 +165,10 @@ export class InputManager {
         this.actionResolver.handleGamepadButtonPress(event.detail.buttonIndex, this.profileService.getEnabledProfiles())
     }
 
+    private readonly handleXRGamepadButtonPressed = (event: CustomEvent<XRGamepadButtonPressedEvent>): void => {
+        this.actionResolver.handleXRGamepadButtonPress(event.detail.handedness, event.detail.buttonIndex, this.profileService.getEnabledProfiles())
+    }
+
     dispose(): void {
         this.stopListening()
         this.stateTracker.clearCallbacks()
@@ -171,6 +176,7 @@ export class InputManager {
         this.actionResolver.clear()
         this.actionResolver.dispose()
         this.eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
+        this.eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
 
         if (InputManager.activeInstance === this) {
             InputManager.activeInstance = null

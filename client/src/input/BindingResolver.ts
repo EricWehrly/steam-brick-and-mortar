@@ -10,7 +10,8 @@ import type {
     InputBinding,
     InputProfileDefinition,
     AxisDirection,
-    MouseAxisBinding
+    MouseAxisBinding,
+    XRBinding
 } from './InputProfile'
 
 /** User-facing look invert/sensitivity for one device - AppSettings owns the values; bindings
@@ -37,6 +38,12 @@ const NEUTRAL_LOOK_TUNING: LookTuning = {
     gamepad: NEUTRAL_DEVICE_LOOK_TUNING
 }
 
+/** One connected XR controller's gamepad-shaped input, as read off XRInputSource.gamepad. */
+export interface XRGamepadState {
+    handedness: XRHandedness
+    gamepad: Gamepad
+}
+
 export interface RawInputState {
     keysPressed: ReadonlySet<string>
     mouseButtonsPressed: ReadonlySet<number>
@@ -44,6 +51,8 @@ export interface RawInputState {
     mouseDeltaY: number
     gamepads: ReadonlyArray<Gamepad>
     lookTuning?: LookTuning
+    /** Optional (defaults to []) so existing hand-built RawInputState test fixtures don't need updating. */
+    xrGamepads?: ReadonlyArray<XRGamepadState>
 }
 
 export interface ResolvedActionState {
@@ -110,6 +119,57 @@ function resolveMouseAxisValue(binding: MouseAxisBinding, rawState: RawInputStat
     return binding.invert ? -value : value
 }
 
+interface XRComponentMapEntry {
+    kind: 'button' | 'axis'
+    index: number
+}
+
+/**
+ * xr-standard gamepad mapping (W3C-registered; used by virtually every WebXR controller/runtime,
+ * and by @webxr-input-profiles/motion-controllers internally). 'menu' has no standardized index -
+ * the system/Oculus button is typically OS-reserved on Quest and not exposed to gamepad.buttons
+ * at all; button 4 is a best-effort guess for controllers that do expose a secondary button there.
+ * See docs/plans/vr-support-plan.md.
+ */
+// TD: xr-menu-button-mapping-unverified
+const XR_STANDARD_COMPONENT_MAP: Readonly<Record<string, XRComponentMapEntry>> = {
+    trigger: { kind: 'button', index: 0 },
+    squeeze: { kind: 'button', index: 1 },
+    'thumbstick-click': { kind: 'button', index: 3 },
+    menu: { kind: 'button', index: 4 },
+    'thumbstick-x': { kind: 'axis', index: 2 },
+    'thumbstick-y': { kind: 'axis', index: 3 }
+}
+
+/**
+ * Loops all connected XR controllers and keeps the strongest match - same shape as
+ * resolveGamepadAxisValue/resolveGamepadButtonValue - so a binding with no handedness pinned
+ * (every builtin VR binding today) resolves from either hand for free.
+ */
+function resolveXRComponentValue(binding: XRBinding, xrGamepads: ReadonlyArray<XRGamepadState>): number {
+    const component = XR_STANDARD_COMPONENT_MAP[binding.componentPath]
+    if (!component) {
+        return 0
+    }
+
+    let bestValue = 0
+    for (const { handedness, gamepad } of xrGamepads) {
+        if (binding.handedness && binding.handedness !== handedness) {
+            continue
+        }
+
+        const value = component.kind === 'button'
+            ? gamepad.buttons[component.index]?.value ?? 0
+            : gamepad.axes[component.index] ?? 0
+
+        if (Math.abs(value) > Math.abs(bestValue)) {
+            bestValue = value
+        }
+    }
+
+    return bestValue
+}
+
 function resolveBindingValue(binding: InputBinding, rawState: RawInputState): number {
     switch (binding.type) {
         case 'keyboard-button':
@@ -125,7 +185,7 @@ function resolveBindingValue(binding: InputBinding, rawState: RawInputState): nu
         case 'touch-gesture':
             return 0
         case 'xr-component':
-            return 0
+            return resolveXRComponentValue(binding, rawState.xrGamepads ?? [])
         default:
             return 0
     }
@@ -180,6 +240,25 @@ export class BindingResolver {
         }
 
         return actionIds
+    }
+
+    /**
+     * Whether an xr-component binding means the given button-index press on the given hand -
+     * for use as a findButtonActionsBoundTo predicate, same role gamepad-button/button-index
+     * equality plays for handleGamepadButtonPress. A binding with no handedness pinned (every
+     * builtin VR binding today) matches either hand.
+     */
+    matchesXRButtonPress(binding: InputBinding, handedness: XRHandedness, buttonIndex: number): boolean {
+        if (binding.type !== 'xr-component') {
+            return false
+        }
+
+        const component = XR_STANDARD_COMPONENT_MAP[binding.componentPath]
+        if (!component || component.kind !== 'button' || component.index !== buttonIndex) {
+            return false
+        }
+
+        return !binding.handedness || binding.handedness === handedness
     }
 
     resolve(profile: InputProfileDefinition, rawState: RawInputState): ResolvedActionState {

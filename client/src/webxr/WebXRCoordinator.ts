@@ -13,6 +13,7 @@
 
 import * as THREE from 'three'
 import { WebXRManager, type WebXRCapabilities } from './WebXRManager'
+import { XRControllerManager } from './XRControllerManager'
 import { InputManager } from '../input/InputManager'
 import { EventManager } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
@@ -34,6 +35,7 @@ export interface WebXRCoordinatorConfig {
 export class WebXRCoordinator {
     private webxrManager: WebXRManager
     private inputManager: InputManager
+    private xrControllerManager: XRControllerManager
     private eventManager: EventManager
     private renderLoopRegistry: RenderLoopRegistry
     private cameraRig: THREE.Object3D
@@ -57,6 +59,8 @@ export class WebXRCoordinator {
                 mouseSensitivity: AppSettings.get('inputMouseSensitivity')
             }
         )
+
+        this.xrControllerManager = new XRControllerManager({ cameraRig: this.cameraRig })
     }
 
     /**
@@ -65,13 +69,15 @@ export class WebXRCoordinator {
     async setupWebXR(renderer: THREE.WebGLRenderer): Promise<void> {
         // Set the renderer for WebXR
         this.webxrManager.setRenderer(renderer)
-        
+
         // Check WebXR capabilities
         await this.webxrManager.checkCapabilities()
-        
+
         // Start input listening
         this.inputManager.startListening()
-        
+
+        this.xrControllerManager.setup(renderer)
+
         // Register update method with render loop
         this.renderLoopRegistry.register(this.constructor.name, this.updateCamera.bind(this))
     }
@@ -148,6 +154,7 @@ export class WebXRCoordinator {
     dispose(): void {
         this.renderLoopRegistry.unregister(this.constructor.name)
         this.inputManager.dispose()
+        this.xrControllerManager.dispose()
         this.webxrManager.dispose()
     }
 
@@ -183,12 +190,14 @@ export class WebXRCoordinator {
         this.cameraRig.position.y = 0
 
         this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
+        this.xrControllerManager.setSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
     }
 
     private handleSessionEnd(): void {
         console.log('🚪 WebXR session ended')
         this.inputManager.setXRSession(null)
+        this.xrControllerManager.setSession(null)
         this.eventManager.emit(WebXREventTypes.SessionEnd, {})
     }
 

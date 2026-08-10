@@ -61,6 +61,7 @@ export class InputActionResolver {
     ): void {
         const gamepads = this.deviceDetector.pollGamepads()
         this.lastConnectedGamepads = gamepads
+        const xrGamepads = this.deviceDetector.pollXRGamepads()
 
         const connectedProfiles = enabledProfiles.filter(profile => this.connectedProfileIds.has(profile.id))
         const lookTuning = this.readLookTuning()
@@ -75,6 +76,7 @@ export class InputActionResolver {
                 mouseDeltaX,
                 mouseDeltaY,
                 gamepads,
+                xrGamepads,
                 lookTuning
             })
 
@@ -115,6 +117,14 @@ export class InputActionResolver {
         this.emitSpecificPressEvents(
             enabledProfiles,
             binding => binding.type === 'gamepad-button' && binding.button === buttonIndex
+        )
+    }
+
+    /** Resolves an XR controller button transition (same no-native-press-event reasoning as gamepad) against connected+enabled profiles' xr-component bindings. */
+    handleXRGamepadButtonPress(handedness: XRHandedness, buttonIndex: number, enabledProfiles: ReadonlyArray<InputProfileDefinition>): void {
+        this.emitSpecificPressEvents(
+            enabledProfiles,
+            binding => this.bindingResolver.matchesXRButtonPress(binding, handedness, buttonIndex)
         )
     }
 

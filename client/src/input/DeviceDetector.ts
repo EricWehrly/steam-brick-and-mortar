@@ -1,8 +1,9 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { EventManager, EventSource } from '../core/EventManager'
-import type { InputDevicesChangedEvent, GamepadButtonPressedEvent } from '../types/InteractionEvents'
+import type { InputDevicesChangedEvent, GamepadButtonPressedEvent, XRGamepadButtonPressedEvent } from '../types/InteractionEvents'
 import { InputEventTypes } from '../types/InteractionEvents'
 import { InputDeviceKind, type InputDeviceKindValue } from './InputProfile'
+import type { XRGamepadState } from './BindingResolver'
 import { Logger } from '../utils/Logger'
 
 export interface InputDeviceInfo {
@@ -34,6 +35,7 @@ export class DeviceDetector {
     private touchSeen = false
     private xrSession: XRSession | null = null
     private previousGamepadButtonsPressed = new Map<number, ReadonlyArray<boolean>>()
+    private previousXRGamepadButtonsPressed = new Map<XRHandedness, ReadonlyArray<boolean>>()
 
     constructor(eventManager: EventManager = EventManager.getInstance()) {
         this.eventManager = eventManager
@@ -101,6 +103,7 @@ export class DeviceDetector {
         window.removeEventListener('touchstart', this.handleTouchStart)
         this.detachXRSessionListeners(this.xrSession)
         this.xrSession = null
+        this.previousXRGamepadButtonsPressed.clear()
         this.started = false
     }
 
@@ -111,9 +114,53 @@ export class DeviceDetector {
 
         this.detachXRSessionListeners(this.xrSession)
         this.xrSession = session
+        this.previousXRGamepadButtonsPressed.clear()
         this.attachXRSessionListeners(this.xrSession)
         this.syncXRDevices()
         this.emitDevicesChanged()
+    }
+
+    /**
+     * Every connected XR controller's gamepad-shaped input, read live off the stored session's
+     * inputSources - each real XRInputSource.gamepad is a standard Gamepad-API-shaped object
+     * (buttons/axes), no XRFrame needed. Empty when no session is active or no controller has a
+     * gamepad (e.g. hand tracking with no physical controller).
+     */
+    getXRGamepads(): ReadonlyArray<XRGamepadState> {
+        if (!this.xrSession) {
+            return []
+        }
+
+        const result: XRGamepadState[] = []
+        for (const inputSource of this.xrSession.inputSources) {
+            if (inputSource.gamepad) {
+                result.push({ handedness: inputSource.handedness, gamepad: inputSource.gamepad })
+            }
+        }
+        return result
+    }
+
+    /**
+     * Same role as pollGamepads() for standard gamepads: returns the live XR gamepad list (so
+     * InputActionResolver.updateFrame doesn't re-read session.inputSources itself) and emits
+     * XRGamepadButtonPressedEvent on a released-to-pressed transition. Keyed by handedness, not
+     * array index - three.js/WebXR don't guarantee a stable controller-to-index mapping.
+     */
+    pollXRGamepads(): ReadonlyArray<XRGamepadState> {
+        const xrGamepads = this.getXRGamepads()
+        const connectedHandedness = new Set(xrGamepads.map(({ handedness }) => handedness))
+
+        for (const handedness of this.previousXRGamepadButtonsPressed.keys()) {
+            if (!connectedHandedness.has(handedness)) {
+                this.previousXRGamepadButtonsPressed.delete(handedness)
+            }
+        }
+
+        for (const xrGamepad of xrGamepads) {
+            this.emitNewlyPressedXRGamepadButtons(xrGamepad)
+        }
+
+        return xrGamepads
     }
 
     /**
@@ -195,6 +242,23 @@ export class DeviceDetector {
         })
 
         this.previousGamepadButtonsPressed.set(gamepad.index, gamepad.buttons.map(button => button.pressed))
+    }
+
+    private emitNewlyPressedXRGamepadButtons({ handedness, gamepad }: XRGamepadState): void {
+        const previousButtons = this.previousXRGamepadButtonsPressed.get(handedness)
+
+        gamepad.buttons.forEach((button, buttonIndex) => {
+            const wasPressed = previousButtons?.[buttonIndex] ?? false
+            if (button.pressed && !wasPressed) {
+                this.eventManager.emit<XRGamepadButtonPressedEvent>(
+                    InputEventTypes.XRGamepadButtonPressed,
+                    { handedness, buttonIndex },
+                    EventSource.System
+                )
+            }
+        })
+
+        this.previousXRGamepadButtonsPressed.set(handedness, gamepad.buttons.map(button => button.pressed))
     }
 
     private addGamepadDevice(gamepad: Gamepad): void {

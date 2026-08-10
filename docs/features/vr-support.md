@@ -1,7 +1,7 @@
 # Feature: VR Support
 
 **Act**: 2 (Gate 2 — required for Act 2 completion)
-**Status**: Not Started — **blocked on a plan doc** (see "Sequencing" below); no code/architecture research has been done yet, this doc only records the sequencing decision
+**Status**: In Progress — sub-scope 1 (VR Controllers) has a plan doc and implementation underway (see [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md)); sub-scope 2 (VR Headset) not started
 **Priority**: High
 
 ## Goal
@@ -28,12 +28,10 @@ in hand for every iteration. Headset work depends on controller routing existing
 (can't interact with anything in headset without controller input flowing somewhere), so this
 isn't a change to the dependency order, just an explicit statement of which half comes first.
 
-**Neither sub-scope starts implementation without a plan doc first** (`docs/plans/vr-support-plan.md`,
-not yet written) — this is a real architectural change (headset-driven camera pose replacing
-keybind-driven camera update in `WebXRCoordinator`, per its own guard comment) spanning multiple
-components, which this project's planning rules require a plan + sign-off for before code starts.
-This doc intentionally stops at sequencing/scoping — no code-level research has been done toward
-either sub-scope yet.
+**Neither sub-scope starts implementation without a plan doc first.** Sub-scope 1 (VR Controllers)
+now has one: [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md) (written 2026-08-10,
+implementation in progress). Sub-scope 2 (VR Headset) still has no plan doc — this project's
+planning rules require a plan + sign-off before code starts there too.
 
 ## Context
 
