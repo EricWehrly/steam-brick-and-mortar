@@ -266,6 +266,28 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 - `external-tool/infrastructure/lambda-src/services/steam-api.js`
 - `external-tool/infrastructure/lambda-hydrator-src/index.js`
 
+## id: xr-menu-button-mapping-unverified
+**Priority**: Low
+**Effort**: ~30 min once a real headset is on hand (connect, run the existing HID/gamepad button
+dump, read the real index off `gamepad.buttons`)
+**Context**: `BindingResolver.ts`'s `XR_STANDARD_COMPONENT_MAP` maps `OpenMenu`'s `'menu'`
+componentPath to `xr-standard` gamepad button index 4 - a best-effort guess, not verified against
+real hardware. The system/Oculus button is typically OS-reserved on Quest and may not be exposed to
+`gamepad.buttons` at all; where a secondary button *is* exposed, its index isn't guaranteed stable
+across controller families. See `docs/plans/vr-support-plan.md`.
+
+**Decision (for now)**: ship the guess, don't block sub-scope 1 on it. In-headset pause-menu access
+realistically belongs to VR Support's sub-scope 2 (spatial UI) anyway - low urgency until that's
+picked up.
+
+**Done when**:
+- Verified (or corrected) against at least one real headset's actual button index
+- If no exposed button exists on a given controller family, `OpenMenu` simply doesn't fire from XR
+  on that hardware (already the graceful behavior today, not a crash) - document that instead
+
+**Related files**:
+- `client/src/input/BindingResolver.ts`
+
 ## id: personal-data-in-git-history
 **Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
 **Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)

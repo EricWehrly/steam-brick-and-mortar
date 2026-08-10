@@ -38,7 +38,13 @@ export enum DataKey {
      * (resize, and the liminal per-frame camera-follow) for free. See
      * docs/plans/placement-anchor-system-plan.md.
      */
-    RoomFrame = 'core.roomFrame'
+    RoomFrame = 'core.roomFrame',
+    /**
+     * XRControllerManager itself (implements XRControllerRaySource) - published once at XR setup
+     * time so SceneClickGameBoxRaycast (owned by a different coordinator) can look up the current
+     * controller ray without a direct cross-class reference. See docs/plans/vr-support-plan.md.
+     */
+    XRControllerRaySource = 'webxr.controllerRaySource'
 }
 
 /**

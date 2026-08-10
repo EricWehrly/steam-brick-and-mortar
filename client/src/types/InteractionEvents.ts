@@ -186,6 +186,18 @@ export interface GamepadButtonPressedEvent extends BaseInteractionEvent {
     buttonIndex: number
 }
 
+/**
+ * Fired by DeviceDetector the frame it detects an XR controller's gamepad-shaped button
+ * transitioning from released to pressed - same shape/reasoning as GamepadButtonPressedEvent
+ * (XRInputSource.gamepad has no native press event either), keyed by handedness rather than a
+ * numeric index since three.js/WebXR don't guarantee a stable controller-to-index mapping across
+ * sessions. Raw, unresolved signal - InputActionResolver decides which action it means.
+ */
+export interface XRGamepadButtonPressedEvent extends BaseInteractionEvent {
+    handedness: XRHandedness
+    buttonIndex: number
+}
+
 // =============================================================================
 // UI EVENTS
 // =============================================================================
@@ -416,7 +428,8 @@ export const InputEventTypes = {
     OpenMenuPressed: 'input:open-menu-pressed',
     InteractPressed: 'input:interact-pressed',
     CancelPressed: 'input:cancel-pressed',
-    GamepadButtonPressed: 'input:gamepad-button-pressed'
+    GamepadButtonPressed: 'input:gamepad-button-pressed',
+    XRGamepadButtonPressed: 'input:xr-gamepad-button-pressed'
 } as const
 
 export const UIEventTypes = {

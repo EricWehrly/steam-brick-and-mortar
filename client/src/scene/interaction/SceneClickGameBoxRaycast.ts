@@ -6,6 +6,7 @@ import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameS
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
+import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -36,6 +37,7 @@ export class SceneClickGameBoxRaycast {
 
     private resolvedScene: THREE.Scene | null = null
     private resolvedCamera: THREE.Camera | null = null
+    private resolvedRaySource: XRControllerRaySource | null = null
 
     private readonly raycaster = new THREE.Raycaster()
     private readonly pointer = new THREE.Vector2()
@@ -101,12 +103,23 @@ export class SceneClickGameBoxRaycast {
 
         this.resolvedScene = scene
         this.resolvedCamera = camera
-
-        this.pointer.x = ndcX
-        this.pointer.y = ndcY
-
         this.raycaster.far = this.maxDistance
-        this.raycaster.setFromCamera(this.pointer, camera)
+
+        // VR: prefer a real controller ray over the click's NDC position when one's available -
+        // null outside an active XR session (or before XRControllerManager.setup() has run), so
+        // desktop/mouse/gamepad behavior below is unaffected. See docs/plans/vr-support-plan.md.
+        const raySource = this.resolvedRaySource ?? dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
+        this.resolvedRaySource = raySource
+        const controllerRay = raySource?.getPrimaryControllerRay() ?? null
+
+        if (controllerRay) {
+            this.raycaster.ray.origin.copy(controllerRay.origin)
+            this.raycaster.ray.direction.copy(controllerRay.direction)
+        } else {
+            this.pointer.x = ndcX
+            this.pointer.y = ndcY
+            this.raycaster.setFromCamera(this.pointer, camera)
+        }
 
         const lineStart = this.raycaster.ray.origin.clone()
         const lineEnd = lineStart.clone().add(this.direction.copy(this.raycaster.ray.direction).multiplyScalar(this.maxDistance))
