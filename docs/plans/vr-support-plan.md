@@ -334,6 +334,23 @@ correctly, the two overlapping models could have made it hard to tell which one 
 Files touched: `XRControllerManager.ts`, `WebXRCoordinator.ts` (+ updated
 `XRControllerManager.test.ts`, `WebXRCoordinator.test.ts` mock).
 
+## Addendum (2026-08-10): dropped the once-per-hand diagnostic logs, made pruning's firing visible
+
+User review: `DeviceDetector.logXRGamepadShapeOnce` and `XRControllerManager.
+logMotionControllerOnceReady` were both real overhead (a tracked-index `Set`, membership checks,
+`.clear()` calls threaded through `stop()`/`setXRSession()`/`dispose()`) just to log something once.
+Both answered a question that's now settled (real button/axis indices confirmed; animation is
+automatic and unconditional per three.js's own source) - removed entirely, along with their
+backing `loggedXRGamepadShapeFor`/`loggedMotionControllerForIndex` Sets.
+
+Also asked whether `pruneDuplicateChildren`'s `while (model.children.length > 1)` is still actually
+needed, or whether it's dead code now. Since that's an open empirical question rather than a
+settled one, `pruneDuplicateChildren` now logs at `info()` (not `debug()`) every time it actually
+removes something - deliberately visible by default on the next real-headset test, so whether this
+backstop is still firing (and how often) can be read straight from the logs instead of guessed.
+
+Files touched: `DeviceDetector.ts`, `XRControllerManager.ts`.
+
 ## Next up (not this branch)
 
 1. **Game-box "open" interaction redesign.** The box comes off the shelf into the player's hand and

@@ -36,7 +36,6 @@ export class DeviceDetector {
     private xrSession: XRSession | null = null
     private previousGamepadButtonsPressed = new Map<number, ReadonlyArray<boolean>>()
     private previousXRGamepadButtonsPressed = new Map<XRHandedness, ReadonlyArray<boolean>>()
-    private readonly loggedXRGamepadShapeFor = new Set<XRHandedness>()
 
     constructor(eventManager: EventManager = EventManager.getInstance()) {
         this.eventManager = eventManager
@@ -105,7 +104,6 @@ export class DeviceDetector {
         this.detachXRSessionListeners(this.xrSession)
         this.xrSession = null
         this.previousXRGamepadButtonsPressed.clear()
-        this.loggedXRGamepadShapeFor.clear()
         this.started = false
     }
 
@@ -117,7 +115,6 @@ export class DeviceDetector {
         this.detachXRSessionListeners(this.xrSession)
         this.xrSession = session
         this.previousXRGamepadButtonsPressed.clear()
-        this.loggedXRGamepadShapeFor.clear()
         this.attachXRSessionListeners(this.xrSession)
         this.syncXRDevices()
         this.emitDevicesChanged()
@@ -138,29 +135,9 @@ export class DeviceDetector {
         for (const inputSource of this.xrSession.inputSources) {
             if (inputSource.gamepad) {
                 result.push({ handedness: inputSource.handedness, gamepad: inputSource.gamepad })
-                this.logXRGamepadShapeOnce(inputSource.handedness, inputSource.gamepad)
             }
         }
         return result
-    }
-
-    /**
-     * Logs a real controller's gamepad.mapping/buttons.length/axes.length once per hand, the
-     * first time it's seen - ground truth for whether the VR profile's raw xr-standard button/axis
-     * indices (InputProfile.ts) actually hold on real hardware (see docs/tech-debt.md's
-     * xr-menu-button-mapping-unverified entry, and the wider question this answers for free).
-     * debug()-level: reach for `setLogLevel('DeviceDetector', 'DEBUG')` if verifying again.
-     */
-    private logXRGamepadShapeOnce(handedness: XRHandedness, gamepad: Gamepad): void {
-        if (this.loggedXRGamepadShapeFor.has(handedness)) {
-            return
-        }
-        this.loggedXRGamepadShapeFor.add(handedness)
-
-        DeviceDetector.logger.debug(
-            `XR gamepad shape [${handedness}]: mapping="${gamepad.mapping}" `
-            + `buttons=${gamepad.buttons.length} axes=${gamepad.axes.length}`
-        )
     }
 
     /**
@@ -274,8 +251,8 @@ export class DeviceDetector {
         gamepad.buttons.forEach((button, buttonIndex) => {
             const wasPressed = previousButtons?.[buttonIndex] ?? false
             if (button.pressed && !wasPressed) {
-                // Real button-index ground truth on every press - see logXRGamepadShapeOnce's
-                // doc comment. debug()-level, same as the shape log above.
+                // Real button-index ground truth on every press - reach for
+                // `setLogLevel('DeviceDetector', 'DEBUG')` if verifying hardware mapping again.
                 DeviceDetector.logger.debug(
                     `XR button pressed [${handedness}]: buttonIndex=${buttonIndex} value=${button.value.toFixed(2)} `
                     + `axes=[${gamepad.axes.map(axis => axis.toFixed(2)).join(', ')}]`
