@@ -82,10 +82,10 @@ export class XRControllerManager implements XRControllerRaySource {
             const onConnected = (event: { data: XRInputSource }): void => {
                 this.handednessByIndex[i] = event.data.handedness
                 this.loggedMotionControllerForIndex.delete(i)
-                XRControllerManager.logger.info(`Controller connected: index=${i} handedness=${event.data.handedness}`)
+                XRControllerManager.logger.debug(`Controller connected: index=${i} handedness=${event.data.handedness}`)
             }
             const onDisconnected = (): void => {
-                XRControllerManager.logger.info(`Controller disconnected: index=${i} (was ${this.handednessByIndex[i] ?? 'unknown'})`)
+                XRControllerManager.logger.debug(`Controller disconnected: index=${i} (was ${this.handednessByIndex[i] ?? 'unknown'})`)
                 this.handednessByIndex[i] = null
             }
             controller.addEventListener('connected', onConnected)
@@ -199,7 +199,8 @@ export class XRControllerManager implements XRControllerRaySource {
      * SILENTLY skips any component whose GLTF asset is missing the expected animation node (the
      * "Could not find xr_standard_squeeze_pressed_min in the model" console warnings are exactly
      * this - a real gap in that specific asset, not a bug in our integration). This makes that
-     * gap visible per-component instead of guessing from console noise.
+     * gap visible per-component instead of guessing from console noise. debug()-level: reach for
+     * `setLogLevel('XRControllerManager', 'DEBUG')` if diagnosing animation issues again.
      */
     private logMotionControllerOnceReady(index: number, model: ControllerModelLike): void {
         if (this.loggedMotionControllerForIndex.has(index) || !model.motionController) {
@@ -215,7 +216,7 @@ export class XRControllerManager implements XRControllerRaySource {
             })
             .join(', ')
 
-        XRControllerManager.logger.info(`Controller model animation-ready: index=${index} components=[${summary}]`)
+        XRControllerManager.logger.debug(`Controller model animation-ready: index=${index} components=[${summary}]`)
     }
 
     private resolvePrimaryControllerIndex(): number | null {

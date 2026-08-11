@@ -105,10 +105,6 @@ export class InputStateTracker {
         return delta
     }
 
-    isShiftPressed(): boolean {
-        return this.keysPressed.has('ShiftLeft') || this.keysPressed.has('ShiftRight')
-    }
-
     clearCallbacks(): void {
         this.callbacks = {}
     }

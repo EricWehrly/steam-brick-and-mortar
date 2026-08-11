@@ -156,16 +156,14 @@ export class InputManager {
         this.actionResolver.setXRSession(session)
     }
 
+    // stateTracker.isShiftPressed() used to be checked here too, but InputAction.Sprint's
+    // MouseKeyboard binding already covers ShiftLeft/ShiftRight, and the mouse-keyboard device is
+    // always registered as connected (DeviceDetector's constructor) - so isActionPressed(Sprint)
+    // already reflects Shift on every frame that binding is resolved. The separate check was
+    // strictly redundant, and worse, bypassed profile-enabled state entirely (Shift would still
+    // trigger sprint even with the MouseKeyboard profile disabled in settings).
     private isSprintActive(): boolean {
-        if (this.actionResolver.isActionPressed(InputAction.Sprint)) {
-            return true
-        }
-
-        if (this.sprintToggled) {
-            return true
-        }
-
-        return this.stateTracker.isShiftPressed()
+        return this.actionResolver.isActionPressed(InputAction.Sprint) || this.sprintToggled
     }
 
     private readonly handleGamepadButtonPressed = (event: CustomEvent<GamepadButtonPressedEvent>): void => {
