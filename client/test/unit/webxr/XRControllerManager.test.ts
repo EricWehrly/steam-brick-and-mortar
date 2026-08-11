@@ -140,16 +140,47 @@ describe('XRControllerManager', () => {
         expect(manager.getPrimaryControllerRay()).toBeNull()
     })
 
-    it('clears any previously loaded controller model on a repeat connected event (guards against XRControllerModelFactory stacking a second GLTF when a runtime re-fires connected without disconnecting first)', () => {
+    it('prunes stale duplicate controller models on update(), keeping only the most-recently-added child (guards against XRControllerModelFactory stacking a second GLTF when a runtime re-fires connected without disconnecting first)', () => {
         manager.setup(renderer)
 
         const controllerModel = grips[0].children[0]
         expect(controllerModel).toBeDefined()
-        controllerModel.add(new THREE.Group()) // simulate a model the factory already loaded
-        expect(controllerModel.children.length).toBe(1)
+        const staleModel = new THREE.Group()
+        const freshModel = new THREE.Group()
+        controllerModel.add(staleModel) // simulate two racing async profile loads both landing
+        controllerModel.add(freshModel)
+        expect(controllerModel.children.length).toBe(2)
 
-        dispatchConnected(controllers[0], 'left') // repeat connect, no disconnect in between
+        manager.update()
 
+        expect(controllerModel.children).toEqual([freshModel])
+    })
+
+    it('disposes geometry/material of pruned stale children instead of just detaching them', () => {
+        manager.setup(renderer)
+        const controllerModel = grips[0].children[0]
+
+        const staleGeometry = new THREE.BoxGeometry()
+        const staleMaterial = new THREE.MeshBasicMaterial()
+        const staleGroup = new THREE.Group()
+        staleGroup.add(new THREE.Mesh(staleGeometry, staleMaterial))
+        controllerModel.add(staleGroup)
+        controllerModel.add(new THREE.Group()) // the one that should survive
+
+        const geometryDispose = vi.spyOn(staleGeometry, 'dispose')
+        const materialDispose = vi.spyOn(staleMaterial, 'dispose')
+
+        manager.update()
+
+        expect(geometryDispose).toHaveBeenCalledTimes(1)
+        expect(materialDispose).toHaveBeenCalledTimes(1)
+    })
+
+    it('update() is a no-op when there is nothing to prune (single model, or none yet)', () => {
+        manager.setup(renderer)
+        const controllerModel = grips[0].children[0]
+
+        expect(() => manager.update()).not.toThrow()
         expect(controllerModel.children.length).toBe(0)
     })
 
