@@ -26,19 +26,6 @@ const CONTROLLER_COUNT = 2
 const TRIGGER_BUTTON_INDEX = 0
 const CONTROLLER_FORWARD = new THREE.Vector3(0, 0, -1)
 
-/** The subset of @webxr-input-profiles/motion-controllers' MotionController shape this class
- *  reads - not re-exported by three's XRControllerModelFactory, so read defensively via a local
- *  structural type instead of importing it. */
-interface MotionControllerLike {
-    components: Record<string, { visualResponses: Record<string, { valueNode: THREE.Object3D | null }> }>
-}
-
-/** XRControllerModel (returned by createControllerModel) isn't exported from three's public API
- *  either - this is the one field on it this class reads. */
-interface ControllerModelLike extends THREE.Object3D {
-    motionController?: MotionControllerLike | null
-}
-
 /**
  * Owns real WebXR controller pose tracking, parenting, and (for player feedback) visual models -
  * see docs/plans/vr-support-plan.md. Controller/grip Group transforms are kept live by three.js
@@ -54,13 +41,10 @@ export class XRControllerManager implements XRControllerRaySource {
     // from the methods that return them instead of importing the (unexported) class names.
     private readonly controllers: ReturnType<THREE.WebGLRenderer['xr']['getController']>[] = []
     private readonly controllerGrips: ReturnType<THREE.WebGLRenderer['xr']['getControllerGrip']>[] = []
-    private readonly controllerModels: ControllerModelLike[] = []
+    private readonly controllerModels: THREE.Object3D[] = []
     private readonly handednessByIndex: Array<XRHandedness | null> = []
     private readonly handleConnected: Array<(event: { data: XRInputSource }) => void> = []
     private readonly handleDisconnected: Array<() => void> = []
-    /** Indices already logged by logMotionControllerOnceReady - once per connect, not once ever,
-     *  so reconnecting a controller (new profile, new components) logs fresh data again. */
-    private readonly loggedMotionControllerForIndex = new Set<number>()
 
     constructor(config: XRControllerManagerConfig) {
         this.cameraRig = config.cameraRig
@@ -70,7 +54,7 @@ export class XRControllerManager implements XRControllerRaySource {
         for (let i = 0; i < CONTROLLER_COUNT; i++) {
             const controller = renderer.xr.getController(i)
             const grip = renderer.xr.getControllerGrip(i)
-            const controllerModel = this.controllerModelFactory.createControllerModel(grip) as ControllerModelLike
+            const controllerModel = this.controllerModelFactory.createControllerModel(grip)
             grip.add(controllerModel)
             this.controllerModels.push(controllerModel)
 
@@ -81,7 +65,6 @@ export class XRControllerManager implements XRControllerRaySource {
             // to learn which hand occupies which index, live, per session.
             const onConnected = (event: { data: XRInputSource }): void => {
                 this.handednessByIndex[i] = event.data.handedness
-                this.loggedMotionControllerForIndex.delete(i)
                 XRControllerManager.logger.debug(`Controller connected: index=${i} handedness=${event.data.handedness}`)
             }
             const onDisconnected = (): void => {
@@ -108,29 +91,19 @@ export class XRControllerManager implements XRControllerRaySource {
     }
 
     /**
-     * Called every render-loop frame (by WebXRCoordinator). Two jobs, both because three.js's own
-     * XRControllerModelFactory 'connected' handler (registered internally on the grip, opaque to
-     * us) has zero guard against firing more than once before its own async profile fetch
-     * resolves - observed on a controller already connected before the XR session even started
-     * (fires twice back-to-back; both fetches complete later and both unconditionally add their
-     * GLTF), vs. one connected mid-session (fires once, no duplicate):
-     *
-     * 1. Prune stale duplicate models. A connect-time clear() can't fix this - if two connects
-     *    fire before either fetch resolves, there's nothing loaded yet to clear at connect time,
-     *    and both loads land later regardless. Pruning every frame instead makes "at most one
-     *    child" a continuously-enforced invariant, correct regardless of how the two connects'
-     *    async loads interleave: whichever connect's fetch chain resolves LAST is unconditionally
-     *    the one both its `motionController` assignment and its `add()` call belong to (same
-     *    synchronous continuation), so keeping only the most-recently-added child always matches
-     *    the current `motionController` too.
-     * 2. Log once (per connect) whether the resolved model's motionController is animation-ready -
-     *    see logMotionControllerOnceReady's doc comment.
+     * Called every render-loop frame (by WebXRCoordinator). Prunes stale duplicate controller
+     * models - three.js's own XRControllerModelFactory 'connected' handler (registered internally
+     * on the grip, opaque to us) has zero guard against firing more than once before its own async
+     * profile fetch resolves - observed on a controller already connected before the XR session
+     * even started (fires twice back-to-back; both fetches complete later and both unconditionally
+     * add their GLTF), vs. one connected mid-session (fires once, no duplicate). A connect-time
+     * clear() can't fix this - if two connects fire before either fetch resolves, there's nothing
+     * loaded yet to clear at connect time, and both loads land later regardless. Pruning every
+     * frame instead makes "at most one child" a continuously-enforced invariant, correct
+     * regardless of how the two connects' async loads interleave.
      */
     update(): void {
-        this.controllerModels.forEach((model, index) => {
-            this.pruneDuplicateChildren(model)
-            this.logMotionControllerOnceReady(index, model)
-        })
+        this.controllerModels.forEach(model => this.pruneDuplicateChildren(model))
     }
 
     /**
@@ -169,15 +142,23 @@ export class XRControllerManager implements XRControllerRaySource {
         this.handednessByIndex.length = 0
         this.handleConnected.length = 0
         this.handleDisconnected.length = 0
-        this.loggedMotionControllerForIndex.clear()
         this.session = null
     }
 
-    /** Keeps only the most-recently-added child (see update()'s doc comment for why "most recent"
-     *  is always correct), disposing the geometry/material of anything pruned so repeated
-     *  duplicate loads don't leak GPU resources. */
+    /**
+     * Keeps only the most-recently-added child (see update()'s doc comment for why "most recent"
+     * is always correct), disposing the geometry/material of anything pruned so repeated duplicate
+     * loads don't leak GPU resources. Logs at info() (not debug()) whenever it actually removes
+     * something - deliberately visible by default so real-hardware testing can confirm whether
+     * this is still firing at all, since it's only a backstop for a race in three.js's own
+     * XRControllerModelFactory (see update()'s doc comment) that may not reproduce every session.
+     */
     private pruneDuplicateChildren(model: THREE.Object3D): void {
         while (model.children.length > 1) {
+            XRControllerManager.logger.info(
+                `Pruning duplicate controller model "${model.children[0].name || model.children[0].uuid}" `
+                + `(${model.children.length} children before prune)`
+            )
             const stale = model.children[0]
             model.remove(stale)
             stale.traverse(child => {
@@ -189,34 +170,6 @@ export class XRControllerManager implements XRControllerRaySource {
                 materials.forEach(material => material.dispose())
             })
         }
-    }
-
-    /**
-     * Once per connect (see onConnected's loggedMotionControllerForIndex.delete), logs whether
-     * each of the resolved profile's components has a fully-resolved visual response node -
-     * XRControllerModel.updateMatrixWorld already drives trigger/thumbstick/button animations
-     * automatically every frame purely from motionController.components, no app code needed, but
-     * SILENTLY skips any component whose GLTF asset is missing the expected animation node (the
-     * "Could not find xr_standard_squeeze_pressed_min in the model" console warnings are exactly
-     * this - a real gap in that specific asset, not a bug in our integration). This makes that
-     * gap visible per-component instead of guessing from console noise. debug()-level: reach for
-     * `setLogLevel('XRControllerManager', 'DEBUG')` if diagnosing animation issues again.
-     */
-    private logMotionControllerOnceReady(index: number, model: ControllerModelLike): void {
-        if (this.loggedMotionControllerForIndex.has(index) || !model.motionController) {
-            return
-        }
-        this.loggedMotionControllerForIndex.add(index)
-
-        const summary = Object.entries(model.motionController.components)
-            .map(([name, component]) => {
-                const responses = Object.values(component.visualResponses)
-                const resolved = responses.filter(response => response.valueNode).length
-                return `${name}(${resolved}/${responses.length})`
-            })
-            .join(', ')
-
-        XRControllerManager.logger.debug(`Controller model animation-ready: index=${index} components=[${summary}]`)
     }
 
     private resolvePrimaryControllerIndex(): number | null {
