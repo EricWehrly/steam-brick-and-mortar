@@ -5,7 +5,10 @@ import { DataKey } from '../../../src/core/data/DataTypes'
 
 vi.mock('three/examples/jsm/webxr/XRControllerModelFactory.js', () => ({
     XRControllerModelFactory: vi.fn().mockImplementation(function () {
-        return { createControllerModel: vi.fn().mockReturnValue(new THREE.Group()) }
+        // A fresh Group per call - THREE.Object3D.add() reparents (steals from any prior parent),
+        // so a shared instance across both controller indices would silently move rather than
+        // duplicate, masking exactly the kind of bug this factory is meant to stand in for.
+        return { createControllerModel: vi.fn().mockImplementation(() => new THREE.Group()) }
     })
 }))
 
@@ -135,6 +138,19 @@ describe('XRControllerManager', () => {
 
         dispatchDisconnected(controllers[1])
         expect(manager.getPrimaryControllerRay()).toBeNull()
+    })
+
+    it('clears any previously loaded controller model on a repeat connected event (guards against XRControllerModelFactory stacking a second GLTF when a runtime re-fires connected without disconnecting first)', () => {
+        manager.setup(renderer)
+
+        const controllerModel = grips[0].children[0]
+        expect(controllerModel).toBeDefined()
+        controllerModel.add(new THREE.Group()) // simulate a model the factory already loaded
+        expect(controllerModel.children.length).toBe(1)
+
+        dispatchConnected(controllers[0], 'left') // repeat connect, no disconnect in between
+
+        expect(controllerModel.children.length).toBe(0)
     })
 
     it('dispose() removes controller/grip groups from the camera rig', () => {
