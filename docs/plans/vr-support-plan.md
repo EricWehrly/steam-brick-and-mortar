@@ -222,3 +222,38 @@ Files touched: `CameraInputApplier.ts`, `InputProfile.ts`, `BindingResolver.ts`,
 `InteractionEvents.ts`, `InputActionResolver.ts`, `InputManager.ts`. New tests:
 `camera-input-applier-movement.test.ts`, plus extensions to `binding-resolver-xr.test.ts` and a new
 `input-manager-sprint-toggle.test.ts`.
+
+## Addendum (2026-08-10): overlapping controller models + diagnostic log cleanup
+
+Real-headset testing confirmed movement, sprint, and trigger-based game-box grabbing all work.
+Two follow-ups from that session:
+
+- **Overlapping controller models**: user reported two controller models rendering superimposed
+  (an Oculus Touch model plus a plainer one, "labeled WebXR"). Root cause: three.js's
+  `XRControllerModelFactory` has no guard in its own `connected` handler against a model already
+  being loaded - it just adds another GLTF as a child. Some runtimes (PICO Connect's Oculus-Touch
+  emulation is the suspect here, per the user's own earlier note about it relabeling their
+  controllers) fire a second `connected` event with updated profile info without a `disconnected`
+  in between, stacking a second model. Fixed defensively in `XRControllerManager`'s own `connected`
+  handler: track the `XRControllerModel` returned per grip and call `.clear()` on it synchronously
+  on every connect - always well before the (always-async) profile fetch resolves and adds its
+  model, so it can never race the model we want to keep.
+- **Diagnostic logging cleanup**: the per-press `info()`-level XR gamepad shape/button logs added
+  earlier this session to empirically verify real button indices (now confirmed: trigger=0,
+  squeeze=1, thumbstick-click=3) downgraded to `debug()`, consistent with the project's standard
+  `setLogLevel`-gated workflow - that verification is done, so permanent unconditional per-press
+  logging is now just noise.
+
+Files touched: `XRControllerManager.ts` (+ new test), `DeviceDetector.ts`.
+
+## Next up (not this branch)
+
+User wants to redesign the game-box "open" interaction next: the box comes off the shelf into the
+player's hand and opens like a physical PC-game box, unfolding both left and right side panels (3
+renderable faces, extensible to 4 via a two-stage flap open). Currently the opened-game overlay
+only renders in the flatscreen view, not in VR - this becomes the fix for that, and the intended
+replacement for the existing details-screen interaction. Explicit requirements: distinct content
+per face (design TBD after the technical build), same new mechanism replaces flatscreen too, and
+the *old* details screen stays in the codebase gated behind a const until the new mechanism is
+functionally equivalent. Needs its own plan doc before implementation (per this project's VR
+architectural-change rule) - not started.
