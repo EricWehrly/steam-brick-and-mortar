@@ -35,11 +35,12 @@ the flatscreen view - nothing appears in the headset.
 **Impact**: Core interaction loop (browse → select → view details/launch) is currently unusable in
 VR, the project's primary target platform.
 **Next Steps**: Not a quick fix - the plan is to replace the interaction entirely rather than port
-the existing 2D overlay into 3D space. See `docs/plans/vr-support-plan.md`'s "Next up" addendum:
-the game box comes off the shelf into the player's hand and opens like a physical game box (3+
-renderable faces), becoming the new mechanism for flatscreen too. Needs its own plan doc before
-implementation. Old details screen stays gated behind a const until the replacement is functionally
-equivalent.
+the existing 2D overlay into 3D space: the game box comes off the shelf into the player's hand and
+opens like a physical game box (3+ renderable faces), becoming the new mechanism for flatscreen
+too. Plan doc written 2026-08-10:
+[`docs/plans/game-box-open-interaction-plan.md`](../plans/game-box-open-interaction-plan.md). Old
+details screen stays gated behind a const (`USE_FOLD_OPEN_GAME_BOX_INTERACTION`) until the
+replacement is functionally equivalent.
 **Files**: `client/src/scene/interaction/SceneClickGameBoxRaycast.ts` (selection, works), detail
 overlay path (TBD which file - not yet the VR problem's root, it's simply never shown in-session)
 

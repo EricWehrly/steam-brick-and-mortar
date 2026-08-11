@@ -353,16 +353,18 @@ Files touched: `DeviceDetector.ts`, `XRControllerManager.ts`.
 
 ## Next up (not this branch)
 
+Both items below now have plan docs (written 2026-08-10, per this project's VR
+architectural-change rule requiring a plan before implementation) but are not started:
+
 1. **Game-box "open" interaction redesign.** The box comes off the shelf into the player's hand and
    opens like a physical PC-game box, unfolding both left and right side panels (3 renderable
    faces, extensible to 4 via a two-stage flap open). Currently the opened-game overlay only renders
    in the flatscreen view, not in VR - this becomes the fix for that, and the intended replacement
-   for the existing details-screen interaction. Explicit requirements: distinct content per face
-   (design TBD after the technical build), same new mechanism replaces flatscreen too, and the
-   *old* details screen stays in the codebase gated behind a const until the new mechanism is
-   functionally equivalent. Needs its own plan doc before implementation (per this project's VR
-   architectural-change rule) - not started.
+   for the existing details-screen interaction. See
+   [`docs/plans/game-box-open-interaction-plan.md`](game-box-open-interaction-plan.md).
 2. **VR menus / spatial settings panel.** None of the app's menus work in VR at all today - see
-   `docs/features/vr-support.md`'s sub-scope 2 note. Current intent is to try projecting the
-   existing settings menu into the VR scene rather than building a separate VR-native menu system.
-   Discuss scope/approach when this is picked up - not planned yet.
+   `docs/features/vr-support.md`'s sub-scope 2 note. Direction: project the existing settings menu
+   into the VR scene (three.js's `HTMLMesh`/`InteractiveGroup`, per the `webxr_vr_sandbox` example)
+   rather than building a separate VR-native menu system. See
+   [`docs/plans/vr-spatial-settings-menu-plan.md`](vr-spatial-settings-menu-plan.md). Intended to be
+   tried in tandem with item 1, not strictly sequenced against it.

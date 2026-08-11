@@ -21,9 +21,9 @@ This feature splits into two sub-scopes, deliberately sequenced:
 2. **VR Headset** — locomotion, comfort pass, spatial UI, hardware testing. Not started, not
    scoped yet. Confirmed gap (2026-08-10, real-headset testing): none of the app's menus (settings,
    pause, etc.) render or are reachable in VR at all today - they're flat-DOM UI with no in-scene
-   representation. Current intent (not yet planned - discuss when this sub-scope is picked up): try
-   projecting the settings menu into the VR scene as a spatial panel, rather than building a
-   separate VR-native menu system from scratch.
+   representation. Direction (2026-08-10): project the settings menu into the VR scene as a spatial
+   panel rather than building a separate VR-native menu system from scratch - now has a plan doc,
+   [`docs/plans/vr-spatial-settings-menu-plan.md`](../plans/vr-spatial-settings-menu-plan.md).
 
 Controllers first because the input abstraction (gamepad → VR controller) is the piece already
 mostly proven out by this project's gamepad work, and because it's independently useful/testable

@@ -65,6 +65,10 @@ These rules apply to all production runtime paths. They are not preferences.
 - Meaningful commits: group related changes, describe what and why
 - Don't mix implementation with documentation in the same commit
 - Secrets: `.env` files locally, AWS Secrets Manager in production — never commit keys
+- **This repo's default/base branch is not `main`.** Don't assume or hardcode a name — ask git or
+  GitHub directly: `git ls-remote --symref origin HEAD` (no clone/checkout needed) or
+  `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`. Use whatever that returns as
+  the base for new branches and PRs.
 
 ### Terraform
 Always follow in order — never skip:
