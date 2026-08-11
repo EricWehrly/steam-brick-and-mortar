@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { EventManager, EventSource } from '../core/EventManager'
-import type { InputDevicesChangedEvent, GamepadButtonPressedEvent, XRGamepadButtonPressedEvent } from '../types/InteractionEvents'
+import type { InputDevicesChangedEvent, GamepadButtonPressedEvent } from '../types/InteractionEvents'
 import { InputEventTypes } from '../types/InteractionEvents'
 import { InputDeviceKind, type InputDeviceKindValue } from './InputProfile'
 import type { XRGamepadState } from './BindingResolver'
@@ -146,8 +146,8 @@ export class DeviceDetector {
 
     /**
      * Logs a real controller's gamepad.mapping/buttons.length/axes.length once per hand, the
-     * first time it's seen - ground truth for whether BindingResolver's XR_STANDARD_COMPONENT_MAP
-     * index assumptions actually hold on real hardware (see docs/tech-debt.md's
+     * first time it's seen - ground truth for whether the VR profile's raw xr-standard button/axis
+     * indices (InputProfile.ts) actually hold on real hardware (see docs/tech-debt.md's
      * xr-menu-button-mapping-unverified entry, and the wider question this answers for free).
      * debug()-level: reach for `setLogLevel('DeviceDetector', 'DEBUG')` if verifying again.
      */
@@ -166,8 +166,9 @@ export class DeviceDetector {
     /**
      * Same role as pollGamepads() for standard gamepads: returns the live XR gamepad list (so
      * InputActionResolver.updateFrame doesn't re-read session.inputSources itself) and emits
-     * XRGamepadButtonPressedEvent on a released-to-pressed transition. Keyed by handedness, not
-     * array index - three.js/WebXR don't guarantee a stable controller-to-index mapping.
+     * GamepadButtonPressedEvent (handedness set, gamepadIndex absent) on a released-to-pressed
+     * transition. Keyed by handedness, not array index - three.js/WebXR don't guarantee a stable
+     * controller-to-index mapping.
      */
     pollXRGamepads(): ReadonlyArray<XRGamepadState> {
         const xrGamepads = this.getXRGamepads()
@@ -279,8 +280,8 @@ export class DeviceDetector {
                     `XR button pressed [${handedness}]: buttonIndex=${buttonIndex} value=${button.value.toFixed(2)} `
                     + `axes=[${gamepad.axes.map(axis => axis.toFixed(2)).join(', ')}]`
                 )
-                this.eventManager.emit<XRGamepadButtonPressedEvent>(
-                    InputEventTypes.XRGamepadButtonPressed,
+                this.eventManager.emit<GamepadButtonPressedEvent>(
+                    InputEventTypes.GamepadButtonPressed,
                     { handedness, buttonIndex },
                     EventSource.System
                 )

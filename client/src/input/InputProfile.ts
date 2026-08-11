@@ -42,11 +42,26 @@ export interface MouseAxisBinding {
     label?: string
 }
 
+/**
+ * Which XR hand a gamepad-button/gamepad-axis binding reads from. This field's mere PRESENCE (even
+ * 'any') is what decides the binding's *source*, not just a filter on top of it: absent means
+ * "read navigator.getGamepads() gamepads, never an XR controller"; present means "read connected
+ * XR controllers' gamepad-shaped input, never a plain physical gamepad" ('any' = whichever hand is
+ * active, 'left'/'right' pins to one). A real XRInputSource's own handedness can be the literal
+ * WebXR value 'none' (e.g. a non-handed input source) - 'any' is a distinct sentinel so that case
+ * is never confused with "hand doesn't matter, match anything".
+ * See BindingResolver's resolveGamepadButtonValue/resolveGamepadAxisValue for the source split -
+ * this is what let VR controllers reuse the plain gamepad-button/gamepad-axis binding types
+ * instead of a parallel xr-component mechanism (see docs/plans/vr-support-plan.md's addendum).
+ */
+export type GamepadBindingHandedness = XRHandedness | 'any'
+
 export interface GamepadButtonBinding {
     type: 'gamepad-button'
     button: number
     threshold?: number
     direction?: AxisDirection
+    handedness?: GamepadBindingHandedness
     label?: string
 }
 
@@ -57,23 +72,13 @@ export interface GamepadAxisBinding {
     deadZone?: number
     invert?: boolean
     sensitivity?: number
+    handedness?: GamepadBindingHandedness
     label?: string
 }
 
 export interface TouchBinding {
     type: 'touch-gesture'
     gesture: 'tap' | 'double-tap' | 'drag' | 'swipe'
-    label?: string
-}
-
-export interface XRBinding {
-    type: 'xr-component'
-    handedness?: 'left' | 'right' | 'none'
-    componentPath: string
-    /** For an axis component (e.g. thumbstick-x/y) bound to a directional action (MoveForward/
-     *  MoveLeft/...), same role as GamepadAxisBinding's direction: split the signed axis value
-     *  into a clamped positive-only magnitude for that one direction. */
-    direction?: AxisDirection
     label?: string
 }
 
@@ -84,7 +89,6 @@ export type InputBinding =
     | GamepadButtonBinding
     | GamepadAxisBinding
     | TouchBinding
-    | XRBinding
 
 export interface InputProfileDefinition {
     id: InputProfileIdValue
@@ -133,8 +137,6 @@ export function formatBindingLabel(binding: InputBinding): string {
             return `Gamepad Axis ${binding.axis}`
         case 'touch-gesture':
             return `Touch ${binding.gesture}`
-        case 'xr-component':
-            return binding.componentPath
         default:
             return 'Unknown Binding'
     }
@@ -238,18 +240,27 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
         deviceKind: InputDeviceKind.VR,
         enabled: true,
         bindings: {
-            [InputAction.Interact]: [{ type: 'xr-component', componentPath: 'trigger', label: 'Trigger' }],
-            [InputAction.OpenMenu]: [{ type: 'xr-component', componentPath: 'menu', label: 'Menu Button' }],
+            // Raw xr-standard indices (W3C-registered, same universal mapping every WebXR
+            // runtime/controller uses) - button/axis indices confirmed empirically against real
+            // Oculus-Touch/PICO-Connect hardware: trigger=0, squeeze=1 (unbound), thumbstick-click=3,
+            // thumbstick-x=axis 2, thumbstick-y=axis 3. These are plain gamepad-button/gamepad-axis
+            // bindings, same as GamepadStandard's - the `handedness` field is what routes them to
+            // read XR controllers instead of navigator.getGamepads() (see GamepadBindingHandedness's
+            // doc comment). menu=4 is unverified - see docs/tech-debt.md's
+            // xr-menu-button-mapping-unverified entry.
+            // TD: xr-menu-button-mapping-unverified
+            [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, handedness: 'any', label: 'Trigger' }],
+            [InputAction.OpenMenu]: [{ type: 'gamepad-button', button: 4, handedness: 'any', label: 'Menu Button' }],
             // Left thumbstick = movement, right = look/turn - real VR convention, and keeps each
             // stick single-purpose (left no longer double-claimed by Look, which is a no-op
             // in-session anyway per WebXRCoordinator's rotation-skip - see its own doc comment).
-            [InputAction.MoveForward]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-y', direction: 'negative', label: 'Left Thumbstick Up' }],
-            [InputAction.MoveBack]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-y', direction: 'positive', label: 'Left Thumbstick Down' }],
-            [InputAction.MoveLeft]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-x', direction: 'negative', label: 'Left Thumbstick Left' }],
-            [InputAction.MoveRight]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-x', direction: 'positive', label: 'Left Thumbstick Right' }],
-            [InputAction.SprintToggle]: [{ type: 'xr-component', handedness: 'left', componentPath: 'thumbstick-click', label: 'Left Thumbstick Click' }],
-            [InputAction.LookHorizontal]: [{ type: 'xr-component', handedness: 'right', componentPath: 'thumbstick-x', label: 'Right Thumbstick X' }],
-            [InputAction.LookVertical]: [{ type: 'xr-component', handedness: 'right', componentPath: 'thumbstick-y', label: 'Right Thumbstick Y' }]
+            [InputAction.MoveForward]: [{ type: 'gamepad-axis', axis: 3, direction: 'negative', handedness: 'left', label: 'Left Thumbstick Up' }],
+            [InputAction.MoveBack]: [{ type: 'gamepad-axis', axis: 3, direction: 'positive', handedness: 'left', label: 'Left Thumbstick Down' }],
+            [InputAction.MoveLeft]: [{ type: 'gamepad-axis', axis: 2, direction: 'negative', handedness: 'left', label: 'Left Thumbstick Left' }],
+            [InputAction.MoveRight]: [{ type: 'gamepad-axis', axis: 2, direction: 'positive', handedness: 'left', label: 'Left Thumbstick Right' }],
+            [InputAction.SprintToggle]: [{ type: 'gamepad-button', button: 3, handedness: 'left', label: 'Left Thumbstick Click' }],
+            [InputAction.LookHorizontal]: [{ type: 'gamepad-axis', axis: 2, handedness: 'right', label: 'Right Thumbstick X' }],
+            [InputAction.LookVertical]: [{ type: 'gamepad-axis', axis: 3, handedness: 'right', label: 'Right Thumbstick Y' }]
         }
     }
 ]

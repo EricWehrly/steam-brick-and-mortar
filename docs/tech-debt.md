@@ -270,9 +270,9 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 **Priority**: Low
 **Effort**: ~30 min once a real headset is on hand (connect, run the existing HID/gamepad button
 dump, read the real index off `gamepad.buttons`)
-**Context**: `BindingResolver.ts`'s `XR_STANDARD_COMPONENT_MAP` maps `OpenMenu`'s `'menu'`
-componentPath to `xr-standard` gamepad button index 4 - a best-effort guess, not verified against
-real hardware. The system/Oculus button is typically OS-reserved on Quest and may not be exposed to
+**Context**: `InputProfile.ts`'s VR profile binds `OpenMenu` to raw `xr-standard` gamepad button
+index 4 - a best-effort guess, not verified against real hardware. The system/Oculus button is
+typically OS-reserved on Quest and may not be exposed to
 `gamepad.buttons` at all; where a secondary button *is* exposed, its index isn't guaranteed stable
 across controller families. See `docs/plans/vr-support-plan.md`.
 

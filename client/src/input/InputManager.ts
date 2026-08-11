@@ -11,7 +11,7 @@ import { InputActionResolver } from './InputActionResolver'
 import { InputEventAdapter } from './InputEventAdapter'
 import { InputProfileService } from './InputProfileService'
 import { InputStateTracker } from './InputStateTracker'
-import { InputEventTypes, type GamepadButtonPressedEvent, type XRGamepadButtonPressedEvent, type SprintTogglePressedEvent } from '../types/InteractionEvents'
+import { InputEventTypes, type GamepadButtonPressedEvent, type SprintTogglePressedEvent } from '../types/InteractionEvents'
 
 export type { InputCallbacks, InputState, MovementOptions } from './InputContracts'
 
@@ -56,7 +56,6 @@ export class InputManager {
         this.cameraInputApplier = new CameraInputApplier()
 
         this.eventManager.registerEventHandler<GamepadButtonPressedEvent>(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
-        this.eventManager.registerEventHandler<XRGamepadButtonPressedEvent>(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
         this.eventManager.registerEventHandler<SprintTogglePressedEvent>(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
 
         InputManager.activeInstance = this
@@ -170,11 +169,7 @@ export class InputManager {
     }
 
     private readonly handleGamepadButtonPressed = (event: CustomEvent<GamepadButtonPressedEvent>): void => {
-        this.actionResolver.handleGamepadButtonPress(event.detail.buttonIndex, this.profileService.getEnabledProfiles())
-    }
-
-    private readonly handleXRGamepadButtonPressed = (event: CustomEvent<XRGamepadButtonPressedEvent>): void => {
-        this.actionResolver.handleXRGamepadButtonPress(event.detail.handedness, event.detail.buttonIndex, this.profileService.getEnabledProfiles())
+        this.actionResolver.handleGamepadButtonPress(event.detail.buttonIndex, this.profileService.getEnabledProfiles(), event.detail.handedness)
     }
 
     private readonly handleSprintTogglePressed = (): void => {
@@ -188,7 +183,6 @@ export class InputManager {
         this.actionResolver.clear()
         this.actionResolver.dispose()
         this.eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
-        this.eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, this.handleXRGamepadButtonPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
 
         if (InputManager.activeInstance === this) {

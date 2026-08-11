@@ -186,25 +186,18 @@ export interface SprintTogglePressedEvent extends BaseInteractionEvent {}
 /**
  * Fired by DeviceDetector the frame it detects a gamepad button transitioning from released to
  * pressed - the Gamepad API has no native press event, so this is the one place that has to poll
- * and diff, right next to where gamepad state is already read. This is a raw, unresolved signal -
- * InputActionResolver is what decides which action (if any) it means and emits the corresponding
- * specific event.
+ * and diff, right next to where gamepad state is already read. Covers both a plain physical
+ * gamepad's button (gamepadIndex set, handedness absent) and an XR controller's gamepad-shaped
+ * button (handedness set, gamepadIndex absent) - XRInputSource.gamepad is a standard
+ * Gamepad-API-shaped object with no native press event either, and is keyed by handedness rather
+ * than a numeric index since three.js/WebXR don't guarantee a stable controller-to-index mapping
+ * across sessions. This is a raw, unresolved signal - InputActionResolver is what decides which
+ * action (if any) it means and emits the corresponding specific event.
  */
 export interface GamepadButtonPressedEvent extends BaseInteractionEvent {
-    gamepadIndex: number
     buttonIndex: number
-}
-
-/**
- * Fired by DeviceDetector the frame it detects an XR controller's gamepad-shaped button
- * transitioning from released to pressed - same shape/reasoning as GamepadButtonPressedEvent
- * (XRInputSource.gamepad has no native press event either), keyed by handedness rather than a
- * numeric index since three.js/WebXR don't guarantee a stable controller-to-index mapping across
- * sessions. Raw, unresolved signal - InputActionResolver decides which action it means.
- */
-export interface XRGamepadButtonPressedEvent extends BaseInteractionEvent {
-    handedness: XRHandedness
-    buttonIndex: number
+    gamepadIndex?: number
+    handedness?: XRHandedness
 }
 
 // =============================================================================
@@ -438,7 +431,6 @@ export const InputEventTypes = {
     InteractPressed: 'input:interact-pressed',
     CancelPressed: 'input:cancel-pressed',
     GamepadButtonPressed: 'input:gamepad-button-pressed',
-    XRGamepadButtonPressed: 'input:xr-gamepad-button-pressed',
     SprintTogglePressed: 'input:sprint-toggle-pressed'
 } as const
 

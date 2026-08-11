@@ -246,6 +246,52 @@ Two follow-ups from that session:
 
 Files touched: `XRControllerManager.ts` (+ new test), `DeviceDetector.ts`.
 
+## Addendum (2026-08-10): collapsed the XR input path into the plain gamepad-button/axis path
+
+User review pushback, correctly: the original design (task 1 above) gave XR controllers their own
+parallel mechanism - an `xr-component` binding type, a `componentPath`-to-index lookup table
+(`XR_STANDARD_COMPONENT_MAP`), a separate resolve function (`resolveXRComponentValue`), a separate
+press-match method (`matchesXRButtonPress`), a separate event type (`XRGamepadButtonPressedEvent`),
+and separate handler wiring in `InputActionResolver`/`InputManager` - all parallel to the
+`GamepadStandard` profile's existing `gamepad-button`/`gamepad-axis` bindings. On reread: the named-
+component indirection bought nothing real, since `GamepadStandard`'s bindings already use raw
+indices directly and xr-standard is (like the standard gamepad mapping) a single universal W3C
+index scheme - there was never more than one indexing scheme to abstract over. The one genuine
+difference is that `XRInputSource.gamepad` carries no handedness of its own (that lives on the
+`XRInputSource`, not the `Gamepad`), so there was nowhere for "which hand" to live on a plain
+`GamepadButtonBinding`/`GamepadAxisBinding` - until now.
+
+**Collapsed design**: `GamepadButtonBinding`/`GamepadAxisBinding` gained an optional `handedness?:
+GamepadBindingHandedness` (`XRHandedness | 'any'`). The field's mere *presence* (even `'any'`)
+decides the binding's source, not just a filter within one shared list: absent -> reads
+`navigator.getGamepads()` only, never an XR controller; present -> reads connected XR controllers'
+gamepad-shaped input only, filtered to the matching hand (`'any'` = whichever hand is active),
+never a plain gamepad. This is what keeps a `GamepadStandard` binding from ever accidentally firing
+off an XR controller's button at the same index, and vice versa, now that both share one binding
+type (`BindingResolver.selectGamepadSources`/`matchesGamepadButtonPress` implement the split; see
+their doc comments). `GamepadButtonPressedEvent` similarly gained optional `gamepadIndex`/
+`handedness` fields (mutually exclusive in practice) replacing the separate `XRGamepadButtonPressedEvent`.
+
+Deleted entirely: `xr-component` binding type, `XRBinding`, `XR_STANDARD_COMPONENT_MAP`,
+`resolveXRComponentValue`, `XR_AXIS_DEAD_ZONE` (gamepad-axis bindings already default to the same
+0.15 dead zone), `matchesXRButtonPress`, `XRGamepadButtonPressedEvent`, `InputEventTypes.
+XRGamepadButtonPressed`, and the separate `handleXRGamepadButtonPress`/`handleXRGamepadButtonPressed`
+methods (folded into `handleGamepadButtonPress`, now taking an optional `handedness` param). VR
+profile bindings now use the same raw xr-standard indices confirmed against real hardware directly
+(trigger=0, thumbstick-click=3, thumbstick-x/y=axes 2/3, menu=4 still unverified - see
+`docs/tech-debt.md`'s `xr-menu-button-mapping-unverified`), same style as `GamepadStandard`'s.
+`DeviceDetector.pollGamepads()`/`pollXRGamepads()` stay separate (they read from genuinely
+different browser APIs - `navigator.getGamepads()` vs `xrSession.inputSources` - and track
+press-edge state under different natural keys), but both now emit the same `GamepadButtonPressed`
+event.
+
+Files touched: `InputProfile.ts`, `BindingResolver.ts`, `InteractionEvents.ts`, `DeviceDetector.ts`,
+`InputActionResolver.ts`, `InputManager.ts`, `InputBindingUtils.ts` (duplicate-binding-warning
+signature needed `handedness` added too, or a left-stick and right-stick binding on the same axis
+index would have falsely flagged as a duplicate). Tests rewritten in `binding-resolver-xr.test.ts`
+(added explicit cross-contamination regression tests for the handedness-presence split),
+`input-action-resolver-xr-press.test.ts`, `device-detector-xr-gamepads.test.ts`.
+
 ## Next up (not this branch)
 
 User wants to redesign the game-box "open" interaction next: the box comes off the shelf into the
