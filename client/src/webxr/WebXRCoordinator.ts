@@ -86,6 +86,7 @@ export class WebXRCoordinator {
      * Update camera movement - called every frame by render loop registry
      */
     private updateCamera(_now: number, _deltaTime: number): void {
+        this.xrControllerManager.update()
         this.updateCameraMovement(this.cameraRig)
     }
 

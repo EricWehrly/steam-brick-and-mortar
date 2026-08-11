@@ -23,6 +23,7 @@ const { webXRManagerMock, inputManagerMock, xrControllerManagerMock, capturedWeb
     xrControllerManagerMock: {
         setup: vi.fn(),
         setSession: vi.fn(),
+        update: vi.fn(),
         getPrimaryControllerRay: vi.fn().mockReturnValue(null),
         dispose: vi.fn(),
     },

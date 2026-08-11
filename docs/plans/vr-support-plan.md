@@ -292,14 +292,60 @@ index would have falsely flagged as a duplicate). Tests rewritten in `binding-re
 (added explicit cross-contamination regression tests for the handedness-presence split),
 `input-action-resolver-xr-press.test.ts`, `device-detector-xr-gamepads.test.ts`.
 
+## Addendum (2026-08-10): controller-model duplication wasn't actually fixed - real fix + animation diagnostics
+
+Real-headset re-test after the earlier "clear on connect" fix (previous addendum) still showed
+overlapping models - but only on the hand that was connected *before* the app/session started
+(left, in the user's test); the hand connected *after* (right) rendered clean. That asymmetry
+pinpointed the real bug: three.js's `XRControllerModelFactory` 'connected' handler has *zero*
+guard against firing twice before its own async profile fetch resolves (confirmed by reading its
+source directly) - a controller already present at session start gets its `connected` dispatched
+twice back-to-back, both fetches complete later, both add their GLTF unconditionally. A controller
+connecting mid-session only ever fires once. The earlier "clear the model synchronously on
+connect" fix was therefore too early in exactly the failure case that mattered: nothing has loaded
+yet at connect time when both connects fire before either fetch resolves, so there was nothing to
+clear.
+
+**Real fix**: stopped trying to time a fix around connect events at all. `XRControllerManager.
+update()` now runs every render-loop frame (wired from `WebXRCoordinator.updateCamera`) and prunes
+each controller model down to at most one child, keeping the most-recently-added one and disposing
+the pruned child's geometry/materials. This makes "at most one visible model" a continuously
+self-healing invariant instead of a one-shot guess about event ordering - correct regardless of how
+the two connects' async loads interleave, because whichever fetch chain resolves *last* is
+unconditionally the one both its `motionController` assignment and its `add()` call belong to (same
+synchronous `.then()` continuation), so "keep the last-added child" always matches the current
+`motionController` too.
+
+**Animation diagnostics**: user also asked whether controller button/thumbstick animations are
+wired up at all. Confirmed by reading three.js's source: `XRControllerModel.updateMatrixWorld` is
+overridden to automatically drive every visual response (trigger squeeze, thumbstick tilt, etc.)
+from `motionController.components` every frame, purely from the loaded GLTF's node names - no
+application code needed, and none was missing. It silently no-ops per-component when the loaded
+asset lacks an expected node (this is exactly what the earlier "Could not find
+xr_standard_squeeze_pressed_min in the model" console warnings were reporting - a real gap in that
+specific fallback asset, not an integration bug). Added a one-time-per-connect log
+(`logMotionControllerOnceReady`) that reports, per component, how many of its visual-response nodes
+actually resolved - e.g. `trigger(1/1), squeeze(0/1)` - so this can be confirmed/diagnosed from real
+hardware logs directly instead of guessing from the warning noise. Also plausible this explains part
+of the "doesn't seem to animate" impression: if the SECOND (duplicate, since-pruned) load happened
+to resolve to the incomplete fallback asset while the real Oculus asset underneath animated
+correctly, the two overlapping models could have made it hard to tell which one was doing what.
+
+Files touched: `XRControllerManager.ts`, `WebXRCoordinator.ts` (+ updated
+`XRControllerManager.test.ts`, `WebXRCoordinator.test.ts` mock).
+
 ## Next up (not this branch)
 
-User wants to redesign the game-box "open" interaction next: the box comes off the shelf into the
-player's hand and opens like a physical PC-game box, unfolding both left and right side panels (3
-renderable faces, extensible to 4 via a two-stage flap open). Currently the opened-game overlay
-only renders in the flatscreen view, not in VR - this becomes the fix for that, and the intended
-replacement for the existing details-screen interaction. Explicit requirements: distinct content
-per face (design TBD after the technical build), same new mechanism replaces flatscreen too, and
-the *old* details screen stays in the codebase gated behind a const until the new mechanism is
-functionally equivalent. Needs its own plan doc before implementation (per this project's VR
-architectural-change rule) - not started.
+1. **Game-box "open" interaction redesign.** The box comes off the shelf into the player's hand and
+   opens like a physical PC-game box, unfolding both left and right side panels (3 renderable
+   faces, extensible to 4 via a two-stage flap open). Currently the opened-game overlay only renders
+   in the flatscreen view, not in VR - this becomes the fix for that, and the intended replacement
+   for the existing details-screen interaction. Explicit requirements: distinct content per face
+   (design TBD after the technical build), same new mechanism replaces flatscreen too, and the
+   *old* details screen stays in the codebase gated behind a const until the new mechanism is
+   functionally equivalent. Needs its own plan doc before implementation (per this project's VR
+   architectural-change rule) - not started.
+2. **VR menus / spatial settings panel.** None of the app's menus work in VR at all today - see
+   `docs/features/vr-support.md`'s sub-scope 2 note. Current intent is to try projecting the
+   existing settings menu into the VR scene rather than building a separate VR-native menu system.
+   Discuss scope/approach when this is picked up - not planned yet.
