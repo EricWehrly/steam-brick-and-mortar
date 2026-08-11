@@ -57,9 +57,9 @@ describe('DeviceDetector XR gamepad polling', () => {
         expect(detector.getXRGamepads()).toEqual([])
     })
 
-    it('emits XRGamepadButtonPressed on a released-to-pressed transition, keyed by handedness', () => {
+    it('emits GamepadButtonPressed (handedness set) on a released-to-pressed transition, keyed by handedness', () => {
         const handler = vi.fn()
-        eventManager.registerEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.registerEventHandler(InputEventTypes.GamepadButtonPressed, handler)
 
         const buttons = [{ pressed: false, value: 0 }, { pressed: false, value: 0 }]
         const gamepad = createFakeGamepad(buttons)
@@ -75,12 +75,12 @@ describe('DeviceDetector XR gamepad polling', () => {
         const event = handler.mock.calls[0][0] as CustomEvent<{ handedness: XRHandedness; buttonIndex: number }>
         expect(event.detail).toMatchObject({ handedness: 'right', buttonIndex: 0 })
 
-        eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, handler)
     })
 
     it('does not re-emit while a button stays held across polls', () => {
         const handler = vi.fn()
-        eventManager.registerEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.registerEventHandler(InputEventTypes.GamepadButtonPressed, handler)
 
         const gamepad = createFakeGamepad([{ pressed: true, value: 1 }])
         detector.setXRSession(createFakeXRSession([{ handedness: 'left', gamepad }]))
@@ -91,12 +91,12 @@ describe('DeviceDetector XR gamepad polling', () => {
 
         expect(handler).toHaveBeenCalledTimes(1)
 
-        eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, handler)
     })
 
     it('tracks left and right hands independently', () => {
         const handler = vi.fn()
-        eventManager.registerEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.registerEventHandler(InputEventTypes.GamepadButtonPressed, handler)
 
         const rightButtons = [{ pressed: true, value: 1 }]
         const leftButtons = [{ pressed: false, value: 0 }]
@@ -109,6 +109,6 @@ describe('DeviceDetector XR gamepad polling', () => {
         expect(handler).toHaveBeenCalledTimes(1)
         expect((handler.mock.calls[0][0] as CustomEvent<{ handedness: XRHandedness }>).detail.handedness).toBe('right')
 
-        eventManager.deregisterEventHandler(InputEventTypes.XRGamepadButtonPressed, handler)
+        eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, handler)
     })
 })

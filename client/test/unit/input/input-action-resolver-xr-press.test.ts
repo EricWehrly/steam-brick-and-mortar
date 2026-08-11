@@ -49,7 +49,7 @@ describe('InputActionResolver XR button-press resolution', () => {
     it('emits InteractPressed for an XR trigger (button 0) press, once the VR profile is connected', () => {
         deviceDetector.setXRSession(createFakeXRSession())
 
-        resolver.handleXRGamepadButtonPress('right', 0, getProfiles(InputProfileId.VR))
+        resolver.handleGamepadButtonPress(0, getProfiles(InputProfileId.VR), 'right')
 
         expect(interactHandler).toHaveBeenCalledTimes(1)
         expect(openMenuHandler).not.toHaveBeenCalled()
@@ -58,7 +58,7 @@ describe('InputActionResolver XR button-press resolution', () => {
     it('emits OpenMenuPressed for the best-effort menu button (index 4)', () => {
         deviceDetector.setXRSession(createFakeXRSession())
 
-        resolver.handleXRGamepadButtonPress('right', 4, getProfiles(InputProfileId.VR))
+        resolver.handleGamepadButtonPress(4, getProfiles(InputProfileId.VR), 'right')
 
         expect(openMenuHandler).toHaveBeenCalledTimes(1)
         expect(interactHandler).not.toHaveBeenCalled()
@@ -67,14 +67,22 @@ describe('InputActionResolver XR button-press resolution', () => {
     it('does not emit for an XR button with no matching binding', () => {
         deviceDetector.setXRSession(createFakeXRSession())
 
-        resolver.handleXRGamepadButtonPress('right', 2, getProfiles(InputProfileId.VR))
+        resolver.handleGamepadButtonPress(2, getProfiles(InputProfileId.VR), 'right')
 
         expect(interactHandler).not.toHaveBeenCalled()
         expect(openMenuHandler).not.toHaveBeenCalled()
     })
 
     it('only resolves against connected profiles - no XR session means no VR device connected', () => {
-        resolver.handleXRGamepadButtonPress('right', 0, getProfiles(InputProfileId.VR))
+        resolver.handleGamepadButtonPress(0, getProfiles(InputProfileId.VR), 'right')
+
+        expect(interactHandler).not.toHaveBeenCalled()
+    })
+
+    it('a plain (non-XR) button press does not match a handedness-pinned VR binding', () => {
+        deviceDetector.setXRSession(createFakeXRSession())
+
+        resolver.handleGamepadButtonPress(0, getProfiles(InputProfileId.VR)) // no handedness - a physical gamepad press
 
         expect(interactHandler).not.toHaveBeenCalled()
     })

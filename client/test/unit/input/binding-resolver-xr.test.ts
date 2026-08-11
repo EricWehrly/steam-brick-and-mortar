@@ -24,8 +24,13 @@ const baseRawState = {
     gamepads: []
 }
 
-describe('BindingResolver xr-component resolution', () => {
-    it('resolves Interact (trigger) from a right-hand controller', () => {
+// VR controllers are handled via the same gamepad-button/gamepad-axis binding types
+// GamepadStandard uses (raw xr-standard indices, no name indirection) - the `handedness` field is
+// what routes a binding to read XR controllers instead of navigator.getGamepads(). See
+// InputProfile.ts's GamepadBindingHandedness doc comment and docs/plans/vr-support-plan.md's
+// addendum for why this collapsed what used to be a parallel xr-component mechanism.
+describe('BindingResolver XR-routed gamepad-button/gamepad-axis resolution', () => {
+    it('resolves Interact (trigger, button 0) from a right-hand controller', () => {
         const resolver = new BindingResolver()
         const vrProfile = getProfile(InputProfileId.VR)
 
@@ -37,7 +42,7 @@ describe('BindingResolver xr-component resolution', () => {
         expect(state.buttons.get(InputAction.Interact)).toBe(true)
     })
 
-    it('resolves Interact (trigger) from a left-hand controller too - no handedness pinned', () => {
+    it('resolves Interact (trigger) from a left-hand controller too - handedness: "any"', () => {
         const resolver = new BindingResolver()
         const vrProfile = getProfile(InputProfileId.VR)
 
@@ -49,13 +54,13 @@ describe('BindingResolver xr-component resolution', () => {
         expect(state.buttons.get(InputAction.Interact)).toBe(true)
     })
 
-    it('resolves LookHorizontal/LookVertical from thumbstick axes 2/3', () => {
+    it('resolves LookHorizontal/LookVertical from the right thumbstick, axes 2/3', () => {
         const resolver = new BindingResolver()
         const vrProfile = getProfile(InputProfileId.VR)
 
-        // Full deflection (±1), not a partial value - resolveXRComponentValue now applies a dead
-        // zone (same as gamepad-axis, see BindingResolver's XR_AXIS_DEAD_ZONE), so a partial raw
-        // value wouldn't survive unchanged; full deflection still clamps to exactly ±1 either way.
+        // Full deflection (±1), not a partial value - resolveGamepadAxisValue applies the same
+        // dead zone gamepad-axis bindings always have (GamepadAxisBinding.deadZone, default 0.15),
+        // so a partial raw value wouldn't survive unchanged; full deflection still clamps to ±1.
         const state = resolver.resolve(vrProfile, {
             ...baseRawState,
             xrGamepads: [createXRGamepad('right', [], [0, 0, 1, -1])]
@@ -91,7 +96,7 @@ describe('BindingResolver xr-component resolution', () => {
             deviceKind: InputDeviceKind.VR,
             enabled: true,
             bindings: {
-                [InputAction.Interact]: [{ type: 'xr-component', handedness: 'right', componentPath: 'trigger' }]
+                [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, handedness: 'right' }]
             }
         }
 
@@ -103,19 +108,39 @@ describe('BindingResolver xr-component resolution', () => {
         expect(state.buttons.get(InputAction.Interact)).toBe(false)
     })
 
-    it('an unknown componentPath resolves to 0 without throwing', () => {
+    it('a handedness-pinned binding never resolves from a plain physical gamepad, even at the same button index', () => {
         const resolver = new BindingResolver()
-        const unknownComponentProfile: InputProfileDefinition = {
+        const anyHandProfile: InputProfileDefinition = {
             id: InputProfileId.VR,
             name: 'Test',
             deviceKind: InputDeviceKind.VR,
             enabled: true,
             bindings: {
-                [InputAction.Interact]: [{ type: 'xr-component', componentPath: 'does-not-exist' }]
+                [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, handedness: 'any' }]
             }
         }
 
-        expect(() => resolver.resolve(unknownComponentProfile, {
+        const state = resolver.resolve(anyHandProfile, {
+            ...baseRawState,
+            gamepads: [{ buttons: [{ pressed: true, value: 1 }], axes: [] } as unknown as Gamepad]
+        })
+
+        expect(state.buttons.get(InputAction.Interact)).toBe(false)
+    })
+
+    it('an out-of-range button index resolves to false without throwing', () => {
+        const resolver = new BindingResolver()
+        const outOfRangeProfile: InputProfileDefinition = {
+            id: InputProfileId.VR,
+            name: 'Test',
+            deviceKind: InputDeviceKind.VR,
+            enabled: true,
+            bindings: {
+                [InputAction.Interact]: [{ type: 'gamepad-button', button: 99, handedness: 'any' }]
+            }
+        }
+
+        expect(() => resolver.resolve(outOfRangeProfile, {
             ...baseRawState,
             xrGamepads: [createXRGamepad('right', [{ pressed: true, value: 1 }])]
         })).not.toThrow()
@@ -183,37 +208,52 @@ describe('BindingResolver left-thumbstick movement bindings', () => {
     })
 })
 
-describe('BindingResolver.matchesXRButtonPress', () => {
-    it('matches the VR profile Interact binding to trigger (button 0) presses', () => {
+describe('BindingResolver.matchesGamepadButtonPress', () => {
+    it('matches the VR profile Interact binding to trigger (button 0) presses from either hand', () => {
         const resolver = new BindingResolver()
         const interactBinding = getProfile(InputProfileId.VR).bindings[InputAction.Interact]![0]
 
-        expect(resolver.matchesXRButtonPress(interactBinding, 'right', 0)).toBe(true)
-        expect(resolver.matchesXRButtonPress(interactBinding, 'left', 0)).toBe(true)
-        expect(resolver.matchesXRButtonPress(interactBinding, 'right', 1)).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(interactBinding, 0, 'right')).toBe(true)
+        expect(resolver.matchesGamepadButtonPress(interactBinding, 0, 'left')).toBe(true)
+        expect(resolver.matchesGamepadButtonPress(interactBinding, 1, 'right')).toBe(false)
     })
 
     it('a handedness-pinned binding only matches its own hand', () => {
         const resolver = new BindingResolver()
-        const pinnedBinding = { type: 'xr-component' as const, handedness: 'left' as const, componentPath: 'trigger' }
+        const pinnedBinding = { type: 'gamepad-button' as const, button: 0, handedness: 'left' as const }
 
-        expect(resolver.matchesXRButtonPress(pinnedBinding, 'left', 0)).toBe(true)
-        expect(resolver.matchesXRButtonPress(pinnedBinding, 'right', 0)).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(pinnedBinding, 0, 'left')).toBe(true)
+        expect(resolver.matchesGamepadButtonPress(pinnedBinding, 0, 'right')).toBe(false)
     })
 
-    it('non-xr-component bindings never match', () => {
+    it('a handedness-pinned binding never matches a plain (non-XR) button press at the same index', () => {
+        const resolver = new BindingResolver()
+        const pinnedBinding = { type: 'gamepad-button' as const, button: 0, handedness: 'any' as const }
+
+        expect(resolver.matchesGamepadButtonPress(pinnedBinding, 0)).toBe(false)
+    })
+
+    it('a plain gamepad-button binding (no handedness) never matches an XR press at the same index', () => {
+        const resolver = new BindingResolver()
+        const plainBinding = { type: 'gamepad-button' as const, button: 0 }
+
+        expect(resolver.matchesGamepadButtonPress(plainBinding, 0, 'right')).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(plainBinding, 0)).toBe(true)
+    })
+
+    it('non-gamepad-button bindings never match', () => {
         const resolver = new BindingResolver()
         const keyboardBinding = { type: 'keyboard-button' as const, code: 'Enter' }
 
-        expect(resolver.matchesXRButtonPress(keyboardBinding, 'right', 0)).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(keyboardBinding, 0, 'right')).toBe(false)
     })
 
     it('matches the VR profile SprintToggle binding to thumbstick-click (button 3), left hand only', () => {
         const resolver = new BindingResolver()
         const sprintToggleBinding = getProfile(InputProfileId.VR).bindings[InputAction.SprintToggle]![0]
 
-        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'left', 3)).toBe(true)
-        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'right', 3)).toBe(false)
-        expect(resolver.matchesXRButtonPress(sprintToggleBinding, 'left', 0)).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(sprintToggleBinding, 3, 'left')).toBe(true)
+        expect(resolver.matchesGamepadButtonPress(sprintToggleBinding, 3, 'right')).toBe(false)
+        expect(resolver.matchesGamepadButtonPress(sprintToggleBinding, 0, 'left')).toBe(false)
     })
 })

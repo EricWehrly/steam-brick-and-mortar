@@ -26,13 +26,11 @@ function normalizeBindingSignature(binding: InputBinding): string {
         case 'mouse-axis':
             return `${binding.type}:${binding.axis}:${binding.invert === true ? '1' : '0'}:${binding.sensitivity ?? 1}`
         case 'gamepad-button':
-            return `${binding.type}:${binding.button}:${binding.threshold ?? 0.5}:${binding.direction ?? 'positive'}`
+            return `${binding.type}:${binding.button}:${binding.threshold ?? 0.5}:${binding.direction ?? 'positive'}:${binding.handedness ?? 'none'}`
         case 'gamepad-axis':
-            return `${binding.type}:${binding.axis}:${binding.direction ?? 'both'}:${binding.deadZone ?? 0.15}:${binding.invert === true ? '1' : '0'}`
+            return `${binding.type}:${binding.axis}:${binding.direction ?? 'both'}:${binding.deadZone ?? 0.15}:${binding.invert === true ? '1' : '0'}:${binding.handedness ?? 'none'}`
         case 'touch-gesture':
             return `${binding.type}:${binding.gesture}`
-        case 'xr-component':
-            return `${binding.type}:${binding.handedness ?? 'none'}:${binding.componentPath}`
         default:
             return 'unknown'
     }

@@ -114,19 +114,16 @@ export class InputActionResolver {
         )
     }
 
-    /** Resolves a gamepad button transition (detected by DeviceDetector, which has no native press event to rely on) against connected+enabled profiles' gamepad-button bindings. */
-    handleGamepadButtonPress(buttonIndex: number, enabledProfiles: ReadonlyArray<InputProfileDefinition>): void {
+    /**
+     * Resolves a gamepad button transition (detected by DeviceDetector, which has no native press
+     * event to rely on) against connected+enabled profiles' gamepad-button bindings. Covers both a
+     * plain physical gamepad press (handedness omitted) and an XR controller press (handedness
+     * given) - BindingResolver.matchesGamepadButtonPress is what keeps the two from crossing.
+     */
+    handleGamepadButtonPress(buttonIndex: number, enabledProfiles: ReadonlyArray<InputProfileDefinition>, handedness?: XRHandedness): void {
         this.emitSpecificPressEvents(
             enabledProfiles,
-            binding => binding.type === 'gamepad-button' && binding.button === buttonIndex
-        )
-    }
-
-    /** Resolves an XR controller button transition (same no-native-press-event reasoning as gamepad) against connected+enabled profiles' xr-component bindings. */
-    handleXRGamepadButtonPress(handedness: XRHandedness, buttonIndex: number, enabledProfiles: ReadonlyArray<InputProfileDefinition>): void {
-        this.emitSpecificPressEvents(
-            enabledProfiles,
-            binding => this.bindingResolver.matchesXRButtonPress(binding, handedness, buttonIndex)
+            binding => this.bindingResolver.matchesGamepadButtonPress(binding, buttonIndex, handedness)
         )
     }
 
