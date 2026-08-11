@@ -41,6 +41,7 @@ export class XRControllerManager implements XRControllerRaySource {
     // from the methods that return them instead of importing the (unexported) class names.
     private readonly controllers: ReturnType<THREE.WebGLRenderer['xr']['getController']>[] = []
     private readonly controllerGrips: ReturnType<THREE.WebGLRenderer['xr']['getControllerGrip']>[] = []
+    private readonly controllerModels: THREE.Object3D[] = []
     private readonly handednessByIndex: Array<XRHandedness | null> = []
     private readonly handleConnected: Array<(event: { data: XRInputSource }) => void> = []
     private readonly handleDisconnected: Array<() => void> = []
@@ -53,7 +54,9 @@ export class XRControllerManager implements XRControllerRaySource {
         for (let i = 0; i < CONTROLLER_COUNT; i++) {
             const controller = renderer.xr.getController(i)
             const grip = renderer.xr.getControllerGrip(i)
-            grip.add(this.controllerModelFactory.createControllerModel(grip))
+            const controllerModel = this.controllerModelFactory.createControllerModel(grip)
+            grip.add(controllerModel)
+            this.controllerModels.push(controllerModel)
 
             this.handednessByIndex.push(null)
 
@@ -62,6 +65,15 @@ export class XRControllerManager implements XRControllerRaySource {
             // to learn which hand occupies which index, live, per session.
             const onConnected = (event: { data: XRInputSource }): void => {
                 this.handednessByIndex[i] = event.data.handedness
+                // Defensive: XRControllerModelFactory's own 'connected' handler (registered
+                // internally on the grip by createControllerModel above) has no guard against a
+                // model already being loaded - it just adds the new profile's GLTF as another
+                // child. Some runtimes (observed: PICO Connect's Oculus-Touch emulation) fire a
+                // second 'connected' event with updated profile info without a 'disconnected' in
+                // between, which stacked two overlapping controller models. Clearing here runs
+                // synchronously on every connect, well before the (always-async) profile fetch
+                // resolves and adds its model, so this never races the model we want to keep.
+                controllerModel.clear()
                 XRControllerManager.logger.info(`Controller connected: index=${i} handedness=${event.data.handedness}`)
             }
             const onDisconnected = (): void => {
@@ -119,6 +131,7 @@ export class XRControllerManager implements XRControllerRaySource {
 
         this.controllers.length = 0
         this.controllerGrips.length = 0
+        this.controllerModels.length = 0
         this.handednessByIndex.length = 0
         this.handleConnected.length = 0
         this.handleDisconnected.length = 0
