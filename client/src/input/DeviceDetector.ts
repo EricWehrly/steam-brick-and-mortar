@@ -149,6 +149,7 @@ export class DeviceDetector {
      * first time it's seen - ground truth for whether BindingResolver's XR_STANDARD_COMPONENT_MAP
      * index assumptions actually hold on real hardware (see docs/tech-debt.md's
      * xr-menu-button-mapping-unverified entry, and the wider question this answers for free).
+     * debug()-level: reach for `setLogLevel('DeviceDetector', 'DEBUG')` if verifying again.
      */
     private logXRGamepadShapeOnce(handedness: XRHandedness, gamepad: Gamepad): void {
         if (this.loggedXRGamepadShapeFor.has(handedness)) {
@@ -156,7 +157,7 @@ export class DeviceDetector {
         }
         this.loggedXRGamepadShapeFor.add(handedness)
 
-        DeviceDetector.logger.info(
+        DeviceDetector.logger.debug(
             `XR gamepad shape [${handedness}]: mapping="${gamepad.mapping}" `
             + `buttons=${gamepad.buttons.length} axes=${gamepad.axes.length}`
         )
@@ -272,9 +273,9 @@ export class DeviceDetector {
         gamepad.buttons.forEach((button, buttonIndex) => {
             const wasPressed = previousButtons?.[buttonIndex] ?? false
             if (button.pressed && !wasPressed) {
-                // Real button-index ground truth, logged on every press - see
-                // logXRGamepadShapeOnce's doc comment for why this matters.
-                DeviceDetector.logger.info(
+                // Real button-index ground truth on every press - see logXRGamepadShapeOnce's
+                // doc comment. debug()-level, same as the shape log above.
+                DeviceDetector.logger.debug(
                     `XR button pressed [${handedness}]: buttonIndex=${buttonIndex} value=${button.value.toFixed(2)} `
                     + `axes=[${gamepad.axes.map(axis => axis.toFixed(2)).join(', ')}]`
                 )
