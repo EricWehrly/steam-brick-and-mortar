@@ -148,14 +148,12 @@ export class XRControllerManager implements XRControllerRaySource {
     /**
      * Keeps only the most-recently-added child (see update()'s doc comment for why "most recent"
      * is always correct), disposing the geometry/material of anything pruned so repeated duplicate
-     * loads don't leak GPU resources. Logs at info() (not debug()) whenever it actually removes
-     * something - deliberately visible by default so real-hardware testing can confirm whether
-     * this is still firing at all, since it's only a backstop for a race in three.js's own
+     * loads don't leak GPU resources. It's only a backstop for a race in three.js's own
      * XRControllerModelFactory (see update()'s doc comment) that may not reproduce every session.
      */
     private pruneDuplicateChildren(model: THREE.Object3D): void {
         while (model.children.length > 1) {
-            XRControllerManager.logger.info(
+            XRControllerManager.logger.debug(
                 `Pruning duplicate controller model "${model.children[0].name || model.children[0].uuid}" `
                 + `(${model.children.length} children before prune)`
             )
