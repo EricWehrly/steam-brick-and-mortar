@@ -234,3 +234,90 @@ this up — flagged here so it isn't accidentally reimplemented as a second fetc
 - [VR Spatial Settings Menu](vr-spatial-settings-menu-plan.md) — parallel VR UX work from the same
   2026-08-10 session, not sequenced against this plan.
 - `docs/bugs.md` → "Game detail overlay doesn't render in the VR view" — the bug this plan fixes.
+
+## Addendum (2026-08-11): implemented — two design changes from this plan's original text
+
+Tasks 1-8 implemented on `feature/game-box-fold-open`. `yarn tsc` clean, full suite 1618/1618
+(13 new tests). Two deviations from the design above, both simplifications discovered while
+building:
+
+- **Summon animation is a local-space scale tween, not a world-to-hand position lerp.** The
+  original design (§2.4) had the box lerp in world space from the raycast hit point
+  (`SceneGameBoxHit.point`) to the resolved anchor. In practice that means lerping toward a
+  *moving* target (the camera/grip anchor moves every frame too), which is real added complexity
+  for a "swap in" effect the user explicitly described as *not* being about the box physically
+  traveling from the shelf ("I imagine this is something that 'swaps in' to the hand, as opposed
+  to being part of the game on the shelf"). Implemented instead: the model parents onto the anchor
+  immediately, at a fixed local offset, and animates `scale` from a small starting value to 1 over
+  `SUMMON_DURATION_MS` (200ms) - simpler, cheaper, and a closer match to "swap in." The `point`
+  field added to `GameSelectedEvent` is unused by the coordinator for now; left on the event as
+  real, already-available data in case a future pass wants it back.
+- **Capability-based handler selection, not bootstrap-level conditional construction.** §2's design
+  had the bootstrap layer decide which of `GameLibraryBinderUI`/`GameBoxFoldCoordinator` handles
+  `GameEventTypes.Selected`. While implementing, found `EventManager` already has exactly this
+  mechanism built in and documented in this project's own architecture rules
+  ("Capability-based handler selection" in root `CLAUDE.md`): `registerEventHandler(..., {
+  isDefault: true })` vs. `{ isOverride: true }` - a default handler is automatically removed the
+  moment an override handler registers for the same event. `GameLibraryBinderUI`'s existing
+  `onGameSelected` registration became `{ isDefault: true }` (one-line change, no flag import
+  needed - exactly as this plan intended); `GameBoxFoldCoordinator` registers `{ isOverride: true }`
+  unconditionally, and `USE_FOLD_OPEN_GAME_BOX_INTERACTION` instead gates whether
+  `SteamBrickAndMortarApp` constructs `GameBoxFoldCoordinator` at all. Same net behavior as
+  originally planned, just routed through the codebase's existing mechanism instead of a new
+  bootstrap-level branch.
+
+**Not yet verified**: dev server wasn't running this session (per `client/CLAUDE.md`, not started
+proactively) - manual desktop-click and real-headset verification (both called for in this plan's
+Verification section) are still outstanding.
+
+Files touched: `InteractionEvents.ts` (`GameSelectedEvent.point`), `SceneClickGameBoxRaycast.ts`
+(threads `point`), `XRControllerManager.ts` (`getPrimaryControllerGrip()`), new
+`scene/game-box-fold/{GameBoxFoldModel,GameBoxFoldCoordinator,GameBoxFoldConfig}.ts`,
+`GameLibraryBinderUI.ts` (`isDefault: true`), `SteamBrickAndMortarApp.ts` (construction + dispose).
+New tests: `test/unit/scene/game-box-fold/{GameBoxFoldModel,GameBoxFoldCoordinator}.test.ts`.
+
+## Addendum (2026-08-11): first real-app pass - four fixes
+
+Real (desktop) testing surfaced four issues, all fixed on the same branch:
+
+- **Cover art didn't load for some games (Proteus, appid 219680)**: `GameBoxFoldCoordinator` was
+  loading artwork via `THREE.TextureLoader` (a plain `<img>` element under the hood) directly
+  against the Steam CDN URL - subject to normal browser CORS enforcement, which the CDN doesn't
+  satisfy for canvas/WebGL texture use (confirmed via console: `library_600x900.jpg` blocked by
+  CORS policy). The shelf's own instanced boxes don't hit this because they go through
+  `GameArtworkProvider`'s pixel-based pipeline instead (fetch/decode happens off the DOM-image
+  path, returns raw `Uint8ClampedArray` pixels, no tainted-canvas moment). Switched
+  `applyCoverTexture()` to call `GameArtworkProvider.getArtwork(...).getPixelsAtSize(...)` and
+  build a `THREE.DataTexture` from the result - same pipeline the shelf already uses successfully,
+  with the added benefit of hitting that pipeline's own disk/session caches instead of a second
+  network round-trip for art the shelf already fetched.
+- **Box appeared bottom-right instead of centered**: `CAMERA_LOCAL_OFFSET` had nonzero X/Y: changed
+  to `(0, 0, -0.6)` - centered in view.
+- **Hinge mechanism didn't read as a real box opening** ("unfolds from the front and the back"):
+  the original design had two wing panels sitting *beside* the center panel even when closed (no
+  Z-stacking, narrower than the base, all three coplanar) - closer to three boxes side-by-side than
+  one box opening. Redesigned per explicit direction: three same-width panels stacked directly on
+  top of each other when closed (base, furthest from viewer; second flap; front cover, closest/
+  outermost - what you see as "the box"), front cover hinged on its **left** edge and second flap
+  hinged on its **right** edge, opening sequentially (front cover swings fully open first, then the
+  second flap) rather than simultaneously. Ends at the same three-coplanar-panels-in-a-row layout
+  as before; only the closed-state stacking and hinge assignment changed.
+- **Spawn still facing the window**: added `cameraRig.rotation.y = CAMERA_SPAWN_YAW_RADIANS` in the
+  prior round, user reports no visible change. Room layout confirmed via `RoomManager.ts`: the
+  glass storefront wall is at `+Z`, back wall at `-Z`; default (unrotated) camera forward is `-Z`,
+  which should already face the back wall, not the window - meaning the geometry doesn't obviously
+  support the `+π` fix that was applied, and the actual cause is still unconfirmed. **Not resolved
+  this round** - needs the user's direct observation (which way they end up facing) rather than
+  another guess, since a second wrong guess already happened once.
+
+## Follow-ups (explicitly deferred to a later pass, not this branch)
+
+Recorded per the user's own framing (2026-08-11) so they aren't lost before the next pick-up:
+
+1. **Closing the held box.** Trivial for controllers (repeat trigger press toggles), but keyboard/
+   mouse has no equivalent gesture yet - needs a real dismiss input, not just VR-side reasoning.
+2. **Walking away should close what's open.** Currently the box stays summoned regardless of player
+   movement; leaving the shelf area (or the game box's general vicinity) should auto-dismiss it.
+3. **Face content design pass.** Per the original plan's own open question - bring over the
+   information the old flat detail screen showed (name, genre, playtime, categories, etc.) as a
+   starting point, then evaluate what actually belongs on each of the three faces from there.
