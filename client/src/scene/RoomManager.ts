@@ -266,7 +266,16 @@ export class RoomManager {
                 this.hasPositionedCamera = true
                 const targetZ = appliedZ - (dimensions.depth / 2)
                 this.cameraRig.position.set(0, 1.6, 0)
-                this.cameraRig.lookAt(0, 1.6, targetZ)
+                // NOT cameraRig.lookAt(...): Object3D.lookAt() special-cases isCamera/isLight
+                // objects to orient TOWARD the target; for any other object type - cameraRig is
+                // a plain THREE.Group - it builds the matrix with eye/target swapped, orienting
+                // the object AWAY from the target instead (see
+                // node_modules/three/src/core/Object3D.js's lookAt()). That silently spawned the
+                // player facing the glass storefront instead of the shelves. Compute the yaw
+                // directly instead of relying on lookAt()'s camera-only "look toward" semantics.
+                const dx = 0 - this.cameraRig.position.x
+                const dz = targetZ - this.cameraRig.position.z
+                this.cameraRig.rotation.y = Math.atan2(-dx, -dz)
                 console.debug(`📷 Camera initial position set to face store center at Z=${targetZ.toFixed(1)}`)
             }
 

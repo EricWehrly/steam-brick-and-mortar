@@ -32,7 +32,6 @@ import { AppSettings } from '../core/AppSettings'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
-import { CAMERA_SPAWN_YAW_RADIANS } from '../input/CameraInputApplier'
 
 export class SceneManager {
     private scene: THREE.Scene
@@ -164,8 +163,12 @@ export class SceneManager {
 
     private setupCamera() {
         // Sets the RIG's position, not the camera's - see this.cameraRig's doc comment.
+        // Rotation is left at its default (0) - the rig's un-rotated forward (-Z) already faces
+        // the shelves (RoomManager's own room layout puts them at negative Z; the glass storefront
+        // is at positive Z). RoomManager.buildRoom() may further correct yaw once real shelf/room
+        // bounds are known (see its own comment - a real, previously-shipped bug in that
+        // correction was causing this, not this constructor).
         this.cameraRig.position.set(0, 1.6, 0)
-        this.cameraRig.rotation.y = CAMERA_SPAWN_YAW_RADIANS
 
         // Default Euler order 'XYZ' lets yaw/pitch interact (gimbal-style) once yaw moves away
         // from 0 - the reported symptom was right-click-drag mouselook eventually flipping the

@@ -5,12 +5,6 @@ import { InputActionResolver } from './InputActionResolver'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 
-/** Spawn/reset yaw - 180 degrees from the rig's un-rotated default facing, so the player starts
- *  (and ResetCamera returns to) facing the store rather than the window behind it. Single source
- *  of truth: SceneManager.setupCamera() applies this at spawn, CameraInputApplier.updateRotation's
- *  ResetCamera handler resets back to it. */
-export const CAMERA_SPAWN_YAW_RADIANS = Math.PI
-
 export class CameraInputApplier {
     private static readonly ROLL_RADIANS_PER_FRAME = 0.02
     private static readonly MAX_PITCH_RADIANS = THREE.MathUtils.degToRad(89)
@@ -105,7 +99,7 @@ export class CameraInputApplier {
 
     updateRotation(camera: THREE.Object3D, actionResolver: InputActionResolver, options: MovementOptions): void {
         if (actionResolver.isActionPressed(InputAction.ResetCamera)) {
-            camera.rotation.set(0, CAMERA_SPAWN_YAW_RADIANS, 0)
+            camera.rotation.set(0, 0, 0)
             return
         }
 

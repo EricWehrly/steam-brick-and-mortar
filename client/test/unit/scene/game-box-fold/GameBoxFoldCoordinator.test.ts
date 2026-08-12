@@ -30,6 +30,14 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
     })
 }))
 
+const fakePixels = new Uint8ClampedArray(4)
+const getPixelsAtSize = vi.fn().mockResolvedValue({ pixels: fakePixels, width: 1, height: 1, fromCache: false })
+
+vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => ({
+    GameArtworkProvider: { getInstance: () => ({ getArtwork: () => ({ getPixelsAtSize }) }) },
+    ARTWORK_DIMENSIONS: { library: { width: 1, height: 1 } }
+}))
+
 import { GameBoxFoldCoordinator } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
 import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
 
@@ -107,6 +115,22 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(model.setContent).toHaveBeenCalledTimes(2)
         expect(model.setContent).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Portal 3' }))
+    })
+
+    it('builds the cover texture with flipY=false - THREE.DataTexture defaults to true, which '
+        + 'rendered the artwork upside down (THREE.DataArrayTexture, what the shelf uses for the '
+        + 'same pixel source, explicitly defaults it to false instead)', async () => {
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        await Promise.resolve()
+        await Promise.resolve()
+
+        const model = fakeModelInstances[0]
+        expect(model.setCoverTexture).toHaveBeenCalled()
+        const texture = model.setCoverTexture.mock.calls.at(-1)?.[0] as THREE.DataTexture
+        expect(texture).toBeInstanceOf(THREE.DataTexture)
+        expect(texture.flipY).toBe(false)
+        expect(texture.colorSpace).toBe(THREE.SRGBColorSpace)
     })
 
     it('CancelPressed while nothing is summoned is a no-op', () => {
