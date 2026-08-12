@@ -202,7 +202,8 @@ export class SceneClickGameBoxRaycast {
 
         if (appid !== undefined) {
             this.eventManager.emit<GameSelectedEvent>(GameEventTypes.Selected, {
-                appid
+                appid,
+                point: hit.point
             })
         } else {
             SceneClickGameBoxRaycast.logger.debug('Hit had no appid metadata', {

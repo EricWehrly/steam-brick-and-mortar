@@ -11,6 +11,7 @@ export interface XRControllerRay {
 
 export interface XRControllerRaySource {
     getPrimaryControllerRay(): XRControllerRay | null
+    getPrimaryControllerGrip(): THREE.Object3D | null
 }
 
 export interface XRControllerManagerConfig {
@@ -126,6 +127,18 @@ export class XRControllerManager implements XRControllerRaySource {
             .normalize()
 
         return { origin, direction }
+    }
+
+    /**
+     * Same hand-resolution as getPrimaryControllerRay(), but returns the real grip Group instead
+     * of a derived ray - for callers (e.g. the game-box fold-open interaction) that want to parent
+     * an object onto the hand rather than just read its aim. Null under the same conditions
+     * getPrimaryControllerRay() is: no session, no connected controller, or neither trigger held
+     * with nothing connected at all.
+     */
+    getPrimaryControllerGrip(): THREE.Object3D | null {
+        const index = this.resolvePrimaryControllerIndex()
+        return index === null ? null : this.controllerGrips[index]
     }
 
     dispose(): void {

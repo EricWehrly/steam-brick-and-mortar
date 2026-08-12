@@ -25,6 +25,7 @@ const { webXRManagerMock, inputManagerMock, xrControllerManagerMock, capturedWeb
         setSession: vi.fn(),
         update: vi.fn(),
         getPrimaryControllerRay: vi.fn().mockReturnValue(null),
+        getPrimaryControllerGrip: vi.fn().mockReturnValue(null),
         dispose: vi.fn(),
     },
     // WebXRCoordinator's constructor passes its onSessionStart/onSessionEnd/etc. callbacks to
