@@ -70,10 +70,14 @@ export class GameLibraryBinderUI {
         this.createBinderContainer()
         this.setupKeyboardShortcut()
 
-        // Listen for game selection from scene (raycast clicks)
+        // Listen for game selection from scene (raycast clicks). Registered as the default
+        // handler (EventManager's capability-based handler selection) - GameBoxFoldCoordinator,
+        // when constructed, registers an override that takes over automatically. See
+        // docs/plans/game-box-open-interaction-plan.md.
         EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
             GameEventTypes.Selected,
-            this.onGameSelected
+            this.onGameSelected,
+            { isDefault: true }
         )
 
         // Cancel (Escape / gamepad B/Circle) closes the binder if open - replaces the old

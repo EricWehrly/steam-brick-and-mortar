@@ -82,7 +82,8 @@ describe('SceneClickGameBoxRaycast controller-ray branch', () => {
         scene.add(box)
 
         DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
-            getPrimaryControllerRay: () => null
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => null
         }, { domain: DataDomain.Scene })
 
         syncWorldMatrices(scene, camera)
@@ -105,7 +106,8 @@ describe('SceneClickGameBoxRaycast controller-ray branch', () => {
             getPrimaryControllerRay: () => ({
                 origin: new THREE.Vector3(5, 0, 0),
                 direction: new THREE.Vector3(0, 0, -1)
-            })
+            }),
+            getPrimaryControllerGrip: () => null
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, fakeRaySource, { domain: DataDomain.Scene })
 

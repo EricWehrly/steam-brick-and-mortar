@@ -24,6 +24,8 @@ import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { EventManager } from './EventManager'
 import { AppEventTypes, GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
+import { GameBoxFoldCoordinator } from '../scene/game-box-fold/GameBoxFoldCoordinator'
+import { USE_FOLD_OPEN_GAME_BOX_INTERACTION } from '../scene/game-box-fold/GameBoxFoldConfig'
 
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { UrlUtils } from '../utils/UrlUtils'
@@ -57,6 +59,7 @@ export class SteamBrickAndMortarApp {
     private appSettings: AppSettings
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
+    private gameBoxFoldCoordinator?: GameBoxFoldCoordinator
     private focusCoordinator?: FocusCoordinator
     private heapMemoryReporter?: HeapMemoryReporter
     private diagnosticsEnabled = false
@@ -225,6 +228,12 @@ export class SteamBrickAndMortarApp {
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
 
+            // Fold-open 3D box interaction (VR + flatscreen) - overrides the binder's flat detail
+            // overlay for shelf-driven selection when enabled. See GameBoxFoldConfig.ts.
+            if (USE_FOLD_OPEN_GAME_BOX_INTERACTION) {
+                this.gameBoxFoldCoordinator = new GameBoxFoldCoordinator()
+            }
+
             // Focus tracking: pause render loop on blur, resume on focus, + window.toggleSceneBlur()
             this.focusCoordinator = new FocusCoordinator()
             this.focusCoordinator.init()
@@ -250,6 +259,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.dispose()
         
         this.systemUICoordinator.dispose()
+        this.gameBoxFoldCoordinator?.dispose()
         this.focusCoordinator?.dispose()
         this.heapMemoryReporter?.dispose()
         this.webxrCoordinator.dispose()

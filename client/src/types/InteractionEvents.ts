@@ -251,6 +251,9 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
     appid: number | string
+    /** World-space point where the selecting raycast hit the box, if known (e.g. shelf
+     *  selection via SceneClickGameBoxRaycast) - used as the fold-open box's summon origin. */
+    point?: THREE.Vector3
 }
 
 export interface ArtworkIntentSettledEvent extends BaseInteractionEvent {
