@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, it, expect } from 'vitest'
-import { CameraInputApplier } from '../../../src/input/CameraInputApplier'
+import { CameraInputApplier, CAMERA_SPAWN_YAW_RADIANS } from '../../../src/input/CameraInputApplier'
 import { InputAction } from '../../../src/input/InputActions'
 import type { InputActionResolver } from '../../../src/input/InputActionResolver'
 import type { MovementOptions } from '../../../src/input/InputContracts'
@@ -18,7 +18,7 @@ function makeActionResolverStub(
 const options: MovementOptions = { speed: 0.075, mouseSensitivity: 0.005, sprintMultiplier: 1.5 }
 
 describe('CameraInputApplier reset', () => {
-    it('snaps rotation back to identity when ResetCamera is pressed, leaving position untouched', () => {
+    it('snaps rotation back to spawn facing when ResetCamera is pressed, leaving position untouched', () => {
         const camera = new THREE.PerspectiveCamera()
         camera.position.set(12, 4, -30)
         camera.rotation.set(0.4, 1.2, 0.3)
@@ -28,7 +28,7 @@ describe('CameraInputApplier reset', () => {
         applier.updateRotation(camera, resolver, options)
 
         expect(camera.rotation.x).toBe(0)
-        expect(camera.rotation.y).toBe(0)
+        expect(camera.rotation.y).toBe(CAMERA_SPAWN_YAW_RADIANS)
         expect(camera.rotation.z).toBe(0)
         expect(camera.position.x).toBe(12)
         expect(camera.position.y).toBe(4)

@@ -32,6 +32,7 @@ import { AppSettings } from '../core/AppSettings'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
+import { CAMERA_SPAWN_YAW_RADIANS } from '../input/CameraInputApplier'
 
 export class SceneManager {
     private scene: THREE.Scene
@@ -164,6 +165,16 @@ export class SceneManager {
     private setupCamera() {
         // Sets the RIG's position, not the camera's - see this.cameraRig's doc comment.
         this.cameraRig.position.set(0, 1.6, 0)
+        this.cameraRig.rotation.y = CAMERA_SPAWN_YAW_RADIANS
+
+        // Default Euler order 'XYZ' lets yaw/pitch interact (gimbal-style) once yaw moves away
+        // from 0 - the reported symptom was right-click-drag mouselook eventually flipping the
+        // view upside down with no way to recover, even though pitch (rotation.x) was already
+        // clamped to +-89 degrees. 'YXZ' (yaw outermost, pitch innermost) is the standard order
+        // for an FPS-style camera driven by independent yaw/pitch writes each frame (see
+        // CameraInputApplier.updateRotation, which writes both to this rig) - it eliminates the
+        // crosstalk entirely rather than special-casing it.
+        this.cameraRig.rotation.order = 'YXZ'
     }
 
     private setupEventListeners() {
