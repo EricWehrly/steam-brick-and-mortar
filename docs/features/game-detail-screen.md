@@ -1,7 +1,9 @@
 # Feature: Game Detail Screen
 
 **Act**: 2 (Best Effort — design pass tied to VR implementation)
-**Status**: In Progress — direction decided 2026-08-10, plan doc written, not yet implemented
+**Status**: In Progress — implemented 2026-08-11 on `feature/game-box-fold-open` (`yarn tsc` clean,
+full suite 1618/1618), pending manual/real-headset verification (dev server wasn't running this
+session, per `client/CLAUDE.md` — not started proactively)
 **Priority**: Medium
 
 ## Goal

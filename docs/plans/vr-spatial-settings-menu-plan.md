@@ -80,10 +80,36 @@ before/after it — the two touch different, mostly non-overlapping parts of the
 
 ## Tasks
 
-1. Spike: get one small DOM panel (e.g. `CacheManagementPanel`) actually projected and interactive
-   in a live XR session via `HTMLMesh`/`InteractiveGroup`. This is a real feasibility check, not a
-   formality — confirm it against this project's actual panel markup/CSS (innerHTML-replacement
-   rendering, external stylesheets), not just that the imports resolve.
+1. ~~Spike: get one small DOM panel (e.g. `CacheManagementPanel`) actually projected and
+   interactive in a live XR session via `HTMLMesh`/`InteractiveGroup`.~~ **Done 2026-08-11** (run as
+   a background agent, per the user's preference for isolated feasibility spikes — see spike code
+   at `client/src/webxr/spikes/SpatialMenuSpike.ts` on branch `worktree-agent-ae09cad888482f942`,
+   not merged, not wired into any bootstrap). Verdict: **feasible, with two concrete integration
+   gaps** to design around in task 2+:
+   - `HTMLMesh`/`InteractiveGroup` import cleanly at this project's pinned three.js version.
+     `HTMLMesh` is a hand-rolled DOM-to-canvas walker (not `html2canvas`) that reads
+     `window.getComputedStyle()`, so this project's external CSS (`styles/pause-menu/*.css`) does
+     apply — but it only understands background-color, border, and per-text-node font/color; no
+     box-shadow, gradients, background-image, opacity, transform, or pseudo-elements. Auto-updates
+     via a `MutationObserver` on the source element, so `PauseMenuPanel`'s `innerHTML`-replacement
+     re-renders trigger a redraw with no manual hook needed.
+   - **Layout gap**: `HTMLMesh` sizes its canvas off `getBoundingClientRect()`, which is zero-area
+     for a `display:none` panel. `PauseMenuPanel.show()/hide()` toggles `display`, so the projected
+     copy needs to stay laid out (e.g. moved offscreen) independent of the flat-screen instance's
+     own visibility state.
+   - **Events gap (the bigger one)**: `HTMLMesh`/`InteractiveGroup` only relay
+     `mousedown/mousemove/mouseup/click` as synthetic events. Plain buttons work. But
+     `CacheManagementPanel`'s checkboxes/select/number-input (wired via
+     `setupToggles`/`setupSelect`/`setupInput`, listening for `change`/`input`) would **not** be
+     operable via a projected raycast as-is — synthetic `click` doesn't flip checkbox state or fire
+     `change`. Needs either a fix upstream in how those controls are wired, or a different
+     interaction path for non-button controls.
+   - `InteractiveGroup` uses its own internal raycaster reacting to the controller's native
+     `move/select/selectstart/selectend` events — doesn't touch `XRControllerManager`/
+     `XRControllerRaySource` at all, but no duplication risk: it operates on the same
+     `XRTargetRaySpace` objects `XRControllerManager` already owns, just registered with both
+     systems. No shared "primary controller" priority logic like
+     `XRControllerManager.getPrimaryControllerRay()` — fires per-controller independently.
 2. Pick and implement an anchor strategy for the first shipped menu (pause/settings).
 3. Wire the projected panel's raycasting to the existing `XRControllerManager` infrastructure
    rather than a parallel raycast path.
