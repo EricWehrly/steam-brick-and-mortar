@@ -302,13 +302,26 @@ Real (desktop) testing surfaced four issues, all fixed on the same branch:
   hinged on its **right** edge, opening sequentially (front cover swings fully open first, then the
   second flap) rather than simultaneously. Ends at the same three-coplanar-panels-in-a-row layout
   as before; only the closed-state stacking and hinge assignment changed.
-- **Spawn still facing the window**: added `cameraRig.rotation.y = CAMERA_SPAWN_YAW_RADIANS` in the
-  prior round, user reports no visible change. Room layout confirmed via `RoomManager.ts`: the
-  glass storefront wall is at `+Z`, back wall at `-Z`; default (unrotated) camera forward is `-Z`,
-  which should already face the back wall, not the window - meaning the geometry doesn't obviously
-  support the `+π` fix that was applied, and the actual cause is still unconfirmed. **Not resolved
-  this round** - needs the user's direct observation (which way they end up facing) rather than
-  another guess, since a second wrong guess already happened once.
+- **Spawn still facing the window** - found and fixed for real this time. The prior round's
+  `CAMERA_SPAWN_YAW_RADIANS` fix in `SceneManager.setupCamera()` was chasing the wrong file - it
+  had no visible effect because `RoomManager.buildRoom()` unconditionally overwrites the rig's
+  rotation later anyway, once real shelf bounds are known, via `cameraRig.lookAt(0, 1.6, targetZ)`.
+  The real bug was IN that call: `THREE.Object3D.lookAt()` special-cases `isCamera`/`isLight`
+  objects to orient the object TOWARD the target; for any other object type - `cameraRig` is a
+  plain `THREE.Group`, not a `Camera` - it builds the matrix with eye/target swapped, orienting the
+  object AWAY from the target instead (confirmed by reading
+  `node_modules/three/src/core/Object3D.js`'s `lookAt()` directly, not assumed). Since the target
+  is always the store's shelves, this silently spawned the player facing away from them - toward
+  the glass storefront - every time. Reverted the `CAMERA_SPAWN_YAW_RADIANS` approach entirely
+  (`SceneManager`/`CameraInputApplier`/their tests) and replaced `RoomManager`'s `.lookAt()` call
+  with an explicit yaw computation (`Math.atan2`) that doesn't hit the isCamera/isLight branch
+  asymmetry. New regression test: `RoomManager-camera-facing.test.ts`.
+- **Cover art rendered upside down** after the CORS fix above swapped in `THREE.DataTexture`.
+  Same class of bug as the mirroring fix from the previous round (a wrong default assumption
+  copied from a differently-configured sibling): `DataTexture` inherits the base `Texture` class's
+  `flipY = true` default, but `THREE.DataArrayTexture` - what `ManagedTextureArray.ts` actually
+  uses for this exact same `GameArtworkProvider` pixel source, for the shelf's real artwork -
+  explicitly overrides it to `false`. Set `texture.flipY = false` to match.
 
 ## Follow-ups (explicitly deferred to a later pass, not this branch)
 

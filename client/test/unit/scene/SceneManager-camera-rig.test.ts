@@ -60,7 +60,6 @@ vi.mock('three', async (importOriginal) => {
 })
 
 import { SceneManager } from '../../../src/scene/SceneManager'
-import { CAMERA_SPAWN_YAW_RADIANS } from '../../../src/input/CameraInputApplier'
 
 describe('SceneManager — camera rig construction invariant', () => {
     let sceneManager: SceneManager
@@ -77,8 +76,9 @@ describe('SceneManager — camera rig construction invariant', () => {
         expect(sceneManager.getScene().children).toContain(sceneManager.getCameraRig())
     })
 
-    it('spawns facing CAMERA_SPAWN_YAW_RADIANS, not the rig\'s un-rotated default facing', () => {
-        expect(sceneManager.getCameraRig().rotation.y).toBe(CAMERA_SPAWN_YAW_RADIANS)
+    it('leaves spawn yaw at the rig\'s un-rotated default (0) - already faces the shelves; '
+        + 'RoomManager.buildRoom() may correct it further once real room bounds are known', () => {
+        expect(sceneManager.getCameraRig().rotation.y).toBe(0)
     })
 
     it('sets rotation.order to YXZ so independently-driven yaw/pitch never interact (the fix for '

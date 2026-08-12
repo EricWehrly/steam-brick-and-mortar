@@ -212,6 +212,12 @@ export class GameBoxFoldCoordinator {
 
             const texture = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.UnsignedByteType)
             texture.colorSpace = THREE.SRGBColorSpace
+            // THREE.DataTexture defaults flipY=true (inherited from the base Texture class).
+            // THREE.DataArrayTexture - what ManagedTextureArray.ts uses for this exact same
+            // GameArtworkProvider pixel source, for the shelf's real artwork - explicitly sets
+            // flipY=false instead. Matching that convention here (DataTexture doesn't default to
+            // it) is what was rendering the cover art upside down.
+            texture.flipY = false
             texture.needsUpdate = true
 
             this.coverTextureCache.set(appid, texture)
