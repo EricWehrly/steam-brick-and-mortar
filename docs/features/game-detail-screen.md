@@ -35,17 +35,33 @@ its own VR adaptation by construction.
 
 ## Acceptance Criteria
 
+Carried forward from the original (pre-fold-open) criteria list below, not dropped — the mechanism
+changed, the underlying requirements didn't. Items still genuinely unmet are marked **(open)**.
+
 - Selecting a game box (any input device, VR or flatscreen) summons a 3D box near the player's
-  hand/view and opens it into a multi-face spread — no flat DOM overlay involved
+  hand/view and opens it into a multi-face spread — no flat DOM overlay involved (met — this is
+  the mechanism itself)
 - Artwork is prominently featured on at least one face (reuses the shelf instance's already-loaded
-  texture, no refetch)
-- Distinct content per face is legible and organized (exact content design TBD, see the plan doc's
-  open questions)
+  texture, no refetch) — **(open)**: currently refetches through `GameArtworkProvider` rather than
+  reusing a texture handle already resolved for the shelf instance; functionally fine (same
+  pipeline, same caches) but not literally "no refetch" yet, see the plan doc's §3
+- Game metadata is legible and organized (name, genre, playtime, tags when available) — **(open)**:
+  placeholder canvas text only right now (name/genre/playtime); tags aren't wired in yet (still
+  waiting on the SteamSpy pipeline, same as before); this is the fold-open plan's "face content
+  design" follow-up, now mapped onto specific faces instead of panel sections
+- Panel is usable in VR — appropriate sizing, controller-friendly interaction targets (met for
+  sizing/attachment; dismiss-by-controller is still the "next pass" closing-gesture follow-up, see
+  the plan doc)
+- Panel is usable on desktop — keyboard accessible, mouse-friendly, appropriate z-layering —
+  **(open)**: mouse selection works; a keyboard-only dismiss/close gesture does not yet exist (also
+  a "next pass" item in the plan doc); z-layering is moot for this mechanism (scene geometry, not
+  DOM), see Notes below
 - Works identically in VR (hand-attached) and on desktop (camera-attached) — one implementation,
-  not two
+  not two (met)
 - The old `BinderGameDetailPanel` flow stays available behind a const gate
-  (`USE_FOLD_OPEN_GAME_BOX_INTERACTION`) until the new mechanism is functionally equivalent
-- Launch/action affordance is clear (what does "play" do in this context?) — deferred, see plan doc
+  (`USE_FOLD_OPEN_GAME_BOX_INTERACTION`) until the new mechanism is functionally equivalent (met)
+- Launch/action affordance is clear (what does "play"/clicking launch do in a WebXR context?) —
+  **(open)**, deferred, see plan doc
 
 ## Stories / Tasks
 

@@ -316,12 +316,50 @@ Real (desktop) testing surfaced four issues, all fixed on the same branch:
   (`SceneManager`/`CameraInputApplier`/their tests) and replaced `RoomManager`'s `.lookAt()` call
   with an explicit yaw computation (`Math.atan2`) that doesn't hit the isCamera/isLight branch
   asymmetry. New regression test: `RoomManager-camera-facing.test.ts`.
-- **Cover art rendered upside down** after the CORS fix above swapped in `THREE.DataTexture`.
-  Same class of bug as the mirroring fix from the previous round (a wrong default assumption
-  copied from a differently-configured sibling): `DataTexture` inherits the base `Texture` class's
-  `flipY = true` default, but `THREE.DataArrayTexture` - what `ManagedTextureArray.ts` actually
-  uses for this exact same `GameArtworkProvider` pixel source, for the shelf's real artwork -
-  explicitly overrides it to `false`. Set `texture.flipY = false` to match.
+- **Cover art rendered upside down** after the CORS fix above swapped in `THREE.DataTexture` - see
+  the next addendum for the fully-corrected story (this round's fix, `flipY = false`, was itself
+  wrong; the real fix landed in the round after).
+
+## Addendum (2026-08-11): flipY correction, and replaced hand-rolled animation with THREE.AnimationMixer
+
+Two more rounds of live-testing feedback:
+
+**Cover art was still upside down** after the previous round's `flipY = false` fix - because that
+fix was based on a false premise. A `Grep` for `flipY` in `DataTexture.js` returned "no matches,"
+so the fix assumed `DataTexture` inherits the base `Texture` class's `flipY = true` default (like
+most textures) and copied `THREE.DataArrayTexture`'s `flipY = false` override instead, reasoning
+that was the "correct" convention for this `GameArtworkProvider` pixel source. Reading
+`node_modules/three/src/textures/DataTexture.js` directly (not grepping it) showed the grep result
+was simply wrong: `DataTexture`'s own constructor unconditionally sets `this.flipY = false` - so
+the earlier fix was a no-op against that default, and this round's first attempt (removing the
+line entirely, assuming the default was `true`) left it at the same wrong `false` value the whole
+time. `texture-processing.worker.ts`'s `getImageData()` produces standard top-down pixel data, same
+as any decoded photo - correct display on a normally-UV-mapped mesh needs `flipY = true`, the same
+reason the *base* `Texture` class defaults to it. `DataTexture` overrides that default because its
+more common use case is non-photographic raw/procedural data where the distinction doesn't apply
+the same way - not applicable here. Fix: explicitly set `texture.flipY = true`, overriding
+`DataTexture`'s own default back to the photo-correct behavior. (`DataArrayTexture`'s own
+`flipY = false` is real and unrelated to this - it's a `WebGL2` array-texture upload detail that
+doesn't transfer to a plain 2D `DataTexture` at all; that reasoning happened to be *directionally*
+right by accident in an earlier draft of this note, but the actual root cause was always the
+`DataTexture` grep miss above, not a `DataArrayTexture` technical constraint.) Lesson: this session
+had several `Grep` calls silently return "no matches" against content later confirmed present via
+`Read` - `lookAt(` in `Object3D.js` was the other one (see the previous addendum). Prefer `Read`
+over `Grep` when a negative result would materially change a conclusion.
+
+**"A lot of the game box folding looks hand-rolled"** - fair: `GameBoxFoldCoordinator` had a
+hand-rolled `phase`/`progress` state machine (`'idle' | 'summoning' | 'opening' | 'closing' |
+'unsummoning'`) manually lerping scale and calling `GameBoxFoldModel.setOpenAmount(t)` every frame.
+Replaced with `THREE.AnimationMixer`/`AnimationClip`/`KeyframeTrack` - already part of three.js, no
+new dependency. `GameBoxFoldModel` now owns one `AnimationClip` (summon-scale, then front-cover
+rotation, then second-flap rotation, as three keyframe tracks) and exposes `playOpen()`/
+`playClose()`/`update(deltaSeconds)`/`onFullyClosed(callback)`; `playClose()` is just the same clip
+played with `timeScale = -1` (a standard three.js pattern for reversible open/close animations - no
+separate close logic needed). `GameBoxFoldCoordinator` no longer tracks animation phase/progress at
+all - it only calls `playOpen()`/`playClose()` at the right moments and forwards `update()` each
+frame. Net: coordinator is markedly smaller, model owns its own animation state (better
+encapsulation - it already owned the geometry the animation drives), and the mechanism is now
+"three.js's own animation system" rather than something hand-rolled.
 
 ## Follow-ups (explicitly deferred to a later pass, not this branch)
 

@@ -9,10 +9,14 @@ import type { XRControllerRaySource } from '../../../../src/webxr/XRControllerMa
 
 const fakeModelInstances: Array<{
     group: THREE.Group
-    setOpenAmount: ReturnType<typeof vi.fn>
+    playOpen: ReturnType<typeof vi.fn>
+    playClose: ReturnType<typeof vi.fn>
+    onFullyClosed: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
     setContent: ReturnType<typeof vi.fn>
     setCoverTexture: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
+    fullyClosedCallback: (() => void) | null
 }> = []
 
 vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
@@ -20,10 +24,14 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
     GameBoxFoldModel: vi.fn().mockImplementation(function () {
         const instance = {
             group: new THREE.Group(),
-            setOpenAmount: vi.fn(),
+            playOpen: vi.fn(),
+            playClose: vi.fn(),
+            onFullyClosed: vi.fn((cb: () => void) => { instance.fullyClosedCallback = cb }),
+            update: vi.fn(),
             setContent: vi.fn(),
             setCoverTexture: vi.fn(),
-            dispose: vi.fn()
+            dispose: vi.fn(),
+            fullyClosedCallback: null as (() => void) | null
         }
         fakeModelInstances.push(instance)
         return instance
@@ -86,6 +94,7 @@ describe('GameBoxFoldCoordinator', () => {
         expect(camera.children).toContain(model.group)
         expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({ name: 'Half-Life 3' }))
         expect(model.group.visible).toBe(true)
+        expect(model.playOpen).toHaveBeenCalledTimes(1)
     })
 
     it('selecting while an XR controller grip is available parents the model to the grip instead', () => {
@@ -117,9 +126,10 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.setContent).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Portal 3' }))
     })
 
-    it('builds the cover texture with flipY=false - THREE.DataTexture defaults to true, which '
-        + 'rendered the artwork upside down (THREE.DataArrayTexture, what the shelf uses for the '
-        + 'same pixel source, explicitly defaults it to false instead)', async () => {
+    it('builds the cover texture with flipY explicitly overridden to true - THREE.DataTexture\'s own '
+        + 'constructor defaults it to false (confirmed by reading DataTexture.js directly), which is '
+        + 'wrong for this standard top-down decoded-image pixel source and rendered the art upside '
+        + 'down - see the source comment for the full story', async () => {
         coordinator = new GameBoxFoldCoordinator()
         selectGame(1)
         await Promise.resolve()
@@ -129,8 +139,9 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.setCoverTexture).toHaveBeenCalled()
         const texture = model.setCoverTexture.mock.calls.at(-1)?.[0] as THREE.DataTexture
         expect(texture).toBeInstanceOf(THREE.DataTexture)
-        expect(texture.flipY).toBe(false)
+        expect(texture.flipY).toBe(true)
         expect(texture.colorSpace).toBe(THREE.SRGBColorSpace)
+
     })
 
     it('CancelPressed while nothing is summoned is a no-op', () => {
@@ -139,6 +150,48 @@ describe('GameBoxFoldCoordinator', () => {
 
         expect(() => cancel()).not.toThrow()
         expect(model.group.visible).toBe(false)
+        expect(model.playClose).not.toHaveBeenCalled()
+    })
+
+    it('CancelPressed while something is summoned plays the close animation', () => {
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+
+        cancel()
+
+        expect(model.playClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('registers a fully-closed callback that hides/detaches the model and clears the current appid, '
+        + 'so re-selecting afterward parents the model again', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        const model = fakeModelInstances[0]
+        expect(model.onFullyClosed).toHaveBeenCalledTimes(1)
+
+        selectGame(1)
+        expect(model.group.visible).toBe(true)
+        expect(camera.children).toContain(model.group)
+
+        // Simulate GameBoxFoldModel's real mixer firing 'finished' after playClose() completes.
+        model.fullyClosedCallback?.()
+
+        expect(model.group.visible).toBe(false)
+        expect(camera.children).not.toContain(model.group)
+    })
+
+    it('drives the model\'s animation every frame via update(), converting ms to seconds', () => {
+        coordinator = new GameBoxFoldCoordinator()
+        const model = fakeModelInstances[0]
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const frameCallback = (RenderLoopRegistry.getInstance() as any).callbacks.get('GameBoxFoldCoordinator')
+        frameCallback(0, 16)
+
+        expect(model.update).toHaveBeenCalledWith(0.016)
     })
 
     it('dispose() frees the model and unregisters from the render loop', () => {

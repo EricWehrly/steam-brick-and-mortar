@@ -13,10 +13,6 @@ import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
 import { GameBoxFoldModel } from './GameBoxFoldModel'
 import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/GameArtworkProvider'
 
-const SUMMON_DURATION_MS = 200
-const OPEN_DURATION_MS = 350
-const SUMMON_START_SCALE = 0.05
-
 // Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
 // Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
 // doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
@@ -27,8 +23,6 @@ const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.12)
 // rotate it to face back toward whatever it's parented to.
 const MODEL_FACING_ROTATION_Y = Math.PI
 
-type AnimationPhase = 'idle' | 'summoning' | 'opening' | 'closing' | 'unsummoning'
-
 /**
  * Owns exactly one pre-warmed GameBoxFoldModel, summoned/re-textured/anchored on
  * GameEventTypes.Selected and dismissed on CancelPressed. See
@@ -36,6 +30,9 @@ type AnimationPhase = 'idle' | 'summoning' | 'opening' | 'closing' | 'unsummonin
  * handler for GameEventTypes.Selected (EventManager's capability-based handler selection) so
  * GameLibraryBinderUI's default flat-overlay handler steps aside automatically - see
  * GameBoxFoldConfig.ts for the const gate controlling whether this class is even constructed.
+ * Animation itself (summon scale, sequential hinge open/close) lives entirely in
+ * GameBoxFoldModel via a THREE.AnimationMixer/AnimationClip - this class only drives
+ * model.update() each frame and calls playOpen()/playClose() at the right moments.
  */
 export class GameBoxFoldCoordinator {
     private static readonly logger = Logger.createLogFunctions(GameBoxFoldCoordinator.name)
@@ -47,8 +44,6 @@ export class GameBoxFoldCoordinator {
     private readonly coverTextureCache = new Map<string, THREE.DataTexture>()
 
     private currentAppid: string | null = null
-    private phase: AnimationPhase = 'idle'
-    private progress = 0
 
     constructor() {
         this.eventManager = EventManager.getInstance()
@@ -57,7 +52,11 @@ export class GameBoxFoldCoordinator {
         this.model = new GameBoxFoldModel()
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
-        this.model.setOpenAmount(0)
+        this.model.onFullyClosed(() => {
+            this.model.group.visible = false
+            this.model.group.removeFromParent()
+            this.currentAppid = null
+        })
 
         this.eventManager.registerEventHandler<GameSelectedEvent>(
             GameEventTypes.Selected,
@@ -101,64 +100,19 @@ export class GameBoxFoldCoordinator {
         this.attachToAnchor()
 
         this.model.group.visible = true
-        this.model.setOpenAmount(0)
-        this.model.group.scale.setScalar(SUMMON_START_SCALE)
-        this.phase = 'summoning'
-        this.progress = 0
+        this.model.playOpen()
     }
 
     private readonly handleCancelPressed = (): void => {
-        if (this.phase === 'idle' || this.phase === 'closing' || this.phase === 'unsummoning') {
+        if (this.currentAppid === null) {
             return
         }
-        this.phase = 'closing'
-        this.progress = 0
+        this.model.playClose()
     }
 
     private readonly update = (_now: number, deltaTime: number): void => {
-        if (this.phase === 'idle') {
-            return
-        }
-
-        if (this.phase === 'summoning') {
-            this.progress = Math.min(1, this.progress + deltaTime / SUMMON_DURATION_MS)
-            this.model.group.scale.setScalar(THREE.MathUtils.lerp(SUMMON_START_SCALE, 1, this.progress))
-            if (this.progress >= 1) {
-                this.phase = 'opening'
-                this.progress = 0
-            }
-            return
-        }
-
-        if (this.phase === 'opening') {
-            this.progress = Math.min(1, this.progress + deltaTime / OPEN_DURATION_MS)
-            this.model.setOpenAmount(this.progress)
-            if (this.progress >= 1) {
-                this.phase = 'idle'
-            }
-            return
-        }
-
-        if (this.phase === 'closing') {
-            this.progress = Math.min(1, this.progress + deltaTime / OPEN_DURATION_MS)
-            this.model.setOpenAmount(1 - this.progress)
-            if (this.progress >= 1) {
-                this.phase = 'unsummoning'
-                this.progress = 0
-            }
-            return
-        }
-
-        if (this.phase === 'unsummoning') {
-            this.progress = Math.min(1, this.progress + deltaTime / SUMMON_DURATION_MS)
-            this.model.group.scale.setScalar(THREE.MathUtils.lerp(1, SUMMON_START_SCALE, this.progress))
-            if (this.progress >= 1) {
-                this.model.group.visible = false
-                this.model.group.removeFromParent()
-                this.currentAppid = null
-                this.phase = 'idle'
-            }
-        }
+        // AnimationMixer's own unit is seconds; RenderLoopRegistry callbacks receive milliseconds.
+        this.model.update(deltaTime / 1000)
     }
 
     private attachToAnchor(): void {
@@ -212,12 +166,16 @@ export class GameBoxFoldCoordinator {
 
             const texture = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.UnsignedByteType)
             texture.colorSpace = THREE.SRGBColorSpace
-            // THREE.DataTexture defaults flipY=true (inherited from the base Texture class).
-            // THREE.DataArrayTexture - what ManagedTextureArray.ts uses for this exact same
-            // GameArtworkProvider pixel source, for the shelf's real artwork - explicitly sets
-            // flipY=false instead. Matching that convention here (DataTexture doesn't default to
-            // it) is what was rendering the cover art upside down.
-            texture.flipY = false
+            // THREE.DataTexture's own constructor unconditionally sets flipY=false (confirmed by
+            // reading node_modules/three/src/textures/DataTexture.js directly - a prior "fix" here
+            // set it to false explicitly, which was a no-op against that default, and a later
+            // "fix" left it unset assuming the false default; both were wrong because the default
+            // itself was never actually true). texture-processing.worker.ts's getImageData() is
+            // standard top-down pixel data, same as any decoded image - displaying it right-side
+            // up on a normally-UV-mapped mesh needs flipY=true, which is why base Texture defaults
+            // to it; DataTexture overrides that default for its more common raw-data use cases,
+            // which doesn't apply to this photo data, so override it back explicitly.
+            texture.flipY = true
             texture.needsUpdate = true
 
             this.coverTextureCache.set(appid, texture)
