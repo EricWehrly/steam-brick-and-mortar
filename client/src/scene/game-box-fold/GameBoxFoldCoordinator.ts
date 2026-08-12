@@ -32,7 +32,9 @@ const MODEL_FACING_ROTATION_Y = Math.PI
  * GameBoxFoldConfig.ts for the const gate controlling whether this class is even constructed.
  * Animation itself (summon scale, sequential hinge open/close) lives entirely in
  * GameBoxFoldModel via a THREE.AnimationMixer/AnimationClip - this class only drives
- * model.update() each frame and calls playOpen()/playClose() at the right moments.
+ * model.update() each frame and calls playOpen()/playClose() at the right moments. Selecting a
+ * game while one is already open always plays close-then-reopen (see pendingSelection) rather
+ * than re-texturing the still-open box in place, so every selection gets visible feedback.
  */
 export class GameBoxFoldCoordinator {
     private static readonly logger = Logger.createLogFunctions(GameBoxFoldCoordinator.name)
@@ -44,6 +46,10 @@ export class GameBoxFoldCoordinator {
     private readonly coverTextureCache = new Map<string, THREE.DataTexture>()
 
     private currentAppid: string | null = null
+    // Set when GameEventTypes.Selected arrives while a box is already summoned - playClose()
+    // needs to finish (see onFullyClosed below) before it's safe to re-texture/reopen with the
+    // new game, so the selection waits here rather than re-texturing the still-open box in place.
+    private pendingSelection: { appid: string; game: SteamGameData } | null = null
 
     constructor() {
         this.eventManager = EventManager.getInstance()
@@ -53,6 +59,12 @@ export class GameBoxFoldCoordinator {
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
         this.model.onFullyClosed(() => {
+            if (this.pendingSelection) {
+                const { appid, game } = this.pendingSelection
+                this.pendingSelection = null
+                this.summon(appid, game)
+                return
+            }
             this.model.group.visible = false
             this.model.group.removeFromParent()
             this.currentAppid = null
@@ -90,6 +102,19 @@ export class GameBoxFoldCoordinator {
             return
         }
 
+        // Nothing summoned yet: open directly. Something already summoned (even the same game
+        // re-selected): close first, then reopen with the new content once onFullyClosed fires -
+        // re-texturing an already-open box in place skipped the animation entirely, which read as
+        // selection just silently swapping the game with no feedback.
+        if (this.currentAppid === null) {
+            this.summon(appid, game)
+        } else {
+            this.pendingSelection = { appid, game }
+            this.model.playClose()
+        }
+    }
+
+    private summon(appid: string, game: SteamGameData): void {
         this.currentAppid = appid
         this.model.setContent({
             name: game.name,
@@ -107,6 +132,8 @@ export class GameBoxFoldCoordinator {
         if (this.currentAppid === null) {
             return
         }
+        // A Cancel always means "stay closed" - drop any switch that was queued mid-close.
+        this.pendingSelection = null
         this.model.playClose()
     }
 
