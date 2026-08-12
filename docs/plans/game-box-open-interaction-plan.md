@@ -361,6 +361,43 @@ frame. Net: coordinator is markedly smaller, model owns its own animation state 
 encapsulation - it already owned the geometry the animation drives), and the mechanism is now
 "three.js's own animation system" rather than something hand-rolled.
 
+## Addendum (2026-08-11): close-then-reopen on every selection; real left/right hinge fix; isDefault moved into the retiring code
+
+Three more fixes from the same live-testing thread:
+
+- **Selecting a different game while one was open just swapped content with no animation at all.**
+  `handleGameSelected` used to re-texture/re-anchor the still-open model in place regardless of
+  whether something was already summoned - `playOpen()` was only ever called once per model
+  lifetime in practice, since the model started fully open already. Added `pendingSelection`:
+  selecting while `currentAppid !== null` now queues the new appid/game and calls `playClose()`
+  instead of re-texturing immediately; the existing `onFullyClosed` callback (already wired for
+  the plain-dismiss case) checks for a pending selection first and, if present, calls a new
+  `summon()` (the selection logic factored out of `handleGameSelected`) instead of hiding/
+  detaching. `handleCancelPressed` clears any queued `pendingSelection` too, so a Cancel that
+  arrives mid-switch stays closed rather than reopening with whatever was queued.
+- **The hinges were still visibly wrong** ("fold open to the right, and then from the back")
+  despite the previous round's stacked-layers redesign, because that redesign had a real sign
+  error: `leftHinge`'s/`rightHinge`'s X positions were derived in `GameBoxFoldModel`'s own local
+  frame without accounting for `GameBoxFoldCoordinator`'s `MODEL_FACING_ROTATION_Y` (`PI`) rotation
+  on the *whole* model, which negates local X. The earlier UV/texture-orientation analysis in this
+  same file correctly carried that outer rotation through; the hinge-position analysis never did.
+  Net effect: "leftHinge" (the front cover) was actually landing on the viewer's *right* once open,
+  and vice versa. Fixed by swapping the `hingeX`/`meshLocalX` arguments between the two
+  `buildFlap()` calls (front cover now built at local `+X` so it lands at viewer-left after the
+  outer rotation; second flap the mirror). New regression test in `GameBoxFoldModel.test.ts`
+  composes the model's open state with the same rotation the coordinator applies and asserts the
+  actual viewer-relative left/right, rather than only checking the model's own local frame -
+  that's specifically the check that was missing before.
+- **`isDefault: true` moved into `GameLibraryBinderUI` conditionally**, gated on
+  `USE_FOLD_OPEN_GAME_BOX_INTERACTION`, instead of being unconditional. Per explicit direction: the
+  new-mechanism vocabulary (`isDefault`/override handler selection) shouldn't leak into the
+  retiring code path when the flag is off - with the flag off, `GameLibraryBinderUI` now registers
+  exactly as it did before this feature existed, no trace of the new mechanism's concepts.
+
+Files touched: `GameBoxFoldCoordinator.ts` (`pendingSelection`, `summon()`), `GameBoxFoldModel.ts`
+(hinge swap + comment), `GameLibraryBinderUI.ts` (conditional `isDefault`), both fold-open test
+files.
+
 ## Follow-ups (explicitly deferred to a later pass, not this branch)
 
 Recorded per the user's own framing (2026-08-11) so they aren't lost before the next pick-up:

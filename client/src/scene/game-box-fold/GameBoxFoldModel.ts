@@ -112,11 +112,17 @@ export class GameBoxFoldModel {
         this.group.add(this.baseMesh)
 
         // Front cover: outermost/closest to the viewer when closed (most negative local Z - see
-        // FACE_INDEX's comment, -Z is "toward the viewer"). Hinges on its LEFT edge.
-        this.leftHinge = this.buildFlap(-BOX_WIDTH / 2, BOX_WIDTH / 2, -2 * STACK_GAP, this.leftContentMaterial)
+        // FACE_INDEX's comment, -Z is "toward the viewer"). Hinges so it swings to the viewer's
+        // LEFT once open. GameBoxFoldCoordinator rotates this whole model 180 degrees around Y to
+        // face its anchor (MODEL_FACING_ROTATION_Y), which negates local X - a hinge built at
+        // local +X (as if opening to this model's own local right) ends up at world -X, i.e. the
+        // viewer's LEFT, once that outer rotation is applied. Built local-right so it renders
+        // viewer-left; this looks backwards reading the numbers alone without that context.
+        this.leftHinge = this.buildFlap(BOX_WIDTH / 2, -BOX_WIDTH / 2, -2 * STACK_GAP, this.leftContentMaterial)
         this.leftHinge.name = HINGE_NAME.frontCover
-        // Second flap: sits between base and front cover when closed. Hinges on its RIGHT edge.
-        this.rightHinge = this.buildFlap(BOX_WIDTH / 2, -BOX_WIDTH / 2, -STACK_GAP, this.rightContentMaterial)
+        // Second flap: sits between base and front cover when closed. Hinges the opposite way, so
+        // it swings to the viewer's RIGHT once open - same local/world flip as leftHinge above.
+        this.rightHinge = this.buildFlap(-BOX_WIDTH / 2, BOX_WIDTH / 2, -STACK_GAP, this.rightContentMaterial)
         this.rightHinge.name = HINGE_NAME.secondFlap
         this.group.add(this.leftHinge, this.rightHinge)
 

@@ -38,6 +38,34 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
+    it('once open, the front cover lands on the viewer\'s LEFT and the second flap on the viewer\'s '
+        + 'RIGHT, accounting for GameBoxFoldCoordinator\'s 180-degree facing rotation on the whole '
+        + 'model (MODEL_FACING_ROTATION_Y) - the model\'s own local +X/-X are each other\'s viewer-'
+        + 'relative side once that outer rotation is composed in; a bug here previously had them '
+        + 'swapped because that composition was never checked, only the model\'s own local frame', () => {
+        const model = new GameBoxFoldModel()
+        const [leftHinge, rightHinge] = getHinges(model)
+        const [leftMesh] = leftHinge.children as THREE.Mesh[]
+        const [rightMesh] = rightHinge.children as THREE.Mesh[]
+
+        model.playOpen()
+        model.update(FULL_OPEN_S + 1)
+
+        // Simulate GameBoxFoldCoordinator.MODEL_FACING_ROTATION_Y - applied to the whole group
+        // (this model's own root), the same way the coordinator applies it in real use.
+        model.group.rotation.y = Math.PI
+        model.group.updateMatrixWorld(true)
+
+        const leftWorldX = leftMesh.getWorldPosition(new THREE.Vector3()).x
+        const rightWorldX = rightMesh.getWorldPosition(new THREE.Vector3()).x
+        // Standard camera convention (this project's own CameraInputApplier uses it too): a
+        // viewer looking down -Z has "right" = world +X, so viewer-left is negative world X.
+        expect(leftWorldX).toBeLessThan(0)
+        expect(rightWorldX).toBeGreaterThan(0)
+
+        model.dispose()
+    })
+
     it('opens the front cover (left) before the second flap (right) - sequential, not simultaneous', () => {
         const model = new GameBoxFoldModel()
         const [leftHinge, rightHinge] = getHinges(model)

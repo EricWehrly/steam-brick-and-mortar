@@ -114,16 +114,44 @@ describe('GameBoxFoldCoordinator', () => {
         expect(camera.children).not.toContain(model.group)
     })
 
-    it('selecting a second game while one is open re-textures the same model instance, not a new one', () => {
+    it('selecting a second game while one is open plays close, waits for it to finish, then '
+        + 'reopens with the new content - re-texturing the still-open box in place gave no visible '
+        + 'feedback that the selection had even registered', () => {
         coordinator = new GameBoxFoldCoordinator()
+        const model = fakeModelInstances[0]
 
         selectGame(1)
-        selectGame(2)
+        expect(model.setContent).toHaveBeenCalledTimes(1)
+        expect(model.playOpen).toHaveBeenCalledTimes(1)
 
-        expect(GameBoxFoldModel).toHaveBeenCalledTimes(1)
-        const model = fakeModelInstances[0]
+        selectGame(2)
+        // Not re-textured yet - still waiting on the close animation to finish.
+        expect(model.setContent).toHaveBeenCalledTimes(1)
+        expect(model.playClose).toHaveBeenCalledTimes(1)
+
+        // Simulate GameBoxFoldModel's real mixer firing 'finished' after playClose() completes.
+        model.fullyClosedCallback?.()
+
+        expect(GameBoxFoldModel).toHaveBeenCalledTimes(1) // still the same pre-warmed instance
         expect(model.setContent).toHaveBeenCalledTimes(2)
         expect(model.setContent).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Portal 3' }))
+        expect(model.playOpen).toHaveBeenCalledTimes(2)
+    })
+
+    it('a CancelPressed that arrives while a switch is queued discards the pending switch - stays '
+        + 'closed instead of reopening with the game that was queued', () => {
+        coordinator = new GameBoxFoldCoordinator()
+        const model = fakeModelInstances[0]
+
+        selectGame(1)
+        selectGame(2) // queues game 2, plays close on game 1
+        cancel()
+
+        model.fullyClosedCallback?.()
+
+        expect(model.setContent).toHaveBeenCalledTimes(1) // never re-textured for game 2
+        expect(model.playOpen).toHaveBeenCalledTimes(1) // never reopened
+        expect(model.group.visible).toBe(false)
     })
 
     it('builds the cover texture with flipY explicitly overridden to true - THREE.DataTexture\'s own '
@@ -141,7 +169,6 @@ describe('GameBoxFoldCoordinator', () => {
         expect(texture).toBeInstanceOf(THREE.DataTexture)
         expect(texture.flipY).toBe(true)
         expect(texture.colorSpace).toBe(THREE.SRGBColorSpace)
-
     })
 
     it('CancelPressed while nothing is summoned is a no-op', () => {

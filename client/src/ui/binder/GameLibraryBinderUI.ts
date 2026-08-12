@@ -13,6 +13,7 @@ import { InputEventTypes, GameEventTypes } from '../../types/InteractionEvents'
 import type { InputPauseEvent, InputResumeEvent, GameSelectedEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { BinderGameDetailPanel } from './BinderGameDetailPanel'
+import { USE_FOLD_OPEN_GAME_BOX_INTERACTION } from '../../scene/game-box-fold/GameBoxFoldConfig'
 import './binder.css'
 
 const GAMES_PER_PAGE = 4
@@ -70,14 +71,16 @@ export class GameLibraryBinderUI {
         this.createBinderContainer()
         this.setupKeyboardShortcut()
 
-        // Listen for game selection from scene (raycast clicks). Registered as the default
-        // handler (EventManager's capability-based handler selection) - GameBoxFoldCoordinator,
-        // when constructed, registers an override that takes over automatically. See
-        // docs/plans/game-box-open-interaction-plan.md.
+        // Listen for game selection from scene (raycast clicks). isDefault only when the
+        // fold-open interaction is enabled - EventManager's capability-based handler selection
+        // then lets GameBoxFoldCoordinator's override take over automatically (see
+        // docs/plans/game-box-open-interaction-plan.md). With the flag off, this registers
+        // exactly as it did before that feature existed - the new-mechanism concept doesn't leak
+        // into this (retiring) code path when it isn't in play.
         EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
             GameEventTypes.Selected,
             this.onGameSelected,
-            { isDefault: true }
+            USE_FOLD_OPEN_GAME_BOX_INTERACTION ? { isDefault: true } : undefined
         )
 
         // Cancel (Escape / gamepad B/Circle) closes the binder if open - replaces the old
