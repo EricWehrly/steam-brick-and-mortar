@@ -193,15 +193,9 @@ export class GameBoxFoldCoordinator {
 
             const texture = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.UnsignedByteType)
             texture.colorSpace = THREE.SRGBColorSpace
-            // THREE.DataTexture's own constructor unconditionally sets flipY=false (confirmed by
-            // reading node_modules/three/src/textures/DataTexture.js directly - a prior "fix" here
-            // set it to false explicitly, which was a no-op against that default, and a later
-            // "fix" left it unset assuming the false default; both were wrong because the default
-            // itself was never actually true). texture-processing.worker.ts's getImageData() is
-            // standard top-down pixel data, same as any decoded image - displaying it right-side
-            // up on a normally-UV-mapped mesh needs flipY=true, which is why base Texture defaults
-            // to it; DataTexture overrides that default for its more common raw-data use cases,
-            // which doesn't apply to this photo data, so override it back explicitly.
+            // Unlike base Texture, DataTexture defaults flipY to false. This pixel data is
+            // standard top-down decoded-image data (same as texture-processing.worker.ts produces
+            // for the shelf's own textures), so it needs flipY=true to display right-side up.
             texture.flipY = true
             texture.needsUpdate = true
 

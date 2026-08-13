@@ -77,11 +77,18 @@ export class GameLibraryBinderUI {
         // docs/plans/game-box-open-interaction-plan.md). With the flag off, this registers
         // exactly as it did before that feature existed - the new-mechanism concept doesn't leak
         // into this (retiring) code path when it isn't in play.
-        EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
-            GameEventTypes.Selected,
-            this.onGameSelected,
-            USE_FOLD_OPEN_GAME_BOX_INTERACTION ? { isDefault: true } : undefined
-        )
+        if (USE_FOLD_OPEN_GAME_BOX_INTERACTION) {
+            EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
+                GameEventTypes.Selected,
+                this.onGameSelected,
+                { isDefault: true }
+            )
+        } else {
+            EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
+                GameEventTypes.Selected,
+                this.onGameSelected
+            )
+        }
 
         // Cancel (Escape / gamepad B/Circle) closes the binder if open - replaces the old
         // raw Escape-only keydown check, so gamepad gets the same dismiss behavior.

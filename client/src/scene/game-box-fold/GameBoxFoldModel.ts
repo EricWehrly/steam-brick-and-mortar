@@ -22,10 +22,22 @@ const SUMMON_DURATION_S = 0.2
 const FRONT_COVER_DURATION_S = 0.2
 const SECOND_FLAP_DURATION_S = 0.2
 
+// Closing reads better snappier than the reveal - same clip played backward, just faster.
+const CLOSE_SPEED_MULTIPLIER = 2
+
 const HINGE_NAME = {
     frontCover: 'game-box-fold-front-cover-hinge',
     secondFlap: 'game-box-fold-second-flap-hinge'
 } as const
+
+// This model is always parented through GameBoxFoldCoordinator, which rotates the whole group
+// 180 degrees around Y to face its anchor (MODEL_FACING_ROTATION_Y there). That outer rotation
+// negates local X, so a hinge built at local +X lands on the viewer's LEFT once open, and local
+// -X lands on the viewer's RIGHT - the opposite of what the sign would suggest read on its own.
+// Naming these by their post-rotation, viewer-relative outcome keeps the constructor below
+// readable without re-deriving that flip at each call site.
+const FRONT_COVER_HINGE_X = BOX_WIDTH / 2 // opens to the viewer's left
+const SECOND_FLAP_HINGE_X = -BOX_WIDTH / 2 // opens to the viewer's right
 
 // THREE.BoxGeometry's per-face material groups are built in a fixed order:
 // [+X, -X, +Y, -Y, +Z, -Z]. The hinges below only ever rotate 0 <-> PI around Y, so "outer"
@@ -112,17 +124,12 @@ export class GameBoxFoldModel {
         this.group.add(this.baseMesh)
 
         // Front cover: outermost/closest to the viewer when closed (most negative local Z - see
-        // FACE_INDEX's comment, -Z is "toward the viewer"). Hinges so it swings to the viewer's
-        // LEFT once open. GameBoxFoldCoordinator rotates this whole model 180 degrees around Y to
-        // face its anchor (MODEL_FACING_ROTATION_Y), which negates local X - a hinge built at
-        // local +X (as if opening to this model's own local right) ends up at world -X, i.e. the
-        // viewer's LEFT, once that outer rotation is applied. Built local-right so it renders
-        // viewer-left; this looks backwards reading the numbers alone without that context.
-        this.leftHinge = this.buildFlap(BOX_WIDTH / 2, -BOX_WIDTH / 2, -2 * STACK_GAP, this.leftContentMaterial)
+        // FACE_INDEX's comment, -Z is "toward the viewer"). See FRONT_COVER_HINGE_X/
+        // SECOND_FLAP_HINGE_X above for why "left"/"right" don't match the raw sign here.
+        this.leftHinge = this.buildFlap(FRONT_COVER_HINGE_X, -2 * STACK_GAP, this.leftContentMaterial)
         this.leftHinge.name = HINGE_NAME.frontCover
-        // Second flap: sits between base and front cover when closed. Hinges the opposite way, so
-        // it swings to the viewer's RIGHT once open - same local/world flip as leftHinge above.
-        this.rightHinge = this.buildFlap(-BOX_WIDTH / 2, BOX_WIDTH / 2, -STACK_GAP, this.rightContentMaterial)
+        // Second flap: sits between base and front cover when closed.
+        this.rightHinge = this.buildFlap(SECOND_FLAP_HINGE_X, -STACK_GAP, this.rightContentMaterial)
         this.rightHinge.name = HINGE_NAME.secondFlap
         this.group.add(this.leftHinge, this.rightHinge)
 
@@ -140,10 +147,11 @@ export class GameBoxFoldModel {
     }
 
     /** Reverses the same clip - open finishes, then front cover, then summon-scale-down - back to
-     *  fully closed. No separate close-animation logic: it's just this clip played backward. */
+     *  fully closed, at CLOSE_SPEED_MULTIPLIER speed. No separate close-animation logic: it's just
+     *  this clip played backward, faster. */
     playClose(): void {
         this.openAction.paused = false
-        this.openAction.timeScale = -1
+        this.openAction.timeScale = -CLOSE_SPEED_MULTIPLIER
         this.openAction.play()
     }
 
@@ -205,13 +213,13 @@ export class GameBoxFoldModel {
     }
 
     /**
-     * hingeX: world/group-local X of the pivot edge (one side of the shared central footprint).
-     * meshLocalX: the panel's offset from that pivot, in the hinge's own local space - chosen so
-     * the panel sits centered on the group's origin when closed (rotation 0) and lands a full
-     * BOX_WIDTH to the opposite side once open (rotation PI negates local X - see buildOpenClip).
-     * closedZ: local Z when closed, establishing this panel's depth in the closed stack.
+     * hingeX: group-local X of the pivot edge (one side of the shared central footprint). The
+     * panel itself is offset -hingeX within the hinge's own local space, so it sits centered on
+     * the group's origin when closed (rotation 0) and lands a full BOX_WIDTH to the opposite side
+     * once open (rotation PI negates local X - see buildOpenClip). closedZ: local Z when closed,
+     * establishing this panel's depth in the closed stack.
      */
-    private buildFlap(hingeX: number, meshLocalX: number, closedZ: number, contentMaterial: THREE.MeshBasicMaterial): THREE.Group {
+    private buildFlap(hingeX: number, closedZ: number, contentMaterial: THREE.MeshBasicMaterial): THREE.Group {
         const hinge = new THREE.Group()
         hinge.position.set(hingeX, 0, closedZ)
 
@@ -222,7 +230,7 @@ export class GameBoxFoldModel {
         materials[FACE_INDEX.posZ] = contentMaterial
 
         const mesh = this.buildPanelMesh(materials)
-        mesh.position.x = meshLocalX
+        mesh.position.x = -hingeX
         hinge.add(mesh)
 
         return hinge
