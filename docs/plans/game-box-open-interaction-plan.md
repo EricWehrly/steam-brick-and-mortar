@@ -398,9 +398,32 @@ Files touched: `GameBoxFoldCoordinator.ts` (`pendingSelection`, `summon()`), `Ga
 (hinge swap + comment), `GameLibraryBinderUI.ts` (conditional `isDefault`), both fold-open test
 files.
 
+## Addendum (2026-08-12): close 2x speed; conditional registration as if/else; comment cleanup
+
+- **`if (USE_FOLD_OPEN_GAME_BOX_INTERACTION) { registerEventHandler(...) } else { registerEventHandler(...) }`**
+  in `GameLibraryBinderUI.init()`, replacing the previous ternary-in-options-argument form. Same
+  behavior, plainer to read.
+- **`playClose()` now runs at `CLOSE_SPEED_MULTIPLIER` (2x)** - closing reads better snappier than
+  the reveal. Still the same clip played backward (`timeScale = -CLOSE_SPEED_MULTIPLIER`), no
+  separate close logic.
+- **Simplified `GameBoxFoldModel`'s hinge construction.** `buildFlap()`'s `meshLocalX` parameter was
+  always exactly `-hingeX` (the panel is centered on the group's origin when closed, the mirror
+  image of its own pivot) - dropped it and compute that internally instead of passing it at each
+  call site. Replaced the two inline "why local +X means viewer-left" comments (duplicated at each
+  `buildFlap()` call after the previous round's hinge-swap fix) with two named constants,
+  `FRONT_COVER_HINGE_X`/`SECOND_FLAP_HINGE_X`, carrying that explanation once. Also trimmed the
+  `flipY` comment in `GameBoxFoldCoordinator.applyCoverTexture` down to the durable fact (DataTexture
+  defaults `flipY` to `false`, this pixel data needs `true`) instead of narrating the two earlier
+  wrong attempts - that history is in this doc's addenda above, not useful as an ongoing source
+  comment.
+
+Files touched: `GameLibraryBinderUI.ts`, `GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts` (comment
+only).
+
 ## Follow-ups (explicitly deferred to a later pass, not this branch)
 
-Recorded per the user's own framing (2026-08-11) so they aren't lost before the next pick-up:
+Recorded per the user's own framing (2026-08-11, updated 2026-08-12) so they aren't lost before the
+next pick-up:
 
 1. **Closing the held box.** Trivial for controllers (repeat trigger press toggles), but keyboard/
    mouse has no equivalent gesture yet - needs a real dismiss input, not just VR-side reasoning.
@@ -409,3 +432,9 @@ Recorded per the user's own framing (2026-08-11) so they aren't lost before the 
 3. **Face content design pass.** Per the original plan's own open question - bring over the
    information the old flat detail screen showed (name, genre, playtime, categories, etc.) as a
    starting point, then evaluate what actually belongs on each of the three faces from there.
+4. **Remove the old flat-overlay implementation and the `USE_FOLD_OPEN_GAME_BOX_INTERACTION` flag.**
+   Once (3) lands and the fold-open box carries real content, `GameLibraryBinderUI`'s
+   `GameEventTypes.Selected` handling (`onGameSelected`/`openGameDetail`/`selectGame`/
+   `renderDetailPanel`/`BinderGameDetailPanel`) and the flag itself become dead code - delete them
+   and make `GameBoxFoldCoordinator`'s registration unconditional rather than carrying two
+   permanently-coexisting selection paths.
