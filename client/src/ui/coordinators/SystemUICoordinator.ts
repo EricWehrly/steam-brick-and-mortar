@@ -126,7 +126,6 @@ export class SystemUICoordinator {
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
         this.createReticleElement()
-        this.settingsPanelProjector.init()
 
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -139,6 +138,10 @@ export class SystemUICoordinator {
 
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels()
+
+        // Must come after pauseMenuManager.init() - it looks up the #pause-menu-overlay DOM
+        // node the pause menu just created.
+        this.settingsPanelProjector.init()
 
         // Setup event handlers
         this.registerEventHandlers()
