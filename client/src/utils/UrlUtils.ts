@@ -52,4 +52,13 @@ export class UrlUtils {
     static isDebugLoggingEnabled(): boolean {
         return UrlUtils.getSearchParams().get('debug') === 'true'
     }
+
+    /**
+     * Whether ?forceSettingsPanelProjection=1 is present — forces SettingsPanelProjector to
+     * activate outside an actual WebXR session, so the CSS3D-projected settings panel can be
+     * previewed on a normal flatscreen browser without a headset.
+     */
+    static isSettingsPanelProjectionForced(): boolean {
+        return UrlUtils.getSearchParams().get('forceSettingsPanelProjection') === '1'
+    }
 }

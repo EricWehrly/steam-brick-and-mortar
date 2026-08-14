@@ -35,6 +35,7 @@ import type { SettingChangedEvent } from '../../core/AppSettings'
 import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
+import { SettingsPanelProjector } from '../../scene/css3d/SettingsPanelProjector'
 import '../../styles/gamepad-reticle.css'
 
 const RETICLE_ELEMENT_ID = 'gamepad-reticle'
@@ -60,6 +61,7 @@ export class SystemUICoordinator {
     private renderer?: THREE.WebGLRenderer
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
+    private settingsPanelProjector: SettingsPanelProjector
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
@@ -99,6 +101,8 @@ export class SystemUICoordinator {
             this.appSettings,
             this.performanceMonitor
         )
+
+        this.settingsPanelProjector = new SettingsPanelProjector(this.eventManager)
     }
 
     public async init(
@@ -122,6 +126,7 @@ export class SystemUICoordinator {
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
         this.createReticleElement()
+        this.settingsPanelProjector.init()
 
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -451,6 +456,7 @@ export class SystemUICoordinator {
 
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
+        this.settingsPanelProjector?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
         this.pauseMenuManager?.dispose()
