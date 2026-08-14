@@ -24,6 +24,7 @@ import {
     WebXREventTypes,
     AppSettingsEventTypes,
     type SceneCanvasClickEvent,
+    type SceneCanvasWheelEvent,
     type InputPauseEvent,
     type InputResumeEvent,
     type MenuOpenEvent,
@@ -113,6 +114,10 @@ export class SystemUICoordinator {
             this.rendererDomElement.addEventListener('mousemove', this.handleRendererMouseMove)
             this.rendererDomElement.addEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.addEventListener('contextmenu', this.handleRendererContextMenu)
+            // passive: true - nothing here calls preventDefault(), so the browser doesn't need to
+            // wait on this handler before it can start scrolling (moot for this canvas anyway,
+            // but the standard default-on posture for a wheel listener that never blocks).
+            this.rendererDomElement.addEventListener('wheel', this.handleRendererWheel, { passive: true })
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
@@ -403,6 +408,26 @@ export class SystemUICoordinator {
         event.preventDefault()
     }
 
+    private readonly handleRendererWheel = (event: WheelEvent): void => {
+        if (!this.rendererDomElement) {
+            return
+        }
+
+        const rect = this.rendererDomElement.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) {
+            return
+        }
+
+        const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        const ndcY = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+        this.eventManager.emit<SceneCanvasWheelEvent>(InputEventTypes.SceneCanvasWheel, {
+            ndcX,
+            ndcY,
+            deltaY: event.deltaY
+        })
+    }
+
     private createReticleElement(): void {
         const element = document.createElement('div')
         element.id = RETICLE_ELEMENT_ID
@@ -420,6 +445,7 @@ export class SystemUICoordinator {
             this.rendererDomElement.removeEventListener('mousemove', this.handleRendererMouseMove)
             this.rendererDomElement.removeEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.removeEventListener('contextmenu', this.handleRendererContextMenu)
+            this.rendererDomElement.removeEventListener('wheel', this.handleRendererWheel)
             this.rendererDomElement = undefined
         }
 

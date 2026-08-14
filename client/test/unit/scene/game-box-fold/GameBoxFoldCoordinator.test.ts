@@ -4,8 +4,18 @@ import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../../../src/core/data/DataTypes'
 import { EventManager } from '../../../../src/core/EventManager'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
-import { GameEventTypes, InputEventTypes, type GameSelectedEvent } from '../../../../src/types/InteractionEvents'
+import {
+    GameEventTypes, InputEventTypes,
+    type GameSelectedEvent, type SceneCanvasClickEvent, type SceneCanvasWheelEvent
+} from '../../../../src/types/InteractionEvents'
 import type { XRControllerRaySource } from '../../../../src/webxr/XRControllerManager'
+
+// Real (empty-geometry) THREE.Mesh instances shared between the model mock's
+// getInteractiveMeshes() and the intersectObjects() stubs below, so "which mesh got hit" can be
+// asserted by reference equality the same way the real raycastAgainstBox() does.
+const fakeStoreMesh = new THREE.Mesh()
+const fakeIdentityMesh = new THREE.Mesh()
+const fakeDebugMesh = new THREE.Mesh()
 
 const fakeModelInstances: Array<{
     group: THREE.Group
@@ -14,7 +24,11 @@ const fakeModelInstances: Array<{
     onFullyClosed: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
     setContent: ReturnType<typeof vi.fn>
-    setCoverTexture: ReturnType<typeof vi.fn>
+    setHeaderImage: ReturnType<typeof vi.fn>
+    getInteractiveMeshes: ReturnType<typeof vi.fn>
+    isContentFaceHit: ReturnType<typeof vi.fn>
+    isPointInPlayButton: ReturnType<typeof vi.fn>
+    scrollDebugPanel: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
     fullyClosedCallback: (() => void) | null
 }> = []
@@ -29,21 +43,27 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
             onFullyClosed: vi.fn((cb: () => void) => { instance.fullyClosedCallback = cb }),
             update: vi.fn(),
             setContent: vi.fn(),
-            setCoverTexture: vi.fn(),
+            setHeaderImage: vi.fn(),
+            getInteractiveMeshes: vi.fn(() => ({ store: fakeStoreMesh, identity: fakeIdentityMesh, debug: fakeDebugMesh })),
+            isContentFaceHit: vi.fn(() => true),
+            isPointInPlayButton: vi.fn(() => false),
+            scrollDebugPanel: vi.fn(),
             dispose: vi.fn(),
             fullyClosedCallback: null as (() => void) | null
         }
         fakeModelInstances.push(instance)
         return instance
-    })
+    }),
+    PANEL_CANVAS_SIZE: 512
 }))
 
 const fakePixels = new Uint8ClampedArray(4)
 const getPixelsAtSize = vi.fn().mockResolvedValue({ pixels: fakePixels, width: 1, height: 1, fromCache: false })
+const getArtwork = vi.fn(() => ({ getPixelsAtSize }))
 
 vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => ({
-    GameArtworkProvider: { getInstance: () => ({ getArtwork: () => ({ getPixelsAtSize }) }) },
-    ARTWORK_DIMENSIONS: { library: { width: 1, height: 1 } }
+    GameArtworkProvider: { getInstance: () => ({ getArtwork }) },
+    ARTWORK_DIMENSIONS: { header: { width: 1, height: 1 } }
 }))
 
 import { GameBoxFoldCoordinator } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
@@ -57,8 +77,31 @@ function cancel(): void {
     EventManager.getInstance().emit(InputEventTypes.CancelPressed, {})
 }
 
+function click(button = 0, ndcX = 0, ndcY = 0): void {
+    EventManager.getInstance().emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
+        clientX: 0, clientY: 0, button, ndcX, ndcY
+    })
+}
+
+function wheel(deltaY: number, ndcX = 0, ndcY = 0): void {
+    EventManager.getInstance().emit<SceneCanvasWheelEvent>(InputEventTypes.SceneCanvasWheel, { ndcX, ndcY, deltaY })
+}
+
+/** Stubs THREE.Raycaster.intersectObjects for one call to report a hit on the given mesh, uv at
+ *  its center. raycastAgainstBox() only reads .object/.uv/.face.materialIndex off the result. */
+function stubRaycastHit(mesh: THREE.Mesh): void {
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValueOnce([
+        { object: mesh, uv: new THREE.Vector2(0.5, 0.5), face: { materialIndex: 0 } } as unknown as THREE.Intersection
+    ])
+}
+
+function stubRaycastMiss(): void {
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValueOnce([])
+}
+
 describe('GameBoxFoldCoordinator', () => {
     let coordinator: GameBoxFoldCoordinator
+    let originalLocation: Location
 
     beforeEach(() => {
         DataManager.resetInstance()
@@ -70,12 +113,23 @@ describe('GameBoxFoldCoordinator', () => {
             { appid: 2, name: 'Portal 3', playtime_forever: 60 }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any, { domain: DataDomain.SteamIntegration })
+
+        // Stubbed so "clicking Play navigates to steam://run/..." can assert against it without
+        // jsdom's real (unimplemented) navigation logging noise.
+        originalLocation = window.location
+        Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true })
+
+        // vi.spyOn returns the SAME mock across tests for a given prototype method - reset its
+        // call history/queued mockReturnValueOnce values so one test's stubs can't leak into the
+        // next (or, via an unreached early-return, into a later call within the same test).
+        vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReset()
     })
 
     afterEach(() => {
         coordinator?.dispose()
         RenderLoopRegistry.dispose()
         DataManager.resetInstance()
+        Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
     })
 
     it('pre-warms exactly one GameBoxFoldModel at construction', () => {
@@ -95,6 +149,65 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({ name: 'Half-Life 3' }))
         expect(model.group.visible).toBe(true)
         expect(model.playOpen).toHaveBeenCalledTimes(1)
+    })
+
+    it('builds rating/playtime/tags content from full game data - genres then top community '
+        + 'tags, deduped and capped at MAX_TAGS_SHOWN - the sections carried over from '
+        + 'BinderGameDetailPanel', () => {
+        DataManager.getInstance().set('steam.games', [{
+            appid: 3,
+            name: 'Deep Rock Galactic',
+            playtime_forever: 600,
+            playtime_2weeks: 120,
+            userscore: 97,
+            genres: [{ description: 'Action' }, { description: 'Indie' }],
+            steamspy_top_tags: ['Action', 'Co-op', 'FPS', 'Multiplayer', 'Mining', 'Difficult']
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any, { domain: DataDomain.SteamIntegration })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(3)
+
+        const model = fakeModelInstances[0]
+        expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'Deep Rock Galactic',
+            rating: '97% · Overwhelmingly Positive',
+            playtimeHours: 10,
+            recentPlaytimeHours: 2,
+            tags: ['Action', 'Indie', 'Co-op', 'FPS', 'Multiplayer', 'Mining']
+        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const content = model.setContent.mock.calls[0][0] as any
+        expect(JSON.parse(content.debugJson)).toMatchObject({ appid: 3, name: 'Deep Rock Galactic' })
+    })
+
+    it('passes Steam category descriptions through as plain text', () => {
+        DataManager.getInstance().set('steam.games', [{
+            appid: 4,
+            name: 'Portal 2',
+            playtime_forever: 60,
+            categories: [{ description: 'Co-op' }, { description: 'Steam Achievements' }]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any, { domain: DataDomain.SteamIntegration })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(4)
+
+        expect(fakeModelInstances[0].setContent).toHaveBeenCalledWith(expect.objectContaining({
+            categories: ['Co-op', 'Steam Achievements']
+        }))
+    })
+
+    it('falls back to Unrated/undefined playtime/empty tags for a game with no metadata beyond name', () => {
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1) // fixture game 1 has no userscore/genres/tags/playtime_2weeks
+
+        const model = fakeModelInstances[0]
+        expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({
+            rating: 'Unrated',
+            recentPlaytimeHours: undefined,
+            tags: []
+        }))
     })
 
     it('selecting while an XR controller grip is available parents the model to the grip instead', () => {
@@ -154,21 +267,18 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.group.visible).toBe(false)
     })
 
-    it('builds the cover texture with flipY explicitly overridden to true - THREE.DataTexture\'s own '
-        + 'constructor defaults it to false (confirmed by reading DataTexture.js directly), which is '
-        + 'wrong for this standard top-down decoded-image pixel source and rendered the art upside '
-        + 'down - see the source comment for the full story', async () => {
+    it('fetches header (not library) format art and hands the model plain pixels for the store '
+        + "panel's disc - GameBoxFoldModel rasterizes it into a canvas itself, so there's no "
+        + 'THREE texture (and no DataTexture flipY quirk) to build here anymore', async () => {
         coordinator = new GameBoxFoldCoordinator()
         selectGame(1)
         await Promise.resolve()
         await Promise.resolve()
 
+        expect(getArtwork).toHaveBeenLastCalledWith(1, 'Half-Life 3', 'header', expect.anything())
+
         const model = fakeModelInstances[0]
-        expect(model.setCoverTexture).toHaveBeenCalled()
-        const texture = model.setCoverTexture.mock.calls.at(-1)?.[0] as THREE.DataTexture
-        expect(texture).toBeInstanceOf(THREE.DataTexture)
-        expect(texture.flipY).toBe(true)
-        expect(texture.colorSpace).toBe(THREE.SRGBColorSpace)
+        expect(model.setHeaderImage).toHaveBeenLastCalledWith({ pixels: fakePixels, width: 1, height: 1 })
     })
 
     it('CancelPressed while nothing is summoned is a no-op', () => {
@@ -219,6 +329,115 @@ describe('GameBoxFoldCoordinator', () => {
         frameCallback(0, 16)
 
         expect(model.update).toHaveBeenCalledWith(0.016)
+    })
+
+    it('clicking the Play button (button 0, hit on the store mesh, within the button rect) launches steam://run/<appid>', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+        model.isPointInPlayButton.mockReturnValue(true)
+
+        stubRaycastHit(fakeStoreMesh)
+        click(0)
+
+        expect(window.location.href).toBe('steam://run/1')
+    })
+
+    it('does not launch when the hit is on the store mesh but outside the Play button rect', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(false)
+
+        stubRaycastHit(fakeStoreMesh)
+        click(0)
+
+        expect(window.location.href).toBe('')
+    })
+
+    it('does not launch on a non-primary button - never even reaches the raycaster', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(true)
+        const intersectSpy = vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects')
+
+        click(2) // right-click, not the primary button SceneClickGameBoxRaycast itself also gates on
+
+        expect(intersectSpy).not.toHaveBeenCalled()
+        expect(window.location.href).toBe('')
+    })
+
+    it('does not launch on a raycast miss', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(true)
+
+        stubRaycastMiss()
+        click(0)
+
+        expect(window.location.href).toBe('')
+    })
+
+    it('does not launch when the hit lands on one of the store mesh\'s five blank faces', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+        model.isPointInPlayButton.mockReturnValue(true)
+        model.isContentFaceHit.mockReturnValue(false)
+
+        stubRaycastHit(fakeStoreMesh)
+        click(0)
+
+        expect(window.location.href).toBe('')
+    })
+
+    it('a click before any game is summoned never reaches the raycaster', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        const intersectSpy = vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects')
+
+        click(0)
+
+        expect(intersectSpy).not.toHaveBeenCalled()
+        expect(window.location.href).toBe('')
+    })
+
+    it('scrolling over the debug panel forwards deltaY to scrollDebugPanel()', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+
+        stubRaycastHit(fakeDebugMesh)
+        wheel(240)
+
+        expect(model.scrollDebugPanel).toHaveBeenCalledWith(240)
+    })
+
+    it('scrolling over the store or identity panel does not touch the debug panel', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+
+        stubRaycastHit(fakeStoreMesh)
+        wheel(100)
+        stubRaycastHit(fakeIdentityMesh)
+        wheel(100)
+
+        expect(model.scrollDebugPanel).not.toHaveBeenCalled()
     })
 
     it('dispose() frees the model and unregisters from the render loop', () => {

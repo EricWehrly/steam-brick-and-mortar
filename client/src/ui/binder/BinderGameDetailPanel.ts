@@ -1,22 +1,9 @@
 import { GameSpotlight } from '../../debug/GameSpotlight'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
-import { RATING_TIERS } from '../../scene/categorization/GroupResolver'
+import { formatRating } from '../../scene/categorization/RatingFormat'
 import { EventManager } from '../../core/EventManager'
 import { InputEventTypes } from '../../types/InteractionEvents'
 import detailPanelTemplate from './detail-panel.html?raw'
-
-/**
- * Format a Steam userscore (0-100) into a display string with tier label.
- * Uses the shared RATING_TIERS constant from GroupResolver to stay in sync
- * with the grouping logic.
- */
-function formatRating(userscore: number): string {
-    if (userscore <= 0) {
-        return 'Unrated'
-    }
-    const tier = RATING_TIERS.find(t => userscore >= t.minScore)
-    return tier ? `${userscore}% · ${tier.label}` : `${userscore}% · Mixed or Lower`
-}
 
 export interface BinderGameDetailPanelOptions {
     onClose?: () => void

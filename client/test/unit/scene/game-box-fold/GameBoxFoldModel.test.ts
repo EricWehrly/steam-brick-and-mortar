@@ -121,7 +121,7 @@ describe('GameBoxFoldModel', () => {
         const rightTextureBefore = internal.rightTexture
 
         model.setContent({ name: 'Half-Life 3' })
-        model.setContent({ name: 'Portal 3', genre: 'Puzzle', playtimeHours: 12 })
+        model.setContent({ name: 'Portal 3', rating: '92% · Overwhelmingly Positive', playtimeHours: 12, tags: ['Puzzle'] })
 
         expect(internal.leftTexture).toBe(leftTextureBefore)
         expect(internal.rightTexture).toBe(rightTextureBefore)
@@ -144,15 +144,115 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('setCoverTexture() does not dispose the texture it is handed - caller owns that lifecycle', () => {
+    it('setContent() handles long names, many tags, and missing optional fields without throwing', () => {
         const model = new GameBoxFoldModel()
-        const texture = new THREE.Texture()
-        const disposeSpy = vi.spyOn(texture, 'dispose')
 
-        model.setCoverTexture(texture)
-        model.setCoverTexture(null)
+        expect(() => model.setContent({
+            name: 'A Very Long Game Title That Should Wrap Across Multiple Lines On The Front Cover'
+        })).not.toThrow()
 
-        expect(disposeSpy).not.toHaveBeenCalled()
+        expect(() => model.setContent({
+            name: 'Short',
+            rating: '100% · Overwhelmingly Positive',
+            playtimeHours: 999,
+            recentPlaytimeHours: 40,
+            tags: ['Action', 'Indie', 'Roguelike', 'Co-op', 'Difficult', 'Pixel Graphics'],
+            categories: ['Single-player', 'Steam Achievements', 'Full controller support'],
+            userCollections: ['Backlog', 'Favorites'],
+            description: 'A very long store-page-style description that should wrap across '
+                + 'several lines on the store panel without throwing or overflowing badly.',
+            metacritic: 'Metacritic: 91',
+            debugJson: JSON.stringify({ appid: 1, nested: { a: 1, b: [1, 2, 3] } }, null, 2)
+        })).not.toThrow()
+
+        model.dispose()
+    })
+
+    it('setHeaderImage() rasterizes pixel data into the store panel without throwing, and null clears it back to a placeholder', () => {
+        const model = new GameBoxFoldModel()
+        const width = 4
+        const height = 2
+        const pixels = new Uint8ClampedArray(width * height * 4).fill(200)
+
+        expect(() => model.setHeaderImage({ pixels, width, height })).not.toThrow()
+        expect(() => model.setHeaderImage(null)).not.toThrow()
+
+        model.dispose()
+    })
+
+    it('getInteractiveMeshes() returns the base mesh and each hinge\'s single content mesh', () => {
+        const model = new GameBoxFoldModel()
+        const [leftHinge, rightHinge] = getHinges(model)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const internal = model as any
+
+        const meshes = model.getInteractiveMeshes()
+
+        expect(meshes.store).toBe(internal.baseMesh)
+        expect(meshes.identity).toBe(leftHinge.children[0])
+        expect(meshes.debug).toBe(rightHinge.children[0])
+
+        model.dispose()
+    })
+
+    it('isContentFaceHit() only accepts the -Z face on the store mesh and the +Z face on the flap meshes', () => {
+        const model = new GameBoxFoldModel()
+        const meshes = model.getInteractiveMeshes()
+
+        expect(model.isContentFaceHit(meshes.store, 5)).toBe(true) // negZ
+        expect(model.isContentFaceHit(meshes.store, 4)).toBe(false) // posZ - not the store's content face
+        expect(model.isContentFaceHit(meshes.identity, 4)).toBe(true) // posZ
+        expect(model.isContentFaceHit(meshes.identity, 5)).toBe(false)
+        expect(model.isContentFaceHit(meshes.debug, 4)).toBe(true)
+        expect(model.isContentFaceHit(meshes.store, undefined)).toBe(false)
+
+        model.dispose()
+    })
+
+    it('isPointInPlayButton() reflects the Play button\'s last-drawn canvas rect, and is false before any content is drawn', () => {
+        const model = new GameBoxFoldModel()
+
+        expect(model.isPointInPlayButton(10, 10)).toBe(false)
+
+        model.setContent({ name: 'Half-Life 3' })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rect = (model as any).playButtonRect as { x: number; y: number; width: number; height: number }
+        expect(rect).toBeTruthy()
+
+        expect(model.isPointInPlayButton(rect.x + 1, rect.y + 1)).toBe(true)
+        expect(model.isPointInPlayButton(rect.x + rect.width - 1, rect.y + rect.height - 1)).toBe(true)
+        expect(model.isPointInPlayButton(rect.x - 5, rect.y)).toBe(false)
+        expect(model.isPointInPlayButton(rect.x + rect.width + 5, rect.y)).toBe(false)
+
+        model.dispose()
+    })
+
+    it('scrollDebugPanel() clamps to [0, maxScroll], resets to 0 on the next setContent(), and is a no-op with no debugJson', () => {
+        const model = new GameBoxFoldModel()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const internal = model as any
+
+        // No debugJson at all - shouldn't throw, and there's nothing to scroll.
+        expect(() => model.scrollDebugPanel(1)).not.toThrow()
+        expect(internal.debugScrollLine).toBe(0)
+
+        const manyLines = Array.from({ length: 30 }, (_, i) => `"line${i}": ${i}`).join(',\n')
+        model.setContent({ name: 'Half-Life 3', debugJson: `{\n${manyLines}\n}` })
+        expect(internal.debugScrollLine).toBe(0) // reset on every new selection
+
+        model.scrollDebugPanel(1)
+        expect(internal.debugScrollLine).toBeGreaterThan(0)
+
+        // Scrolling far past the end clamps rather than growing unbounded.
+        for (let i = 0; i < 20; i++) model.scrollDebugPanel(1)
+        const maxed = internal.debugScrollLine
+        expect(maxed).toBe(internal.debugMaxScrollLine)
+        model.scrollDebugPanel(1)
+        expect(internal.debugScrollLine).toBe(maxed)
+
+        // Scrolling back up clamps at 0, not negative.
+        for (let i = 0; i < 20; i++) model.scrollDebugPanel(-1)
+        expect(internal.debugScrollLine).toBe(0)
 
         model.dispose()
     })
