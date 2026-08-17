@@ -128,11 +128,36 @@ export class PauseMenuManager {
         this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
     }
 
+    // Escape (and gamepad Menu/Start) are bound to BOTH OpenMenu and Cancel - InputActionResolver
+    // fires every action bound to a physical key from one press, synchronously, in the same pass
+    // (see emitSpecificPressEvents). Without this guard, opening from closed would immediately
+    // self-cancel: OpenMenuPressed opens it, then CancelPressed (same keypress, same synchronous
+    // batch) sees isOpen=true and closes it right back - so Escape looked like it did nothing.
+    // The reset is deferred to a microtask (not cleared synchronously right after open()) because
+    // emitSpecificPressEvents' for-loop calls emit() once per bound action as separate, fully
+    // synchronous dispatches - by the time CancelPressed's own emit() runs, this handler has
+    // already returned, so a synchronous reset would have already cleared the flag before Cancel
+    // ever saw it. A microtask still resolves before any *later*, independent keypress (a new
+    // browser input event is always a new task, always after pending microtasks drain), so it
+    // doesn't suppress a genuinely separate Cancel-driven close.
+    private suppressNextCancelClose = false
+
     private readonly handleOpenMenuPressed = (): void => {
-        this.toggle()
+        if (this.state.isOpen) {
+            this.close()
+            return
+        }
+        this.suppressNextCancelClose = true
+        this.open()
+        void Promise.resolve().then(() => {
+            this.suppressNextCancelClose = false
+        })
     }
 
     private readonly handleCancelPressed = (): void => {
+        if (this.suppressNextCancelClose) {
+            return
+        }
         if (this.state.isOpen) {
             this.close()
         }

@@ -52,9 +52,16 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
         expect(pauseMenuManager.isOpen()).toBe(false)
     })
 
-    it('closes on CancelPressed (gamepad B/Circle) when open', () => {
+    it('closes on a later, independent CancelPressed (gamepad B/Circle) when open', async () => {
         eventManager.emit(InputEventTypes.OpenMenuPressed, {})
         expect(pauseMenuManager.isOpen()).toBe(true)
+
+        // A real gamepad B/Circle press is a genuinely separate event, sometime after the menu
+        // was opened by something else - awaiting a microtask models that gap. Without it, this
+        // would be indistinguishable from Escape/Start's own same-keypress OpenMenu+Cancel
+        // double-fire (see PauseMenuManager's suppressNextCancelClose), which this test isn't
+        // simulating.
+        await Promise.resolve()
 
         eventManager.emit(InputEventTypes.CancelPressed, {})
         expect(pauseMenuManager.isOpen()).toBe(false)
@@ -63,6 +70,28 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
     it('does not open on CancelPressed when already closed - a pure dismiss, not a toggle', () => {
         expect(pauseMenuManager.isOpen()).toBe(false)
 
+        eventManager.emit(InputEventTypes.CancelPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
+
+    // Escape (and gamepad Menu/Start) are bound to BOTH OpenMenu and Cancel - InputActionResolver
+    // fires every action bound to one physical key from a single press, synchronously and back to
+    // back (see InputActionResolver.emitSpecificPressEvents). These two cases are that exact
+    // shape: no await between the emits, unlike the gamepad-B/Circle case above.
+    it('stays open when OpenMenuPressed and CancelPressed fire from the same keypress while closed', () => {
+        expect(pauseMenuManager.isOpen()).toBe(false)
+
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        eventManager.emit(InputEventTypes.CancelPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(true)
+    })
+
+    it('still closes when OpenMenuPressed and CancelPressed fire from the same keypress while open', () => {
+        pauseMenuManager.open()
+
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
         eventManager.emit(InputEventTypes.CancelPressed, {})
 
         expect(pauseMenuManager.isOpen()).toBe(false)
