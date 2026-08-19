@@ -32,6 +32,15 @@ const TITLE_FONT_SIZE = 18
 // comfortable handheld-tablet size at VRSettingsPanelCoordinator's 0.6m viewing distance.
 const PIXEL_SIZE = 0.0008
 
+// Without this, the panel sorted into the scene's normal transparent-object depth order - game
+// box artwork (also alpha-blended) would render in front of it despite being visually "behind"
+// the panel, while opaque shelf geometry (unaffected by transparent sort either way) didn't have
+// the problem. The panel represents active UI and should never be occluded by scene content while
+// open, so it always wins depth testing and draws after everything else instead of being sorted
+// by distance. depthTest/renderOrder are both inherited uikit properties - setting them on the
+// root Container is enough for the whole tree.
+const ALWAYS_ON_TOP_RENDER_ORDER = 1000
+
 export class VRDisplayAdvancedPanel {
     readonly container: Container
     private readonly rows: Record<keyof typeof DEFAULTS, UIKitSliderRow>
@@ -82,6 +91,8 @@ export class VRDisplayAdvancedPanel {
             padding: PANEL_PADDING,
             width: PANEL_WIDTH,
             pixelSize: PIXEL_SIZE,
+            depthTest: false,
+            renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
             backgroundColor: '#1c1c22',
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
