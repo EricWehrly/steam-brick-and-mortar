@@ -5,9 +5,12 @@
  * docs/plans/css3d-panel-projection-spike.md). This is real WebGL geometry, so it renders
  * correctly inside a headset.
  *
- * Phase 1 scope (see docs/plans/vr-uikit-menu-migration-plan.md): one panel
- * (VRDisplayAdvancedPanel), no tab shell yet - reviewed live before porting further panels or
- * adding tab navigation. Interaction is wired two ways: @pmndrs/pointer-events' forwardHtmlEvents
+ * Owns a single long-lived VRSettingsMenuShell (Story 4 of docs/plans/vr-uikit-menu-migration-plan.md)
+ * - the tab column + content-swap area - constructed once here rather than per-activation, so its
+ * UIEventTypes.MenuPanelChanged subscription is never missed (see the shell's own doc comment for
+ * why). Only the shell's container is attached/detached from the anchor per open/close; this
+ * coordinator's job is purely anchoring + pointer lifecycle, not panel content. Interaction is
+ * wired two ways: @pmndrs/pointer-events' forwardHtmlEvents
  * drives hover/click/scroll from real DOM mouse/wheel events on the renderer canvas (flatscreen
  * testing, mouse acts as a cursor); syncControllerPointers()/VRControllerPointer drive the same
  * pointer-events pipeline from real WebXR controllers - one ray-pointer per connected controller,
@@ -43,7 +46,7 @@ import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../typ
 import { UrlUtils } from '../../utils/UrlUtils'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRControllerManager'
-import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
+import { VRSettingsMenuShell } from './VRSettingsMenuShell'
 import { VRControllerPointer } from './VRControllerPointer'
 
 // Same "held in front of the viewer" convention GameBoxFoldCoordinator uses - kept in parity,
@@ -81,8 +84,9 @@ export class VRSettingsPanelCoordinator {
     private readonly forwardEvents: ForwardEventsFn
     private readonly anchorMode: VRPanelAnchorMode
 
+    private readonly menuShell: VRSettingsMenuShell
+
     private renderer: THREE.WebGLRenderer | null = null
-    private panel: VRDisplayAdvancedPanel | null = null
     private forwardedEvents: { update: () => void; destroy: () => void } | null = null
     private readonly controllerPointers = new Map<number, VRControllerPointer>()
     private active = false
@@ -103,6 +107,7 @@ export class VRSettingsPanelCoordinator {
         this.forceEnabled = forceEnabled
         this.forwardEvents = forwardEvents
         this.anchorMode = anchorMode
+        this.menuShell = new VRSettingsMenuShell(eventManager, appSettings)
 
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
@@ -163,8 +168,7 @@ export class VRSettingsPanelCoordinator {
             return
         }
 
-        this.panel = new VRDisplayAdvancedPanel(this.appSettings)
-        this.attachToAnchor(this.panel.container, camera, scene)
+        this.attachToAnchor(this.menuShell.container, camera, scene)
 
         this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
 
@@ -184,8 +188,7 @@ export class VRSettingsPanelCoordinator {
         }
         this.controllerPointers.clear()
 
-        this.panel?.container.removeFromParent()
-        this.panel = null
+        this.menuShell.container.removeFromParent()
 
         this.active = false
     }
@@ -198,11 +201,6 @@ export class VRSettingsPanelCoordinator {
      * disconnecting mid-session while the panel is open.
      */
     private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<XRControllerRayInfo> {
-        const panel = this.panel
-        if (!panel) {
-            return []
-        }
-
         const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
         const connected = raySource?.getControllerRaySpaces?.() ?? []
         const connectedIndices = new Set(connected.map(entry => entry.index))
@@ -221,7 +219,7 @@ export class VRSettingsPanelCoordinator {
             this.controllerPointers.set(index, new VRControllerPointer({
                 raySpace,
                 getCamera: () => camera as THREE.PerspectiveCamera,
-                intersectRoot: panel.container,
+                intersectRoot: this.menuShell.container,
                 scene
             }))
         }
@@ -290,9 +288,9 @@ export class VRSettingsPanelCoordinator {
 
         this.forwardedEvents?.update()
         // Component.update()'s own contract: "must only be called for the root component" - the
-        // panel's own top-level Container is that root. deltaTime is already milliseconds
+        // shell's own top-level Container is that root. deltaTime is already milliseconds
         // (RenderLoopRegistry's unit), matching what uikit's own update(delta) example passes.
-        this.panel?.container.update(deltaTime)
+        this.menuShell.container.update(deltaTime)
 
         const scene = this.getScene()
         const camera = this.getCamera()
@@ -311,6 +309,7 @@ export class VRSettingsPanelCoordinator {
 
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
+        this.menuShell.dispose()
 
         this.renderer = null
     }

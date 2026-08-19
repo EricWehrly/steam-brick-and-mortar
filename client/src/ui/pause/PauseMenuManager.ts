@@ -20,8 +20,8 @@ import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
 import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
-import { SteamEventTypes, InputEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
+import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, MenuPanelChangedEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
@@ -126,6 +126,21 @@ export class PauseMenuManager {
         // Cancel (gamepad B/Circle, or Escape/Start alongside OpenMenu above) closes the menu if
         // it's open - a pure dismiss, not a toggle, so it never reopens a closed menu.
         this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+
+        // The VR uikit tab shell (VRSettingsMenuShell) emits the same event when its own tabs are
+        // clicked, so the two menus' active panel stays in sync without either calling the other
+        // directly - see docs/plans/vr-uikit-menu-migration-plan.md. showPanel() below emits this
+        // event too, guarded to skip a no-op re-show, which is what keeps this from looping.
+        this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+    }
+
+    private readonly handleMenuPanelChanged = (event: CustomEvent<MenuPanelChangedEvent>): void => {
+        if (!this.panels.has(this.resolvePanelId(event.detail.panelId))) {
+            // Originated from a VR-only tab (e.g. the "More Settings" placeholder) that has no
+            // DOM counterpart - nothing for this menu to switch to.
+            return
+        }
+        this.showPanel(event.detail.panelId)
     }
 
     // Escape (and gamepad Menu/Start) are bound to BOTH OpenMenu and Cancel - InputActionResolver
@@ -303,6 +318,14 @@ export class PauseMenuManager {
     showPanel(panelId: string): void {
         const resolvedPanelId = this.resolvePanelId(panelId)
 
+        // Already showing this panel - skip the hide/show cycle entirely. This also doubles as
+        // the guard that keeps MenuPanelChanged (emitted below) from looping between this class
+        // and the VR uikit tab shell: each side only re-emits when the panel actually changes, so
+        // an echo of your own just-emitted event is a no-op here rather than bouncing back again.
+        if (resolvedPanelId === this.state.activePanel) {
+            return
+        }
+
         // Hide current panel
         if (this.state.activePanel) {
             this.captureActivePanelMemory()
@@ -320,6 +343,7 @@ export class PauseMenuManager {
             this.updateActiveTab(resolvedPanelId)
             this.updateContentLayout(resolvedPanelId)
             this.restoreScrollPosition(resolvedPanelId)
+            this.eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: resolvedPanelId })
         }
     }
 
@@ -585,6 +609,7 @@ export class PauseMenuManager {
         )
         this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
 
         // Dispose all panels
         this.panels.forEach(panel => {

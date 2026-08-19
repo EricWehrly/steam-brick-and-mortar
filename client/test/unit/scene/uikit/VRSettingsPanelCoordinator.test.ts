@@ -15,7 +15,8 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { AppSettings } from '../../../../src/core/AppSettings'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
-import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../../src/types/InteractionEvents'
+import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
+import { VR_MENU_TABS } from '../../../../src/scene/uikit/VRMenuTabRegistry'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
 import type { XRControllerRaySource, XRControllerRayInfo } from '../../../../src/webxr/XRControllerManager'
 
@@ -155,6 +156,24 @@ describe('VRSettingsPanelCoordinator', () => {
 
         expect(grip.children).toHaveLength(1)
         expect(camera.children).toHaveLength(0)
+    })
+
+    it('keeps the same menu shell (and its selected tab) across a close/reopen cycle', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator.init(createFakeRenderer())
+
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+        const otherTab = VR_MENU_TABS[1]
+        EventManager.getInstance().emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.panelId })
+        const shellContainerAtFirstOpen = scene.children.find(child => child instanceof Container)
+
+        EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+        const shellContainerAtReopen = scene.children.find(child => child instanceof Container)
+
+        // Same object identity - the shell itself is long-lived (constructed once, not
+        // per-activation), only its container is detached/reattached.
+        expect(shellContainerAtReopen).toBe(shellContainerAtFirstOpen)
     })
 
     it('deactivates on the pause menu closing, removing the panel from its anchor', () => {
