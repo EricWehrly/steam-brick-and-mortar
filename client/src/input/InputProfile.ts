@@ -242,7 +242,7 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
         bindings: {
             // Raw xr-standard indices (W3C-registered, same universal mapping every WebXR
             // runtime/controller uses) - button/axis indices confirmed empirically against real
-            // Oculus-Touch/PICO-Connect hardware: trigger=0, squeeze=1 (unbound), thumbstick-click=3,
+            // Oculus-Touch/PICO-Connect hardware: trigger=0, squeeze=1, thumbstick-click=3,
             // thumbstick-x=axis 2, thumbstick-y=axis 3. These are plain gamepad-button/gamepad-axis
             // bindings, same as GamepadStandard's - the `handedness` field is what routes them to
             // read XR controllers instead of navigator.getGamepads() (see GamepadBindingHandedness's
@@ -250,6 +250,12 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             // xr-menu-button-mapping-unverified entry.
             // TD: xr-menu-button-mapping-unverified
             [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, handedness: 'any', label: 'Trigger' }],
+            // Cancel is the same generic "back out" action Cancel already means everywhere else
+            // (pause menu, binder UI, debug inspector) - for a summoned game box specifically,
+            // GameBoxFoldCoordinator.handleCancelPressed() is what "drop"/put-back means. Squeeze
+            // was previously left unbound; grip is the natural opposite-hand-motion pairing with
+            // trigger's "grab".
+            [InputAction.Cancel]: [{ type: 'gamepad-button', button: 1, handedness: 'any', label: 'Grip / Squeeze' }],
             [InputAction.OpenMenu]: [{ type: 'gamepad-button', button: 4, handedness: 'any', label: 'Menu Button' }],
             // Left thumbstick = movement, right = look/turn - real VR convention, and keeps each
             // stick single-purpose (left no longer double-claimed by Look, which is a no-op
