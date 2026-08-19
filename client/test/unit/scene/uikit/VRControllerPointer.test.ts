@@ -7,7 +7,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { VRControllerPointer } from '../../../../src/scene/uikit/VRControllerPointer'
+import { VRControllerPointer, RAY_DIRECTION } from '../../../../src/scene/uikit/VRControllerPointer'
+
+/** Places a target exactly one unit along the pointer's real (pitch-corrected) ray direction,
+ *  so tests hit it regardless of the exact correction angle in use. */
+function positionOnRay(target: THREE.Object3D, distance = 1): void {
+    target.position.copy(RAY_DIRECTION).multiplyScalar(distance)
+}
 
 // Plain THREE.Group's addEventListener/dispatchEvent types only know Object3DEventMap - real
 // controller Groups (XRTargetRaySpace) are typed with WebXRSpaceEventMap's 'selectstart'/
@@ -52,11 +58,12 @@ describe('VRControllerPointer', () => {
         return new VRControllerPointer({ raySpace, getCamera: () => camera, intersectRoot, scene })
     }
 
-    it('adds a beam to the raySpace and a hidden hit marker to the scene', () => {
+    it('adds a hidden beam to the raySpace and a hidden hit marker to the scene', () => {
         createPointer()
 
         expect(raySpace.children).toHaveLength(1)
         expect(raySpace.children[0]).toBeInstanceOf(THREE.Line)
+        expect(raySpace.children[0].visible).toBe(false)
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh)
         expect(hitMarker).toBeDefined()
@@ -66,7 +73,7 @@ describe('VRControllerPointer', () => {
     it('keeps the hit marker hidden when update() finds nothing interactable', () => {
         const pointer = createPointer()
 
-        pointer.update()
+        pointer.update(1)
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
         expect(hitMarker.visible).toBe(false)
@@ -74,23 +81,23 @@ describe('VRControllerPointer', () => {
 
     it('shows and positions the hit marker at a real intersection', () => {
         const target = createInteractableMesh()
-        target.position.set(0, 0, -1)
+        positionOnRay(target)
         intersectRoot.add(target)
         intersectRoot.updateMatrixWorld(true)
 
         const pointer = createPointer()
-        pointer.update()
+        pointer.update(1)
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
         expect(hitMarker.visible).toBe(true)
-        // Box is centered at z=-1 with a 0.2 side, so the near face the ray actually hits is at
-        // z=-0.9, not the box's own center.
-        expect(hitMarker.position.z).toBeCloseTo(-0.9, 1)
+        // The ray hits the box's near face, not its exact center - within the box's own half-size
+        // of the target's placed position confirms the (pitch-corrected) ray actually reached it.
+        expect(hitMarker.position.distanceTo(target.position)).toBeLessThan(0.2)
     })
 
     it('fires pointerdown/pointerup on selectstart/selectend while hovering a target', () => {
         const target = createInteractableMesh()
-        target.position.set(0, 0, -1)
+        positionOnRay(target)
         intersectRoot.add(target)
         intersectRoot.updateMatrixWorld(true)
 
@@ -100,7 +107,7 @@ describe('VRControllerPointer', () => {
         target.addEventListener('pointerup', pointerUp)
 
         const pointer = createPointer()
-        pointer.update()
+        pointer.update(1)
 
         dispatchSelectStart(raySpace)
         expect(pointerDown).toHaveBeenCalledTimes(1)
@@ -111,7 +118,7 @@ describe('VRControllerPointer', () => {
 
     it('dispose() removes the beam and hit marker and stops reacting to select events', () => {
         const target = createInteractableMesh()
-        target.position.set(0, 0, -1)
+        positionOnRay(target)
         intersectRoot.add(target)
         intersectRoot.updateMatrixWorld(true)
 
@@ -119,7 +126,7 @@ describe('VRControllerPointer', () => {
         target.addEventListener('pointerdown', pointerDown)
 
         const pointer = createPointer()
-        pointer.update()
+        pointer.update(1)
         pointer.dispose()
 
         expect(raySpace.children).toHaveLength(0)
@@ -127,5 +134,54 @@ describe('VRControllerPointer', () => {
 
         dispatchSelectStart(raySpace)
         expect(pointerDown).not.toHaveBeenCalled()
+    })
+
+    describe('trigger gating', () => {
+        it('does not raycast or show the beam while the trigger is below the active threshold', () => {
+            const target = createInteractableMesh()
+            positionOnRay(target)
+            intersectRoot.add(target)
+            intersectRoot.updateMatrixWorld(true)
+
+            const pointer = createPointer()
+            pointer.update(0)
+
+            expect(raySpace.children[0].visible).toBe(false)
+            const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
+            expect(hitMarker.visible).toBe(false)
+        })
+
+        it('shows the beam and raycasts once the trigger crosses the active threshold', () => {
+            const target = createInteractableMesh()
+            positionOnRay(target)
+            intersectRoot.add(target)
+            intersectRoot.updateMatrixWorld(true)
+
+            const pointer = createPointer()
+            pointer.update(0)
+            pointer.update(1)
+
+            expect(raySpace.children[0].visible).toBe(true)
+            const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
+            expect(hitMarker.visible).toBe(true)
+        })
+
+        it('exits (clears hover) once the trigger drops back below the active threshold', () => {
+            const target = createInteractableMesh()
+            positionOnRay(target)
+            intersectRoot.add(target)
+            intersectRoot.updateMatrixWorld(true)
+
+            const pointerLeave = vi.fn()
+            target.addEventListener('pointerleave', pointerLeave)
+
+            const pointer = createPointer()
+            pointer.update(1)
+            expect(pointerLeave).not.toHaveBeenCalled()
+
+            pointer.update(0)
+
+            expect(pointerLeave).toHaveBeenCalledTimes(1)
+        })
     })
 })

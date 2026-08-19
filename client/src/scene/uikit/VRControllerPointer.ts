@@ -11,6 +11,11 @@
  * exactly what three.js's own XR interaction examples do. This is independent of (and can fire
  * alongside) the existing trigger-driven game-box raycast pipeline (SceneClickGameBoxRaycast) -
  * see VRSettingsPanelCoordinator's doc comment for the accepted overlap this creates.
+ *
+ * The ray itself is trigger-gated, not always-on: update() takes the controller's live analog
+ * trigger value (XRControllerManager.getControllerRaySpaces()) and skips raycasting/hides the
+ * beam entirely below TRIGGER_ACTIVE_THRESHOLD - by request, so the beam doesn't idly sweep the
+ * panel (and cost a raycast) every frame just because a controller happens to be pointed at it.
  */
 
 import * as THREE from 'three'
@@ -21,6 +26,20 @@ const BEAM_COLOR = 0x4da3ff
 const BEAM_DEFAULT_LENGTH = 1.5
 const HIT_MARKER_COLOR = 0x4da3ff
 const HIT_MARKER_RADIUS = 0.01
+// "The least amount" of trigger depression, per direct request - not a click threshold, just
+// enough to distinguish real analog input from at-rest sensor noise.
+const TRIGGER_ACTIVE_THRESHOLD = 0.01
+
+// WebXR's reported targetRaySpace direction (local -Z) commonly points noticeably above the
+// physical barrel for Touch-style controllers (Oculus Touch/PICO Connect - see InputProfile.ts's
+// VR profile comment) - confirmed live: the beam read as aiming up and away rather than forward.
+// Pitching the ray/beam's local direction down compensates. First-pass empirical value, easy to
+// re-tune: adjust the degrees below and re-test in headset.
+const RAY_PITCH_CORRECTION_DEGREES = -15
+// Exported so tests can position targets along the real corrected direction instead of
+// duplicating this rotation math.
+export const RAY_DIRECTION = new THREE.Vector3(0, 0, -1)
+    .applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(RAY_PITCH_CORRECTION_DEGREES))
 
 export interface VRControllerPointerOptions {
     readonly raySpace: THREE.XRTargetRaySpace
@@ -38,6 +57,7 @@ export class VRControllerPointer {
     private readonly beam: THREE.Line
     private readonly beamGeometry: THREE.BufferGeometry
     private readonly hitMarker: THREE.Mesh
+    private wasActive = false
 
     private readonly handleSelectStart = (): void => {
         this.pointer.down({ timeStamp: performance.now(), button: 0 })
@@ -52,13 +72,14 @@ export class VRControllerPointer {
         this.intersectRoot = options.intersectRoot
         this.scene = options.scene
 
-        this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {})
+        this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {}, { direction: RAY_DIRECTION })
 
         this.beamGeometry = new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(0, 0, 0),
-            new THREE.Vector3(0, 0, -BEAM_DEFAULT_LENGTH)
+            RAY_DIRECTION.clone().multiplyScalar(BEAM_DEFAULT_LENGTH)
         ])
         this.beam = new THREE.Line(this.beamGeometry, new THREE.LineBasicMaterial({ color: BEAM_COLOR }))
+        this.beam.visible = false
         this.raySpace.add(this.beam)
 
         this.hitMarker = new THREE.Mesh(
@@ -74,7 +95,21 @@ export class VRControllerPointer {
         this.raySpace.addEventListener('selectend', this.handleSelectEnd)
     }
 
-    update(): void {
+    update(triggerValue: number): void {
+        if (triggerValue < TRIGGER_ACTIVE_THRESHOLD) {
+            if (this.wasActive) {
+                // Trigger released below threshold mid-hover/drag - cleanly exit rather than leave
+                // stale hover/capture state on whatever was last under the ray.
+                this.pointer.exit({ timeStamp: performance.now() })
+            }
+            this.wasActive = false
+            this.beam.visible = false
+            this.hitMarker.visible = false
+            return
+        }
+        this.wasActive = true
+        this.beam.visible = true
+
         this.pointer.move(this.intersectRoot, { timeStamp: performance.now() })
 
         // getIntersection() is never undefined once a move has happened - with nothing real hit,
@@ -84,11 +119,11 @@ export class VRControllerPointer {
         const intersection = this.pointer.getIntersection()
         if (intersection && !intersection.object.isVoidObject) {
             const length = Math.max(intersection.distance, 0)
-            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -length)])
+            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), RAY_DIRECTION.clone().multiplyScalar(length)])
             this.hitMarker.visible = true
             this.hitMarker.position.copy(intersection.point)
         } else {
-            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -BEAM_DEFAULT_LENGTH)])
+            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), RAY_DIRECTION.clone().multiplyScalar(BEAM_DEFAULT_LENGTH)])
             this.hitMarker.visible = false
         }
     }

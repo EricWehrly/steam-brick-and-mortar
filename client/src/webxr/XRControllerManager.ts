@@ -15,6 +15,10 @@ export interface XRControllerRayInfo {
     /** The real XRTargetRaySpace, typed precisely (not plain Object3D) so consumers can register
      *  for its 'selectstart'/'selectend'/... WebXR-specific events. */
     readonly raySpace: THREE.XRTargetRaySpace
+    /** Live analog trigger depression (xr-standard button 0), 0 (released) to 1 (fully pressed) -
+     *  read fresh every call, not cached. Lets a VR pointer/cursor gate its raycast on "trigger
+     *  being held at all" rather than needing a separate poll. */
+    readonly triggerValue: number
 }
 
 export interface XRControllerRaySource {
@@ -164,17 +168,35 @@ export class XRControllerManager implements XRControllerRaySource {
 
     /**
      * All connected controllers (not just the trigger-resolved "primary" one) - a VR pointer/
-     * cursor needs to be able to point and hover before any trigger is ever pressed, so
-     * getPrimaryControllerRay()'s trigger-first resolution doesn't apply here.
+     * cursor needs one entry per hand, not just whichever hand getPrimaryControllerRay() would
+     * pick. Each entry's triggerValue is read live, so callers can gate their own raycasting on it
+     * (e.g. only casting while the trigger is at least slightly depressed) without a separate poll.
      */
     getControllerRaySpaces(): ReadonlyArray<XRControllerRayInfo> {
         const result: XRControllerRayInfo[] = []
         this.handednessByIndex.forEach((handedness, index) => {
             if (handedness !== null) {
-                result.push({ index, handedness, raySpace: this.controllers[index] })
+                result.push({ index, handedness, raySpace: this.controllers[index], triggerValue: this.getTriggerValue(handedness) })
             }
         })
         return result
+    }
+
+    /** Live analog trigger depression for the given hand, 0 if no session or no matching input
+     *  source's gamepad reports one. Mirrors resolvePrimaryControllerIndex()'s inputSources scan.
+     *  inputSources is an external WebXR API boundary - see DeviceDetector's identical guard for
+     *  why this checks it explicitly rather than trusting a non-null session alone. */
+    private getTriggerValue(handedness: XRHandedness): number {
+        if (!this.session?.inputSources) {
+            return 0
+        }
+
+        for (const inputSource of this.session.inputSources) {
+            if (inputSource.handedness === handedness) {
+                return inputSource.gamepad?.buttons[TRIGGER_BUTTON_INDEX]?.value ?? 0
+            }
+        }
+        return 0
     }
 
     dispose(): void {
@@ -220,7 +242,9 @@ export class XRControllerManager implements XRControllerRaySource {
     }
 
     private resolvePrimaryControllerIndex(): number | null {
-        if (!this.session) {
+        // inputSources is an external WebXR API boundary - see DeviceDetector's identical guard
+        // for why this checks it explicitly rather than trusting a non-null session alone.
+        if (!this.session?.inputSources) {
             return null
         }
 
