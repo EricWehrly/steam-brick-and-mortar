@@ -8,7 +8,6 @@
 
 import { describe, it, expect } from 'vitest'
 import { AppSettings, Setting } from '../../../../../src/core/AppSettings'
-import { DEFAULTS } from '../../../../../src/ui/pause/panels/DisplayAdvancedPanel'
 import { VRDisplayAdvancedPanel } from '../../../../../src/scene/uikit/panels/VRDisplayAdvancedPanel'
 
 describe('VRDisplayAdvancedPanel', () => {
@@ -19,7 +18,7 @@ describe('VRDisplayAdvancedPanel', () => {
 
     it('writes through to AppSettings when a slider changes', () => {
         const appSettings = AppSettings.getInstance()
-        appSettings.setSetting(Setting.ArtworkRoughness, DEFAULTS.artworkRoughness)
+        appSettings.setSetting(Setting.ArtworkRoughness, appSettings.getDefaultSetting('artworkRoughness'))
         new VRDisplayAdvancedPanel(appSettings)
 
         appSettings.setSetting(Setting.ArtworkRoughness, 0.5)
@@ -27,7 +26,7 @@ describe('VRDisplayAdvancedPanel', () => {
         expect(appSettings.getSetting('artworkRoughness')).toBe(0.5)
     })
 
-    it('resets all six settings to DEFAULTS on reset', () => {
+    it('resets all six settings to their defaults on reset', () => {
         const appSettings = AppSettings.getInstance()
         appSettings.setSetting(Setting.ArtworkRoughness, 0.59)
         appSettings.setSetting(Setting.ArtworkMetalness, 0.19)
@@ -39,11 +38,21 @@ describe('VRDisplayAdvancedPanel', () => {
         const panel = new VRDisplayAdvancedPanel(appSettings)
         panel.reset()
 
-        expect(appSettings.getSetting('artworkRoughness')).toBe(DEFAULTS.artworkRoughness)
-        expect(appSettings.getSetting('artworkMetalness')).toBe(DEFAULTS.artworkMetalness)
-        expect(appSettings.getSetting('artworkFresnelLift')).toBe(DEFAULTS.artworkFresnelLift)
-        expect(appSettings.getSetting('artworkFresnelPower')).toBe(DEFAULTS.artworkFresnelPower)
-        expect(appSettings.getSetting('shadowContactBias')).toBe(DEFAULTS.shadowContactBias)
-        expect(appSettings.getSetting('shadowContactNormalBias')).toBe(DEFAULTS.shadowContactNormalBias)
+        expect(appSettings.getSetting('artworkRoughness')).toBe(appSettings.getDefaultSetting('artworkRoughness'))
+        expect(appSettings.getSetting('artworkMetalness')).toBe(appSettings.getDefaultSetting('artworkMetalness'))
+        expect(appSettings.getSetting('artworkFresnelLift')).toBe(appSettings.getDefaultSetting('artworkFresnelLift'))
+        expect(appSettings.getSetting('artworkFresnelPower')).toBe(appSettings.getDefaultSetting('artworkFresnelPower'))
+        expect(appSettings.getSetting('shadowContactBias')).toBe(appSettings.getDefaultSetting('shadowContactBias'))
+        expect(appSettings.getSetting('shadowContactNormalBias')).toBe(appSettings.getDefaultSetting('shadowContactNormalBias'))
+    })
+
+    it('builds all three schema sections into the scroll container', () => {
+        const appSettings = AppSettings.getInstance()
+        const panel = new VRDisplayAdvancedPanel(appSettings)
+
+        // container children: title Text, scroll Container, reset Button.
+        expect(panel.container.children).toHaveLength(3)
+        const scroll = panel.container.children[1]
+        expect(scroll.children).toHaveLength(3)
     })
 })

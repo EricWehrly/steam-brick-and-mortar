@@ -1,17 +1,20 @@
 /**
- * VR port of DisplayAdvancedPanel (client/src/ui/pause/panels/DisplayAdvancedPanel.ts) - the same
- * 6 artwork/shadow sliders + reset button, built as real @pmndrs/uikit geometry instead of DOM, so
- * it renders inside an actual immersive WebXR session. Reads/writes the same AppSettings singleton
- * the DOM panel uses, so both UIs stay in sync automatically - this is Phase 1 of the larger
- * DOM -> uikit menu migration (see docs/plans/vr-spatial-settings-menu-plan.md and
- * docs/plans/css3d-panel-projection-spike.md for why DOM-projection was abandoned first).
+ * VR port of DisplayAdvancedPanel (client/src/ui/pause/panels/DisplayAdvancedPanel.ts) - built as
+ * real @pmndrs/uikit geometry instead of DOM, so it renders inside an actual immersive WebXR
+ * session. Both panels render the same DISPLAY_ADVANCED_SCHEMA (SettingsSchema.ts) and read/write
+ * the same AppSettings singleton, so they stay in sync automatically and can't drift from each
+ * other the way two hand-written copies of the same six controls previously could - see
+ * docs/plans/vr-uikit-menu-migration-plan.md. This is Phase 1 of the larger DOM -> uikit menu
+ * migration (see also docs/plans/css3d-panel-projection-spike.md for why DOM-projection was
+ * abandoned first).
  */
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
-import { AppSettings, Setting } from '../../../core/AppSettings'
-import { DEFAULTS } from '../../../ui/pause/panels/DisplayAdvancedPanel'
-import { createSliderRow, type UIKitSliderRow } from '../UIKitRowHelpers'
+import { AppSettings } from '../../../core/AppSettings'
+import { DISPLAY_ADVANCED_SCHEMA, schemaSettingKeys, type NumericSettingKey } from '../../../ui/settings/SettingsSchema'
+import { buildSettingsSchemaTree } from '../SettingsSchemaUIKitRenderer'
+import type { UIKitSliderRow } from '../UIKitRowHelpers'
 
 const PANEL_WIDTH = 500
 // Deliberately shorter than the natural content height (6 rows + gaps) so this panel's own
@@ -43,48 +46,15 @@ const ALWAYS_ON_TOP_RENDER_ORDER = 1000
 
 export class VRDisplayAdvancedPanel {
     readonly container: Container
-    private readonly rows: Record<keyof typeof DEFAULTS, UIKitSliderRow>
+    private readonly rowsBySetting: ReadonlyMap<NumericSettingKey, UIKitSliderRow>
 
     constructor(private readonly appSettings: AppSettings) {
-        const s = appSettings
-
-        this.rows = {
-            artworkRoughness: createSliderRow({
-                label: 'Roughness', min: 0.2, max: 0.6, step: 0.01,
-                value: s.getSetting('artworkRoughness'), formatDisplay: v => v.toFixed(2),
-                onChange: v => this.appSettings.setSetting(Setting.ArtworkRoughness, v)
-            }),
-            artworkMetalness: createSliderRow({
-                label: 'Metalness', min: 0.0, max: 0.2, step: 0.01,
-                value: s.getSetting('artworkMetalness'), formatDisplay: v => v.toFixed(2),
-                onChange: v => this.appSettings.setSetting(Setting.ArtworkMetalness, v)
-            }),
-            artworkFresnelLift: createSliderRow({
-                label: 'Fresnel Lift', min: 0.0, max: 0.3, step: 0.01,
-                value: s.getSetting('artworkFresnelLift'), formatDisplay: v => v.toFixed(2),
-                onChange: v => this.appSettings.setSetting(Setting.ArtworkFresnelLift, v)
-            }),
-            artworkFresnelPower: createSliderRow({
-                label: 'Fresnel Power', min: 2.0, max: 8.0, step: 0.1,
-                value: s.getSetting('artworkFresnelPower'), formatDisplay: v => v.toFixed(1),
-                onChange: v => this.appSettings.setSetting(Setting.ArtworkFresnelPower, v)
-            }),
-            shadowContactBias: createSliderRow({
-                label: 'Shadow Bias', min: -0.005, max: -0.0001, step: 0.0001,
-                value: s.getSetting('shadowContactBias'), formatDisplay: v => v.toFixed(4),
-                onChange: v => this.appSettings.setSetting(Setting.ShadowContactBias, v)
-            }),
-            shadowContactNormalBias: createSliderRow({
-                label: 'Shadow Normal Bias', min: 0.0, max: 0.03, step: 0.001,
-                value: s.getSetting('shadowContactNormalBias'), formatDisplay: v => v.toFixed(3),
-                onChange: v => this.appSettings.setSetting(Setting.ShadowContactNormalBias, v)
-            })
-        }
-
-        this.container = this.build()
+        const built = this.build()
+        this.container = built.container
+        this.rowsBySetting = built.rowsBySetting
     }
 
-    private build(): Container {
+    private build(): { container: Container; rowsBySetting: ReadonlyMap<NumericSettingKey, UIKitSliderRow> } {
         const root = new Container({
             flexDirection: 'column',
             gap: ROW_GAP,
@@ -112,8 +82,9 @@ export class VRDisplayAdvancedPanel {
             height: SCROLL_HEIGHT,
             overflow: 'scroll'
         })
-        for (const row of Object.values(this.rows)) {
-            scroll.add(row.container)
+        const { sectionContainers, rowsBySetting } = buildSettingsSchemaTree(DISPLAY_ADVANCED_SCHEMA, this.appSettings)
+        for (const section of sectionContainers) {
+            scroll.add(section)
         }
         root.add(scroll)
 
@@ -121,22 +92,14 @@ export class VRDisplayAdvancedPanel {
         resetButton.add(new Text({ text: 'Reset to Defaults', color: '#ffffff' }))
         root.add(resetButton)
 
-        return root
+        return { container: root, rowsBySetting }
     }
 
     reset(): void {
-        this.appSettings.setSetting(Setting.ArtworkRoughness, DEFAULTS.artworkRoughness)
-        this.appSettings.setSetting(Setting.ArtworkMetalness, DEFAULTS.artworkMetalness)
-        this.appSettings.setSetting(Setting.ArtworkFresnelLift, DEFAULTS.artworkFresnelLift)
-        this.appSettings.setSetting(Setting.ArtworkFresnelPower, DEFAULTS.artworkFresnelPower)
-        this.appSettings.setSetting(Setting.ShadowContactBias, DEFAULTS.shadowContactBias)
-        this.appSettings.setSetting(Setting.ShadowContactNormalBias, DEFAULTS.shadowContactNormalBias)
+        this.appSettings.resetSettingsToDefaults(schemaSettingKeys(DISPLAY_ADVANCED_SCHEMA))
 
-        this.rows.artworkRoughness.setValue(DEFAULTS.artworkRoughness)
-        this.rows.artworkMetalness.setValue(DEFAULTS.artworkMetalness)
-        this.rows.artworkFresnelLift.setValue(DEFAULTS.artworkFresnelLift)
-        this.rows.artworkFresnelPower.setValue(DEFAULTS.artworkFresnelPower)
-        this.rows.shadowContactBias.setValue(DEFAULTS.shadowContactBias)
-        this.rows.shadowContactNormalBias.setValue(DEFAULTS.shadowContactNormalBias)
+        for (const [setting, row] of this.rowsBySetting) {
+            row.setValue(this.appSettings.getSetting(setting))
+        }
     }
 }
