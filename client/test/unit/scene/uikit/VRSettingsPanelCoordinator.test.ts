@@ -71,14 +71,53 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(camera.children).toHaveLength(0)
     })
 
-    it('activates on the pause menu opening and anchors to the camera when no grip is published', () => {
+    it('activates on the pause menu opening and world-locks into the scene by default', () => {
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
+        // beforeEach already parents camera under scene, so scene starts with 1 child.
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
-        expect(camera.children).toHaveLength(1)
-        expect(camera.children[0]).toBeInstanceOf(Container)
+        expect(scene.children).toHaveLength(2)
+        expect(camera.children).toHaveLength(0)
+        const panelContainer = scene.children.find(child => child instanceof Container)
+        expect(panelContainer).toBeDefined()
+    })
+
+    it('world-locks the panel a fixed distance in front of the camera, independent of the camera afterward', () => {
+        camera.position.set(1, 1.6, 2)
+        camera.rotation.set(0, Math.PI / 2, 0)
+        camera.updateWorldMatrix(true, false)
+
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator.init(createFakeRenderer())
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+
+        const panelContainer = scene.children.find(child => child instanceof Container)!
+        const positionAtOpen = panelContainer.position.clone()
+
+        // Moving the camera afterward must not move the already-open panel - that's the entire
+        // point of world-lock vs. camera/grip-attach.
+        camera.position.set(5, 5, 5)
+        camera.updateWorldMatrix(true, false)
+
+        expect(panelContainer.position.equals(positionAtOpen)).toBe(true)
+        expect(positionAtOpen.distanceTo(new THREE.Vector3(1, 1.6, 2))).toBeCloseTo(0.6, 5)
+    })
+
+    it('world-lock strips camera pitch, keeping the panel upright', () => {
+        camera.rotation.set(Math.PI / 6, Math.PI / 4, 0.3)
+        camera.updateWorldMatrix(true, false)
+
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator.init(createFakeRenderer())
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+
+        const panelContainer = scene.children.find(child => child instanceof Container)!
+        const panelEuler = new THREE.Euler().setFromQuaternion(panelContainer.quaternion, 'YXZ')
+
+        expect(panelEuler.x).toBeCloseTo(0, 5)
+        expect(panelEuler.z).toBeCloseTo(0, 5)
     })
 
     it('ignores MenuOpen events for a different menu type', () => {
@@ -88,9 +127,20 @@ describe('VRSettingsPanelCoordinator', () => {
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'debug' })
 
         expect(camera.children).toHaveLength(0)
+        expect(scene.children).toHaveLength(1)
     })
 
-    it('anchors to the primary controller grip when one is published', () => {
+    it('anchors to the camera when grip-attached mode has no grip published', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'grip-attached')
+        coordinator.init(createFakeRenderer())
+
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+
+        expect(camera.children).toHaveLength(1)
+        expect(camera.children[0]).toBeInstanceOf(Container)
+    })
+
+    it('anchors to the primary controller grip in grip-attached mode when one is published', () => {
         const grip = new THREE.Group()
         const raySource: XRControllerRaySource = {
             getPrimaryControllerRay: () => null,
@@ -98,7 +148,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'grip-attached')
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -112,22 +162,22 @@ describe('VRSettingsPanelCoordinator', () => {
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        expect(camera.children).toHaveLength(1)
+        expect(scene.children).toHaveLength(2)
 
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
 
-        expect(camera.children).toHaveLength(0)
+        expect(scene.children).toHaveLength(1)
     })
 
     it('stays active through a menu close when forced via the URL override', () => {
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), true, createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
-        expect(camera.children).toHaveLength(1)
+        expect(scene.children).toHaveLength(2)
 
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
 
-        expect(camera.children).toHaveLength(1)
+        expect(scene.children).toHaveLength(2)
     })
 
     it('does nothing (and does not throw) if no main camera is published yet', () => {
@@ -155,8 +205,8 @@ describe('VRSettingsPanelCoordinator', () => {
 
     it('creates a controller-ray pointer (beam) for each connected controller once update() runs', () => {
         const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace },
-            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace }
+            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 },
+            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
         const raySource: XRControllerRaySource = {
             getPrimaryControllerRay: () => null,
@@ -177,7 +227,7 @@ describe('VRSettingsPanelCoordinator', () => {
 
     it('tears down a controller pointer once that controller disconnects', () => {
         let raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace }
+            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
         const raySource: XRControllerRaySource = {
             getPrimaryControllerRay: () => null,
@@ -202,7 +252,7 @@ describe('VRSettingsPanelCoordinator', () => {
 
     it('disposes all controller pointers when the panel deactivates', () => {
         const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace }
+            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
         const raySource: XRControllerRaySource = {
             getPrimaryControllerRay: () => null,
@@ -229,10 +279,10 @@ describe('VRSettingsPanelCoordinator', () => {
 
         coordinator.dispose()
 
-        expect(camera.children).toHaveLength(0)
+        expect(scene.children).toHaveLength(1)
 
         // Nothing should be listening anymore.
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        expect(camera.children).toHaveLength(0)
+        expect(scene.children).toHaveLength(1)
     })
 })

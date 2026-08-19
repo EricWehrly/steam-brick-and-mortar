@@ -22,6 +22,12 @@
  * flows into these via PauseMenuManager, so no new input wiring was needed. The DOM pause menu is
  * deliberately NOT suppressed while this panel is active; both can be open at once for now, an
  * accepted simplification while this panel stays behind the ?forceVRSettingsPanel=1 dev flag.
+ *
+ * Anchor strategy (decided 2026-08-19, see docs/plans/vr-uikit-menu-migration-plan.md) is
+ * switchable via VRPanelAnchorMode: 'world-lock' (default - pinned to a fixed point in front of
+ * the player at open time) vs. 'grip-attached' (follows the primary controller, the original
+ * behavior). See attachToAnchor() for why world-lock is worth trying: grip-attach means the panel
+ * swings while you point at it with the same hand.
  */
 
 import * as THREE from 'three'
@@ -35,7 +41,7 @@ import { DataKey } from '../../core/data/DataTypes'
 import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
 import { UrlUtils } from '../../utils/UrlUtils'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
-import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
+import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRControllerManager'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRControllerPointer } from './VRControllerPointer'
 
@@ -43,6 +49,17 @@ import { VRControllerPointer } from './VRControllerPointer'
 // use - kept in parity, not imported (those constants are module-private).
 const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.6)
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.3)
+// Distance in front of the player the panel world-locks to at open time - matches
+// CAMERA_LOCAL_OFFSET's magnitude so the two modes place the panel at the same initial distance.
+const WORLD_LOCK_DISTANCE = 0.6
+
+/** Which fixed point the VR settings panel is anchored to while open. 'world-lock' (default) pins
+ *  it to a point in front of the player computed once at open time, so it stays still in the world
+ *  while they look/move around it. 'grip-attached' is the original behavior - the panel follows
+ *  the primary controller. Comparing the two live in-headset is the point of keeping both around;
+ *  see the constructor's anchorMode parameter to switch. */
+export type VRPanelAnchorMode = 'world-lock' | 'grip-attached'
+const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'world-lock'
 
 /** Matches forwardHtmlEvents' own signature - injectable so tests can avoid it entirely: jsdom's
  *  canvas doesn't implement Pointer Events capture APIs (setPointerCapture/...), which
@@ -61,6 +78,7 @@ export class VRSettingsPanelCoordinator {
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly forceEnabled: boolean
     private readonly forwardEvents: ForwardEventsFn
+    private readonly anchorMode: VRPanelAnchorMode
 
     private renderer: THREE.WebGLRenderer | null = null
     private panel: VRDisplayAdvancedPanel | null = null
@@ -75,13 +93,15 @@ export class VRSettingsPanelCoordinator {
         eventManager: EventManager,
         appSettings: AppSettings,
         forceEnabled: boolean = UrlUtils.isVRSettingsPanelForced(),
-        forwardEvents: ForwardEventsFn = forwardHtmlEvents
+        forwardEvents: ForwardEventsFn = forwardHtmlEvents,
+        anchorMode: VRPanelAnchorMode = DEFAULT_ANCHOR_MODE
     ) {
         this.eventManager = eventManager
         this.appSettings = appSettings
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         this.forceEnabled = forceEnabled
         this.forwardEvents = forwardEvents
+        this.anchorMode = anchorMode
 
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
@@ -143,7 +163,7 @@ export class VRSettingsPanelCoordinator {
         }
 
         this.panel = new VRDisplayAdvancedPanel(this.appSettings)
-        this.attachToAnchor(this.panel.container, camera)
+        this.attachToAnchor(this.panel.container, camera, scene)
 
         this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
 
@@ -176,10 +196,10 @@ export class VRSettingsPanelCoordinator {
      * 'connected'/'disconnected' events. Correct regardless of controllers connecting or
      * disconnecting mid-session while the panel is open.
      */
-    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): void {
+    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<XRControllerRayInfo> {
         const panel = this.panel
         if (!panel) {
-            return
+            return []
         }
 
         const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
@@ -204,20 +224,62 @@ export class VRSettingsPanelCoordinator {
                 scene
             }))
         }
+
+        return connected
     }
 
-    private attachToAnchor(container: THREE.Object3D, camera: THREE.Camera): void {
-        const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        const grip = raySource?.getPrimaryControllerGrip() ?? null
+    private attachToAnchor(container: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
+        // Logged every activation, on purpose - this is a live A/B still being evaluated in
+        // headset (see the class doc comment and docs/plans/vr-uikit-menu-migration-plan.md's
+        // anchoring decision), not settled behavior. Flip DEFAULT_ANCHOR_MODE (or pass an
+        // explicit anchorMode to the constructor) to compare the two.
+        console.log(`VRSettingsPanelCoordinator: anchoring panel via '${this.anchorMode}' - comparing whether pinning it in front of the player at open time (world-lock) reads better than following the primary controller (grip-attached, which swings while you point at it with the same hand).`)
 
-        if (grip) {
-            grip.add(container)
-            container.position.copy(GRIP_LOCAL_OFFSET)
+        if (this.anchorMode === 'grip-attached') {
+            const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
+            const grip = raySource?.getPrimaryControllerGrip() ?? null
+
+            if (grip) {
+                grip.add(container)
+                container.position.copy(GRIP_LOCAL_OFFSET)
+                return
+            }
+
+            camera.add(container)
+            container.position.copy(CAMERA_LOCAL_OFFSET)
             return
         }
 
-        camera.add(container)
-        container.position.copy(CAMERA_LOCAL_OFFSET)
+        this.attachWorldLocked(container, camera, scene)
+    }
+
+    /**
+     * World-lock: compute a fixed world position + orientation from the camera once, right now,
+     * and add the panel directly to the scene (not parented to camera/grip) so it stays put while
+     * the player looks/moves around it afterward - a real per-frame follow would just be a
+     * yaw-only version of camera-attach, not what "world-lock" is meant to test.
+     */
+    private attachWorldLocked(container: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
+        // updateWorldMatrix (not updateMatrixWorld) refreshes only this object's own matrixWorld
+        // from its ancestor chain, without the expense of also recursing into children - this can
+        // run before the render loop has updated the frame's matrices yet (right at menu-open).
+        camera.updateWorldMatrix(true, false)
+
+        const cameraWorldPosition = new THREE.Vector3()
+        camera.getWorldPosition(cameraWorldPosition)
+        const cameraWorldQuaternion = new THREE.Quaternion()
+        camera.getWorldQuaternion(cameraWorldQuaternion)
+
+        // 'YXZ' extracts yaw (Y) independent of pitch (X) and roll (Z) - strips however far the
+        // player was looking up/down/tilting when they opened the menu, so the panel comes in
+        // upright and level rather than tilted to match their exact head angle.
+        const yaw = new THREE.Euler().setFromQuaternion(cameraWorldQuaternion, 'YXZ').y
+        const yawQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ'))
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuaternion)
+
+        scene.add(container)
+        container.position.copy(cameraWorldPosition).addScaledVector(forward, WORLD_LOCK_DISTANCE)
+        container.quaternion.copy(yawQuaternion)
     }
 
     private readonly update = (_now: number, deltaTime: number): void => {
@@ -234,10 +296,10 @@ export class VRSettingsPanelCoordinator {
         const scene = this.getScene()
         const camera = this.getCamera()
         if (scene && camera) {
-            this.syncControllerPointers(scene, camera)
-        }
-        for (const pointer of this.controllerPointers.values()) {
-            pointer.update()
+            const connected = this.syncControllerPointers(scene, camera)
+            for (const { index, triggerValue } of connected) {
+                this.controllerPointers.get(index)?.update(triggerValue)
+            }
         }
     }
 
