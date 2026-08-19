@@ -1,5 +1,12 @@
 # Plan: VR Spatial Settings Menu
 
+> **Superseded 2026-08-19** by
+> [`vr-uikit-menu-migration-plan.md`](vr-uikit-menu-migration-plan.md). This plan's entire design
+> is DOM projection into the scene (`HTMLMesh` / `InteractiveGroup`), which was spiked and
+> abandoned — see [`css3d-panel-projection-spike.md`](css3d-panel-projection-spike.md). The
+> replacement direction is real `@pmndrs/uikit` scene geometry. Kept for the survey and the
+> anchor-strategy discussion, which are still accurate; do not implement from it.
+
 ## Goal
 
 Give VR sessions a way to reach the app's menus (pause/settings, currently 100% flat-DOM) at all —

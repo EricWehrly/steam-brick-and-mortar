@@ -23,7 +23,15 @@ This feature splits into two sub-scopes, deliberately sequenced:
    pause, etc.) render or are reachable in VR at all today - they're flat-DOM UI with no in-scene
    representation. Direction (2026-08-10): project the settings menu into the VR scene as a spatial
    panel rather than building a separate VR-native menu system from scratch - now has a plan doc,
-   [`docs/plans/vr-spatial-settings-menu-plan.md`](../plans/vr-spatial-settings-menu-plan.md).
+   [`docs/plans/vr-spatial-settings-menu-plan.md`](../plans/vr-spatial-settings-menu-plan.md) -
+   **now superseded**: DOM projection was spiked and abandoned (it never reaches an immersive
+   session's render surface). The replacement direction is real `@pmndrs/uikit` scene geometry, and
+   a VR settings panel with per-controller ray interaction is built on it today (see
+   `VRSettingsPanelCoordinator`/`VRControllerPointer`) - but only one of nine panels is ported, with
+   no tab shell, still behind `?forceVRSettingsPanel=1`. Migrating the rest is planned in
+   [`docs/plans/vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md).
+   Sibling scope: in-VR button hints, planned but back-burnered -
+   [`docs/plans/vr-button-hints-plan.md`](../plans/vr-button-hints-plan.md).
 
 Controllers first because the input abstraction (gamepad → VR controller) is the piece already
 mostly proven out by this project's gamepad work, and because it's independently useful/testable
