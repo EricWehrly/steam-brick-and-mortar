@@ -60,7 +60,10 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
 }))
 
 function makeMockRenderer(): { domElement: HTMLCanvasElement } {
-    return { domElement: document.createElement('canvas') } as unknown as { domElement: HTMLCanvasElement }
+    return {
+        domElement: document.createElement('canvas'),
+        setTransparentSort: vi.fn()
+    } as unknown as { domElement: HTMLCanvasElement }
 }
 
 function emitInteractPressed(): void {
@@ -93,6 +96,17 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
         expect(eventManagerMock.emit).toHaveBeenCalledWith(
             InputEventTypes.SceneCanvasClick,
             expect.objectContaining({ ndcX: 0, ndcY: 0 } satisfies Partial<SceneCanvasClickEvent>)
+        )
+    })
+
+    it('does not emit SceneCanvasClick when InteractPressed fires while a menu is open', () => {
+        isPauseMenuOpen = true
+
+        emitInteractPressed()
+
+        expect(eventManagerMock.emit).not.toHaveBeenCalledWith(
+            InputEventTypes.SceneCanvasClick,
+            expect.anything()
         )
     })
 

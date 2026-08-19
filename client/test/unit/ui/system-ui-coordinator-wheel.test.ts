@@ -57,7 +57,7 @@ function makeMockRenderer(): { domElement: HTMLCanvasElement } {
     canvas.getBoundingClientRect = vi.fn(() => ({
         left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600, x: 0, y: 0, toJSON: () => ({})
     }))
-    return { domElement: canvas } as unknown as { domElement: HTMLCanvasElement }
+    return { domElement: canvas, setTransparentSort: vi.fn() } as unknown as { domElement: HTMLCanvasElement }
 }
 
 describe('SystemUICoordinator wheel wiring', () => {

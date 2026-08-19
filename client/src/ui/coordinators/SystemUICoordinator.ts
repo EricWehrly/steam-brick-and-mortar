@@ -36,6 +36,7 @@ import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { SettingsPanelProjector } from '../../scene/css3d/SettingsPanelProjector'
+import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
 import '../../styles/gamepad-reticle.css'
 
 const RETICLE_ELEMENT_ID = 'gamepad-reticle'
@@ -62,6 +63,7 @@ export class SystemUICoordinator {
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private settingsPanelProjector: SettingsPanelProjector
+    private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
@@ -103,6 +105,7 @@ export class SystemUICoordinator {
         )
 
         this.settingsPanelProjector = new SettingsPanelProjector(this.eventManager)
+        this.vrSettingsPanelCoordinator = new VRSettingsPanelCoordinator(this.eventManager, this.appSettings)
     }
 
     public async init(
@@ -142,6 +145,8 @@ export class SystemUICoordinator {
         // Must come after pauseMenuManager.init() - it looks up the #pause-menu-overlay DOM
         // node the pause menu just created.
         this.settingsPanelProjector.init()
+
+        this.vrSettingsPanelCoordinator.init(renderer)
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -274,6 +279,17 @@ export class SystemUICoordinator {
     }
 
     private readonly handleInteractPressed = (): void => {
+        // While a menu is open (DOM pause menu and/or the VR uikit settings panel - both open
+        // together, see VRSettingsPanelCoordinator's doc comment), the menu is what's actually in
+        // front of the player; a trigger/Enter/gamepad-A press shouldn't reach through it to
+        // select whatever game box happens to be further along the same ray. This was previously
+        // an accepted known limitation - fixed here at the single chokepoint every non-mouse
+        // Interact press already funnels through, rather than teaching the raycast itself about
+        // occlusion.
+        if (this.pauseMenuManager.isOpen()) {
+            return
+        }
+
         // Simulates a click at the reticle position (screen center) - a real mouse click never
         // reaches here at all (see the registration comment above).
         this.eventManager.emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
@@ -460,6 +476,7 @@ export class SystemUICoordinator {
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
         this.settingsPanelProjector?.dispose()
+        this.vrSettingsPanelCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
         this.pauseMenuManager?.dispose()

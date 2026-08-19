@@ -16,7 +16,7 @@ import { EventManager } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import { RangeControl } from '../../components/UIComponent'
 
-const DEFAULTS = {
+export const DEFAULTS = {
     artworkRoughness: 0.35,
     artworkMetalness: 0.05,
     artworkFresnelLift: 0.15,

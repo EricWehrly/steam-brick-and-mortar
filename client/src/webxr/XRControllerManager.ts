@@ -9,9 +9,23 @@ export interface XRControllerRay {
     direction: THREE.Vector3
 }
 
+export interface XRControllerRayInfo {
+    readonly index: number
+    readonly handedness: XRHandedness
+    /** The real XRTargetRaySpace, typed precisely (not plain Object3D) so consumers can register
+     *  for its 'selectstart'/'selectend'/... WebXR-specific events. */
+    readonly raySpace: THREE.XRTargetRaySpace
+}
+
 export interface XRControllerRaySource {
     getPrimaryControllerRay(): XRControllerRay | null
     getPrimaryControllerGrip(): THREE.Object3D | null
+    /** All currently-connected controllers' real targetRaySpace Object3Ds (live three.js-managed
+     *  pose, not a derived snapshot) - for callers that want to drive a continuous VR pointer/
+     *  cursor per hand rather than the single trigger-resolved "primary" ray. Optional so existing
+     *  XRControllerRaySource fixtures across the test suite don't need touching for a capability
+     *  only the VR uikit pointer bridge uses so far. */
+    getControllerRaySpaces?(): ReadonlyArray<XRControllerRayInfo>
 }
 
 export interface XRControllerManagerConfig {
@@ -102,6 +116,13 @@ export class XRControllerManager implements XRControllerRaySource {
      * loaded yet to clear at connect time, and both loads land later regardless. Pruning every
      * frame instead makes "at most one child" a continuously-enforced invariant, correct
      * regardless of how the two connects' async loads interleave.
+     *
+     * Kept as "keep last-added" for now - a "keep first-added" attempt (on the theory that the
+     * generic fallback loads first) didn't visibly fix the generic-vs-recognized-model issue on
+     * real-headset re-test, still under investigation. Live-testing hypothesis worth checking
+     * first: XRControllerModelFactory's profile fetch may simply never be resolving to the
+     * recognized asset at all (no confirmed CDN reachability for @webxr-input-profiles/assets on
+     * this Tauri/WebView2 target), which would make pruning moot regardless of which child it keeps.
      */
     update(): void {
         this.controllerModels.forEach(model => this.pruneDuplicateChildren(model))
@@ -141,6 +162,21 @@ export class XRControllerManager implements XRControllerRaySource {
         return index === null ? null : this.controllerGrips[index]
     }
 
+    /**
+     * All connected controllers (not just the trigger-resolved "primary" one) - a VR pointer/
+     * cursor needs to be able to point and hover before any trigger is ever pressed, so
+     * getPrimaryControllerRay()'s trigger-first resolution doesn't apply here.
+     */
+    getControllerRaySpaces(): ReadonlyArray<XRControllerRayInfo> {
+        const result: XRControllerRayInfo[] = []
+        this.handednessByIndex.forEach((handedness, index) => {
+            if (handedness !== null) {
+                result.push({ index, handedness, raySpace: this.controllers[index] })
+            }
+        })
+        return result
+    }
+
     dispose(): void {
         this.controllers.forEach((controller, i) => {
             controller.removeEventListener('connected', this.handleConnected[i])
@@ -160,8 +196,8 @@ export class XRControllerManager implements XRControllerRaySource {
 
     /**
      * Keeps only the most-recently-added child (see update()'s doc comment for why "most recent"
-     * is always correct), disposing the geometry/material of anything pruned so repeated duplicate
-     * loads don't leak GPU resources. It's only a backstop for a race in three.js's own
+     * is the current choice), disposing the geometry/material of anything pruned so repeated
+     * duplicate loads don't leak GPU resources. It's only a backstop for a race in three.js's own
      * XRControllerModelFactory (see update()'s doc comment) that may not reproduce every session.
      */
     private pruneDuplicateChildren(model: THREE.Object3D): void {

@@ -61,4 +61,13 @@ export class UrlUtils {
     static isSettingsPanelProjectionForced(): boolean {
         return UrlUtils.getSearchParams().get('forceSettingsPanelProjection') === '1'
     }
+
+    /**
+     * Whether ?forceVRSettingsPanel=1 is present — forces VRSettingsPanelCoordinator to activate
+     * outside an actual WebXR session, so the uikit settings panel can be previewed on a normal
+     * flatscreen browser (mouse-driven) without a headset.
+     */
+    static isVRSettingsPanelForced(): boolean {
+        return UrlUtils.getSearchParams().get('forceVRSettingsPanel') === '1'
+    }
 }

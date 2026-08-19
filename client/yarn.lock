@@ -184,10 +184,60 @@
   dependencies:
     playwright "1.59.1"
 
+"@pmndrs/msdfonts@^1.0.75":
+  version "1.0.75"
+  resolved "https://registry.yarnpkg.com/@pmndrs/msdfonts/-/msdfonts-1.0.75.tgz#934ad849629b8c316643d52def6fb8c83f66816e"
+  integrity sha512-sqcAzsSJe6dOwEEf2S4LCC19rA2nXTxrPp3PSSRqcdePqippBIW7Bt0z3BIYH7c4iUMi4dOiKb1+bsAqtrG/qg==
+
+"@pmndrs/pointer-events@^6.6.30":
+  version "6.6.30"
+  resolved "https://registry.yarnpkg.com/@pmndrs/pointer-events/-/pointer-events-6.6.30.tgz#b7b3fc4794a533836c670fb3160a98cccb85b4b0"
+  integrity sha512-YD2jWdgEqqAWJNOOZ1WZMunUby8jwuQyOMk8zbeqC39R4nkZnGvu1Pa5EMGbV1zd2vZTxXDxYcAVxtQuhVwf3g==
+
+"@pmndrs/uikit-default@^1.0.75":
+  version "1.0.75"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-default/-/uikit-default-1.0.75.tgz#8671169c19c9c3b02bd339e27fe33f5047957672"
+  integrity sha512-PDG+FsgmGNz+YCkRp0zioE8JpCPKAWFO5D5rovoJdE4VG1pPtIQACEKStkTMNXxBrckxhBvNlcdBFyoccYpuQg==
+  dependencies:
+    "@pmndrs/uikit" "^1.0.75"
+    "@pmndrs/uikit-lucide" "^1.0.75"
+    zod "^4.4.3"
+
+"@pmndrs/uikit-lucide@^1.0.75":
+  version "1.0.75"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-lucide/-/uikit-lucide-1.0.75.tgz#be949ee0dfc30f8c321e1ba170e37f55f476948d"
+  integrity sha512-OdM3+hkZYyMXavSb8UyYsyU4cHV7iXb6ZTJcJhGE4VwCW4x/tFgF6j3FNkatTE0Kh81ODrWrtG6xRrjtftLYkQ==
+  dependencies:
+    "@pmndrs/uikit" "^1.0.75"
+
+"@pmndrs/uikit-pub-sub@^1.0.75":
+  version "1.0.75"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-pub-sub/-/uikit-pub-sub-1.0.75.tgz#3ff98c3c145bfd7ac2caae30149bac8ee3315f12"
+  integrity sha512-mDQj95VfYtOcmUVse2C1h3E6KIC4p2t63wXjeNR5OkgTJSElb+Aaq4pEB1IFJUbwrbC4ft54W8LVUzi9PSFlyg==
+  dependencies:
+    "@preact/signals-core" "^1.8.0"
+
+"@pmndrs/uikit@^1.0.75":
+  version "1.0.75"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit/-/uikit-1.0.75.tgz#c8b66c7621f32adbf6a3920c0d80df9991f338d5"
+  integrity sha512-5UWP2aqZb6//9DUnGhGlMCN1QPkCMCtzFLqPBujz9i/oF1GHNrY+sHyw9u9pAohMCh2vkdweubSdWSNtfo4olA==
+  dependencies:
+    "@pmndrs/msdfonts" "^1.0.75"
+    "@pmndrs/uikit-pub-sub" "^1.0.75"
+    "@preact/signals-core" "^1.5.1"
+    "@zappar/msdf-generator" "^1.2.4"
+    yoga-layout "^3.2.1"
+    zod "^4.4.3"
+
 "@polka/url@^1.0.0-next.24":
   version "1.0.0-next.29"
   resolved "https://registry.yarnpkg.com/@polka/url/-/url-1.0.0-next.29.tgz#5a40109a1ab5f84d6fd8fc928b19f367cbe7e7b1"
   integrity sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==
+
+"@preact/signals-core@^1.14.4", "@preact/signals-core@^1.5.1", "@preact/signals-core@^1.8.0":
+  version "1.14.4"
+  resolved "https://registry.yarnpkg.com/@preact/signals-core/-/signals-core-1.14.4.tgz#d3588cbda237fcb3c8a8e478f6cc370653609eb7"
+  integrity sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==
 
 "@rolldown/binding-android-arm64@1.0.0-rc.12":
   version "1.0.0-rc.12"
@@ -530,6 +580,13 @@
   resolved "https://registry.yarnpkg.com/@webxr-input-profiles/motion-controllers/-/motion-controllers-1.0.0.tgz#0a84533288af39d85bfe1987721035925d69be47"
   integrity sha512-Ppxde+G1/QZbU8ShCQg+eq5VtlcL/FPkerF1dkDOLlIml0LJD1tFqnCZYR0SrHzYleIQ2siRnOx7xbFLaCpExQ==
 
+"@zappar/msdf-generator@^1.2.4":
+  version "1.2.4"
+  resolved "https://registry.yarnpkg.com/@zappar/msdf-generator/-/msdf-generator-1.2.4.tgz#5a3ba270a1fc51237eae8f76b1bece5392620d3a"
+  integrity sha512-6S/MCk0Ky0ipewZJw4xFEzH/2aYfWmPXEkTdBtNyDDfkbicrNwgJgtxZ4SnTDyNe9XHMqDA4sL9srRsgDLRMqA==
+  dependencies:
+    comlink "^4.4.2"
+
 acorn-jsx@^5.3.2:
   version "5.3.2"
   resolved "https://registry.yarnpkg.com/acorn-jsx/-/acorn-jsx-5.3.2.tgz#7ed5bb55908b3b2f1bc55c6af1653bada7f07937"
@@ -618,6 +675,11 @@ cockatiel@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/cockatiel/-/cockatiel-4.0.0.tgz#037b17beb3fc32e2825eb89eff71d7359bf651c0"
   integrity sha512-XpUZJnogsd03BGB19T9sv7Xb8SwvD8JddZV2Tlp0LNspopZ6Idv24ZwCl8vAGJ6JwODZ0zLRYVj3NWvmRcUDqA==
+
+comlink@^4.4.2:
+  version "4.4.2"
+  resolved "https://registry.yarnpkg.com/comlink/-/comlink-4.4.2.tgz#cbbcd82742fbebc06489c28a183eedc5c60a2bca"
+  integrity sha512-OxGdvBmJuNKSCMO4NTl1L47VRp6xn2wG4F/2hYzB6tiCb709otOxtEYCSvK80PtjODfXXZu8ds+Nw5kVCjqd2g==
 
 convert-source-map@^2.0.0:
   version "2.0.0"
@@ -1702,3 +1764,13 @@ yocto-queue@^0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
+
+yoga-layout@^3.2.1:
+  version "3.2.1"
+  resolved "https://registry.yarnpkg.com/yoga-layout/-/yoga-layout-3.2.1.tgz#d2d1ba06f0e81c2eb650c3e5ad8b0b4adde1e843"
+  integrity sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ==
+
+zod@^4.4.3:
+  version "4.4.3"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-4.4.3.tgz#b680f172885d18bbebf21a834ea25e55a1bbf356"
+  integrity sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==
