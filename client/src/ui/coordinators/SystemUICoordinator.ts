@@ -35,7 +35,6 @@ import type { SettingChangedEvent } from '../../core/AppSettings'
 import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
-import { SettingsPanelProjector } from '../../scene/css3d/SettingsPanelProjector'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
 import '../../styles/gamepad-reticle.css'
 
@@ -62,7 +61,6 @@ export class SystemUICoordinator {
     private renderer?: THREE.WebGLRenderer
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
-    private settingsPanelProjector: SettingsPanelProjector
     private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
@@ -104,7 +102,6 @@ export class SystemUICoordinator {
             this.performanceMonitor
         )
 
-        this.settingsPanelProjector = new SettingsPanelProjector(this.eventManager)
         this.vrSettingsPanelCoordinator = new VRSettingsPanelCoordinator(this.eventManager, this.appSettings)
     }
 
@@ -141,10 +138,6 @@ export class SystemUICoordinator {
 
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels()
-
-        // Must come after pauseMenuManager.init() - it looks up the #pause-menu-overlay DOM
-        // node the pause menu just created.
-        this.settingsPanelProjector.init()
 
         this.vrSettingsPanelCoordinator.init(renderer)
 
@@ -475,7 +468,6 @@ export class SystemUICoordinator {
 
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
-        this.settingsPanelProjector?.dispose()
         this.vrSettingsPanelCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null

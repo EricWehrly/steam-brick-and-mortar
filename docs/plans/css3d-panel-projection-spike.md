@@ -1,8 +1,13 @@
 # Spike: CSS3D Panel Projection
 
-**Status**: Complete (spike) — 2026-08-12/13. Follow-on (2026-08-13): a real, tested
-`SettingsPanelProjector` (`client/src/scene/css3d/SettingsPanelProjector.ts`) now projects the
-actual pause menu onto a plane, wired into `SystemUICoordinator`. See "Follow-on" below.
+**Status**: Concluded — 2026-08-12/13 spike, 2026-08-13 follow-on (`SettingsPanelProjector`
+projected the real pause menu onto a plane, wired into `SystemUICoordinator`), **removed
+2026-08-19**: this verdict held — it never appeared in an actual immersive WebXR session — and the
+project moved to real `@pmndrs/uikit` scene geometry instead (see
+[`vr-uikit-menu-migration-plan.md`](vr-uikit-menu-migration-plan.md)). `SettingsPanelProjector`,
+its `SystemUICoordinator` wiring, and `UrlUtils.isSettingsPanelProjectionForced()` are deleted;
+kept here as the record of why DOM/CSS3D projection doesn't work for this app. See "Follow-on"
+below for the (now-removed) implementation detail.
 **Type**: Feasibility spike, not a build plan. Throwaway prototype code lives at
 `client/src/debug/Css3dPanelSpike.ts`, gated behind `?css3dSpike=1`
 (`UrlUtils.isCss3dPanelSpikeEnabled()`), self-executing on `GameEventTypes.Start` the same way

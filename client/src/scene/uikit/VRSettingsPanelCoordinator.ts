@@ -1,10 +1,11 @@
 /**
  * VR Settings Panel Coordinator - owns a real @pmndrs/uikit component tree in the 3D scene,
- * instead of projecting the DOM pause menu (see SettingsPanelProjector, which never reaches an
- * actual immersive WebXR session - confirmed in docs/plans/css3d-panel-projection-spike.md). This
- * is real WebGL geometry, so it renders correctly inside a headset.
+ * instead of projecting the DOM pause menu (that approach - a CSS3D-projected copy of the DOM
+ * menu - was tried and removed; it never reaches an actual immersive WebXR session, confirmed in
+ * docs/plans/css3d-panel-projection-spike.md). This is real WebGL geometry, so it renders
+ * correctly inside a headset.
  *
- * Phase 1 scope (see the "VR-Native Settings Menu via @pmndrs/uikit" plan): one panel
+ * Phase 1 scope (see docs/plans/vr-uikit-menu-migration-plan.md): one panel
  * (VRDisplayAdvancedPanel), no tab shell yet - reviewed live before porting further panels or
  * adding tab navigation. Interaction is wired two ways: @pmndrs/pointer-events' forwardHtmlEvents
  * drives hover/click/scroll from real DOM mouse/wheel events on the renderer canvas (flatscreen
@@ -45,8 +46,8 @@ import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRC
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRControllerPointer } from './VRControllerPointer'
 
-// Same "held in front of the viewer" convention GameBoxFoldCoordinator/SettingsPanelProjector both
-// use - kept in parity, not imported (those constants are module-private).
+// Same "held in front of the viewer" convention GameBoxFoldCoordinator uses - kept in parity,
+// not imported (that constant is module-private).
 const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.6)
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.3)
 // Distance in front of the player the panel world-locks to at open time - matches
@@ -133,8 +134,8 @@ export class VRSettingsPanelCoordinator {
         if (event.detail.menuType !== 'pause') {
             return
         }
-        // Mirrors SettingsPanelProjector: the override is meant to keep the panel visible for
-        // flatscreen preview regardless of real menu state.
+        // The override is meant to keep the panel visible for flatscreen preview regardless of
+        // real menu state.
         if (!this.forceEnabled) {
             this.deactivate()
         }
