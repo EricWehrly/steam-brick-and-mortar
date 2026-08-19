@@ -246,9 +246,7 @@ export const BUILTIN_INPUT_PROFILES: ReadonlyArray<InputProfileDefinition> = [
             // thumbstick-x=axis 2, thumbstick-y=axis 3. These are plain gamepad-button/gamepad-axis
             // bindings, same as GamepadStandard's - the `handedness` field is what routes them to
             // read XR controllers instead of navigator.getGamepads() (see GamepadBindingHandedness's
-            // doc comment). menu=4 is unverified - see docs/tech-debt.md's
-            // xr-menu-button-mapping-unverified entry.
-            // TD: xr-menu-button-mapping-unverified
+            // doc comment). menu=4 confirmed against real headset hardware 2026-08-19.
             [InputAction.Interact]: [{ type: 'gamepad-button', button: 0, handedness: 'any', label: 'Trigger' }],
             // Cancel is the same generic "back out" action Cancel already means everywhere else
             // (pause menu, binder UI, debug inspector) - for a summoned game box specifically,

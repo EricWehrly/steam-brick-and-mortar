@@ -266,28 +266,6 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 - `external-tool/infrastructure/lambda-src/services/steam-api.js`
 - `external-tool/infrastructure/lambda-hydrator-src/index.js`
 
-## id: xr-menu-button-mapping-unverified
-**Priority**: Low
-**Effort**: ~30 min once a real headset is on hand (connect, run the existing HID/gamepad button
-dump, read the real index off `gamepad.buttons`)
-**Context**: `InputProfile.ts`'s VR profile binds `OpenMenu` to raw `xr-standard` gamepad button
-index 4 - a best-effort guess, not verified against real hardware. The system/Oculus button is
-typically OS-reserved on Quest and may not be exposed to
-`gamepad.buttons` at all; where a secondary button *is* exposed, its index isn't guaranteed stable
-across controller families. See `docs/plans/vr-support-plan.md`.
-
-**Decision (for now)**: ship the guess, don't block sub-scope 1 on it. In-headset pause-menu access
-realistically belongs to VR Support's sub-scope 2 (spatial UI) anyway - low urgency until that's
-picked up.
-
-**Done when**:
-- Verified (or corrected) against at least one real headset's actual button index
-- If no exposed button exists on a given controller family, `OpenMenu` simply doesn't fire from XR
-  on that hardware (already the graceful behavior today, not a crash) - document that instead
-
-**Related files**:
-- `client/src/input/BindingResolver.ts`
-
 ## id: personal-data-in-git-history
 **Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
 **Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)
@@ -706,6 +684,10 @@ not a source of bugs.
 
 ## id: approximated-placement-tripwire
 **Status**: ✅ Resolved (date not tracked — confirmed via code audit 2026-07-22) — approximation assumptions documented inline (`GameBoxUtils.ts:9-13`, explicitly framed as a deliberate tripwire for model-sync regressions) and covered by `client/test/unit/scene/placement-tripwire.test.ts`.
+
+## id: xr-menu-button-mapping-unverified
+**Status**: ✅ Resolved 2026-08-19 — confirmed against real headset hardware: `xr-standard` button
+index 4 does open the menu. `InputProfile.ts`'s VR `OpenMenu` binding was correct as shipped.
 
 ## id: gamepad-button-actions-unconsumed
 **Status**: ✅ Resolved 2026-07-24 — see `docs/plans/input-action-routing-plan.md` (implemented, then revised twice the same day after design reviews — see the plan's "Revision history" for what changed and why each time). Keyboard `Interact`/`OpenMenu` now fire directly off the real `keydown` DOM event (via a new `InputStateTracker.onRawKeyDown` callback) — no polling, no frame-diffing, since keyboard already has a real press edge. Mouse deliberately has no equivalent path: a real mouse click already has its own independent dispatch (`SystemUICoordinator`), entirely separate from the binding system, so nothing was added to route it through here too. Gamepad has no native press event, so `DeviceDetector.pollGamepads()` (which already polls every frame) tracks per-button state and emits `InputEventTypes.GamepadButtonPressed` on a transition. Both keyboard and gamepad funnel through `InputActionResolver`'s new `handleRawKeyPress()`/`handleGamepadButtonPress()`, which look up bound actions via a new `BindingResolver.findButtonActionsBoundTo()` and resolve all the way to a *specific* event per action (`InputEventTypes.OpenMenuPressed`, `InputEventTypes.InteractPressed`) rather than a generic tagged envelope — `InputActionResolver` is the class whose job is deciding which action fired, so it does that fully rather than handing a partial answer downstream. No dispatcher class: `PauseMenuManager` listens for `OpenMenuPressed` directly and calls its own `toggle()` (replacing the old hardcoded `Escape`-only listener); `SystemUICoordinator` listens for `InteractPressed` (simulates a click at the reticle position by emitting the existing `SceneCanvasClick` with center-screen NDC) and owns the gamepad/VR reticle. Along the way, fixed two real bugs: (1) pausing didn't actually stop gamepad-driven camera movement — `InputManager` now has `pause()`/`resume()` that gate camera application only, while `updateFrame()` (gamepad polling) keeps running; (2) `DeviceDetector.pollGamepads()` only flagged a device-list change on gamepad *disconnect*, never *connect* via polling. `ToggleUI` and `ToggleFullscreen` were both removed entirely rather than built (see [Input System](features/input-system.md) Stretch section) — no consumer was ever designed for `ToggleUI`, and `ToggleFullscreen` was redundant scope (F11 already provides native browser fullscreen).
