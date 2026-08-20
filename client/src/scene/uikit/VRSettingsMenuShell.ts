@@ -4,9 +4,9 @@
  * constructor, not per-activation) and subscribes to UIEventTypes.MenuPanelChanged immediately, so
  * it doesn't miss the DOM menu's initial panel choice - PauseMenuManager.open() emits that before
  * the MenuOpen event this shell's container gets attached in response to even exists yet. Only the
- * container is attached/detached from the scene per open/close; the shell instance and its
- * subscription persist for the app's lifetime, the same pattern VRSettingsPanelCoordinator itself
- * already uses for MenuOpen/MenuClose.
+ * container's visibility/anchor is toggled per open/close (see VRSettingsPanelCoordinator); the
+ * shell instance and its subscription persist for the app's lifetime, the same pattern
+ * VRSettingsPanelCoordinator itself already uses for MenuOpen/MenuClose.
  *
  * Syncs "which panel is active" with the DOM pause menu bidirectionally via MenuPanelChanged,
  * without either side calling the other directly - see PauseMenuManager.showPanel() for the DOM
@@ -20,6 +20,7 @@ import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
 import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenuTabContent } from './VRMenuTabRegistry'
+import { toUikitSafeText } from './UikitTextSanitizer'
 
 const SHELL_PIXEL_SIZE = 0.0008
 const TAB_COLUMN_WIDTH = 150
@@ -105,7 +106,7 @@ export class VRSettingsMenuShell {
     }
 
     private buildTabButton(tab: VRMenuTab): TabButtonHandle {
-        const label = new Text({ text: `${tab.icon} ${tab.title}`, fontSize: TAB_LABEL_FONT_SIZE, color: TAB_INACTIVE_COLOR })
+        const label = new Text({ text: toUikitSafeText(`${tab.icon} ${tab.title}`), fontSize: TAB_LABEL_FONT_SIZE, color: TAB_INACTIVE_COLOR })
         const button = new Button({
             variant: 'ghost',
             backgroundColor: TAB_INACTIVE_BACKGROUND,

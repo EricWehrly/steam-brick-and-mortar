@@ -9,6 +9,7 @@ import { Container, Text } from '@pmndrs/uikit'
 import type { AppSettings } from '../../core/AppSettings'
 import type { NumericSettingKey, SettingsPanelSchema, SettingsSection } from '../../ui/settings/SettingsSchema'
 import { createSliderRow, type UIKitSliderRow } from './UIKitRowHelpers'
+import { toUikitSafeText } from './UikitTextSanitizer'
 
 const SECTION_GAP = 10
 const SECTION_HEADING_FONT_SIZE = 15
@@ -35,16 +36,16 @@ function buildSection(
     rowsBySetting: Map<NumericSettingKey, UIKitSliderRow>
 ): Container {
     const container = new Container({ flexDirection: 'column', gap: SECTION_GAP, width: '100%' })
-    container.add(new Text({ text: section.heading, fontSize: SECTION_HEADING_FONT_SIZE, color: HEADING_TEXT_COLOR }))
+    container.add(new Text({ text: toUikitSafeText(section.heading), fontSize: SECTION_HEADING_FONT_SIZE, color: HEADING_TEXT_COLOR }))
 
     if (section.description) {
-        container.add(new Text({ text: section.description, fontSize: DESCRIPTION_FONT_SIZE, color: DESCRIPTION_TEXT_COLOR }))
+        container.add(new Text({ text: toUikitSafeText(section.description), fontSize: DESCRIPTION_FONT_SIZE, color: DESCRIPTION_TEXT_COLOR }))
     }
 
     for (const control of section.controls) {
         if (control.kind === 'range') {
             const row = createSliderRow({
-                label: control.label,
+                label: toUikitSafeText(control.label),
                 min: control.min,
                 max: control.max,
                 step: control.step,
