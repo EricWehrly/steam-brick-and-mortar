@@ -29,22 +29,33 @@ import { DebugStatsProvider } from '../../../ui/pause/panels/DebugStatsProvider'
 import type { DebugStats } from '../../../ui/pause/panels/DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../../ui/PerformanceMonitor'
 import { toUikitSafeText } from '../UikitTextSanitizer'
+import { UIKIT_COLORS } from '../UikitColorTokens'
 
 const PANEL_PADDING = 20
-const SECTION_GAP = 16
-const ROW_GAP = 4
 const TITLE_FONT_SIZE = 18
-const SECTION_HEADING_FONT_SIZE = 13
-const SECTION_HEADING_COLOR = '#aac4ff'
+const ROW_GAP = 6
 const ROW_LABEL_FONT_SIZE = 13
-const ROW_LABEL_COLOR = '#9a9a9a'
-const ROW_VALUE_COLOR = '#e8e8e8'
+const ROW_LABEL_COLOR = UIKIT_COLORS.textSecondary
+const ROW_VALUE_COLOR = UIKIT_COLORS.textPrimary
 const SCROLL_HEIGHT = 460
 const LOADING_TEXT = 'loading...'
-// Mirrors DebugPanel.getPerformanceClass()'s good/caution/warning thresholds and traffic-light intent.
-const GOOD_COLOR = '#7ed957'
-const CAUTION_COLOR = '#e0c15a'
-const WARNING_COLOR = '#e05a5a'
+// Mirrors DebugPanel.getPerformanceClass()'s good/caution/warning thresholds and traffic-light
+// intent, sourced from tokens.css's status colors rather than ad-hoc hex values.
+const GOOD_COLOR = UIKIT_COLORS.success
+const CAUTION_COLOR = UIKIT_COLORS.warning
+const WARNING_COLOR = UIKIT_COLORS.error
+
+// The DOM DebugPanel (debug-panel.css's .debug-sections) lays out its four stat groups as a
+// responsive card grid, not one long flat list - direct request (2026-08-20): "it doesn't seem to
+// really try to honor its original design. It's just a list now." Mirrored here as a two-column
+// wrapping grid of section "cards" instead of a single vertical stack.
+const GRID_GAP = 16
+const CARD_WIDTH = 350
+const CARD_PADDING = 14
+const CARD_BACKGROUND = UIKIT_COLORS.surface2
+const CARD_RADIUS = 10
+const CARD_HEADING_FONT_SIZE = 13
+const CARD_HEADING_COLOR = UIKIT_COLORS.accent
 
 interface StatRowSpec {
     readonly key: keyof typeof ROW_FORMATTERS
@@ -162,11 +173,12 @@ export class VRDebugPanel {
 
     private build(): Container {
         const root = new Container({ flexDirection: 'column', gap: ROW_GAP, padding: PANEL_PADDING, width: '100%' })
-        root.add(new Text({ text: 'Debug', fontSize: TITLE_FONT_SIZE, color: '#ffffff' }))
+        root.add(new Text({ text: 'Debug', fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
 
         const scroll = new Container({
-            flexDirection: 'column',
-            gap: SECTION_GAP,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: GRID_GAP,
             width: '100%',
             height: SCROLL_HEIGHT,
             overflow: 'scroll'
@@ -177,19 +189,26 @@ export class VRDebugPanel {
         root.add(scroll)
 
         const refreshButton = new Button({ variant: 'secondary', onClick: () => void this.refresh() })
-        refreshButton.add(new Text({ text: 'Refresh', color: '#ffffff' }))
+        refreshButton.add(new Text({ text: 'Refresh', color: UIKIT_COLORS.textPrimary }))
         root.add(refreshButton)
 
         return root
     }
 
     private buildSection(heading: string, rows: readonly StatRowSpec[]): Container {
-        const section = new Container({ flexDirection: 'column', gap: ROW_GAP, width: '100%' })
-        section.add(new Text({ text: heading.toUpperCase(), fontSize: SECTION_HEADING_FONT_SIZE, color: SECTION_HEADING_COLOR }))
+        const card = new Container({
+            flexDirection: 'column',
+            gap: ROW_GAP,
+            width: CARD_WIDTH,
+            padding: CARD_PADDING,
+            backgroundColor: CARD_BACKGROUND,
+            borderRadius: CARD_RADIUS
+        })
+        card.add(new Text({ text: heading.toUpperCase(), fontSize: CARD_HEADING_FONT_SIZE, color: CARD_HEADING_COLOR }))
         for (const row of rows) {
-            section.add(this.buildRow(row))
+            card.add(this.buildRow(row))
         }
-        return section
+        return card
     }
 
     private buildRow(row: StatRowSpec): Container {

@@ -94,6 +94,6 @@ describe('VRDebugPanel', () => {
         await Promise.resolve()
 
         const fpsCall = setPropertiesSpy.mock.calls.find(call => (call[0] as { text?: string }).text === '12.0')
-        expect(fpsCall?.[0]).toMatchObject({ color: '#e05a5a' })
+        expect(fpsCall?.[0]).toMatchObject({ color: '#dc3545' })
     })
 })

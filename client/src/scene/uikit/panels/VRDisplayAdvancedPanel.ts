@@ -19,14 +19,15 @@ import { AppSettings } from '../../../core/AppSettings'
 import { DISPLAY_ADVANCED_SCHEMA, schemaSettingKeys, type NumericSettingKey } from '../../../ui/settings/SettingsSchema'
 import { buildSettingsSchemaTree } from '../SettingsSchemaUIKitRenderer'
 import type { UIKitSliderRow } from '../UIKitRowHelpers'
+import { UIKIT_COLORS } from '../UikitColorTokens'
 
-// Deliberately shorter than the natural content height (6 rows + gaps) so this panel's own
-// scroll container is always exercised, not just the tab shell's - see the plan's testing note on
-// verifying scroll/click/cursor interaction on the very first pass.
-const SCROLL_HEIGHT = 260
-const PANEL_PADDING = 20
-const ROW_GAP = 14
-const TITLE_FONT_SIZE = 18
+// Grown from 260/20/14/18 - direct request (2026-08-20): "the 'advanced' is unnecessarily
+// squished, too tight, not readable enough." Tall enough now that the 6 controls mostly fit
+// without fighting the tab shell's own outer scroll with a second, nested one.
+const SCROLL_HEIGHT = 480
+const PANEL_PADDING = 28
+const ROW_GAP = 20
+const TITLE_FONT_SIZE = 20
 
 export class VRDisplayAdvancedPanel {
     readonly container: Container
@@ -49,7 +50,7 @@ export class VRDisplayAdvancedPanel {
         // Plain hyphen, not an em-dash: uikit's msdf glyph lookup had no glyph for "—" (confirmed
         // via repeated "Missing glyph info" console warnings), and the whole title failed to
         // render rather than just that one character.
-        root.add(new Text({ text: 'Display - Advanced', fontSize: TITLE_FONT_SIZE, color: '#ffffff' }))
+        root.add(new Text({ text: 'Display - Advanced', fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
 
         const scroll = new Container({
             flexDirection: 'column',
@@ -65,7 +66,7 @@ export class VRDisplayAdvancedPanel {
         root.add(scroll)
 
         const resetButton = new Button({ variant: 'secondary', onClick: this.reset.bind(this) })
-        resetButton.add(new Text({ text: 'Reset to Defaults', color: '#ffffff' }))
+        resetButton.add(new Text({ text: 'Reset to Defaults', color: UIKIT_COLORS.textPrimary }))
         root.add(resetButton)
 
         return { container: root, rowsBySetting }

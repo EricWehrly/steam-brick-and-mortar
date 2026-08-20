@@ -10,14 +10,15 @@ import type { AppSettings } from '../../core/AppSettings'
 import type { NumericSettingKey, SettingsPanelSchema, SettingsSection } from '../../ui/settings/SettingsSchema'
 import { createSliderRow, type UIKitSliderRow } from './UIKitRowHelpers'
 import { toUikitSafeText } from './UikitTextSanitizer'
+import { UIKIT_COLORS } from './UikitColorTokens'
 
-const SECTION_GAP = 10
-const SECTION_HEADING_FONT_SIZE = 15
-// Matches UIKitRowHelpers' ROW_TEXT_COLOR - kept as its own constant since a section heading
-// reads as a step up from row text, not identical styling that happens to share a value.
-const HEADING_TEXT_COLOR = '#e8e8ec'
-const DESCRIPTION_FONT_SIZE = 12
-const DESCRIPTION_TEXT_COLOR = '#9a9aa5'
+// Bumped from 10/15/12 - direct request (2026-08-20): the Advanced settings panel read as
+// "unnecessarily squished, too tight, not readable enough."
+const SECTION_GAP = 18
+const SECTION_HEADING_FONT_SIZE = 17
+const HEADING_TEXT_COLOR = UIKIT_COLORS.textPrimary
+const DESCRIPTION_FONT_SIZE = 13
+const DESCRIPTION_TEXT_COLOR = UIKIT_COLORS.textTertiary
 
 export interface SettingsSchemaUIKitTree {
     readonly sectionContainers: readonly Container[]

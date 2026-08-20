@@ -7,12 +7,16 @@
 import { Container, Text } from '@pmndrs/uikit'
 import { Slider } from '@pmndrs/uikit-default'
 import { signal } from '@preact/signals-core'
+import { UIKIT_COLORS } from './UikitColorTokens'
 
-const ROW_LABEL_FONT_SIZE = 14
-const ROW_GAP = 4
+// Bumped from 14/4 - direct request (2026-08-20): rows read as "unnecessarily squished, too
+// tight, not readable enough."
+const ROW_LABEL_FONT_SIZE = 16
+const ROW_GAP = 8
 // uikit's Text has no default color (renders black) - this panel's rows sit on a dark
-// (#1c1c22) background, so an unset color is invisible, not just low-contrast.
-const ROW_TEXT_COLOR = '#e8e8ec'
+// surface, so an unset color is invisible, not just low-contrast. Sourced from tokens.css'
+// --color-text-primary via UIKIT_COLORS, not an ad-hoc hex value - see UikitColorTokens.ts.
+const ROW_TEXT_COLOR = UIKIT_COLORS.textPrimary
 
 export interface UIKitSliderRowOptions {
     readonly label: string

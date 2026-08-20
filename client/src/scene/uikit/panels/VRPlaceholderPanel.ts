@@ -7,12 +7,13 @@
  */
 
 import { Container, Text } from '@pmndrs/uikit'
+import { UIKIT_COLORS } from '../UikitColorTokens'
 
 const CONTAINER_GAP = 8
 const CONTAINER_PADDING = 20
 const TITLE_FONT_SIZE = 18
 const MESSAGE_FONT_SIZE = 14
-const MESSAGE_COLOR = '#9a9aa5'
+const MESSAGE_COLOR = UIKIT_COLORS.textTertiary
 const DEFAULT_MESSAGE = 'Not available in VR yet - use the flatscreen menu for this tab.'
 
 export interface VRPlaceholderPanelOptions {
@@ -25,7 +26,7 @@ export class VRPlaceholderPanel {
 
     constructor(options: VRPlaceholderPanelOptions) {
         this.container = new Container({ flexDirection: 'column', gap: CONTAINER_GAP, padding: CONTAINER_PADDING, width: '100%' })
-        this.container.add(new Text({ text: options.title, fontSize: TITLE_FONT_SIZE, color: '#ffffff' }))
+        this.container.add(new Text({ text: options.title, fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
         this.container.add(new Text({
             text: options.message ?? DEFAULT_MESSAGE,
             fontSize: MESSAGE_FONT_SIZE,
