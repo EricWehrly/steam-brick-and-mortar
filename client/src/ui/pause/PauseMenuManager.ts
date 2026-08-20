@@ -79,6 +79,13 @@ export class PauseMenuManager {
     private scrollPositionByPanelId: Map<string, number> = new Map()
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
+    // When true, open()/close() still run their full state machine (activePanel tracking,
+    // MenuPanelChanged sync, input pause) but the DOM overlay itself never becomes visible - the
+    // VR uikit menu is the only thing the player actually sees. Direct request (2026-08-20): the
+    // DOM menu is being phased out, and forceVRSettingsPanel should let it be evaluated as the
+    // only UI on flatscreen too, not just alongside the DOM one. See SystemUICoordinator, which
+    // sets this from UrlUtils.isVRSettingsPanelForced().
+    private domVisualsSuppressed = false
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
     private eventManager: EventManager
@@ -190,6 +197,15 @@ export class PauseMenuManager {
         this.systemDependencies = dependencies
     }
 
+    /** See domVisualsSuppressed's doc comment. Applied immediately if the menu happens to already
+     *  be open when called, not just on the next open(). */
+    setDomVisualsSuppressed(suppressed: boolean): void {
+        this.domVisualsSuppressed = suppressed
+        if (this.overlay && this.state.isOpen) {
+            this.overlay.style.display = suppressed ? 'none' : 'flex'
+        }
+    }
+
     registerPanel(panel: PauseMenuPanel): void {
         this.panels.set(panel.id, panel)
         panel.init()
@@ -272,8 +288,9 @@ export class PauseMenuManager {
         // Pause input
         this.pauseInput()
         
-        // Show overlay
-        if (this.overlay) {
+        // Show overlay - unless the VR uikit menu is standing in as the only visible UI (see
+        // domVisualsSuppressed's doc comment).
+        if (this.overlay && !this.domVisualsSuppressed) {
             this.overlay.style.display = 'flex'
         }
 

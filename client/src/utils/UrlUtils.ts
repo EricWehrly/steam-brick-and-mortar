@@ -54,10 +54,14 @@ export class UrlUtils {
     }
 
     /**
-     * Whether ?forceVRSettingsPanel=1 is present — SystemUICoordinator opens the real pause menu
+     * Whether ?forceVRSettingsPanel=1 is present — switches to the VR uikit menu system as the
+     * only visible UI, including on flatscreen (the DOM pause menu is being phased out; this flag
+     * is how it gets evaluated as the sole UI ahead of that, not just previewed alongside it - see
+     * PauseMenuManager.setDomVisualsSuppressed()). SystemUICoordinator opens the real pause menu
      * at startup when this is set, so the uikit settings panel (which only ever activates via a
-     * real MenuOpen - see VRSettingsPanelCoordinator) shows immediately on a normal flatscreen
-     * browser (mouse-driven) without a headset, with no manual Settings/OpenMenu press needed.
+     * real MenuOpen - see VRSettingsPanelCoordinator) shows immediately without a manual
+     * Settings/OpenMenu press, and also stands up the standalone Category Reference world-lock
+     * trial (VRCategoryReferenceCoordinator).
      */
     static isVRSettingsPanelForced(): boolean {
         return UrlUtils.getSearchParams().get('forceVRSettingsPanel') === '1'

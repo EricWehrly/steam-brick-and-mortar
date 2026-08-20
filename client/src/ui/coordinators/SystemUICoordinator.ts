@@ -38,6 +38,7 @@ import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
+import { VRCategoryReferenceCoordinator } from '../../scene/uikit/VRCategoryReferenceCoordinator'
 import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
 
@@ -65,6 +66,7 @@ export class SystemUICoordinator {
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
+    private vrCategoryReferenceCoordinator?: VRCategoryReferenceCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
@@ -148,16 +150,27 @@ export class SystemUICoordinator {
 
         this.vrSettingsPanelCoordinator.init(renderer)
 
-        // ?forceVRSettingsPanel=1 dev-preview convenience: open the real pause menu at startup so
-        // the VR uikit panel (which only ever activates via a real MenuOpen, see
-        // VRSettingsPanelCoordinator's doc comment) shows immediately without needing a manual
-        // Settings/OpenMenu press first. Going through the same open() every real press uses means
-        // this panel's active state can never disagree with PauseMenuManager's - a previous
-        // version pre-activated the VR panel independently and the two desynced (confirmed live
-        // 2026-08-20: first real press looked like a no-op, second one was the one that actually
-        // closed anything).
+        // ?forceVRSettingsPanel=1: switches to the VR uikit menu as the ONLY visible UI, including
+        // on flatscreen - direct request (2026-08-20), so the VR menu can be evaluated toward
+        // becoming the one final UI while the DOM menu is phased out, not just previewed alongside
+        // it. Opens the real pause menu at startup (so the VR uikit panel - which only ever
+        // activates via a real MenuOpen, see VRSettingsPanelCoordinator's doc comment - shows
+        // immediately without a manual Settings/OpenMenu press) but suppresses the DOM overlay's
+        // own visuals; the DOM menu's state machine (activePanel, MenuPanelChanged sync) keeps
+        // running underneath, since VRSettingsMenuShell's tab sync depends on it. Going through the
+        // same open() every real press uses means this panel's active state can never disagree with
+        // PauseMenuManager's - a previous version pre-activated the VR panel independently and the
+        // two desynced (confirmed live 2026-08-20: first real press looked like a no-op).
+        //
+        // Also stands up the standalone Category Reference world-lock trial (see
+        // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
+        // evaluating this VR menu system in flatscreen together, not two separate dev toggles.
         if (UrlUtils.isVRSettingsPanelForced()) {
+            this.pauseMenuManager.setDomVisualsSuppressed(true)
             this.pauseMenuManager.open()
+
+            this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
+            this.vrCategoryReferenceCoordinator.init(renderer)
         }
 
         // Setup event handlers
@@ -346,10 +359,16 @@ export class SystemUICoordinator {
     }
 
     private readonly handlePauseInput = (): void => {
+        if (!this.appSettings.getSetting('lockMovementWhileMenuOpen')) {
+            return
+        }
         this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
     }
 
     private readonly handleResumeInput = (): void => {
+        if (!this.appSettings.getSetting('lockMovementWhileMenuOpen')) {
+            return
+        }
         this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
     }
 
@@ -488,6 +507,7 @@ export class SystemUICoordinator {
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
         this.vrSettingsPanelCoordinator?.dispose()
+        this.vrCategoryReferenceCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
         this.pauseMenuManager?.dispose()

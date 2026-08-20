@@ -64,6 +64,9 @@ describe('SystemUICoordinator pause/resume input wiring', () => {
         lastPauseMenuManager = undefined
         mockEventManager = EventManager.getInstance()
         const mockAppSettings = AppSettings.getInstance()
+        // This test's subject is "does onPauseInput/onResumeInput really emit Pause/Resume",
+        // independent of lockMovementWhileMenuOpen's own dev/prod default - see AppSettings.ts.
+        mockAppSettings.setSetting('lockMovementWhileMenuOpen', true)
 
         new SystemUICoordinator(mockEventManager, mockAppSettings)
     })
@@ -78,5 +81,18 @@ describe('SystemUICoordinator pause/resume input wiring', () => {
         lastPauseMenuManager!.callbacks.onResumeInput?.()
 
         expect(mockEventManager.emit).toHaveBeenCalledWith(InputEventTypes.Resume, { reason: 'menu' })
+    })
+
+    it('does not emit Pause/Resume when lockMovementWhileMenuOpen is off', () => {
+        const mockAppSettings = AppSettings.getInstance()
+        mockAppSettings.setSetting('lockMovementWhileMenuOpen', false)
+        new SystemUICoordinator(mockEventManager, mockAppSettings)
+        vi.mocked(mockEventManager.emit).mockClear()
+
+        lastPauseMenuManager!.callbacks.onPauseInput?.()
+        lastPauseMenuManager!.callbacks.onResumeInput?.()
+
+        expect(mockEventManager.emit).not.toHaveBeenCalledWith(InputEventTypes.Pause, expect.anything())
+        expect(mockEventManager.emit).not.toHaveBeenCalledWith(InputEventTypes.Resume, expect.anything())
     })
 })
