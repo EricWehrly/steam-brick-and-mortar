@@ -14,27 +14,27 @@ Make the app's settings menu genuinely usable in an immersive WebXR session, fro
 When this is done, `?forceVRSettingsPanel=1` is deleted, the VR panel shows real settings (not just
 the one Advanced tab), and the dead CSS3D projector is removed.
 
-## Where we actually are (2026-08-19, all live-verified)
+## Where we actually are (updated 2026-08-20, all live-verified unless noted)
 
 Built and working:
 
 - `VRSettingsPanelCoordinator` — owns a real uikit tree in the scene, activates/deactivates on the
-  same `UIEventTypes.MenuOpen`/`MenuClose` the DOM pause menu emits, anchored to the primary
-  controller grip (falling back to camera-local). Per-frame `update()` drives uikit layout,
-  flatscreen mouse forwarding, and controller-pointer reconciliation.
+  same `UIEventTypes.MenuOpen`/`MenuClose` the DOM pause menu emits. Anchor mode is currently
+  `world-lock` (temporary, live trial - see "world-lock trial" below; `camera-attached` was the
+  2026-08-19 A/B winner). Per-frame `update()` drives uikit layout, flatscreen mouse forwarding, and
+  controller-pointer reconciliation.
 - `VRControllerPointer` — one `@pmndrs/pointer-events` ray pointer per connected controller, with a
-  laser beam + hit marker, gated on analog trigger depression, native `selectstart`/`selectend` for
-  down/up, and a `-15°` pitch correction on the reported target-ray direction.
-- `VRDisplayAdvancedPanel` + `UIKitRowHelpers.createSliderRow` — exactly **one** ported panel
-  (Display → Advanced, 6 sliders + a reset button), drawing on top of scene content via
-  `depthTest: false` + a high `renderOrder`.
+  laser beam + hit marker, always-on (not trigger-gated - that behavior is reserved for a future
+  real-world game-box raycast instead), native `selectstart`/`selectend` for down/up.
+- `VRSettingsMenuShell` — the tab column + content-swap area (Story 4, done). Four tabs today:
+  `display-advanced` (✅ ported), `vr-category-reference` (world-lock trial, not a real DOM panel),
+  `debug` (✅ ported), `vr-more-settings` (placeholder covering the five still-unported panels).
 - VR `OpenMenu` (xr-standard button 4) confirmed against real hardware; VR `Cancel` bound to grip.
 
 Not built:
 
-- Any tab shell in VR. There is no way to reach a second panel.
-- Seven of the eight DOM panels (corrected count, 2026-08-20 survey — see "Full menu/panel
-  inventory" below; the plan previously said "nine" in one place and "8 panels" in another).
+- Five of the eight DOM panels (`CacheManagementPanel`, `ControlsPanel`, `ApplicationPanel`,
+  `GameSettingsPanel`, `GraphicsSettingsPanel`) - see "Full menu/panel inventory" below.
 - Any suppression/coordination of the DOM pause menu while in a session (both "open" at once today,
   which is harmless only because the DOM one is invisible in-headset).
 - Removal of `?forceVRSettingsPanel=1` and of the dead `SettingsPanelProjector` (CSS3D), which is
@@ -176,7 +176,7 @@ targets, tab order below.** All 8 confirmed live via code survey (no others exis
 | Panel | File | Weight | VR status |
 |---|---|---|---|
 | `DisplayAdvancedPanel` | `panels/DisplayAdvancedPanel.ts` | Small, schema-driven | ✅ Ported (`display-advanced`) |
-| `DebugPanel` | `panels/DebugPanel.ts` | Substantial (454 lines) | Next up — see pivot below |
+| `DebugPanel` | `panels/DebugPanel.ts` | Substantial (454 lines) | ✅ Ported (`debug`, 2026-08-20) — `VRDebugPanel.ts`. Read-only stats only: console capture/clear and JSON export left out entirely (no VR equivalent worth faking), no auto-refresh interval (`VRMenuTabContent` has no teardown hook yet - see that class's doc comment) |
 | `CacheManagementPanel` | `panels/CacheManagementPanel.ts` | Substantial (482 lines) | Next up — see pivot below |
 | `CameraSettingsPanel` | `panels/CameraSettingsPanel.ts` | Moderate (307 lines) | Planned, settings-shaped |
 | `ApplicationPanel` | `panels/ApplicationPanel.ts` | Moderate (161 lines) | Planned, settings-shaped |
@@ -227,9 +227,11 @@ piloting is finer-grained than that: a real tab with some sections rendered live
 
 Revised order:
 
-1. **`DebugPanel`** — first real tab built after `display-advanced`. Mostly read-only stats/counts,
-   a good uikit fit (Text/Container, little interactivity), and a reasonable test of whether a
-   data-shaped (not settings-shaped) panel can go through the same schema-ish approach at all.
+1. **`DebugPanel`** ✅ done 2026-08-20 — first real tab built after `display-advanced`. Read-only
+   stats/counts rendered from the same `DebugStatsProvider` the DOM panel uses (unmodified - see
+   `VRDebugPanel.ts`'s doc comment for how `PerformanceMonitorUI` reaches it), confirming a
+   data-shaped (not settings-shaped) panel can go through the same "one data source, one VR
+   renderer" approach without needing an actual `SettingsSchema`-style descriptor.
 2. **`CacheManagementPanel`** — pilots the inline "to be implemented" placeholder pattern
    specifically, on whichever parts don't trivially port (clear-cache actions, cached-user list
    management) while the stats/readouts render for real.
@@ -314,7 +316,8 @@ One commit per panel. Order revised 2026-08-20 (see "Tab order & scope pivot" ab
 now lead, piloting the inline "to be implemented" placeholder pattern on low-stakes panels before
 the settings-shaped ones:
 
-1. `DebugPanel` — mostly read-only stats; first test of the pattern on a non-settings-shaped panel.
+1. `DebugPanel` ✅ done 2026-08-20 — mostly read-only stats; first test of the pattern on a
+   non-settings-shaped panel.
 2. `CacheManagementPanel` — pilots inline per-section "to be implemented" placeholders specifically.
 3. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves)
 4. `ApplicationPanel` (toggles + buttons — exercises `createToggleRow`)
