@@ -44,7 +44,15 @@ export enum DataKey {
      * time so SceneClickGameBoxRaycast (owned by a different coordinator) can look up the current
      * controller ray without a direct cross-class reference. See docs/plans/vr-support-plan.md.
      */
-    XRControllerRaySource = 'webxr.controllerRaySource'
+    XRControllerRaySource = 'webxr.controllerRaySource',
+    /**
+     * PerformanceMonitorUI (SystemUICoordinator constructs and owns it) - published so
+     * VRDebugPanel can look it up without a direct cross-coordinator reference, the same
+     * lazy-resolve pattern VRSettingsPanelCoordinator already uses for MainScene/MainCamera. The
+     * DOM DebugPanel gets this via direct constructor injection instead (see PauseMenuManager) -
+     * this key exists specifically for the VR side, which has no equivalent injection point.
+     */
+    PerformanceMonitor = 'ui.performanceMonitor'
 }
 
 /**

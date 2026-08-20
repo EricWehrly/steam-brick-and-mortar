@@ -18,6 +18,8 @@ import { LayoutControlPanel } from '../LayoutControlPanel'
 import { ScenePropsPanel } from '../ScenePropsPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
+import { DataManager } from '../../core/data/DataManager'
+import { DataDomain, DataKey } from '../../core/data/DataTypes'
 import {
     UIEventTypes,
     InputEventTypes,
@@ -88,6 +90,10 @@ export class SystemUICoordinator {
             updateInterval: 100,
             precision: 1
         })
+        // Published for VRDebugPanel's lookup - the DOM DebugPanel gets this via direct
+        // constructor injection (see PauseMenuManager.registerDefaultPanels) instead, since it's
+        // only the VR side that has no such injection point back to here.
+        DataManager.getInstance().set(DataKey.PerformanceMonitor, this.performanceMonitor, { domain: DataDomain.Scene })
 
         this.pauseMenuManager = new PauseMenuManager(
             {},
