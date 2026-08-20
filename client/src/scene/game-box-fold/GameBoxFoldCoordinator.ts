@@ -29,8 +29,13 @@ const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 // Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
 // Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
 // doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
-const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.6)
-const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.12)
+// Flatscreen distance brought in from -0.6 per direct request ("game boxes are way too far from
+// the camera in flatscreen").
+const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.35)
+// Pushed further from the grip (was -0.12) per direct request - held right at the hand, the box
+// ended up right in front of the player's face too. More separation from the grip reads as
+// "holding it out to look at" instead.
+const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.22)
 // The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
