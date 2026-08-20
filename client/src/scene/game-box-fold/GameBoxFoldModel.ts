@@ -395,12 +395,14 @@ export class GameBoxFoldModel {
         return { canvas, context, texture }
     }
 
-    /** Front cover face: the player's relationship to this game - rating, playtime, and (until we
-     *  have real data for them, see docs/plans/game-box-store-data-research.md) reserved rows for
-     *  screenshots/videos. The title itself now lives on the store panel instead (2026-08-12,
-     *  "put the title at the middle top, above the disk"). +Z faces use standard (non-reversed)
-     *  UVs - see FACE_INDEX's comment - so no pre-mirroring is needed here, unlike
-     *  LabelTextureArrayManager's -Z-mapped labels. */
+    /** Front cover face: the player's relationship to this game - rating, and (until we have real
+     *  data for them, see docs/plans/game-box-store-data-research.md) reserved rows for
+     *  screenshots/videos. The title itself lives on the store panel instead (2026-08-12, "put the
+     *  title at the middle top, above the disk"); playtime/"recently played" lived here too but
+     *  was dropped per direct request ("don't need to repeat playtime or 'recently' on the left
+     *  side") - it's still shown once, on the store panel next to the Play button. +Z faces use
+     *  standard (non-reversed) UVs - see FACE_INDEX's comment - so no pre-mirroring is needed
+     *  here, unlike LabelTextureArrayManager's -Z-mapped labels. */
     private drawIdentityPanel(ctx: CanvasRenderingContext2D, content: GameBoxFoldContent): void {
         const size = PANEL_CANVAS_SIZE
         this.clearPanel(ctx)
@@ -416,23 +418,7 @@ export class GameBoxFoldModel {
             y += size * 0.07
         }
 
-        y += size * 0.02
-        ctx.textBaseline = 'alphabetic'
-        ctx.font = `${Math.floor(size / 26)}px Arial, sans-serif`
-        ctx.fillStyle = '#9a9a9a'
-        ctx.fillText('PLAYTIME', size / 2, y)
-        y += size * 0.05
-        ctx.font = `bold ${Math.floor(size / 11)}px Arial, sans-serif`
-        ctx.fillStyle = '#ffffff'
-        ctx.fillText(content.playtimeHours !== undefined ? `${content.playtimeHours}h` : '—', size / 2, y)
-        y += size * 0.055
-        ctx.font = `${Math.floor(size / 24)}px Arial, sans-serif`
-        ctx.fillStyle = '#c9c9c9'
-        ctx.fillText(
-            content.recentPlaytimeHours ? `${content.recentPlaytimeHours}h in last 2 weeks` : 'Not played recently',
-            size / 2, y
-        )
-        y += size * 0.1
+        y += size * 0.15
 
         this.drawComingSoonRows(ctx, y, ['Screenshots', 'Videos'])
     }
@@ -470,36 +456,64 @@ export class GameBoxFoldModel {
         return y + lines.length * lineHeight + size * 0.035
     }
 
-    /** Second flap face: description up top (right-aligned, moved here from the store panel per
-     *  explicit request - "top-right, debug section makes room for it"), then the raw cache-entry
-     *  JSON this box's content was built from - carried over from BinderGameDetailPanel's debug
-     *  dump per explicit request. The JSON viewport already scrolls (GameBoxFoldCoordinator's wheel
-     *  handling -> scrollDebugPanel(), which re-invokes this with the same debugJson at the new
-     *  this.debugScrollLine offset), so shrinking its visible window to make room costs nothing -
-     *  reads this.latestContent directly for the description, same pattern redrawStorePanel()
-     *  uses, since debugJson alone doesn't carry it. */
+    /** Second flap face: the store-page-style content that doesn't fit the front cover or center
+     *  panel - description, metacritic, and tags (moved here from the store panel per explicit
+     *  request - "metacritic ... should go under description on the right flap, along with tags") -
+     *  followed by a visually distinct, deliberately minor "cache entry" section holding the raw
+     *  JSON this box's content was built from (carried over from BinderGameDetailPanel's debug
+     *  dump). Previously this whole face was framed as one "DEBUG: CACHE ENTRY" block with the
+     *  description crammed into its corner - restructured per explicit request ("top-right should
+     *  be description followed by a different area showing the cache, this is definitely wrong")
+     *  into description-first, cache-second. The JSON viewport already scrolls
+     *  (GameBoxFoldCoordinator's wheel handling -> scrollDebugPanel(), which re-invokes this with
+     *  the same debugJson at the new this.debugScrollLine offset), so it's fine for the content
+     *  above it to leave it little room - reads this.latestContent directly for
+     *  description/metacritic/tags, same pattern redrawStorePanel() uses, since debugJson alone
+     *  doesn't carry them. */
     private drawDebugPanel(ctx: CanvasRenderingContext2D, debugJson: string | undefined): void {
         const size = PANEL_CANVAS_SIZE
         this.clearPanel(ctx)
+        const content = this.latestContent
 
-        ctx.textAlign = 'left'
-        ctx.textBaseline = 'top'
-        ctx.fillStyle = '#9a9a9a'
-        ctx.font = `${Math.floor(size / 26)}px Arial, sans-serif`
-        ctx.fillText('DEBUG: CACHE ENTRY', size * 0.06, size * 0.04)
+        let y = size * 0.06
 
-        let jsonStartY = size * 0.1
-        const description = this.latestContent?.description
+        const description = content?.description
         if (description) {
-            ctx.textAlign = 'right'
-            ctx.font = `${Math.floor(size / 30)}px Arial, sans-serif`
-            ctx.fillStyle = '#c9c9c9'
-            const descLineHeight = size / 22
-            const descLines = this.wrapLines(ctx, description, size * 0.55).slice(0, 3)
-            descLines.forEach((line, i) => ctx.fillText(line, size * 0.94, jsonStartY + i * descLineHeight, size * 0.55))
-            jsonStartY += descLines.length * descLineHeight + size * 0.03
             ctx.textAlign = 'left'
+            ctx.textBaseline = 'top'
+            ctx.font = `${Math.floor(size / 24)}px Arial, sans-serif`
+            ctx.fillStyle = '#d0d0d0'
+            const descLineHeight = size / 19
+            const descLines = this.wrapLines(ctx, description, size * 0.88).slice(0, 5)
+            descLines.forEach((line, i) => ctx.fillText(line, size * 0.06, y + i * descLineHeight, size * 0.88))
+            y += descLines.length * descLineHeight + size * 0.03
         }
+
+        if (content?.metacritic) {
+            ctx.textAlign = 'left'
+            ctx.textBaseline = 'alphabetic'
+            ctx.font = `bold ${Math.floor(size / 24)}px Arial, sans-serif`
+            ctx.fillStyle = '#66cc33'
+            ctx.fillText(content.metacritic, size * 0.06, y + size * 0.03)
+            y += size * 0.07
+        }
+
+        y = this.drawLabeledChipLines(ctx, y, 'TAGS', content?.tags, '#8fc7ff')
+
+        y += size * 0.02
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'alphabetic'
+        ctx.strokeStyle = '#3a3a3a'
+        ctx.lineWidth = size * 0.002
+        ctx.beginPath()
+        ctx.moveTo(size * 0.06, y)
+        ctx.lineTo(size * 0.94, y)
+        ctx.stroke()
+        y += size * 0.035
+        ctx.fillStyle = '#6a6a6a'
+        ctx.font = `${Math.floor(size / 32)}px Arial, sans-serif`
+        ctx.fillText('CACHE ENTRY', size * 0.06, y)
+        y += size * 0.02
 
         if (!debugJson) {
             this.debugMaxScrollLine = 0
@@ -510,8 +524,8 @@ export class GameBoxFoldModel {
         ctx.font = `${fontSize}px "Courier New", monospace`
         const maxWidth = size * 0.88
         const lineHeight = fontSize * 1.25
-        const startY = jsonStartY
-        const maxLines = Math.floor((size * 0.96 - startY) / lineHeight)
+        const startY = y + lineHeight * 0.5
+        const maxLines = Math.max(1, Math.floor((size * 0.96 - startY) / lineHeight))
 
         const wrapped = this.wrapMonospaceLines(ctx, debugJson.split('\n'), maxWidth, Number.POSITIVE_INFINITY)
         this.debugMaxScrollLine = Math.max(0, wrapped.length - maxLines)
@@ -557,12 +571,12 @@ export class GameBoxFoldModel {
     /** Base/center face: revealed once both flaps swing away. Title up top, then header art
      *  presented like a disc emerging from its sleeve (2026-08-12 direction - visual identity to
      *  iterate on, see the plan doc), a Play button sharing its row with a condensed playtime
-     *  summary, metacritic, tags/categories/collections (moved here from the identity panel per
-     *  explicit request), and placeholder rows for sections with no data source wired up yet
-     *  (DLC/achievements - screenshots/videos moved to the identity panel). Description lives on
-     *  the debug face instead (see drawDebugPanel()), not here. Reads this.latestContent directly
-     *  rather than taking a parameter, since it can be triggered by either setContent() or
-     *  setHeaderImage() alone. */
+     *  summary (the only place playtime is shown - see drawIdentityPanel()'s doc comment),
+     *  categories/collections, and placeholder rows for sections with no data source wired up yet
+     *  (DLC/achievements - screenshots/videos moved to the identity panel). Description, metacritic,
+     *  and tags live on the debug face instead (see drawDebugPanel()), not here. Reads
+     *  this.latestContent directly rather than taking a parameter, since it can be triggered by
+     *  either setContent() or setHeaderImage() alone. */
     private redrawStorePanel(): void {
         const size = PANEL_CANVAS_SIZE
         const ctx = this.centerContext
@@ -647,18 +661,9 @@ export class GameBoxFoldModel {
         ctx.fillText(lastPlayedLine, size * 0.92, y + playH * 0.75)
         y += playH + size * 0.06
 
-        // Description moved to the debug face (top-right, above the cache-entry JSON) per direct
-        // request - see drawDebugPanel().
-        if (content?.metacritic) {
-            ctx.textAlign = 'center'
-            ctx.font = `bold ${Math.floor(size / 24)}px Arial, sans-serif`
-            ctx.fillStyle = '#66cc33'
-            ctx.fillText(content.metacritic, size / 2, y)
-            y += size * 0.06
-        }
-
+        // Description, metacritic, and tags all moved to the debug face per direct request - see
+        // drawDebugPanel().
         y += size * 0.02
-        y = this.drawLabeledChipLines(ctx, y, 'TAGS', content?.tags, '#8fc7ff')
         y = this.drawLabeledChipLines(ctx, y, 'FEATURES', content?.categories, '#a0d8a0')
         y = this.drawLabeledChipLines(ctx, y, 'YOUR COLLECTIONS', content?.userCollections, '#e0a0e0')
 
