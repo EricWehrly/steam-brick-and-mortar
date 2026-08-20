@@ -9,6 +9,7 @@ import type { Container } from '@pmndrs/uikit'
 import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
+import { VRCategoryReferencePanel } from './panels/VRCategoryReferencePanel'
 
 export interface VRMenuTabContent {
     readonly container: Container
@@ -24,6 +25,10 @@ export interface VRMenuTab {
 }
 
 const MORE_SETTINGS_PANEL_ID = 'vr-more-settings'
+// Not a real DOM PauseMenuPanel id - CategoryReferencePanel is a standalone dev/design panel
+// (hotkey G), not a pause-menu tab, so there's nothing for MenuPanelChanged to sync this tab
+// against. Same non-syncing situation as MORE_SETTINGS_PANEL_ID below.
+const CATEGORY_REFERENCE_PANEL_ID = 'vr-category-reference'
 
 export const VR_MENU_TABS: readonly VRMenuTab[] = [
     {
@@ -31,6 +36,15 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Display · Advanced',
         icon: '🔬',
         build: appSettings => new VRDisplayAdvancedPanel(appSettings)
+    },
+    {
+        // Piloting `world-lock` anchoring on real, non-settings content - see
+        // docs/plans/vr-uikit-menu-migration-plan.md's "world-lock trial via
+        // CategoryReferencePanel" section. Not part of the Tier 1 migration order.
+        panelId: CATEGORY_REFERENCE_PANEL_ID,
+        title: 'Category Reference',
+        icon: '🏷️',
+        build: () => new VRCategoryReferencePanel()
     },
     {
         // Doesn't correspond to a real DOM panel id - stands in for every DOM panel not yet
