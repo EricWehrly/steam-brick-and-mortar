@@ -192,7 +192,7 @@ tab order implied yet:
 | Panel | File | What it is |
 |---|---|---|
 | `LightingControlsPanel` | `client/src/ui/LightingControlsPanel.ts` | The "lighting panel" — master/per-group/per-light brightness sliders |
-| `CategoryReferencePanel` | `client/src/ui/CategoryReferencePanel.ts` | Dev/design quick-reference for game categories/sort dimensions (hotkey `G`) — see "Future ideas" below, a VR tab may not be the right shape for this one |
+| `CategoryReferencePanel` | `client/src/ui/CategoryReferencePanel.ts` | Dev/design quick-reference for game categories/sort dimensions (hotkey `G`) — **pulled out of Tier 2, see the `world-lock` trial section below**: ported as a `category-reference` VR tab specifically to pilot `world-lock` anchoring |
 | `LayoutControlPanel` | `client/src/ui/LayoutControlPanel.ts` | Layout/Group/Sort control bar |
 | `GameLibraryListPanel` | `client/src/ui/GameLibraryListPanel.ts` | Searchable/filterable full-library list view |
 | `ScenePropsPanel` | `client/src/ui/ScenePropsPanel.ts` | User prop-folder picker |
@@ -206,9 +206,9 @@ tab order implied yet:
   wanted) is a world-anchored HUD question, not a menu tab.
 - `SteamUIPanel`, `ProgressDisplay`, `WebXRUIPanel`, `StartupProgressUI` — pre-session/loading-flow
   UI, not applicable inside an in-game VR menu.
-- `CacheManagementUI` (`client/src/ui/CacheManagementUI.ts`) — `@deprecated`, unused dead code,
-  superseded by the pause menu's `CacheManagementPanel`. Not a migration target; a removal
-  candidate instead.
+- ~~`CacheManagementUI`~~ — unused dead code superseded by the pause menu's `CacheManagementPanel`;
+  deleted 2026-08-20 rather than left marked deprecated (no external callers existed, so there was
+  nothing a deprecation period would have protected).
 
 ## Tab order & scope pivot (decided 2026-08-20)
 
@@ -241,23 +241,36 @@ Revised order:
 Tier 2 (standalone) panels are explicitly not sequenced yet — revisit once the Tier 1 order above
 is further along.
 
+### `world-lock` trial via `CategoryReferencePanel` (2026-08-20)
+
+Clarified: the "sample a world-fixed menu" ask and the "bury `CategoryReferencePanel` somewhere in
+the world" idea from the previous session were the same idea, not two separate ones — try
+`world-lock` anchoring specifically by porting `CategoryReferencePanel`'s content (not a settings
+panel) into a uikit tab. Judged small enough to build directly rather than write a separate plan
+for: the content is 28 static rows (19 Steam genres + 4 meta-categories + 5 sort dimensions, each
+just a label + status) across three sections, a good fit for the `Container`/`Text` primitives and
+the `overflow: 'scroll'` content area already built for the tab shell (see the sizing pivot in this
+session's commits) — no new anchoring or layout mechanism needed, unlike a genuinely *permanent*
+in-world fixture would require. Implemented as a new `category-reference` tab; **not** a permanent
+scene object yet — this trial reuses the existing menu open/close lifecycle with `world-lock`
+substituted for the anchor mode, which is enough to judge "does world-locked content read well when
+you walk around it" without building the separate always-present-object mechanism first. If the
+trial reads well, "make it actually permanent, not gated behind menu-open" becomes its own follow-up
+rather than a prerequisite.
+
 ### Future ideas (not scheduled, logged so they aren't lost)
 
 - **Tab-navigation "knobs"** — a control row at the top of the VR menu shell for jumping between
   top-level menu/sub-menu groups directly, instead of only the tab column. Raised alongside this
-  pivot; no design yet.
-- **`CategoryReferencePanel` as a static world-anchored object**, not a menu tab at all — bury it
-  somewhere in the scene as a fixed panel the player can walk up to, the way the "wrist-mounted
-  computer" idea (see `act4-encore-someday-maybe.md`'s VR/Interaction section) reframes the settings
-  menu's anchor. Distinct from the Tier 2 listing above, which still assumes a conventional tab.
+  pivot; no design yet. (Also logged in `act4-encore-someday-maybe.md`'s VR/Interaction section.)
 - **Migrating individual Tier 1 panels via low-context subagents** — once the pattern from panels
   1–2 above is proven out, later panel ports (3 onward) are a good fit to fan out to subagents
   rather than sequence one after another in the main thread, since each port is a bounded,
   well-specified unit of work against an established pattern. Revisit once panels 1–2 land.
-- **Sample `world-lock` anchor mode live** — `VRPanelAnchorMode` already supports it
-  (`VRSettingsPanelCoordinator`'s constructor param); `camera-attached` won the 2026-08-19 A/B, but
-  it's a one-line swap to compare again now that the panel itself has grown (see the sizing pivot in
-  this session's commits). Not yet re-tested since the panel resize.
+- **Making the `CategoryReferencePanel` world-lock trial a genuinely permanent scene fixture** —
+  not gated behind opening a menu at all, more like a placed prop than a summoned panel. Only worth
+  doing if the trial above reads well; needs its own placement mechanism (fixed world coordinate,
+  no open/close), which doesn't exist yet.
 
 ## Stories
 

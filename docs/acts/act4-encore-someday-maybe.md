@@ -56,17 +56,6 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
   for jumping directly between top-level menu/sub-menu groups, rather than only the tab column.
   Raised 2026-08-20 alongside the migration's tab-order pivot — see
   [`vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md)'s "Future ideas".
-- **`CategoryReferencePanel` as a static, world-anchored object** instead of a menu tab — bury the
-  category/sort-dimension quick-reference somewhere in the 3D scene as a fixed panel the player can
-  walk up to, rather than porting it into the settings shell like the other panels. Raised
-  2026-08-20; no design yet — see the migration plan's "Future ideas" section.
-- **Handedness-aware menu anchor** — raised 2026-08-20 in a "what happened to my earlier idea"
-  check-in, but not found recorded anywhere in the docs (confirmed via full-repo survey - only
-  *controller* handedness routing exists, `XRControllerManager`'s `left`/`right` field, which is
-  about input binding, not menu anchoring). Closest existing thing is `grip-attached` anchor mode
-  (`VRSettingsPanelCoordinator`), which follows a single "primary" controller, not a user-facing
-  hand choice. Logged here so it isn't lost again, but needs restating/expanding before it's a real
-  idea to build from.
 
 ## Misc
 

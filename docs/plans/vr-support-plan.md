@@ -358,6 +358,18 @@ Three items came out of live-testing the VR settings menu and the fold-open game
 [`game-box-open-interaction-plan.md`](game-box-open-interaction-plan.md) for that work) - not
 implemented yet, logged here so they don't get lost.
 
+**Update, same day, second look**: the user restated the underlying motivation more concretely -
+with only one VR controller equipped, the game box grabbing that same controller left no free hand
+to interact with anything else. Three concrete asks came out of that, tracked below against items
+1-3: (1) **done same-session** - `GameBoxFoldCoordinator.attachToAnchor()` now only grip-anchors
+the box with 2+ controllers connected (`MIN_CONTROLLERS_FOR_GRIP_ANCHOR`), camera-anchoring
+otherwise - the same fallback flatscreen already uses with zero controllers, so "how many
+controllers are connected" is now the only thing deciding the anchor, not a separate VR-only
+special case. (2) is exactly item 2 below (multi-hand controls setting) - not started, this is
+where "which hand grabbed the box" plumbing would live. (3) is exactly item 3 below (hand
+tracking) - a feasibility-spike background agent was dispatched same-session; see
+[`hand-tracking-feasibility-spike.md`](hand-tracking-feasibility-spike.md) once it lands.
+
 1. **Partial-trigger-press pointer for the overworld (game-box targeting).** The VR settings
    menu's controller cursor was made always-on (no trigger gating - see
    `VRControllerPointer.ts`), on the reasoning that trigger-gating belongs to real-world game-box
