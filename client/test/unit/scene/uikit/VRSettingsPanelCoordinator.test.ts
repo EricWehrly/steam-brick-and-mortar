@@ -77,12 +77,8 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(camera.children).toHaveLength(0)
     })
 
-    it('activates on the pause menu opening and camera-attaches in camera-attached mode', () => {
-        // Explicit mode, not relying on the constructor default - DEFAULT_ANCHOR_MODE is
-        // temporarily 'world-lock' for a live trial (see the source's own doc comment), so this
-        // test's actual subject (does camera-attached mode work) shouldn't ride on which mode
-        // happens to be the default at any given moment.
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached')
+    it('activates on the pause menu opening and camera-attaches by default', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -90,16 +86,6 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(camera.children).toHaveLength(1)
         expect(camera.children[0]).toBeInstanceOf(Container)
         expect(camera.children[0].visible).toBe(true)
-    })
-
-    it('currently defaults to world-lock (live trial, see DEFAULT_ANCHOR_MODE\'s doc comment)', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
-
-        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-
-        expect(scene.children.some(child => child instanceof Container)).toBe(true)
-        expect(camera.children).toHaveLength(0)
     })
 
     it('anchors to a fixed point in front of the camera, independent of the camera afterward, in world-lock mode', () => {

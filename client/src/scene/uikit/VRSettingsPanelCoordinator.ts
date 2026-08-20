@@ -78,12 +78,12 @@ const WORLD_LOCK_DISTANCE = 0.9
  *  'grip-attached' follows the primary controller. See the constructor's anchorMode parameter to
  *  switch. */
 export type VRPanelAnchorMode = 'camera-attached' | 'world-lock' | 'grip-attached'
-// Temporarily 'world-lock' (was 'camera-attached', the 2026-08-19 A/B winner) to sample it live
-// against the new 'category-reference' tab (see VRMenuTabRegistry.ts and
-// docs/plans/vr-uikit-menu-migration-plan.md's "world-lock trial" section) - flip back to
-// 'camera-attached' once that trial concludes, unless it wins a re-look now that the panel is
-// bigger (see this session's sizing pivot).
-const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'world-lock'
+// 'camera-attached' - the 2026-08-19 A/B winner - is what this whole settings menu keeps using.
+// The world-lock trial (2026-08-20) was a misunderstanding: it was meant to try the *Category
+// Reference* content as a standalone world-positioned panel, not to change how the main settings
+// menu anchors - see VRCategoryReferenceCoordinator.ts, which owns that trial instead and doesn't
+// touch this constant.
+const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'camera-attached'
 
 /** Matches forwardHtmlEvents' own signature - injectable so tests can avoid it entirely: jsdom's
  *  canvas doesn't implement Pointer Events capture APIs (setPointerCapture/...), which
