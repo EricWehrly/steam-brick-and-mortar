@@ -44,6 +44,15 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Community management** — Discord/forums, code of conduct, moderation, beta programs
 - **A/B testing framework** — for feature improvements and UX experiments
 
+## VR / Interaction
+
+- **Wrist-mounted computer with settings menu** — a persistent, glanceable UI anchored to the
+  off-hand wrist/forearm (Fallout-Pip-Boy-style) instead of a summoned floating panel, for the VR
+  settings menu once it's further along. Raised 2026-08-19 alongside the VR uikit menu migration
+  (see [`vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md)) as a fourth
+  anchor option worth trying eventually, after camera-attached (the option that actually won that
+  round's live test).
+
 ## Misc
 
 - **Friend stream projection (Tiers 2–4)** — presence data, Steam Broadcasting DASH, and native window capture; the `getDisplayMedia` Tier 1 proof is **pulled into Act 2**. See [Friend Stream Projection](../features/friend-stream-projection.md).
