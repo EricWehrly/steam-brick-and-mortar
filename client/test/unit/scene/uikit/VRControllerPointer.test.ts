@@ -58,12 +58,12 @@ describe('VRControllerPointer', () => {
         return new VRControllerPointer({ raySpace, getCamera: () => camera, intersectRoot, scene })
     }
 
-    it('adds a hidden beam to the raySpace and a hidden hit marker to the scene', () => {
+    it('adds a visible beam to the raySpace and a hidden hit marker to the scene - the ray is always on, not trigger-gated', () => {
         createPointer()
 
         expect(raySpace.children).toHaveLength(1)
         expect(raySpace.children[0]).toBeInstanceOf(THREE.Line)
-        expect(raySpace.children[0].visible).toBe(false)
+        expect(raySpace.children[0].visible).toBe(true)
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh)
         expect(hitMarker).toBeDefined()
@@ -73,7 +73,7 @@ describe('VRControllerPointer', () => {
     it('keeps the hit marker hidden when update() finds nothing interactable', () => {
         const pointer = createPointer()
 
-        pointer.update(1)
+        pointer.update()
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
         expect(hitMarker.visible).toBe(false)
@@ -86,7 +86,7 @@ describe('VRControllerPointer', () => {
         intersectRoot.updateMatrixWorld(true)
 
         const pointer = createPointer()
-        pointer.update(1)
+        pointer.update()
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
         expect(hitMarker.visible).toBe(true)
@@ -107,7 +107,7 @@ describe('VRControllerPointer', () => {
         target.addEventListener('pointerup', pointerUp)
 
         const pointer = createPointer()
-        pointer.update(1)
+        pointer.update()
 
         dispatchSelectStart(raySpace)
         expect(pointerDown).toHaveBeenCalledTimes(1)
@@ -126,7 +126,7 @@ describe('VRControllerPointer', () => {
         target.addEventListener('pointerdown', pointerDown)
 
         const pointer = createPointer()
-        pointer.update(1)
+        pointer.update()
         pointer.dispose()
 
         expect(raySpace.children).toHaveLength(0)
@@ -136,52 +136,18 @@ describe('VRControllerPointer', () => {
         expect(pointerDown).not.toHaveBeenCalled()
     })
 
-    describe('trigger gating', () => {
-        it('does not raycast or show the beam while the trigger is below the active threshold', () => {
-            const target = createInteractableMesh()
-            positionOnRay(target)
-            intersectRoot.add(target)
-            intersectRoot.updateMatrixWorld(true)
+    it('keeps raycasting across repeated update() calls without needing a trigger pull', () => {
+        const target = createInteractableMesh()
+        positionOnRay(target)
+        intersectRoot.add(target)
+        intersectRoot.updateMatrixWorld(true)
 
-            const pointer = createPointer()
-            pointer.update(0)
+        const pointer = createPointer()
+        pointer.update()
+        pointer.update()
+        pointer.update()
 
-            expect(raySpace.children[0].visible).toBe(false)
-            const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
-            expect(hitMarker.visible).toBe(false)
-        })
-
-        it('shows the beam and raycasts once the trigger crosses the active threshold', () => {
-            const target = createInteractableMesh()
-            positionOnRay(target)
-            intersectRoot.add(target)
-            intersectRoot.updateMatrixWorld(true)
-
-            const pointer = createPointer()
-            pointer.update(0)
-            pointer.update(1)
-
-            expect(raySpace.children[0].visible).toBe(true)
-            const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
-            expect(hitMarker.visible).toBe(true)
-        })
-
-        it('exits (clears hover) once the trigger drops back below the active threshold', () => {
-            const target = createInteractableMesh()
-            positionOnRay(target)
-            intersectRoot.add(target)
-            intersectRoot.updateMatrixWorld(true)
-
-            const pointerLeave = vi.fn()
-            target.addEventListener('pointerleave', pointerLeave)
-
-            const pointer = createPointer()
-            pointer.update(1)
-            expect(pointerLeave).not.toHaveBeenCalled()
-
-            pointer.update(0)
-
-            expect(pointerLeave).toHaveBeenCalledTimes(1)
-        })
+        const hitMarker = scene.children.find(child => child instanceof THREE.Mesh) as THREE.Mesh
+        expect(hitMarker.visible).toBe(true)
     })
 })

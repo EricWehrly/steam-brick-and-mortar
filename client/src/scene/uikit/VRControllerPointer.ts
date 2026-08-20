@@ -12,10 +12,13 @@
  * alongside) the existing trigger-driven game-box raycast pipeline (SceneClickGameBoxRaycast) -
  * see VRSettingsPanelCoordinator's doc comment for the accepted overlap this creates.
  *
- * The ray itself is trigger-gated, not always-on: update() takes the controller's live analog
- * trigger value (XRControllerManager.getControllerRaySpaces()) and skips raycasting/hides the
- * beam entirely below TRIGGER_ACTIVE_THRESHOLD - by request, so the beam doesn't idly sweep the
- * panel (and cost a raycast) every frame just because a controller happens to be pointed at it.
+ * The ray is always on while this instance exists (one per connected controller, only while the
+ * settings menu is active - see VRSettingsPanelCoordinator's per-frame self-healing), not
+ * trigger-gated - confirmed 2026-08-19 this is what a menu cursor should do; requiring a trigger
+ * pull just to see where you're pointing at a UI made the menu hard to use. Trigger-gating a
+ * raycast (only cast while depressed, so a beam doesn't idly sweep and cost a raycast every frame)
+ * is still the right call for the real-world game-box interaction pipeline - that's a separate
+ * system (SceneClickGameBoxRaycast), untouched by this class either way.
  */
 
 import * as THREE from 'three'
@@ -26,9 +29,6 @@ const BEAM_COLOR = 0x4da3ff
 const BEAM_DEFAULT_LENGTH = 1.5
 const HIT_MARKER_COLOR = 0x4da3ff
 const HIT_MARKER_RADIUS = 0.01
-// "The least amount" of trigger depression, per direct request - not a click threshold, just
-// enough to distinguish real analog input from at-rest sensor noise.
-const TRIGGER_ACTIVE_THRESHOLD = 0.01
 
 // WebXR's reported targetRaySpace direction (local -Z) commonly points noticeably above the
 // physical barrel for Touch-style controllers (Oculus Touch/PICO Connect - see InputProfile.ts's
@@ -57,7 +57,6 @@ export class VRControllerPointer {
     private readonly beam: THREE.Line
     private readonly beamGeometry: THREE.BufferGeometry
     private readonly hitMarker: THREE.Mesh
-    private wasActive = false
 
     private readonly handleSelectStart = (): void => {
         this.pointer.down({ timeStamp: performance.now(), button: 0 })
@@ -79,7 +78,6 @@ export class VRControllerPointer {
             RAY_DIRECTION.clone().multiplyScalar(BEAM_DEFAULT_LENGTH)
         ])
         this.beam = new THREE.Line(this.beamGeometry, new THREE.LineBasicMaterial({ color: BEAM_COLOR }))
-        this.beam.visible = false
         this.raySpace.add(this.beam)
 
         this.hitMarker = new THREE.Mesh(
@@ -95,21 +93,7 @@ export class VRControllerPointer {
         this.raySpace.addEventListener('selectend', this.handleSelectEnd)
     }
 
-    update(triggerValue: number): void {
-        if (triggerValue < TRIGGER_ACTIVE_THRESHOLD) {
-            if (this.wasActive) {
-                // Trigger released below threshold mid-hover/drag - cleanly exit rather than leave
-                // stale hover/capture state on whatever was last under the ray.
-                this.pointer.exit({ timeStamp: performance.now() })
-            }
-            this.wasActive = false
-            this.beam.visible = false
-            this.hitMarker.visible = false
-            return
-        }
-        this.wasActive = true
-        this.beam.visible = true
-
+    update(): void {
         this.pointer.move(this.intersectRoot, { timeStamp: performance.now() })
 
         // getIntersection() is never undefined once a move has happened - with nothing real hit,
