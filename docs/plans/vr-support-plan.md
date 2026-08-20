@@ -351,6 +351,41 @@ backstop is still firing (and how often) can be read straight from the logs inst
 
 Files touched: `DeviceDetector.ts`, `XRControllerManager.ts`.
 
+## Addendum (2026-08-20): roadmap items raised during live headset testing
+
+Three items came out of live-testing the VR settings menu and the fold-open game box (see
+[`vr-uikit-menu-migration-plan.md`](vr-uikit-menu-migration-plan.md) and
+[`game-box-open-interaction-plan.md`](game-box-open-interaction-plan.md) for that work) - not
+implemented yet, logged here so they don't get lost.
+
+1. **Partial-trigger-press pointer for the overworld (game-box targeting).** The VR settings
+   menu's controller cursor was made always-on (no trigger gating - see
+   `VRControllerPointer.ts`), on the reasoning that trigger-gating belongs to real-world game-box
+   interaction instead, once that gets its own WebXR-native raycast. Direct request: build that -
+   a partial trigger press shows the pointer/ray while aiming at game boxes on the shelf, the same
+   "least amount of depression" gesture the settings menu cursor used to have. `XRControllerManager
+   .getControllerRaySpaces()` already reports live per-hand `triggerValue` for this; the real work
+   is a new raycast pipeline against shelved game boxes (parallel to `SceneClickGameBoxRaycast`'s
+   gamepad-button-driven one, not a replacement for it) that gates on that value the way
+   `VRControllerPointer` used to. Scoped as "soon," not immediate - not started.
+2. **"Permit multi-hand controls" setting.** A new AppSettings toggle, enabled by default, gated on
+   whether the connected input devices can actually be told apart by hand - for now that's strictly
+   "are there two distinct VR controllers connected" (`XRControllerManager`/`DeviceDetector` already
+   know handedness per controller). Behavior: with the setting on and two controllers connected,
+   grabbable things (the fold-open game box today; the VR settings panel's `grip-attached` mode is
+   the existing precedent) anchor to whichever specific controller grabbed them. With the setting
+   off, or only one/zero controllers connected, everything falls back to the existing single-anchor
+   behavior (camera-mount for the settings menu, its current grip fallback for the game box). Not
+   started - needs a per-hand "which controller grabbed this" tracking concept that doesn't exist
+   yet (today's `getPrimaryControllerGrip()` returns one controller, not "the one that grabbed X").
+3. **Hand tracking - flagged for later research, not scoped yet.** Explicitly called out as its own
+   research pass, not sequenced into the above. Three.js ships several real examples, including
+   `webxr_vr_handinput_pointerclick` (https://threejs.org/examples/?q=hand#webxr_vr_handinput_pointerclick)
+   - looks tractable per a first look, but needs its own investigation (device support, how it'd
+   coexist with controller-based input in `XRControllerManager`, whether it's a controller
+   *replacement* or an *addition*) before it becomes a real plan. Good candidate for an isolated
+   feasibility spike rather than folding into controller-input work directly.
+
 ## Next up (not this branch)
 
 Both items below now have plan docs (written 2026-08-10, per this project's VR
