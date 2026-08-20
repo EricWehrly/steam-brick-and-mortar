@@ -36,6 +36,7 @@ import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
+import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
 
 const RETICLE_ELEMENT_ID = 'gamepad-reticle'
@@ -140,6 +141,18 @@ export class SystemUICoordinator {
         this.pauseMenuManager.registerDefaultPanels()
 
         this.vrSettingsPanelCoordinator.init(renderer)
+
+        // ?forceVRSettingsPanel=1 dev-preview convenience: open the real pause menu at startup so
+        // the VR uikit panel (which only ever activates via a real MenuOpen, see
+        // VRSettingsPanelCoordinator's doc comment) shows immediately without needing a manual
+        // Settings/OpenMenu press first. Going through the same open() every real press uses means
+        // this panel's active state can never disagree with PauseMenuManager's - a previous
+        // version pre-activated the VR panel independently and the two desynced (confirmed live
+        // 2026-08-20: first real press looked like a no-op, second one was the one that actually
+        // closed anything).
+        if (UrlUtils.isVRSettingsPanelForced()) {
+            this.pauseMenuManager.open()
+        }
 
         // Setup event handlers
         this.registerEventHandlers()

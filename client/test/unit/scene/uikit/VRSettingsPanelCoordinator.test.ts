@@ -5,6 +5,11 @@
  * plus the two renderer flags it sets once at init()). Real uikit Container/Slider/Text/Button
  * construct fine under jsdom (see VRDisplayAdvancedPanel.test.ts), so the panel itself is real,
  * not stubbed - only the renderer is faked.
+ *
+ * deactivate() hides the panel (container.visible = false) rather than removing it from the scene
+ * graph - see the coordinator's own comment on why (avoiding Object3D.add()'s unconditional
+ * removeFromParent()-then-add() churn on every open of the common "same anchor as last time"
+ * case). So these tests check visibility, not child-array membership, once a panel has attached.
  */
 
 import { beforeEach, afterEach, describe, expect, it } from 'vitest'
@@ -66,20 +71,21 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('stays inactive after construction and init() alone', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         expect(camera.children).toHaveLength(0)
     })
 
     it('activates on the pause menu opening and camera-attaches by default', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
         expect(camera.children).toHaveLength(1)
         expect(camera.children[0]).toBeInstanceOf(Container)
+        expect(camera.children[0].visible).toBe(true)
     })
 
     it('anchors to a fixed point in front of the camera, independent of the camera afterward, in world-lock mode', () => {
@@ -87,7 +93,7 @@ describe('VRSettingsPanelCoordinator', () => {
         camera.rotation.set(0, Math.PI / 2, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'world-lock')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'world-lock')
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
@@ -107,7 +113,7 @@ describe('VRSettingsPanelCoordinator', () => {
         camera.rotation.set(Math.PI / 6, Math.PI / 4, 0.3)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'world-lock')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'world-lock')
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
@@ -119,7 +125,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('ignores MenuOpen events for a different menu type', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'debug' })
@@ -128,7 +134,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('anchors to the camera when grip-attached mode has no grip published', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'grip-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'grip-attached')
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -145,7 +151,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents(), 'grip-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'grip-attached')
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -154,8 +160,8 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(camera.children).toHaveLength(0)
     })
 
-    it('keeps the same menu shell (and its selected tab) across a close/reopen cycle', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+    it('keeps the same menu shell container (and its selected tab) across a close/reopen cycle', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -168,47 +174,47 @@ describe('VRSettingsPanelCoordinator', () => {
         const shellContainerAtReopen = camera.children[0]
 
         // Same object identity - the shell itself is long-lived (constructed once, not
-        // per-activation), only its container is detached/reattached.
+        // per-activation), and its container stays parented throughout (only visibility toggles).
         expect(shellContainerAtReopen).toBe(shellContainerAtFirstOpen)
     })
 
-    it('deactivates on the pause menu closing, removing the panel from its anchor', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+    it('deactivates on the pause menu closing by hiding the panel, not removing it from its anchor', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
         expect(camera.children).toHaveLength(1)
+        expect(camera.children[0].visible).toBe(true)
 
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
-
-        expect(camera.children).toHaveLength(0)
-    })
-
-    it('pre-activates at init() when forced via the URL override, but a real menu close still deactivates it', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), true, createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
 
         expect(camera.children).toHaveLength(1)
+        expect(camera.children[0].visible).toBe(false)
+    })
 
-        // The force flag is a "start pre-opened" convenience for flatscreen preview, not a
-        // standing override - once a real close happens (e.g. the Settings button), the panel
-        // should honestly track menu state instead of looking unresponsive to it.
+    it('re-shows the same container (visible again) on reactivation rather than reparenting', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator.init(createFakeRenderer())
+
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
-        expect(camera.children).toHaveLength(0)
+        expect(camera.children).toHaveLength(1)
+        expect(camera.children[0].visible).toBe(true)
     })
 
     it('does nothing (and does not throw) if no main camera is published yet', () => {
         DataManager.resetInstance()
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         expect(() => EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })).not.toThrow()
     })
 
     it('registers and unregisters a render-loop callback across init()/dispose()', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
 
         expect(RenderLoopRegistry.getInstance().getCount()).toBeGreaterThan(0)
@@ -233,7 +239,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
@@ -254,7 +260,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
@@ -279,7 +285,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
         runUpdate(coordinator)
@@ -290,17 +296,17 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(raySpaces[0].raySpace.children).toHaveLength(0)
     })
 
-    it('dispose() tears down the panel and deregisters listeners', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), false, createStubForwardEvents())
+    it('dispose() hides the panel and deregisters listeners', () => {
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
         coordinator.dispose()
 
-        expect(camera.children).toHaveLength(0)
+        expect(camera.children[0].visible).toBe(false)
 
         // Nothing should be listening anymore.
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        expect(camera.children).toHaveLength(0)
+        expect(camera.children[0].visible).toBe(false)
     })
 })

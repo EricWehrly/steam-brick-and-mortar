@@ -26,9 +26,16 @@
  * flows into these via PauseMenuManager, so no new input wiring was needed. The DOM pause menu is
  * deliberately NOT suppressed while this panel is active; both can be open at once for now, an
  * accepted simplification while this panel stays behind the ?forceVRSettingsPanel=1 dev flag.
- * That flag only pre-activates at init() for flatscreen-preview convenience - a real MenuClose
- * always deactivates regardless of the flag, so once you've opened/closed it once for real, the
- * force flag stops being observable and this panel just tracks the DOM menu's state honestly.
+ *
+ * This class has no knowledge of that flag or of PauseMenuManager at all - activation is purely
+ * MenuOpen/MenuClose, unconditionally, always. A previous version pre-activated independently at
+ * init() when forced, which desynced this panel's active state from PauseMenuManager's real
+ * isOpen (confirmed live 2026-08-20: the VR panel would already be showing at load, so the first
+ * real Settings/OpenMenu press - which PauseMenuManager saw as "opening" a menu it thought was
+ * closed - looked like a no-op, and the *second* press was the one that actually closed anything).
+ * The flag's dev-preview behavior now lives at SystemUICoordinator's level instead: it calls the
+ * real pauseMenuManager.open() once at startup when forced, so both surfaces open through the
+ * exact same path and can never disagree about whether a menu is open.
  *
  * Anchor strategy (settled 2026-08-19 via live headset testing, see
  * docs/plans/vr-uikit-menu-migration-plan.md) is switchable via VRPanelAnchorMode:
@@ -47,7 +54,6 @@ import { AppSettings } from '../../core/AppSettings'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
-import { UrlUtils } from '../../utils/UrlUtils'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRControllerManager'
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
@@ -86,7 +92,6 @@ export class VRSettingsPanelCoordinator {
     private readonly eventManager: EventManager
     private readonly appSettings: AppSettings
     private readonly renderLoopRegistry: RenderLoopRegistry
-    private readonly forceEnabled: boolean
     private readonly forwardEvents: ForwardEventsFn
     private readonly anchorMode: VRPanelAnchorMode
 
@@ -103,14 +108,12 @@ export class VRSettingsPanelCoordinator {
     constructor(
         eventManager: EventManager,
         appSettings: AppSettings,
-        forceEnabled: boolean = UrlUtils.isVRSettingsPanelForced(),
         forwardEvents: ForwardEventsFn = forwardHtmlEvents,
         anchorMode: VRPanelAnchorMode = DEFAULT_ANCHOR_MODE
     ) {
         this.eventManager = eventManager
         this.appSettings = appSettings
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
-        this.forceEnabled = forceEnabled
         this.forwardEvents = forwardEvents
         this.anchorMode = anchorMode
         this.menuShell = new VRSettingsMenuShell(eventManager, appSettings)
@@ -128,10 +131,6 @@ export class VRSettingsPanelCoordinator {
         renderer.setTransparentSort(reversePainterSortStable)
 
         this.renderLoopRegistry.register(this.constructor.name, this.update)
-
-        if (this.forceEnabled) {
-            this.activate()
-        }
     }
 
     private readonly handleMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
@@ -145,11 +144,6 @@ export class VRSettingsPanelCoordinator {
         if (event.detail.menuType !== 'pause') {
             return
         }
-        // A real close always deactivates, force flag or not - see the class doc comment. The
-        // flag used to suppress this (to keep the panel visible for flatscreen preview
-        // regardless of menu state), but that made the panel look unresponsive to the real
-        // Settings/OpenMenu toggle once someone actually pressed it during a force-flagged
-        // session - confirmed live 2026-08-19.
         this.deactivate()
     }
 
@@ -195,7 +189,12 @@ export class VRSettingsPanelCoordinator {
         }
         this.controllerPointers.clear()
 
-        this.menuShell.container.removeFromParent()
+        // Hide rather than remove from the scene graph - re-parenting a uikit root on every
+        // open/close (Object3D.add() unconditionally calls removeFromParent() first, even when
+        // re-adding to the object it's already a child of) is unnecessary churn on an object
+        // that's about to come right back with the same anchor almost every time. attachToAnchor()
+        // only actually reparents when the target genuinely changed.
+        this.menuShell.container.visible = false
 
         this.active = false
     }
@@ -234,15 +233,26 @@ export class VRSettingsPanelCoordinator {
         return connected
     }
 
+    /** Adds container to target only if it isn't already that target's child - Object3D.add()
+     *  unconditionally calls removeFromParent() first, even when re-adding to the same parent, so
+     *  skipping the redundant call avoids detach/reattach churn on every open of the common case
+     *  (same anchor target as last time). */
+    private attachIfNeeded(container: THREE.Object3D, target: THREE.Object3D): void {
+        if (container.parent !== target) {
+            target.add(container)
+        }
+    }
+
     private attachToAnchor(container: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
         // Logged every activation, on purpose - this is a live A/B still being evaluated in
         // headset (see the class doc comment and docs/plans/vr-uikit-menu-migration-plan.md's
         // anchoring decision), not settled behavior. Flip DEFAULT_ANCHOR_MODE (or pass an
         // explicit anchorMode to the constructor) to compare the two.
         console.log(`VRSettingsPanelCoordinator: anchoring panel via '${this.anchorMode}'.`)
+        container.visible = true
 
         if (this.anchorMode === 'camera-attached') {
-            camera.add(container)
+            this.attachIfNeeded(container, camera)
             container.position.copy(CAMERA_LOCAL_OFFSET)
             return
         }
@@ -252,12 +262,12 @@ export class VRSettingsPanelCoordinator {
             const grip = raySource?.getPrimaryControllerGrip() ?? null
 
             if (grip) {
-                grip.add(container)
+                this.attachIfNeeded(container, grip)
                 container.position.copy(GRIP_LOCAL_OFFSET)
                 return
             }
 
-            camera.add(container)
+            this.attachIfNeeded(container, camera)
             container.position.copy(CAMERA_LOCAL_OFFSET)
             return
         }
@@ -289,7 +299,7 @@ export class VRSettingsPanelCoordinator {
         const yawQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ'))
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuaternion)
 
-        scene.add(container)
+        this.attachIfNeeded(container, scene)
         container.position.copy(cameraWorldPosition).addScaledVector(forward, WORLD_LOCK_DISTANCE)
         container.quaternion.copy(yawQuaternion)
     }

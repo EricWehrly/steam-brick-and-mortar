@@ -54,9 +54,10 @@ export class UrlUtils {
     }
 
     /**
-     * Whether ?forceVRSettingsPanel=1 is present — forces VRSettingsPanelCoordinator to activate
-     * outside an actual WebXR session, so the uikit settings panel can be previewed on a normal
-     * flatscreen browser (mouse-driven) without a headset.
+     * Whether ?forceVRSettingsPanel=1 is present — SystemUICoordinator opens the real pause menu
+     * at startup when this is set, so the uikit settings panel (which only ever activates via a
+     * real MenuOpen - see VRSettingsPanelCoordinator) shows immediately on a normal flatscreen
+     * browser (mouse-driven) without a headset, with no manual Settings/OpenMenu press needed.
      */
     static isVRSettingsPanelForced(): boolean {
         return UrlUtils.getSearchParams().get('forceVRSettingsPanel') === '1'
