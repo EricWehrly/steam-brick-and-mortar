@@ -33,7 +33,8 @@ Built and working:
 Not built:
 
 - Any tab shell in VR. There is no way to reach a second panel.
-- Eight of the nine DOM panels.
+- Seven of the eight DOM panels (corrected count, 2026-08-20 survey — see "Full menu/panel
+  inventory" below; the plan previously said "nine" in one place and "8 panels" in another).
 - Any suppression/coordination of the DOM pause menu while in a session (both "open" at once today,
   which is harmless only because the DOM one is invisible in-headset).
 - Removal of `?forceVRSettingsPanel=1` and of the dead `SettingsPanelProjector` (CSS3D), which is
@@ -53,8 +54,9 @@ plan has to answer, not an afterthought.
 
 `VRDisplayAdvancedPanel` today is a hand-written duplicate of `DisplayAdvancedPanel`. Both encode
 the same six controls' labels, ranges, steps, formatters, defaults, and target `Setting` keys, in
-two places, in two shapes. Nine panels of that is roughly 2,500 lines of duplicated *intent* that
-will silently drift the first time someone tweaks a slider range on one side.
+two places, in two shapes. Doing that to the remaining seven pause-menu panels (eight total, one
+already ported — see "Full menu/panel inventory" below) is roughly 2,500 lines of duplicated
+*intent* that will silently drift the first time someone tweaks a slider range on one side.
 
 This is precisely the "second, differently-shaped mechanism for the same job" that root `CLAUDE.md`
 calls a design smell, so continuing to hand-port is not a neutral default.
@@ -63,7 +65,7 @@ Three options:
 
 | | Approach | Cost | Drift risk |
 |---|---|---|---|
-| A | Hand-port each panel to uikit (continue Phase 1's shape) | ~2,500 lines, 8 panels | High — permanent, two sources forever |
+| A | Hand-port each panel to uikit (continue Phase 1's shape) | ~2,500 lines, 7 panels | High — permanent, two sources forever |
 | B | Full descriptor refactor: define every panel declaratively, DOM and uikit both render from it | Large up-front; touches all 9 DOM panels including table/action-heavy ones | Eliminated |
 | C | **Descriptor layer for the settings-shaped panels only; the action/table-heavy panels stay DOM-only and out of VR scope for now** | Moderate | Eliminated where it matters |
 
@@ -163,6 +165,100 @@ than contorting the schema.
    "VR keyboard is its own feature" non-goal; downgrades `GameSettingsPanel`'s text inputs from
    "read-only in VR" back to fully functional for Story 5.
 
+## Full menu/panel inventory (surveyed 2026-08-20)
+
+Every distinct in-app menu/panel, so nothing gets forgotten while this migration is underway. Not
+all of it is in scope for this plan — see the tier notes.
+
+**Tier 1 — pause-menu panels (`PauseMenuManager.registerDefaultPanels`) — the actual migration
+targets, tab order below.** All 8 confirmed live via code survey (no others exist):
+
+| Panel | File | Weight | VR status |
+|---|---|---|---|
+| `DisplayAdvancedPanel` | `panels/DisplayAdvancedPanel.ts` | Small, schema-driven | ✅ Ported (`display-advanced`) |
+| `DebugPanel` | `panels/DebugPanel.ts` | Substantial (454 lines) | Next up — see pivot below |
+| `CacheManagementPanel` | `panels/CacheManagementPanel.ts` | Substantial (482 lines) | Next up — see pivot below |
+| `CameraSettingsPanel` | `panels/CameraSettingsPanel.ts` | Moderate (307 lines) | Planned, settings-shaped |
+| `ApplicationPanel` | `panels/ApplicationPanel.ts` | Moderate (161 lines) | Planned, settings-shaped |
+| `GameSettingsPanel` | `panels/GameSettingsPanel.ts` | Substantial (437 lines) | Planned, settings-shaped |
+| `GraphicsSettingsPanel` | `panels/GraphicsSettingsPanel.ts` | Largest (676 lines) | Planned, settings-shaped, highest escape-hatch risk |
+| `ControlsPanel` | `panels/ControlsPanel.ts` | Substantial (392 lines) | Planned, action-shaped (rebind-capture UI) |
+
+**Tier 2 — standalone panels, not part of the pause menu, tracked but not scheduled.** Per direct
+request ("we're also going to need to incorporate essentially all of the menus... they're not all
+necessarily important, most are almost explicitly unimportant") — listed so they aren't lost, no
+tab order implied yet:
+
+| Panel | File | What it is |
+|---|---|---|
+| `LightingControlsPanel` | `client/src/ui/LightingControlsPanel.ts` | The "lighting panel" — master/per-group/per-light brightness sliders |
+| `CategoryReferencePanel` | `client/src/ui/CategoryReferencePanel.ts` | Dev/design quick-reference for game categories/sort dimensions (hotkey `G`) — see "Future ideas" below, a VR tab may not be the right shape for this one |
+| `LayoutControlPanel` | `client/src/ui/LayoutControlPanel.ts` | Layout/Group/Sort control bar |
+| `GameLibraryListPanel` | `client/src/ui/GameLibraryListPanel.ts` | Searchable/filterable full-library list view |
+| `ScenePropsPanel` | `client/src/ui/ScenePropsPanel.ts` | User prop-folder picker |
+
+**Tier 3 — explicitly not this migration's concern:**
+
+- `GameLibraryBinderUI` / `BinderGameDetailPanel` — separate scope, unchanged from the original plan.
+- The game-box-fold panels (`client/src/scene/game-box-fold/`) — already VR-native (canvas-texture
+  faces, not DOM/uikit), nothing to migrate.
+- `PerformanceMonitorUI`, `CompassRose` — debug HUD overlays, not menus; a VR equivalent (if ever
+  wanted) is a world-anchored HUD question, not a menu tab.
+- `SteamUIPanel`, `ProgressDisplay`, `WebXRUIPanel`, `StartupProgressUI` — pre-session/loading-flow
+  UI, not applicable inside an in-game VR menu.
+- `CacheManagementUI` (`client/src/ui/CacheManagementUI.ts`) — `@deprecated`, unused dead code,
+  superseded by the pause menu's `CacheManagementPanel`. Not a migration target; a removal
+  candidate instead.
+
+## Tab order & scope pivot (decided 2026-08-20)
+
+Reverses this plan's original Non-goals (below): `DebugPanel` and `CacheManagementPanel` move from
+"DOM-only, out of VR scope" to **first** in the migration order, ahead of the settings-shaped
+panels Story 5 originally started with. Rationale (direct request): the settings panels are the
+high-value screens — we don't want to ship those half-finished. The debug/cache panels are lower
+stakes (genuinely "almost explicitly unimportant"), which makes them the right place to pilot
+whether a **"to be implemented" placeholder pattern** reads as acceptable in VR at all, before
+deciding how much of that pattern the higher-value panels should lean on.
+
+`VRPlaceholderPanel` (`client/src/scene/uikit/panels/VRPlaceholderPanel.ts`) already exists as a
+whole-tab-stub component (used for "More Settings" today) — the open question this pivot is
+piloting is finer-grained than that: a real tab with some sections rendered live and others marked
+"to be implemented" inline, not just an entire tab replaced by one message.
+
+Revised order:
+
+1. **`DebugPanel`** — first real tab built after `display-advanced`. Mostly read-only stats/counts,
+   a good uikit fit (Text/Container, little interactivity), and a reasonable test of whether a
+   data-shaped (not settings-shaped) panel can go through the same schema-ish approach at all.
+2. **`CacheManagementPanel`** — pilots the inline "to be implemented" placeholder pattern
+   specifically, on whichever parts don't trivially port (clear-cache actions, cached-user list
+   management) while the stats/readouts render for real.
+3. **`CameraSettingsPanel`, `ApplicationPanel`, `GameSettingsPanel`, `GraphicsSettingsPanel`** —
+   unchanged from the original Story 5 order (settings-shaped, simplest first).
+4. **`ControlsPanel`** — last; rebind-capture UI is the least schema-shaped thing in the whole set,
+   likely the heaviest user of the placeholder pattern once 1–2 above show how that reads.
+
+Tier 2 (standalone) panels are explicitly not sequenced yet — revisit once the Tier 1 order above
+is further along.
+
+### Future ideas (not scheduled, logged so they aren't lost)
+
+- **Tab-navigation "knobs"** — a control row at the top of the VR menu shell for jumping between
+  top-level menu/sub-menu groups directly, instead of only the tab column. Raised alongside this
+  pivot; no design yet.
+- **`CategoryReferencePanel` as a static world-anchored object**, not a menu tab at all — bury it
+  somewhere in the scene as a fixed panel the player can walk up to, the way the "wrist-mounted
+  computer" idea (see `act4-encore-someday-maybe.md`'s VR/Interaction section) reframes the settings
+  menu's anchor. Distinct from the Tier 2 listing above, which still assumes a conventional tab.
+- **Migrating individual Tier 1 panels via low-context subagents** — once the pattern from panels
+  1–2 above is proven out, later panel ports (3 onward) are a good fit to fan out to subagents
+  rather than sequence one after another in the main thread, since each port is a bounded,
+  well-specified unit of work against an established pattern. Revisit once panels 1–2 land.
+- **Sample `world-lock` anchor mode live** — `VRPanelAnchorMode` already supports it
+  (`VRSettingsPanelCoordinator`'s constructor param); `camera-attached` won the 2026-08-19 A/B, but
+  it's a one-line swap to compare again now that the panel itself has grown (see the sizing pivot in
+  this session's commits). Not yet re-tested since the panel resize.
+
 ## Stories
 
 Ordered so each lands independently and is testable in headset on its own.
@@ -199,18 +295,23 @@ occupant plus a placeholder. Wire the active-panel event both directions. Anchor
 Acceptance: in headset, open the menu, switch between two panels, close, reopen — lands on the same
 panel the DOM menu is showing.
 
-### Story 5 — Migrate the remaining settings-shaped panels
+### Story 5 — Migrate the remaining panels
 
-One commit per panel, in this order (simplest first, so the schema's gaps surface cheaply):
+One commit per panel. Order revised 2026-08-20 (see "Tab order & scope pivot" above) — debug/cache
+now lead, piloting the inline "to be implemented" placeholder pattern on low-stakes panels before
+the settings-shaped ones:
 
-1. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves)
-2. `ApplicationPanel` (toggles + buttons — exercises `createToggleRow`)
-3. `GameSettingsPanel` (toggles + selects + inputs — exercises `createSelectRow`; text input in VR
+1. `DebugPanel` — mostly read-only stats; first test of the pattern on a non-settings-shaped panel.
+2. `CacheManagementPanel` — pilots inline per-section "to be implemented" placeholders specifically.
+3. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves)
+4. `ApplicationPanel` (toggles + buttons — exercises `createToggleRow`)
+5. `GameSettingsPanel` (toggles + selects + inputs — exercises `createSelectRow`; text input in VR
    is an open problem, see Non-goals)
-4. `GraphicsSettingsPanel` (largest; expect real escape-hatch pressure — presets, reload badges)
+6. `GraphicsSettingsPanel` (largest; expect real escape-hatch pressure — presets, reload badges)
+7. `ControlsPanel` (rebind-capture UI — least schema-shaped, likely heaviest placeholder use)
 
-Each: schema entry → both renderers → DOM panel rewritten to the schema → VR panel appears in the
-shell → tests → in-headset check.
+Each: schema entry (or placeholder-annotated equivalent for 1/2/7) → both renderers → DOM panel
+rewritten to the schema → VR panel appears in the shell → tests → in-headset check.
 
 ### Story 6 — Remove the toggle, define the DOM menu's VR behavior
 
@@ -227,7 +328,12 @@ shell → tests → in-headset check.
 
 ## Non-goals (explicitly out of scope; revisit later)
 
-- `CacheManagementPanel`, `DebugPanel`, `ControlsPanel` in VR. Documented as DOM-only for now.
+- ~~`CacheManagementPanel`, `DebugPanel`, `ControlsPanel` in VR. Documented as DOM-only for now.~~
+  **Reversed 2026-08-20** — see "Tab order & scope pivot" above; these now lead the migration
+  order specifically to pilot the "to be implemented" placeholder pattern on low-stakes panels.
+- Tier 2/3 standalone panels from the "Full menu/panel inventory" above (`LightingControlsPanel`,
+  `CategoryReferencePanel`, `LayoutControlPanel`, `GameLibraryListPanel`, `ScenePropsPanel`, and
+  everything in Tier 3) — tracked, not scheduled.
 - **A virtual/on-screen VR keyboard.** Text entry itself is in scope (see decision 5 above — assume
   a physical keyboard, real caret, real keyboard events) but building an in-scene keyboard for
   controller-only input is not; revisit if we confirm headset users regularly lack a keyboard.
@@ -252,5 +358,8 @@ shell → tests → in-headset check.
   abandoned.
 - [`vr-support-plan.md`](vr-support-plan.md) — sub-scope 1, the controller input this builds on.
 - [`vr-button-hints-plan.md`](vr-button-hints-plan.md) — sibling VR scope, back-burnered.
-- [`ui-normalization-plan.md`](ui-normalization-plan.md) — overlapping concern; the settings schema
-  should be checked against it before Story 3 so the two don't invent competing abstractions.
+- [`ui-normalization-plan.md`](ui-normalization-plan.md) — **paused 2026-08-20** in favor of this
+  plan's dual-renderer `SettingsSchema` approach; see that doc and
+  [`ui-standardization.md`](../features/ui-standardization.md) for the reasoning. Its Phase A/B
+  output (`tokens.css`, the `UIComponent` hierarchy) isn't discarded — `SettingsSchemaDomRenderer`
+  still reuses it for the DOM half of each schema-driven panel.
