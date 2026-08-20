@@ -24,11 +24,24 @@
 import * as THREE from 'three'
 import { createRayPointer } from '@pmndrs/pointer-events'
 import type { GetCamera, Pointer } from '@pmndrs/pointer-events'
+import { ALWAYS_ON_TOP_RENDER_ORDER } from './VRSettingsMenuShell'
 
 const BEAM_COLOR = 0x4da3ff
+// A THREE.Line's linewidth is not honored by WebGL on most platforms (browsers clamp it to 1px
+// regardless of the material property) - confirmed the cause of "beam needs to be a bit bigger,
+// not visible where it connects to the menu" (direct request, 2026-08-20). A thin cylinder mesh
+// gives real, adjustable width instead.
+const BEAM_RADIUS = 0.004
 const BEAM_DEFAULT_LENGTH = 1.5
 const HIT_MARKER_COLOR = 0x4da3ff
-const HIT_MARKER_RADIUS = 0.01
+const HIT_MARKER_RADIUS = 0.015
+// Both the beam and hit marker need to render on top of the uikit menu itself (depthTest:false,
+// renderOrder ALWAYS_ON_TOP_RENDER_ORDER - see VRSettingsMenuShell.ts) or they get depth-occluded
+// right at the point that matters most: where the ray actually meets the panel. This was the
+// "cursor/dot thing is a different issue entirely" bug (direct request, 2026-08-20) - distinct
+// from the beam's line-width problem above, same root cause (no depth/render-order override) as
+// this fixes for both.
+const ON_TOP_RENDER_ORDER = ALWAYS_ON_TOP_RENDER_ORDER + 1
 
 // WebXR's reported targetRaySpace direction (local -Z) commonly points noticeably above the
 // physical barrel for Touch-style controllers (Oculus Touch/PICO Connect - see InputProfile.ts's
@@ -54,8 +67,7 @@ export class VRControllerPointer {
     private readonly intersectRoot: THREE.Object3D
     private readonly scene: THREE.Scene
 
-    private readonly beam: THREE.Line
-    private readonly beamGeometry: THREE.BufferGeometry
+    private readonly beam: THREE.Mesh
     private readonly hitMarker: THREE.Mesh
 
     private readonly handleSelectStart = (): void => {
@@ -73,17 +85,22 @@ export class VRControllerPointer {
 
         this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {}, { direction: RAY_DIRECTION })
 
-        this.beamGeometry = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0),
-            RAY_DIRECTION.clone().multiplyScalar(BEAM_DEFAULT_LENGTH)
-        ])
-        this.beam = new THREE.Line(this.beamGeometry, new THREE.LineBasicMaterial({ color: BEAM_COLOR }))
+        // Unit-height cylinder, translated so it spans local Y [0, 1] instead of straddling the
+        // origin, then rotated so that local +Y axis points along RAY_DIRECTION - update() only
+        // has to scale.y to the current length each frame, no geometry rebuild needed.
+        const beamGeometry = new THREE.CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS, 1, 8)
+        beamGeometry.translate(0, 0.5, 0)
+        this.beam = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({ color: BEAM_COLOR, depthTest: false }))
+        this.beam.renderOrder = ON_TOP_RENDER_ORDER
+        this.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), RAY_DIRECTION)
+        this.beam.scale.y = BEAM_DEFAULT_LENGTH
         this.raySpace.add(this.beam)
 
         this.hitMarker = new THREE.Mesh(
             new THREE.SphereGeometry(HIT_MARKER_RADIUS, 12, 12),
-            new THREE.MeshBasicMaterial({ color: HIT_MARKER_COLOR })
+            new THREE.MeshBasicMaterial({ color: HIT_MARKER_COLOR, depthTest: false })
         )
+        this.hitMarker.renderOrder = ON_TOP_RENDER_ORDER
         this.hitMarker.visible = false
         this.scene.add(this.hitMarker)
 
@@ -102,12 +119,11 @@ export class VRControllerPointer {
         // explicitly via isVoidObject rather than by truthiness.
         const intersection = this.pointer.getIntersection()
         if (intersection && !intersection.object.isVoidObject) {
-            const length = Math.max(intersection.distance, 0)
-            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), RAY_DIRECTION.clone().multiplyScalar(length)])
+            this.beam.scale.y = Math.max(intersection.distance, 0)
             this.hitMarker.visible = true
             this.hitMarker.position.copy(intersection.point)
         } else {
-            this.beamGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), RAY_DIRECTION.clone().multiplyScalar(BEAM_DEFAULT_LENGTH)])
+            this.beam.scale.y = BEAM_DEFAULT_LENGTH
             this.hitMarker.visible = false
         }
     }
@@ -119,7 +135,7 @@ export class VRControllerPointer {
         this.pointer.exit({ timeStamp: performance.now() })
 
         this.beam.removeFromParent()
-        this.beamGeometry.dispose();
+        this.beam.geometry.dispose();
         (this.beam.material as THREE.Material).dispose()
 
         this.hitMarker.removeFromParent()

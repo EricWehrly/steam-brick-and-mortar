@@ -62,7 +62,7 @@ describe('VRControllerPointer', () => {
         createPointer()
 
         expect(raySpace.children).toHaveLength(1)
-        expect(raySpace.children[0]).toBeInstanceOf(THREE.Line)
+        expect(raySpace.children[0]).toBeInstanceOf(THREE.Mesh)
         expect(raySpace.children[0].visible).toBe(true)
 
         const hitMarker = scene.children.find(child => child instanceof THREE.Mesh)
