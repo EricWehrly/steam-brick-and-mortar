@@ -26,12 +26,16 @@
  * flows into these via PauseMenuManager, so no new input wiring was needed. The DOM pause menu is
  * deliberately NOT suppressed while this panel is active; both can be open at once for now, an
  * accepted simplification while this panel stays behind the ?forceVRSettingsPanel=1 dev flag.
+ * That flag only pre-activates at init() for flatscreen-preview convenience - a real MenuClose
+ * always deactivates regardless of the flag, so once you've opened/closed it once for real, the
+ * force flag stops being observable and this panel just tracks the DOM menu's state honestly.
  *
- * Anchor strategy (decided 2026-08-19, see docs/plans/vr-uikit-menu-migration-plan.md) is
- * switchable via VRPanelAnchorMode: 'world-lock' (default - pinned to a fixed point in front of
- * the player at open time) vs. 'grip-attached' (follows the primary controller, the original
- * behavior). See attachToAnchor() for why world-lock is worth trying: grip-attach means the panel
- * swings while you point at it with the same hand.
+ * Anchor strategy (settled 2026-08-19 via live headset testing, see
+ * docs/plans/vr-uikit-menu-migration-plan.md) is switchable via VRPanelAnchorMode:
+ * 'camera-attached' (default - moves with the player's head, like a HUD) won out over
+ * 'world-lock' (pinned to a fixed point in front of the player at open time) and 'grip-attached'
+ * (follows the primary controller - swings while you point at it with the same hand). The losing
+ * modes are kept, not deleted, in case a future panel shape wants a different anchor.
  */
 
 import * as THREE from 'three'
@@ -57,13 +61,15 @@ const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.3)
 // CAMERA_LOCAL_OFFSET's magnitude so the two modes place the panel at the same initial distance.
 const WORLD_LOCK_DISTANCE = 0.6
 
-/** Which fixed point the VR settings panel is anchored to while open. 'world-lock' (default) pins
- *  it to a point in front of the player computed once at open time, so it stays still in the world
- *  while they look/move around it. 'grip-attached' is the original behavior - the panel follows
- *  the primary controller. Comparing the two live in-headset is the point of keeping both around;
- *  see the constructor's anchorMode parameter to switch. */
-export type VRPanelAnchorMode = 'world-lock' | 'grip-attached'
-const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'world-lock'
+/** Which fixed point the VR settings panel is anchored to while open. 'camera-attached' (default,
+ *  settled 2026-08-19) parents it to the camera so it moves with the player's head like a HUD -
+ *  the winner of a live headset A/B against the other two modes, kept below for a future panel
+ *  that might want a different anchor. 'world-lock' pins it to a point in front of the player
+ *  computed once at open time, so it stays still in the world while they look/move around it.
+ *  'grip-attached' follows the primary controller. See the constructor's anchorMode parameter to
+ *  switch. */
+export type VRPanelAnchorMode = 'camera-attached' | 'world-lock' | 'grip-attached'
+const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'camera-attached'
 
 /** Matches forwardHtmlEvents' own signature - injectable so tests can avoid it entirely: jsdom's
  *  canvas doesn't implement Pointer Events capture APIs (setPointerCapture/...), which
@@ -139,11 +145,12 @@ export class VRSettingsPanelCoordinator {
         if (event.detail.menuType !== 'pause') {
             return
         }
-        // The override is meant to keep the panel visible for flatscreen preview regardless of
-        // real menu state.
-        if (!this.forceEnabled) {
-            this.deactivate()
-        }
+        // A real close always deactivates, force flag or not - see the class doc comment. The
+        // flag used to suppress this (to keep the panel visible for flatscreen preview
+        // regardless of menu state), but that made the panel look unresponsive to the real
+        // Settings/OpenMenu toggle once someone actually pressed it during a force-flagged
+        // session - confirmed live 2026-08-19.
+        this.deactivate()
     }
 
     private getScene(): THREE.Scene | null {
@@ -232,7 +239,13 @@ export class VRSettingsPanelCoordinator {
         // headset (see the class doc comment and docs/plans/vr-uikit-menu-migration-plan.md's
         // anchoring decision), not settled behavior. Flip DEFAULT_ANCHOR_MODE (or pass an
         // explicit anchorMode to the constructor) to compare the two.
-        console.log(`VRSettingsPanelCoordinator: anchoring panel via '${this.anchorMode}' - comparing whether pinning it in front of the player at open time (world-lock) reads better than following the primary controller (grip-attached, which swings while you point at it with the same hand).`)
+        console.log(`VRSettingsPanelCoordinator: anchoring panel via '${this.anchorMode}'.`)
+
+        if (this.anchorMode === 'camera-attached') {
+            camera.add(container)
+            container.position.copy(CAMERA_LOCAL_OFFSET)
+            return
+        }
 
         if (this.anchorMode === 'grip-attached') {
             const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
@@ -296,8 +309,8 @@ export class VRSettingsPanelCoordinator {
         const camera = this.getCamera()
         if (scene && camera) {
             const connected = this.syncControllerPointers(scene, camera)
-            for (const { index, triggerValue } of connected) {
-                this.controllerPointers.get(index)?.update(triggerValue)
+            for (const { index } of connected) {
+                this.controllerPointers.get(index)?.update()
             }
         }
     }

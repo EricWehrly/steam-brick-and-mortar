@@ -134,17 +134,16 @@ than contorting the schema.
 
 ## Anchoring, shell, and interaction (decided 2026-08-19)
 
-1. **Anchor: world-lock at open, switchable, decision logged live.** Implemented as
-   `VRPanelAnchorMode` (`'world-lock' | 'grip-attached'`), a constructor parameter defaulting to a
-   module constant (`DEFAULT_ANCHOR_MODE`) — same DI shape as `forceEnabled`, so it's a one-line
-   edit to compare modes without a runtime UI toggle (not requested, would be over-engineering
-   here). World-lock computes position + yaw-only orientation from the camera **once, at open**
-   (not every frame — that would just be a yaw-only version of grip/camera-attach) and adds the
-   panel directly to the scene rather than parenting it, so it stays put in the world while the
-   player looks/moves around it. A `console.log` fires on every activation stating which mode is
-   active and why we're comparing them, so live headset testing carries its own paper trail.
-   Grip-attached mode (the original behavior, panel follows the primary controller) is fully
-   preserved behind the same switch, not deleted.
+1. **Anchor: camera-attached wins the live A/B (resolved 2026-08-19).** `VRPanelAnchorMode`
+   (`'camera-attached' | 'world-lock' | 'grip-attached'`) is a constructor parameter defaulting to
+   a module constant (`DEFAULT_ANCHOR_MODE`) — same DI shape as `forceEnabled`, so switching modes
+   is still a one-line edit if a future panel wants a different anchor. Confirmed live in headset:
+   the menu should move with the player's head like a HUD (`camera-attached`, now default), not
+   stay pinned in world space (`world-lock` — you could just walk away from it) or follow the
+   primary controller (`grip-attached` — swings while you point at it with the same hand). All
+   three modes are kept implemented, not deleted, for future reuse. `world-lock` still computes
+   position + yaw-only orientation from the camera once, at open, and adds the panel directly to
+   the scene rather than parenting it.
 2. **Tab shell: keep the DOM menu's existing tab/subtab structure**, not the flat single-column
    redesign originally proposed. Port `PauseMenuTabGroup`'s shape as-is for Story 4; use the extra
    vertical room VR affords for taller content areas instead of restructuring navigation. Get a
@@ -215,6 +214,10 @@ shell → tests → in-headset check.
 
 ### Story 6 — Remove the toggle, define the DOM menu's VR behavior
 
+- **Partially landed 2026-08-19**: the force flag no longer suppresses a real `MenuClose` (it used
+  to, which made the panel look unresponsive to the Settings button once live-tested in headset -
+  it now only pre-activates at `init()` as a flatscreen-preview convenience). Deleting the flag
+  entirely is still this story's remaining work.
 - Delete `?forceVRSettingsPanel=1` and `UrlUtils.isVRSettingsPanelForced()`; activation is purely
   `MenuOpen`/`MenuClose`.
 - Decide and implement what the DOM pause menu does during an immersive session. Simply leaving it
