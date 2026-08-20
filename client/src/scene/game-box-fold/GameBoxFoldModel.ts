@@ -560,7 +560,9 @@ export class GameBoxFoldModel {
         const titleTop = size * 0.05
         nameLines.forEach((line, i) => ctx.fillText(line, size / 2, titleTop + i * nameLineHeight, size * 0.85))
 
-        const diskRadius = size * 0.28
+        // Widened from 0.28 per direct request ("make the disc bigger/wider") - 0.4 still clears
+        // the canvas edges at diskCenterX +/- diskRadius (0.1-0.9 of size) with room to spare.
+        const diskRadius = size * 0.4
         const diskCenterX = size / 2
         const diskCenterY = titleTop + Math.max(nameLines.length, 1) * nameLineHeight + size * 0.02 + diskRadius
 
