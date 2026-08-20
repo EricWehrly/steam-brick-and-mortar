@@ -470,10 +470,14 @@ export class GameBoxFoldModel {
         return y + lines.length * lineHeight + size * 0.035
     }
 
-    /** Second flap face: the raw cache-entry JSON this box's content was built from - carried over
-     *  from BinderGameDetailPanel's debug dump per explicit request. Scrollable via
-     *  GameBoxFoldCoordinator's wheel handling -> scrollDebugPanel(), which re-invokes this with
-     *  the same debugJson at the new this.debugScrollLine offset. */
+    /** Second flap face: description up top (right-aligned, moved here from the store panel per
+     *  explicit request - "top-right, debug section makes room for it"), then the raw cache-entry
+     *  JSON this box's content was built from - carried over from BinderGameDetailPanel's debug
+     *  dump per explicit request. The JSON viewport already scrolls (GameBoxFoldCoordinator's wheel
+     *  handling -> scrollDebugPanel(), which re-invokes this with the same debugJson at the new
+     *  this.debugScrollLine offset), so shrinking its visible window to make room costs nothing -
+     *  reads this.latestContent directly for the description, same pattern redrawStorePanel()
+     *  uses, since debugJson alone doesn't carry it. */
     private drawDebugPanel(ctx: CanvasRenderingContext2D, debugJson: string | undefined): void {
         const size = PANEL_CANVAS_SIZE
         this.clearPanel(ctx)
@@ -484,6 +488,19 @@ export class GameBoxFoldModel {
         ctx.font = `${Math.floor(size / 26)}px Arial, sans-serif`
         ctx.fillText('DEBUG: CACHE ENTRY', size * 0.06, size * 0.04)
 
+        let jsonStartY = size * 0.1
+        const description = this.latestContent?.description
+        if (description) {
+            ctx.textAlign = 'right'
+            ctx.font = `${Math.floor(size / 30)}px Arial, sans-serif`
+            ctx.fillStyle = '#c9c9c9'
+            const descLineHeight = size / 22
+            const descLines = this.wrapLines(ctx, description, size * 0.55).slice(0, 3)
+            descLines.forEach((line, i) => ctx.fillText(line, size * 0.94, jsonStartY + i * descLineHeight, size * 0.55))
+            jsonStartY += descLines.length * descLineHeight + size * 0.03
+            ctx.textAlign = 'left'
+        }
+
         if (!debugJson) {
             this.debugMaxScrollLine = 0
             return
@@ -493,8 +510,8 @@ export class GameBoxFoldModel {
         ctx.font = `${fontSize}px "Courier New", monospace`
         const maxWidth = size * 0.88
         const lineHeight = fontSize * 1.25
-        const startY = size * 0.1
-        const maxLines = Math.floor((size * 0.86) / lineHeight)
+        const startY = jsonStartY
+        const maxLines = Math.floor((size * 0.96 - startY) / lineHeight)
 
         const wrapped = this.wrapMonospaceLines(ctx, debugJson.split('\n'), maxWidth, Number.POSITIVE_INFINITY)
         this.debugMaxScrollLine = Math.max(0, wrapped.length - maxLines)
@@ -540,11 +557,12 @@ export class GameBoxFoldModel {
     /** Base/center face: revealed once both flaps swing away. Title up top, then header art
      *  presented like a disc emerging from its sleeve (2026-08-12 direction - visual identity to
      *  iterate on, see the plan doc), a Play button sharing its row with a condensed playtime
-     *  summary, description/metacritic, tags/categories/collections (moved here from the identity
-     *  panel per explicit request), and placeholder rows for sections with no data source wired up
-     *  yet (DLC/achievements - screenshots/videos moved to the identity panel). Reads
-     *  this.latestContent directly rather than taking a parameter, since it can be triggered by
-     *  either setContent() or setHeaderImage() alone. */
+     *  summary, metacritic, tags/categories/collections (moved here from the identity panel per
+     *  explicit request), and placeholder rows for sections with no data source wired up yet
+     *  (DLC/achievements - screenshots/videos moved to the identity panel). Description lives on
+     *  the debug face instead (see drawDebugPanel()), not here. Reads this.latestContent directly
+     *  rather than taking a parameter, since it can be triggered by either setContent() or
+     *  setHeaderImage() alone. */
     private redrawStorePanel(): void {
         const size = PANEL_CANVAS_SIZE
         const ctx = this.centerContext
@@ -629,17 +647,8 @@ export class GameBoxFoldModel {
         ctx.fillText(lastPlayedLine, size * 0.92, y + playH * 0.75)
         y += playH + size * 0.06
 
-        if (content?.description) {
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'alphabetic'
-            ctx.font = `${Math.floor(size / 26)}px Arial, sans-serif`
-            ctx.fillStyle = '#d8d8d8'
-            const lines = this.wrapLines(ctx, content.description, size * 0.85).slice(0, 4)
-            const lineHeight = size / 18
-            lines.forEach((line, i) => ctx.fillText(line, size / 2, y + i * lineHeight, size * 0.85))
-            y += lines.length * lineHeight + size * 0.03
-        }
-
+        // Description moved to the debug face (top-right, above the cache-entry JSON) per direct
+        // request - see drawDebugPanel().
         if (content?.metacritic) {
             ctx.textAlign = 'center'
             ctx.font = `bold ${Math.floor(size / 24)}px Arial, sans-serif`

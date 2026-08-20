@@ -160,7 +160,7 @@ describe('GameBoxFoldModel', () => {
             categories: ['Single-player', 'Steam Achievements', 'Full controller support'],
             userCollections: ['Backlog', 'Favorites'],
             description: 'A very long store-page-style description that should wrap across '
-                + 'several lines on the store panel without throwing or overflowing badly.',
+                + 'several lines on the debug panel without throwing or overflowing badly.',
             metacritic: 'Metacritic: 91',
             debugJson: JSON.stringify({ appid: 1, nested: { a: 1, b: [1, 2, 3] } }, null, 2)
         })).not.toThrow()
