@@ -35,6 +35,13 @@ const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.12)
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
 const MODEL_FACING_ROTATION_Y = Math.PI
+// Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's own forward axis points roughly
+// "out and down" in a natural grip, so with only the Y-flip above the box's face ended up angled
+// down/back toward the palm - reading it meant over-extending the wrist, tilting the controller
+// forward to bring the face up into view. Pitching the box forward by 90 degrees is meant to
+// bring the face up to a natural viewing angle without that wrist tilt. First-pass, unconfirmed
+// in headset - flip the sign below and re-test live if it ends up facing the wrong way.
+const GRIP_BOX_PITCH_DEGREES = -90
 
 /**
  * Owns exactly one pre-warmed GameBoxFoldModel, summoned/re-textured/anchored on
@@ -255,6 +262,7 @@ export class GameBoxFoldCoordinator {
         if (grip) {
             grip.add(this.model.group)
             this.model.group.position.copy(GRIP_LOCAL_OFFSET)
+            this.model.group.rotation.x = THREE.MathUtils.degToRad(GRIP_BOX_PITCH_DEGREES)
             return
         }
 
@@ -262,6 +270,9 @@ export class GameBoxFoldCoordinator {
         if (camera) {
             camera.add(this.model.group)
             this.model.group.position.copy(CAMERA_LOCAL_OFFSET)
+            // Reset in case a previous summon this session was grip-anchored (pitch is
+            // grip-only) - the same model.group is reused across summons, not recreated.
+            this.model.group.rotation.x = 0
         }
     }
 
