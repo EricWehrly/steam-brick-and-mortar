@@ -23,8 +23,13 @@ import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenu
 import { toUikitSafeText } from './UikitTextSanitizer'
 
 const SHELL_PIXEL_SIZE = 0.0008
-const TAB_COLUMN_WIDTH = 150
-const CONTENT_WIDTH = 500
+const TAB_COLUMN_WIDTH = 170
+const CONTENT_WIDTH = 640
+// Fixed rather than autosized to whichever tab happens to be shortest - per direct request ("the
+// settings menu can be taller ... start with the tallest page, and work towards the most
+// complicated"), every tab gets this much room up front, with contentArea's overflow:'scroll'
+// below absorbing anything taller still.
+const SHELL_HEIGHT = 640
 const SHELL_GAP = 12
 const TAB_COLUMN_PADDING = 16
 const TAB_BUTTON_GAP = 8
@@ -76,6 +81,7 @@ export class VRSettingsMenuShell {
             flexDirection: 'row',
             gap: SHELL_GAP,
             width: TAB_COLUMN_WIDTH + CONTENT_WIDTH + SHELL_GAP,
+            height: SHELL_HEIGHT,
             pixelSize: SHELL_PIXEL_SIZE,
             depthTest: false,
             renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
@@ -90,6 +96,7 @@ export class VRSettingsMenuShell {
             flexDirection: 'column',
             gap: TAB_BUTTON_GAP,
             width: TAB_COLUMN_WIDTH,
+            height: SHELL_HEIGHT,
             padding: TAB_COLUMN_PADDING
         })
         for (const tab of VR_MENU_TABS) {
@@ -99,7 +106,10 @@ export class VRSettingsMenuShell {
         }
         container.add(tabColumn)
 
-        const contentArea = new Container({ flexDirection: 'column', width: CONTENT_WIDTH })
+        // overflow:'scroll' - SHELL_HEIGHT is a fixed budget, not a guarantee every tab fits
+        // within it; a future tall tab (see the "tallest page" direction above) scrolls instead
+        // of overflowing the panel's rounded frame.
+        const contentArea = new Container({ flexDirection: 'column', width: CONTENT_WIDTH, height: SHELL_HEIGHT, overflow: 'scroll' })
         container.add(contentArea)
 
         return { container, tabColumn, contentArea }

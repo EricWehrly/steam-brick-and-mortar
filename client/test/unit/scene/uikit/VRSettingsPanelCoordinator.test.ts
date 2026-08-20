@@ -106,7 +106,7 @@ describe('VRSettingsPanelCoordinator', () => {
         camera.updateWorldMatrix(true, false)
 
         expect(panelContainer.position.equals(positionAtOpen)).toBe(true)
-        expect(positionAtOpen.distanceTo(new THREE.Vector3(1, 1.6, 2))).toBeCloseTo(0.6, 5)
+        expect(positionAtOpen.distanceTo(new THREE.Vector3(1, 1.6, 2))).toBeCloseTo(0.9, 5)
     })
 
     it('world-lock strips camera pitch, keeping the panel upright', () => {

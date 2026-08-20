@@ -59,13 +59,16 @@ import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRC
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
 import { VRControllerPointer } from './VRControllerPointer'
 
-// Same "held in front of the viewer" convention GameBoxFoldCoordinator uses - kept in parity,
-// not imported (that constant is module-private).
-const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.6)
+// Same "held in front of the viewer" convention GameBoxFoldCoordinator uses, but further out
+// (was -0.6, matching parity with the game box) - the panel itself grew (see
+// VRSettingsMenuShell's CONTENT_WIDTH/SHELL_HEIGHT) per direct request ("the settings menu can be
+// taller ... maybe we should get away with it being a little further away and generally bigger"),
+// and a bigger panel held at the old distance would dominate the view.
+const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.9)
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.3)
 // Distance in front of the player the panel world-locks to at open time - matches
 // CAMERA_LOCAL_OFFSET's magnitude so the two modes place the panel at the same initial distance.
-const WORLD_LOCK_DISTANCE = 0.6
+const WORLD_LOCK_DISTANCE = 0.9
 
 /** Which fixed point the VR settings panel is anchored to while open. 'camera-attached' (default,
  *  settled 2026-08-19) parents it to the camera so it moves with the player's head like a HUD -
