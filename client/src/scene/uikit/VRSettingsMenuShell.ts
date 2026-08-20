@@ -1,5 +1,5 @@
 /**
- * VR settings menu tab shell - owns the tab column + content-swap area for the VR uikit settings
+ * VR settings menu tab shell - owns the tab row + content-swap area for the VR uikit settings
  * panel. Long-lived like VRSettingsPanelCoordinator itself: constructed once (in the coordinator's
  * constructor, not per-activation) and subscribes to UIEventTypes.MenuPanelChanged immediately, so
  * it doesn't miss the DOM menu's initial panel choice - PauseMenuManager.open() emits that before
@@ -7,6 +7,12 @@
  * container's visibility/anchor is toggled per open/close (see VRSettingsPanelCoordinator); the
  * shell instance and its subscription persist for the app's lifetime, the same pattern
  * VRSettingsPanelCoordinator itself already uses for MenuOpen/MenuClose.
+ *
+ * Tabs render as a row across the top (flexWrap: 'wrap' if there are ever too many to fit one
+ * line), content below - matching the DOM pause menu's own #pause-menu-tabs layout (see
+ * PauseMenuManager.ts). A left-side vertical tab column was tried first and reverted per direct
+ * request (2026-08-20): "I want the menu to return to its tabs-on-top navigation, at least for
+ * now."
  *
  * Syncs "which panel is active" with the DOM pause menu bidirectionally via MenuPanelChanged,
  * without either side calling the other directly - see PauseMenuManager.showPanel() for the DOM
@@ -21,30 +27,28 @@ import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
 import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenuTabContent } from './VRMenuTabRegistry'
 import { toUikitSafeText } from './UikitTextSanitizer'
+import { UIKIT_COLORS } from './UikitColorTokens'
 
 const SHELL_PIXEL_SIZE = 0.0008
-const TAB_COLUMN_WIDTH = 170
-const CONTENT_WIDTH = 640
+const PANEL_WIDTH = 820
 // Fixed rather than autosized to whichever tab happens to be shortest - per direct request ("the
 // settings menu can be taller ... start with the tallest page, and work towards the most
 // complicated"), every tab gets this much room up front, with contentArea's overflow:'scroll'
-// below absorbing anything taller still.
-const SHELL_HEIGHT = 640
+// below absorbing anything taller still. This is the content area's own scroll budget, separate
+// from the tab row's height above it.
+const CONTENT_HEIGHT = 640
 const SHELL_GAP = 12
-const TAB_COLUMN_PADDING = 16
+const TAB_ROW_PADDING = 12
 const TAB_BUTTON_GAP = 8
 const TAB_LABEL_FONT_SIZE = 13
-const TAB_INACTIVE_COLOR = '#e8e8ec'
-const TAB_ACTIVE_COLOR = '#ffffff'
-const TAB_ACTIVE_BACKGROUND = '#33333d'
+const TAB_INACTIVE_COLOR = UIKIT_COLORS.textSecondary
+const TAB_ACTIVE_COLOR = UIKIT_COLORS.textPrimary
+const TAB_ACTIVE_BACKGROUND = UIKIT_COLORS.surface3
 const TAB_INACTIVE_BACKGROUND = 'transparent'
 
-// Same as the panel-level constant this replaces (VRDisplayAdvancedPanel used to set this on its
-// own root before it became one tab's content nested inside this shell) - the panel represents
-// active UI and should never be occluded by scene content while open. depthTest/renderOrder are
-// both inherited uikit properties, so setting them here on the shell's root covers every tab's
-// content too without each one repeating it.
-const ALWAYS_ON_TOP_RENDER_ORDER = 1000
+/** Exported so other VR uikit surfaces (e.g. VRControllerPointer's cursor/beam) can render above
+ *  this menu's own geometry without guessing a number that happens to be higher. */
+export const ALWAYS_ON_TOP_RENDER_ORDER = 1000
 
 interface TabButtonHandle {
     readonly button: Button
@@ -54,7 +58,7 @@ interface TabButtonHandle {
 export class VRSettingsMenuShell {
     readonly container: Container
 
-    private readonly tabColumn: Container
+    private readonly tabRow: Container
     private readonly contentArea: Container
     private readonly tabButtons = new Map<string, TabButtonHandle>()
     private activePanelId: string
@@ -68,7 +72,7 @@ export class VRSettingsMenuShell {
 
         const built = this.build()
         this.container = built.container
-        this.tabColumn = built.tabColumn
+        this.tabRow = built.tabRow
         this.contentArea = built.contentArea
 
         this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
@@ -76,43 +80,42 @@ export class VRSettingsMenuShell {
         this.showTab(this.activePanelId, { emit: false })
     }
 
-    private build(): { container: Container; tabColumn: Container; contentArea: Container } {
+    private build(): { container: Container; tabRow: Container; contentArea: Container } {
         const container = new Container({
-            flexDirection: 'row',
+            flexDirection: 'column',
             gap: SHELL_GAP,
-            width: TAB_COLUMN_WIDTH + CONTENT_WIDTH + SHELL_GAP,
-            height: SHELL_HEIGHT,
+            width: PANEL_WIDTH,
             pixelSize: SHELL_PIXEL_SIZE,
             depthTest: false,
             renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
-            backgroundColor: '#1c1c22',
+            backgroundColor: UIKIT_COLORS.surface1,
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
             borderBottomLeftRadius: 12,
             borderBottomRightRadius: 12
         })
 
-        const tabColumn = new Container({
-            flexDirection: 'column',
+        const tabRow = new Container({
+            flexDirection: 'row',
+            flexWrap: 'wrap',
             gap: TAB_BUTTON_GAP,
-            width: TAB_COLUMN_WIDTH,
-            height: SHELL_HEIGHT,
-            padding: TAB_COLUMN_PADDING
+            width: '100%',
+            padding: TAB_ROW_PADDING
         })
         for (const tab of VR_MENU_TABS) {
             const handle = this.buildTabButton(tab)
             this.tabButtons.set(tab.panelId, handle)
-            tabColumn.add(handle.button)
+            tabRow.add(handle.button)
         }
-        container.add(tabColumn)
+        container.add(tabRow)
 
-        // overflow:'scroll' - SHELL_HEIGHT is a fixed budget, not a guarantee every tab fits
+        // overflow:'scroll' - CONTENT_HEIGHT is a fixed budget, not a guarantee every tab fits
         // within it; a future tall tab (see the "tallest page" direction above) scrolls instead
         // of overflowing the panel's rounded frame.
-        const contentArea = new Container({ flexDirection: 'column', width: CONTENT_WIDTH, height: SHELL_HEIGHT, overflow: 'scroll' })
+        const contentArea = new Container({ flexDirection: 'column', width: '100%', height: CONTENT_HEIGHT, overflow: 'scroll' })
         container.add(contentArea)
 
-        return { container, tabColumn, contentArea }
+        return { container, tabRow, contentArea }
     }
 
     private buildTabButton(tab: VRMenuTab): TabButtonHandle {
