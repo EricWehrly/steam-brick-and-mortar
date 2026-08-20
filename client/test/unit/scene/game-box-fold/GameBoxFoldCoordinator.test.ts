@@ -8,7 +8,7 @@ import {
     GameEventTypes, InputEventTypes,
     type GameSelectedEvent, type SceneCanvasClickEvent, type SceneCanvasWheelEvent
 } from '../../../../src/types/InteractionEvents'
-import type { XRControllerRaySource } from '../../../../src/webxr/XRControllerManager'
+import type { XRControllerRaySource, XRControllerRayInfo } from '../../../../src/webxr/XRControllerManager'
 
 // Real (empty-geometry) THREE.Mesh instances shared between the model mock's
 // getInteractiveMeshes() and the intersectObjects() stubs below, so "which mesh got hit" can be
@@ -210,13 +210,18 @@ describe('GameBoxFoldCoordinator', () => {
         }))
     })
 
-    it('selecting while an XR controller grip is available parents the model to the grip instead', () => {
+    it('selecting with two connected XR controllers parents the model to the primary grip instead', () => {
         const camera = new THREE.Object3D()
         const grip = new THREE.Object3D()
+        const raySpaces: XRControllerRayInfo[] = [
+            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 },
+            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
         DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
             getPrimaryControllerRay: () => null,
-            getPrimaryControllerGrip: () => grip
+            getPrimaryControllerGrip: () => grip,
+            getControllerRaySpaces: () => raySpaces
         }, { domain: DataDomain.Scene })
 
         coordinator = new GameBoxFoldCoordinator()
@@ -225,6 +230,28 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(grip.children).toContain(model.group)
         expect(camera.children).not.toContain(model.group)
+    })
+
+    it('selecting with only one connected XR controller camera-anchors instead of grip-anchoring - '
+        + 'a lone controller needs to stay free for pointing/interacting, not glued to the box', () => {
+        const camera = new THREE.Object3D()
+        const grip = new THREE.Object3D()
+        const raySpaces: XRControllerRayInfo[] = [
+            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => grip,
+            getControllerRaySpaces: () => raySpaces
+        }, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(camera.children).toContain(model.group)
+        expect(grip.children).not.toContain(model.group)
     })
 
     it('selecting a second game while one is open plays close, waits for it to finish, then '

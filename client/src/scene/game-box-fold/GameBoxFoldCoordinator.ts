@@ -47,6 +47,9 @@ const MODEL_FACING_ROTATION_Y = Math.PI
 // bring the face up to a natural viewing angle without that wrist tilt. First-pass, unconfirmed
 // in headset - flip the sign below and re-test live if it ends up facing the wrong way.
 const GRIP_BOX_PITCH_DEGREES = -90
+// See attachToAnchor()'s doc comment - below this many connected controllers, camera-anchor
+// instead of grip-anchor, so the player keeps a free hand to point/interact with.
+const MIN_CONTROLLERS_FOR_GRIP_ANCHOR = 2
 
 /**
  * Owns exactly one pre-warmed GameBoxFoldModel, summoned/re-textured/anchored on
@@ -262,7 +265,16 @@ export class GameBoxFoldCoordinator {
     private attachToAnchor(): void {
         const dm = DataManager.getInstance()
         const raySource = dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        const grip = raySource?.getPrimaryControllerGrip() ?? null
+        // Grip-anchoring only makes sense with a spare hand: with a single controller connected,
+        // that same controller is also whatever the player points/clicks with, so gluing the box
+        // to it too means it swings every time they aim elsewhere. Direct request (2026-08-20):
+        // with only one controller, camera-anchor instead - same behavior flatscreen already uses
+        // with zero controllers, so this also makes "how many controllers" the only thing that
+        // decides the anchor, not a separate VR-only special case.
+        const connectedControllerCount = raySource?.getControllerRaySpaces?.().length ?? 0
+        const grip = connectedControllerCount >= MIN_CONTROLLERS_FOR_GRIP_ANCHOR
+            ? raySource?.getPrimaryControllerGrip() ?? null
+            : null
 
         if (grip) {
             grip.add(this.model.group)
