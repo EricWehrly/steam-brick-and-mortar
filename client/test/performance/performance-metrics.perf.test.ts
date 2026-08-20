@@ -55,11 +55,6 @@ vi.mock('../../src/ui/UIManager', async () => {
     return uiManagerMockFactory()
 })
 
-vi.mock('../../src/ui/CacheManagementUI', async () => {
-    const { cacheManagementUIMockFactory } = await import('../mocks/ui/CacheManagementUI.mock')
-    return cacheManagementUIMockFactory()
-})
-
 // Mock DOM for PerformanceMonitor
 const mockDocument = {
     createElement: vi.fn().mockReturnValue({
