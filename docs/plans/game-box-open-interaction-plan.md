@@ -420,21 +420,206 @@ files.
 Files touched: `GameLibraryBinderUI.ts`, `GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts` (comment
 only).
 
+## Addendum (2026-08-12): face content design pass - extracting BinderGameDetailPanel's valuable sections
+
+New branch `feature/game-box-detail-content` off the now-merged `act2/default`. Addresses
+Follow-up (3) below. Went through `BinderGameDetailPanel`/`detail-panel.html` section by section and
+judged what's worth carrying over onto the fold-open box's two content faces (front cover +
+second flap - the base's own face already carries the cover art):
+
+- **Kept, now on the front cover**: game name, Steam rating (`formatRating()` - **extracted** out
+  of `BinderGameDetailPanel` into `client/src/scene/categorization/RatingFormat.ts` so both surfaces
+  share one implementation instead of duplicating it, per this project's no-duplicate-logic rule).
+- **Kept, now on the second flap**: total playtime, "last 2 weeks" recent playtime (only shown when
+  nonzero, same as the old panel's conditional block), genres, and top SteamSpy community tags
+  (`getTopSteamSpyTags`, the same fallback `GroupResolver` already uses for tag-mode grouping) -
+  combined into one deduped, capped (`MAX_TAGS_SHOWN = 6`) list rather than two separate sections,
+  since a flap face has room for one legible list, not two.
+- **Left out (debug-only, not real user content)**: the raw JSON cache-entry dump, the "Spotlight"
+  debug button (`GameSpotlight`), and the bare App ID stat - these were dev-verification tools, not
+  information a player looks up.
+- **Left out (interaction, not content - deferred)**: the "Play"/"Store Page" buttons. The old panel
+  could do this because it was a real DOM overlay with clickable anchors; the fold-open box's faces
+  are canvas-drawn textures on 3D geometry with no click-target wiring yet. Making the box
+  interactive is the same "gravy"/"point of the hit" question already flagged as deferred earlier in
+  this doc's history, not re-opened here.
+- **`GameBoxFoldModel`**: replaced the single generic `drawContentPanel(ctx, text)` with two
+  purpose-built layouts, `drawTitlePanel()` (name + rating, word-wrapped) and `drawStatsPanel()`
+  (playtime block + wrapped tag line), plus a shared `wrapLines()` greedy word-wrap helper - the
+  previous version only ever received one or two pre-joined lines and never needed to wrap.
+- **`GameBoxFoldContent`** grew from `{ name, genre?, playtimeHours? }` to
+  `{ name, rating?, playtimeHours?, recentPlaytimeHours?, tags? }` - `genre` (singular) is gone,
+  folded into the caller-built `tags` list alongside community tags.
+- **`GameBoxFoldCoordinator.summon()`** now builds the full content object from `SteamGameData`
+  directly (`buildTags()` does the genre+community-tag merge/dedupe/cap) instead of the placeholder
+  single-genre/playtime-only object from the previous round.
+
+Not yet done: live visual verification. This addendum is code + unit-test verified only
+(`yarn tsc` clean, full suite green) - see the "Live-verify" follow-up, since the user separately
+flagged that the hinge direction "still opens exactly as it has been" despite the merged sign-error
+fix, which needs an actual dev-server check, not another code-only pass.
+
+Files touched: `client/src/scene/categorization/RatingFormat.ts` (new),
+`client/src/ui/binder/BinderGameDetailPanel.ts` (import swap only), `GameBoxFoldModel.ts`,
+`GameBoxFoldCoordinator.ts`, both fold-open test files.
+
+## Addendum (2026-08-12, same branch): three-panel redesign - identity/store/debug, ahead of interaction
+
+Before the previous addendum's content had even been visually confirmed, the user asked for a much
+bigger reshuffle: "we can fit a ton more onto these game spaces," store-page-style content (header
+art, description) in the center, the JSON debug dump moved onto the right flap and made scrollable,
+a working Play button under the header, tags AND categories, user collections, and later
+sections for DLC/achievements/friends-who-own. Given the size, three explicit clarifying questions
+were asked before building anything (see chat) and answered:
+
+- **Content now, interaction (Play button, scrollable JSON) as an immediate follow-up** - nothing
+  on the box is click/scroll-hittable yet, so a working button or real scrolling needs a new
+  raycasting/hit-testing subsystem against the held box's own faces, which is its own chunk of work.
+- **Missing data (screenshots/videos/DLC/achievements) gets placeholder "coming soon" rows for now**
+  - none of these are fetched anywhere in the pipeline today (confirmed by reading
+    `SteamGameMetadata`); wiring them up is separate follow-up work, not blocking this pass.
+- **The "disk" idea gets a scoped first pass now**, per explicit direction: "try drawing the disk in
+  the middle flap, top - just the top half of the disk emerging from its sleeve - header image
+  across that." Scoped to the center panel's own illustration, not a geometry change to the box.
+
+Resulting per-panel redesign (all three canvases bumped 256px -> `PANEL_CANVAS_SIZE = 512` - "we can
+fit a ton more"):
+
+- **Front cover -> identity panel** (`drawIdentityPanel()`): name, rating, playtime
+  (total + recent), then three labeled chip-line sections via a shared `drawLabeledChipLines()`
+  helper - TAGS (genres + community tags, as before), FEATURES (Steam's own `categories` - distinct
+  from tags per explicit request), YOUR COLLECTIONS (`user_collections`, the desktop user's own
+  Steam library collections - this **is** "which user categories we know it to be a part of").
+- **Base/center -> store panel** (`redrawStorePanel()`): header art presented as a disc emerging
+  from a sleeve (circular canvas clip, top half only, `ctx.arc(cx, cy, r, PI, 2*PI)`, header image
+  `drawImage()`'d in with "cover" scaling), a reserved-but-outlined (not filled, so it doesn't read
+  as already working) "▶ PLAY (soon)" zone under it, then description/metacritic text, then
+  coming-soon rows for Screenshots/Videos/DLC/Achievements. Friends-who-own stayed fully out per the
+  user's own "later" framing - not even a placeholder row for it yet.
+- **Second flap -> debug panel** (`drawDebugPanel()`): the raw cache-entry JSON dump, reversing the
+  previous addendum's "leave it out, it's debug-only" call per explicit request - static/top-aligned
+  only for now (line-wrapped via a new `wrapMonospaceLines()` char-cut helper, since JSON doesn't
+  reliably wrap on spaces the way prose does), truncated with a "scrolling coming soon" note when it
+  overflows.
+- **Header art fetch changed from `library` to `header` format**, and the whole `THREE.DataTexture`/
+  `flipY` mechanism for it is gone: `GameBoxFoldCoordinator.applyHeaderImage()` now hands
+  `GameBoxFoldModel.setHeaderImage()` a plain `{pixels, width, height}` bundle, which the model
+  rasterizes into a scratch canvas via `ctx.createImageData()`/`putImageData()` (not `new
+  ImageData(...)` - that global constructor isn't guaranteed to exist in every test environment,
+  e.g. jsdom) and reads with `drawImage()` for the disc. Canvas `ImageData` is inherently top-down,
+  same row order as the pixel source, so this removes the flipY failure class entirely rather than
+  fixing it again.
+- **`coverTextureCache: Map<string, THREE.DataTexture>`** (which needed per-entry `.dispose()`)
+  became **`headerImageCache: Map<string, GameBoxFoldHeaderImage>`** (plain pixel bundles - nothing
+  to dispose, `dispose()` just clears the map).
+
+Same as the previous addendum: code + unit-test verified only, not yet visually confirmed.
+
+Files touched: `GameBoxFoldModel.ts` (large rewrite), `GameBoxFoldCoordinator.ts`
+(`applyHeaderImage()` replacing `applyCoverTexture()`, richer `summon()` content), both fold-open
+test files.
+
+## Addendum (2026-08-12, same branch): raycast interaction, second layout pass, data-sourcing research
+
+Three more pieces from the same session, landed together:
+
+- **Data-sourcing research, dispatched to a background agent** (constrained: research + a doc,
+  no implementation) to answer Follow-up (5) below using this project's established desktop-Rust
+  local-file-read pattern (`desktop/tauri-app/src/steam/` - `librarycache.rs`/`screenshots.rs`/
+  `appinfo.rs`), not the Steam Web API. Findings written up in
+  [`game-box-store-data-research.md`](game-box-store-data-research.md): **DLC and achievements are
+  both feasible from local Steam client files** (achievements via a plain JSON cache,
+  `appcache/librarycache/<appid>.json` - not VDF at all; DLC via one more field read in
+  `appinfo.rs`'s existing `extended` block decode) - **screenshots and videos are not**, they
+  genuinely need the Store API (`appdetails.screenshots[]`/`.movies[]`), confirmed against this
+  repo's own prior research on that endpoint. Recommended build order: achievements, then DLC;
+  screenshots/videos treated as a separate, deliberate networked-dependency decision, not scoped
+  here.
+- **Raycast interaction** (Follow-up (4), pulled forward into this same pass per explicit request):
+  `GameBoxFoldCoordinator` now raycasts against the held box's own three content meshes -
+  `GameBoxFoldModel.getInteractiveMeshes()` exposes them, `isContentFaceHit()` keeps the
+  per-mesh "which of its 6 faces is the content one" knowledge internal to the model rather than
+  exporting `FACE_INDEX`. A new `SceneCanvasWheelEvent`/`InputEventTypes.SceneCanvasWheel`
+  (mirroring the existing `SceneCanvasClickEvent`) was added, emitted by `SystemUICoordinator`
+  alongside its existing mousedown/mousemove/mouseup/contextmenu wiring on the renderer canvas -
+  the class that already owns that DOM listener setup, not a new one. Clicking the Play button
+  (hit-tested via `GameBoxFoldModel.isPointInPlayButton()`, tracking the button's last-drawn
+  canvas rect) navigates to `steam://run/<appid>`, the same OS-protocol-handler mechanism
+  `BinderGameDetailPanel`'s plain `<a href>` used - untested inside the Tauri desktop webview
+  specifically (no shell plugin installed in this project; not a regression, the old link was
+  never verified there either). Scrolling over the debug panel calls
+  `GameBoxFoldModel.scrollDebugPanel()`, which now tracks a line offset and re-wraps/re-slices the
+  JSON from `GameBoxFoldCoordinator.summon()`'s existing `debugJson` content - clamped to
+  `[0, debugMaxScrollLine]`, reset to 0 on every new selection. UV->canvas-space conversion
+  (`canvasX = uv.x * size`, `canvasY = (1 - uv.y) * size`) was re-derived directly from
+  `BoxGeometry`'s own UV-generation source (same rigor as this session's earlier hinge/hinge-fix
+  math, after two rounds of sign-error bugs from skipping that step) - confirmed face-independent,
+  unlike the per-face winding direction, so no `-Z`-specific correction was needed here.
+- **Second layout pass**, per explicit new direction:
+  - Title moved to the store/center panel, top, above the disc (previously only on the identity
+    panel, which now shows no title at all - the store panel is the primary "identity" surface).
+  - Play button now shares one row with a condensed playtime/last-played summary instead of
+    standing alone.
+  - TAGS/FEATURES/YOUR COLLECTIONS moved from the identity panel to the store panel (via the
+    already-shared `drawLabeledChipLines()`); Screenshots/Videos coming-soon rows moved the
+    opposite direction, from the store panel to the identity panel (via a newly-extracted
+    `drawComingSoonRows()`, shared with the store panel's remaining DLC/Achievements rows).
+  - **Feature icons - tried, then reverted.** Steam's own category API data (`{id, description}`)
+    has no icon field (confirmed against this repo's `SteamCategory` type), so a small curated
+    `CategoryIcons.ts` lookup (description text -> emoji) was added, then removed again per
+    explicit direction the same session: "get rid of CategoryIcons until we have some icons for
+    them." Categories render as plain text again. Left as a Follow-up (nice-to-have, not expected
+    to get picked up) rather than a deleted idea, in case a real icon source shows up later.
+
+Files touched: `client/src/types/InteractionEvents.ts` (new `SceneCanvasWheelEvent`),
+`client/src/ui/coordinators/SystemUICoordinator.ts` (wheel listener), `GameBoxFoldModel.ts`
+(interactive-mesh accessors, play-button rect, debug scroll, layout reshuffle),
+`GameBoxFoldCoordinator.ts` (`handleBoxClick`/`handleBoxWheel`/`raycastAgainstBox`), `docs/plans/
+game-box-store-data-research.md` (new, background-agent output), plus fold-open/
+SystemUICoordinator test files.
+
 ## Follow-ups (explicitly deferred to a later pass, not this branch)
 
-Recorded per the user's own framing (2026-08-11, updated 2026-08-12) so they aren't lost before the
-next pick-up:
+Recorded per the user's own framing (2026-08-11, updated 2026-08-12 x3) so they aren't lost before
+the next pick-up:
 
 1. **Closing the held box.** Trivial for controllers (repeat trigger press toggles), but keyboard/
    mouse has no equivalent gesture yet - needs a real dismiss input, not just VR-side reasoning.
 2. **Walking away should close what's open.** Currently the box stays summoned regardless of player
    movement; leaving the shelf area (or the game box's general vicinity) should auto-dismiss it.
-3. **Face content design pass.** Per the original plan's own open question - bring over the
-   information the old flat detail screen showed (name, genre, playtime, categories, etc.) as a
-   starting point, then evaluate what actually belongs on each of the three faces from there.
-4. **Remove the old flat-overlay implementation and the `USE_FOLD_OPEN_GAME_BOX_INTERACTION` flag.**
-   Once (3) lands and the fold-open box carries real content, `GameLibraryBinderUI`'s
+3. ~~Face content design pass.~~ Done across the three 2026-08-12 addenda above - not yet visually
+   confirmed by the user.
+4. ~~Interaction: working Play button + scrollable JSON debug panel.~~ Done in this addendum - not
+   yet visually confirmed by the user (in particular, Play's `steam://` launch inside the Tauri
+   desktop webview specifically).
+5. **Missing data: screenshots, videos, DLC, achievements.** See
+   [`game-box-store-data-research.md`](game-box-store-data-research.md) - achievements and DLC are
+   feasible from local Steam client files (recommended build order: achievements first, DLC
+   second); screenshots/videos need the Store API, scope separately. Currently stubbed as
+   "coming soon" rows.
+6. **Friends who own/have played this game.** Explicitly "later" per the user - not even a
+   placeholder row exists for it yet, unlike (5).
+7. **Remove the old flat-overlay implementation and the `USE_FOLD_OPEN_GAME_BOX_INTERACTION` flag.**
+   Per explicit direction (2026-08-12): do this "as soon as we've confirmed transfer of its
+   meaningful contents" - i.e. once the user visually confirms the fold-open faces carry what
+   matters from `BinderGameDetailPanel`, delete `GameLibraryBinderUI`'s
    `GameEventTypes.Selected` handling (`onGameSelected`/`openGameDetail`/`selectGame`/
-   `renderDetailPanel`/`BinderGameDetailPanel`) and the flag itself become dead code - delete them
-   and make `GameBoxFoldCoordinator`'s registration unconditional rather than carrying two
-   permanently-coexisting selection paths.
+   `renderDetailPanel`/`BinderGameDetailPanel`) and the flag itself, and make
+   `GameBoxFoldCoordinator`'s registration unconditional.
+8. **Feature category icons.** Nice-to-have, probably won't get picked up - see the addendum above.
+   Needs an actual icon source (Steam's category API data has none) before it's worth re-adding.
+9. ~~Whether these panels should be hand-drawn canvas at all, vs. real HTML/CSS projected onto the
+   surface via `CSS3DRenderer`.~~ **Resolved (2026-08-13) via
+   [`css3d-panel-projection-spike.md`](css3d-panel-projection-spike.md): stay with canvas-drawn +
+   raycast hover-simulation for this box.** Confirmed by reading `CSS3DRenderer.js` directly (not
+   assumed): CSS3D content is a plain absolutely-positioned DOM layer with a CSS `matrix3d`
+   transform, never submitted through `WebGLRenderingContext`/`XRWebGLLayer` - structurally
+   invisible in an actual WebXR session, the same root cause that made the original flat
+   `BinderGameDetailPanel` invisible in VR in the first place (see this doc's Goal section). CSS3D
+   stays a legitimate tool for genuinely flatscreen-only surfaces (the settings menu itself, per
+   the spike) - just not this box, which has to work identically on both platforms.
+10. **Manual hover-simulation for the box's own faces**, now the recommended path per the spike
+    above (raycasting to detect "pointer is over this button-shaped region," reusing
+    `GameBoxFoldCoordinator.raycastAgainstBox()`'s existing infrastructure) - not built yet, no
+    interactive element currently needs it beyond the Play button, which already has working click
+    handling without hover feedback.

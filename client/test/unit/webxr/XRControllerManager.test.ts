@@ -184,6 +184,53 @@ describe('XRControllerManager', () => {
         expect(controllerModel.children.length).toBe(0)
     })
 
+    it('getControllerRaySpaces() returns an empty list with no connected controllers', () => {
+        manager.setup(renderer)
+        expect(manager.getControllerRaySpaces()).toEqual([])
+    })
+
+    it('getControllerRaySpaces() returns every connected controller, not just the trigger-resolved primary one', () => {
+        manager.setup(renderer)
+        dispatchConnected(controllers[0], 'left')
+        dispatchConnected(controllers[1], 'right')
+
+        const raySpaces = manager.getControllerRaySpaces()
+
+        expect(raySpaces).toHaveLength(2)
+        expect(raySpaces).toEqual(expect.arrayContaining([
+            { index: 0, handedness: 'left', raySpace: controllers[0], triggerValue: 0 },
+            { index: 1, handedness: 'right', raySpace: controllers[1], triggerValue: 0 }
+        ]))
+    })
+
+    it('getControllerRaySpaces() drops a controller once it disconnects', () => {
+        manager.setup(renderer)
+        dispatchConnected(controllers[0], 'left')
+        dispatchConnected(controllers[1], 'right')
+
+        dispatchDisconnected(controllers[0])
+
+        expect(manager.getControllerRaySpaces()).toEqual([
+            { index: 1, handedness: 'right', raySpace: controllers[1], triggerValue: 0 }
+        ])
+    })
+
+    it('getControllerRaySpaces() reports live analog trigger depression per hand', () => {
+        manager.setup(renderer)
+        dispatchConnected(controllers[0], 'left')
+        dispatchConnected(controllers[1], 'right')
+
+        manager.setSession(createFakeSession([
+            { handedness: 'left', gamepad: { buttons: [{ pressed: false, value: 0.35 }], axes: [] } as unknown as Gamepad },
+            { handedness: 'right', gamepad: createFakeGamepad(false) }
+        ]))
+
+        const raySpaces = manager.getControllerRaySpaces()
+
+        expect(raySpaces.find(entry => entry.handedness === 'left')?.triggerValue).toBeCloseTo(0.35)
+        expect(raySpaces.find(entry => entry.handedness === 'right')?.triggerValue).toBe(0)
+    })
+
     it('dispose() removes controller/grip groups from the camera rig', () => {
         manager.setup(renderer)
         expect(cameraRig.children.length).toBeGreaterThan(0)
