@@ -165,6 +165,52 @@ than contorting the schema.
    "VR keyboard is its own feature" non-goal; downgrades `GameSettingsPanel`'s text inputs from
    "read-only in VR" back to fully functional for Story 5.
 
+## Menu state extraction (planned, not started, 2026-08-20)
+
+Direct request, prompted by `domVisualsSuppressed`: right now `PauseMenuManager` owns the *entire*
+open/close/active-panel state machine (`isOpen`, `activePanel`, `open()`/`close()`/`showPanel()`,
+input pause/resume, tab-group resolution) **and** all of its own DOM rendering, in the same class.
+`VRSettingsMenuShell` doesn't share that state - it just mirrors it after the fact via
+`UIEventTypes.MenuPanelChanged`, so there are two menus each partially tracking "is the menu open,
+which panel is active," kept in sync by event echo rather than a single source of truth. That's
+tolerable today (both sides are simple and the sync is well-tested), but it's the wrong shape for
+"one unified menu definition" - it's exactly what makes suppressing the DOM's own *visuals* (see
+`PauseMenuManager.setDomVisualsSuppressed`) feel like a workaround bolted on from outside instead of
+a natural state, since the class was never split into "owns state" vs. "renders state" to begin
+with.
+
+**Proposed shape**: extract the open/close/active-panel/input-pause state machine out of
+`PauseMenuManager` into its own class - working name `MenuSessionState` - owning:
+- `isOpen`, `activePanel`, `inputPaused`, tab-group resolution (`resolvePanelId`)
+- `open()` / `close()` / `toggle()` / `showPanel()`
+- Emitting `UIEventTypes.MenuOpen` / `MenuClose` / `MenuPanelChanged` as **its own** events, not a
+  callback pair (`onMenuOpen`/`onMenuClose`) that only `PauseMenuManager` currently exposes
+- The `OpenMenuPressed` / `CancelPressed` input wiring, including the same-keypress self-cancel
+  guard (`suppressNextCancelClose`)
+
+`PauseMenuManager` (DOM) and `VRSettingsMenuShell` / `VRSettingsPanelCoordinator` (VR) both become
+**pure renderers**: each owns only its own visuals, subscribes to `MenuSessionState`'s events, and
+never mutates menu state directly - a `showPanel()` call becomes a request *into*
+`MenuSessionState`, not a `this.state.activePanel = ...` assignment inside the DOM class. This is a
+direct application of root `CLAUDE.md`'s "owner-managed subscriptions" rule: today
+`PauseMenuManager` is the de facto owner and `VRSettingsMenuShell` a second-class mirror; after this,
+there's one real owner and two equal subscribers.
+
+`setDomVisualsSuppressed` likely disappears entirely once this lands - "don't render" is what a pure
+DOM *renderer* does natively when the DOM surface isn't the active one, not a flag threaded into the
+state-owning class from outside.
+
+**Scope estimate**: touches `PauseMenuManager.ts` (shrinks substantially - loses `state`,
+`open`/`close`/`showPanel`/`resolvePanelId`/the input-pause callbacks/the OpenMenu-Cancel guard),
+`SystemUICoordinator.ts` (constructs `MenuSessionState` once, hands it to both renderers instead of
+wiring `PauseMenuCallbacks`), `VRSettingsPanelCoordinator.ts` (subscribes to the extracted class's
+events instead of - or via - the existing `UIEventTypes.MenuOpen`/`MenuPanelChanged`, which can stay
+the same event types, just emitted from a new place), and every test currently mocking
+`PauseMenuCallbacks` or asserting on `PauseMenuManager.getState()`.
+
+**Not started - ships as its own branch/PR**, separate from this plan's VR-menu visual work, per
+direct request (2026-08-20: "isolate it at PR time").
+
 ## Full menu/panel inventory (surveyed 2026-08-20)
 
 Every distinct in-app menu/panel, so nothing gets forgotten while this migration is underway. Not
