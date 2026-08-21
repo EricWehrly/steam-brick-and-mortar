@@ -29,9 +29,14 @@ const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 // Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
 // Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
 // doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
-// Flatscreen distance brought in from -0.6 per direct request ("game boxes are way too far from
-// the camera in flatscreen").
-const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.35)
+// Pushed back out to -0.7 (was -0.35, itself brought in from -0.6 per a prior "too far away"
+// request) - direct request (2026-08-20), confirmed via flatscreen screenshot: -0.35 was tuned
+// against the CLOSED box (0.3m wide), but this same fixed offset also has to hold the OPEN box,
+// which spreads its three panels into roughly a 0.9m-wide row - at -0.35 that overflowed the
+// viewport (the right flap's text was visibly cut off past the screen edge). There's no separate
+// open-vs-closed distance yet (see GameBoxFoldModel - only scale/rotation are animated, position
+// is set once in attachToAnchor() below), so this single constant has to fit both states.
+const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.7)
 // Pushed further from the grip (was -0.12) per direct request - held right at the hand, the box
 // ended up right in front of the player's face too. More separation from the grip reads as
 // "holding it out to look at" instead.
@@ -158,7 +163,14 @@ export class GameBoxFoldCoordinator {
         this.currentAppid = appid
         this.model.setContent({
             name: game.name,
-            rating: formatRating(game.userscore ?? 0),
+            // Distinct from "Steam reports 0/no reviews" (a real, meaningful value - see
+            // AppDetailsCache.ts's isDefined-based merge comment): userscore itself is
+            // undefined when we never got rating data for this game at all. Collapsing that
+            // into 0 (as this used to) made "no data" and "confirmed unrated" both render the
+            // same misleading "Unrated" text - direct request (2026-08-20), confirmed live that
+            // most boxes were actually hitting the no-data case. Omitting the field entirely
+            // here (GameBoxFoldContent.rating is optional) makes the debug panel skip the row.
+            rating: game.userscore !== undefined ? formatRating(game.userscore) : undefined,
             playtimeHours: game.playtime_forever ? Math.round(game.playtime_forever / 60) : undefined,
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
             tags: this.buildTags(game),
@@ -223,7 +235,11 @@ export class GameBoxFoldCoordinator {
 
     private readonly handleBoxWheel = (event: CustomEvent<SceneCanvasWheelEvent>): void => {
         const hit = this.raycastAgainstBox(event.detail.ndcX, event.detail.ndcY)
-        if (hit?.face === 'debug') {
+        // Gated to the cache-entry viewport specifically (not the whole debug face) - direct
+        // request (2026-08-20): the scrollbar was firing from anywhere on the right flap,
+        // including over the description/tags text above it, which read as broken/oversensitive
+        // scrolling rather than "you're over the JSON viewport."
+        if (hit?.face === 'debug' && this.model.isPointInCacheEntry(hit.canvasY)) {
             this.model.scrollDebugPanel(event.detail.deltaY)
         }
     }

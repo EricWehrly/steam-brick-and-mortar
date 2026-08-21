@@ -94,12 +94,14 @@ export interface GameBoxFoldHeaderImage {
  * cover (hinged on its right edge). Opening swings the front cover flat to the left first, then
  * the second flap flat to the right, ending as three coplanar panels in a row - see
  * docs/plans/game-box-open-interaction-plan.md. Each panel has a distinct role: front cover =
- * identity (name/rating/playtime/tags), base/center = store page (header art on a disc, play
- * zone, description), second flap = debug (raw cache-entry JSON). Owns its own animation via a
- * THREE.AnimationMixer/AnimationClip (playOpen()/playClose() play one clip forward/backward - see
- * buildOpenClip()) rather than a hand-rolled phase/progress state machine. Otherwise a pure
- * display object: no events, no globals beyond what the caller explicitly drives via update().
- * Built once and reused for every selection (see GameBoxFoldCoordinator).
+ * identity (screenshots/videos placeholders only - rating moved to the debug face, see
+ * drawDebugPanel()); base/center = store page (title, header art on a disc, play zone, playtime,
+ * collections); second flap = debug (description, rating, metacritic, tags, features, then the
+ * raw cache-entry JSON). Owns its own animation via a THREE.AnimationMixer/AnimationClip
+ * (playOpen()/playClose() play one clip forward/backward - see buildOpenClip()) rather than a
+ * hand-rolled phase/progress state machine. Otherwise a pure display object: no events, no
+ * globals beyond what the caller explicitly drives via update(). Built once and reused for every
+ * selection (see GameBoxFoldCoordinator).
  */
 export class GameBoxFoldModel {
     readonly group: THREE.Group
@@ -136,6 +138,10 @@ export class GameBoxFoldModel {
     // Canvas-space rect of the store panel's Play button as last drawn - GameBoxFoldCoordinator
     // hit-tests clicks against this rather than either side hardcoding the layout twice.
     private playButtonRect: { x: number; y: number; width: number; height: number } | null = null
+    // Canvas-space Y (debug face) where the cache-entry section starts, as last drawn - lets
+    // GameBoxFoldCoordinator gate wheel-scroll to just that section instead of the whole face,
+    // since everything above it (description/rating/metacritic/tags/features) is static text.
+    private cacheEntryStartY = 0
     // Line offset into the wrapped debug JSON, adjusted by scrollDebugPanel(). Reset per
     // selection by setContent() so a new game doesn't inherit the previous one's scroll position.
     private debugScrollLine = 0
@@ -252,6 +258,12 @@ export class GameBoxFoldModel {
         }
         return canvasX >= rect.x && canvasX <= rect.x + rect.width
             && canvasY >= rect.y && canvasY <= rect.y + rect.height
+    }
+
+    /** Whether a debug-face canvas-space Y falls at or below the cache-entry section (the
+     *  scrollable JSON viewport and its "CACHE ENTRY" heading) as last drawn. */
+    isPointInCacheEntry(canvasY: number): boolean {
+        return canvasY >= this.cacheEntryStartY
     }
 
     /** Scrolls the debug panel by DEBUG_SCROLL_LINES_PER_TICK lines, direction from the wheel
@@ -395,32 +407,22 @@ export class GameBoxFoldModel {
         return { canvas, context, texture }
     }
 
-    /** Front cover face: the player's relationship to this game - rating, and (until we have real
-     *  data for them, see docs/plans/game-box-store-data-research.md) reserved rows for
-     *  screenshots/videos. The title itself lives on the store panel instead (2026-08-12, "put the
-     *  title at the middle top, above the disk"); playtime/"recently played" lived here too but
-     *  was dropped per direct request ("don't need to repeat playtime or 'recently' on the left
-     *  side") - it's still shown once, on the store panel next to the Play button. +Z faces use
-     *  standard (non-reversed) UVs - see FACE_INDEX's comment - so no pre-mirroring is needed
-     *  here, unlike LabelTextureArrayManager's -Z-mapped labels. */
+    /** Front cover face: reserved rows for screenshots/videos (until we have real data for them,
+     *  see docs/plans/game-box-store-data-research.md). The title itself lives on the store panel
+     *  instead (2026-08-12, "put the title at the middle top, above the disk"); playtime/"recently
+     *  played" lived here too but was dropped per direct request ("don't need to repeat playtime
+     *  or 'recently' on the left side") - it's still shown once, on the store panel next to the
+     *  Play button. Rating moved to the debug face, under the description (direct request,
+     *  2026-08-20 - see drawDebugPanel()). +Z faces use standard (non-reversed) UVs - see
+     *  FACE_INDEX's comment - so no pre-mirroring is needed here, unlike LabelTextureArrayManager's
+     *  -Z-mapped labels. */
     private drawIdentityPanel(ctx: CanvasRenderingContext2D, content: GameBoxFoldContent): void {
         const size = PANEL_CANVAS_SIZE
         this.clearPanel(ctx)
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
-        let y = size * 0.12
-
-        if (content.rating) {
-            ctx.font = `${Math.floor(size / 18)}px Arial, sans-serif`
-            ctx.fillStyle = '#e0c15a'
-            ctx.fillText(content.rating, size / 2, y, size * 0.85)
-            y += size * 0.07
-        }
-
-        y += size * 0.15
-
-        this.drawComingSoonRows(ctx, y, ['Screenshots', 'Videos'])
+        this.drawComingSoonRows(ctx, size * 0.27, ['Screenshots', 'Videos'])
     }
 
     /** One labeled, wrapped chip-line section (e.g. "TAGS: Action · Indie · ...") - returns the Y
@@ -457,19 +459,21 @@ export class GameBoxFoldModel {
     }
 
     /** Second flap face: the store-page-style content that doesn't fit the front cover or center
-     *  panel - description, metacritic, and tags (moved here from the store panel per explicit
-     *  request - "metacritic ... should go under description on the right flap, along with tags") -
-     *  followed by a visually distinct, deliberately minor "cache entry" section holding the raw
-     *  JSON this box's content was built from (carried over from BinderGameDetailPanel's debug
-     *  dump). Previously this whole face was framed as one "DEBUG: CACHE ENTRY" block with the
+     *  panel - description, rating, metacritic, tags, and features (moved here from either the
+     *  identity or store panel per explicit request - "metacritic ... should go under description
+     *  on the right flap, along with tags", then rating and features 2026-08-20: "move 'unrated'
+     *  to the right, under description" / "let's move Features on the right as well") - followed
+     *  by a visually distinct, deliberately minor "cache entry" section holding the raw JSON this
+     *  box's content was built from (carried over from BinderGameDetailPanel's debug dump).
+     *  Previously this whole face was framed as one "DEBUG: CACHE ENTRY" block with the
      *  description crammed into its corner - restructured per explicit request ("top-right should
      *  be description followed by a different area showing the cache, this is definitely wrong")
-     *  into description-first, cache-second. The JSON viewport already scrolls
-     *  (GameBoxFoldCoordinator's wheel handling -> scrollDebugPanel(), which re-invokes this with
-     *  the same debugJson at the new this.debugScrollLine offset), so it's fine for the content
-     *  above it to leave it little room - reads this.latestContent directly for
-     *  description/metacritic/tags, same pattern redrawStorePanel() uses, since debugJson alone
-     *  doesn't carry them. */
+     *  into description-first, cache-second. Crunching the cache viewport to make room for the
+     *  content above it is expected/accepted (direct request, 2026-08-20), and it already scrolls
+     *  (GameBoxFoldCoordinator's wheel handling -> scrollDebugPanel(), gated to
+     *  isPointInCacheEntry() so scrolling over the static text above doesn't also scroll the JSON)
+     *  - reads this.latestContent directly for description/rating/metacritic/tags/categories, same
+     *  pattern redrawStorePanel() uses, since debugJson alone doesn't carry them. */
     private drawDebugPanel(ctx: CanvasRenderingContext2D, debugJson: string | undefined): void {
         const size = PANEL_CANVAS_SIZE
         this.clearPanel(ctx)
@@ -489,6 +493,18 @@ export class GameBoxFoldModel {
             y += descLines.length * descLineHeight + size * 0.03
         }
 
+        // Moved here from the identity (front cover) panel, under description - direct request
+        // (2026-08-20). Omitted (not "Unrated") when there's genuinely no rating data - see
+        // GameBoxFoldCoordinator's setContent() call for the undefined-vs-zero distinction.
+        if (content?.rating) {
+            ctx.textAlign = 'left'
+            ctx.textBaseline = 'alphabetic'
+            ctx.font = `bold ${Math.floor(size / 24)}px Arial, sans-serif`
+            ctx.fillStyle = '#e0c15a'
+            ctx.fillText(content.rating, size * 0.06, y + size * 0.03)
+            y += size * 0.07
+        }
+
         if (content?.metacritic) {
             ctx.textAlign = 'left'
             ctx.textBaseline = 'alphabetic'
@@ -499,8 +515,11 @@ export class GameBoxFoldModel {
         }
 
         y = this.drawLabeledChipLines(ctx, y, 'TAGS', content?.tags, '#8fc7ff')
+        // Moved here from the store panel - direct request (2026-08-20).
+        y = this.drawLabeledChipLines(ctx, y, 'FEATURES', content?.categories, '#a0d8a0')
 
         y += size * 0.02
+        this.cacheEntryStartY = y
         ctx.textAlign = 'left'
         ctx.textBaseline = 'alphabetic'
         ctx.strokeStyle = '#3a3a3a'
@@ -661,10 +680,9 @@ export class GameBoxFoldModel {
         ctx.fillText(lastPlayedLine, size * 0.92, y + playH * 0.75)
         y += playH + size * 0.06
 
-        // Description, metacritic, and tags all moved to the debug face per direct request - see
-        // drawDebugPanel().
+        // Description, rating, metacritic, tags, and features all moved to the debug face per
+        // direct request - see drawDebugPanel().
         y += size * 0.02
-        y = this.drawLabeledChipLines(ctx, y, 'FEATURES', content?.categories, '#a0d8a0')
         y = this.drawLabeledChipLines(ctx, y, 'YOUR COLLECTIONS', content?.userCollections, '#e0a0e0')
 
         y += size * 0.02

@@ -28,6 +28,7 @@ const fakeModelInstances: Array<{
     getInteractiveMeshes: ReturnType<typeof vi.fn>
     isContentFaceHit: ReturnType<typeof vi.fn>
     isPointInPlayButton: ReturnType<typeof vi.fn>
+    isPointInCacheEntry: ReturnType<typeof vi.fn>
     scrollDebugPanel: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
     fullyClosedCallback: (() => void) | null
@@ -47,6 +48,7 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
             getInteractiveMeshes: vi.fn(() => ({ store: fakeStoreMesh, identity: fakeIdentityMesh, debug: fakeDebugMesh })),
             isContentFaceHit: vi.fn(() => true),
             isPointInPlayButton: vi.fn(() => false),
+            isPointInCacheEntry: vi.fn(() => true),
             scrollDebugPanel: vi.fn(),
             dispose: vi.fn(),
             fullyClosedCallback: null as (() => void) | null
@@ -198,15 +200,31 @@ describe('GameBoxFoldCoordinator', () => {
         }))
     })
 
-    it('falls back to Unrated/undefined playtime/empty tags for a game with no metadata beyond name', () => {
+    it('omits rating (not "Unrated") when userscore is genuinely missing, alongside undefined playtime/empty tags, for a game with no metadata beyond name', () => {
         coordinator = new GameBoxFoldCoordinator()
         selectGame(1) // fixture game 1 has no userscore/genres/tags/playtime_2weeks
 
         const model = fakeModelInstances[0]
         expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({
-            rating: 'Unrated',
+            rating: undefined,
             recentPlaytimeHours: undefined,
             tags: []
+        }))
+    })
+
+    it('shows "Unrated" when userscore is really 0 (Steam confirms no reviews), distinct from missing data', () => {
+        DataManager.getInstance().set('steam.games', [{
+            appid: 5,
+            name: 'Brand New Release',
+            userscore: 0
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any, { domain: DataDomain.SteamIntegration })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(5)
+
+        expect(fakeModelInstances[0].setContent).toHaveBeenCalledWith(expect.objectContaining({
+            rating: 'Unrated'
         }))
     })
 
@@ -463,6 +481,20 @@ describe('GameBoxFoldCoordinator', () => {
         wheel(100)
         stubRaycastHit(fakeIdentityMesh)
         wheel(100)
+
+        expect(model.scrollDebugPanel).not.toHaveBeenCalled()
+    })
+
+    it('scrolling over the debug panel but outside the cache-entry viewport does not scroll it', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const model = fakeModelInstances[0]
+        model.isPointInCacheEntry.mockReturnValue(false)
+
+        stubRaycastHit(fakeDebugMesh)
+        wheel(240)
 
         expect(model.scrollDebugPanel).not.toHaveBeenCalled()
     })

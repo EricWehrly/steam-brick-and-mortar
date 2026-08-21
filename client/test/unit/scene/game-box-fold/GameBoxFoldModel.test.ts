@@ -227,6 +227,32 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
+    it('isPointInCacheEntry() reflects the cache-entry section\'s last-drawn start Y, gating the debug face\'s static text (description/rating/tags/features) out of scroll range', () => {
+        const model = new GameBoxFoldModel()
+
+        // Before any content, cacheEntryStartY defaults to 0 - everything reads as "in" the
+        // section, which is harmless since there's nothing to scroll yet either.
+        expect(model.isPointInCacheEntry(0)).toBe(true)
+
+        model.setContent({
+            name: 'Half-Life 3',
+            description: 'A description long enough to occupy real vertical space on the debug face.',
+            rating: '92% · Overwhelmingly Positive',
+            tags: ['Action'],
+            categories: ['Single-player'],
+            debugJson: '{"appid": 1}'
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const startY = (model as any).cacheEntryStartY as number
+        expect(startY).toBeGreaterThan(0)
+
+        expect(model.isPointInCacheEntry(startY - 1)).toBe(false)
+        expect(model.isPointInCacheEntry(startY)).toBe(true)
+        expect(model.isPointInCacheEntry(startY + 50)).toBe(true)
+
+        model.dispose()
+    })
+
     it('scrollDebugPanel() clamps to [0, maxScroll], resets to 0 on the next setContent(), and is a no-op with no debugJson', () => {
         const model = new GameBoxFoldModel()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
