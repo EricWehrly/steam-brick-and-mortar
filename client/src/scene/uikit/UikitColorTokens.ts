@@ -1,17 +1,19 @@
 /**
- * Color tokens for the VR uikit menu system, mirroring client/src/ui/tokens.css - the app's one
- * real design-token source of truth. uikit can't read CSS custom properties directly (these are
- * plain three.js materials/instanced meshes, not a DOM tree with a stylesheet cascade), so this is
- * a hand-kept TypeScript copy of the same values. Every VR panel should import from here instead
- * of inventing its own hex literals - direct request (2026-08-20): "I'm fairly sure our colors
- * aren't being applied to these menus" turned out to mean the VR menu's ad-hoc colors didn't match
- * the app's real palette, not that colors weren't rendering at all.
+ * Color tokens for the VR uikit menu system, read live from client/src/ui/tokens.css's --color-*
+ * custom properties (the app's one real design-token source) via getComputedStyle. uikit can't
+ * read CSS custom properties itself - these become plain three.js materials/instanced meshes, not
+ * a DOM tree with a stylesheet cascade - so this resolves each token once, at module load, into a
+ * plain hex-string object every VR panel imports instead of inventing its own hex literals.
  *
- * Keep this in sync with tokens.css by hand if that file's values change - there's no build-time
- * link between the two.
+ * This used to be a hand-kept copy of tokens.css's values, which could silently drift. Reading the
+ * computed values directly means it can't drift - change tokens.css and the VR menu follows, no
+ * second edit required. The FALLBACKS below (tokens.css's own shipped values) only kick in where
+ * getComputedStyle isn't meaningful - non-browser test environments where tokens.css's <style> tag
+ * was never injected - so tests keep seeing the same stable values without needing jsdom to load
+ * real CSS.
  */
 
-export const UIKIT_COLORS = {
+const FALLBACKS = {
     accent: '#00aaff',
     accentBright: '#33bbff',
     accentDim: '#0088cc',
@@ -31,3 +33,46 @@ export const UIKIT_COLORS = {
     border: '#333333',
     borderBright: '#555555'
 } as const
+
+type UikitColorKey = keyof typeof FALLBACKS
+
+const CSS_VAR_NAMES: Record<UikitColorKey, string> = {
+    accent: '--color-accent',
+    accentBright: '--color-accent-bright',
+    accentDim: '--color-accent-dim',
+
+    surface1: '--color-surface-1',
+    surface2: '--color-surface-2',
+    surface3: '--color-surface-3',
+
+    textPrimary: '--color-text-primary',
+    textSecondary: '--color-text-secondary',
+    textTertiary: '--color-text-tertiary',
+
+    success: '--color-success',
+    warning: '--color-warning',
+    error: '--color-error',
+
+    border: '--color-border',
+    borderBright: '--color-border-bright'
+}
+
+function readCssColorTokens(): Record<UikitColorKey, string> {
+    if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
+        return { ...FALLBACKS }
+    }
+
+    const rootStyle = getComputedStyle(document.documentElement)
+    const resolved = { ...FALLBACKS } as Record<UikitColorKey, string>
+
+    for (const key of Object.keys(FALLBACKS) as UikitColorKey[]) {
+        const liveValue = rootStyle.getPropertyValue(CSS_VAR_NAMES[key]).trim()
+        if (liveValue) {
+            resolved[key] = liveValue
+        }
+    }
+
+    return resolved
+}
+
+export const UIKIT_COLORS: Readonly<Record<UikitColorKey, string>> = readCssColorTokens()
