@@ -11,7 +11,7 @@ import {
 } from '../../types/InteractionEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
-import { GameBoxFoldModel, PANEL_CANVAS_SIZE, type GameBoxFoldHeaderImage } from './GameBoxFoldModel'
+import { GameBoxFoldModel, PANEL_CANVAS_SIZE, OPEN_BOX_HALF_WIDTH, type GameBoxFoldHeaderImage } from './GameBoxFoldModel'
 import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/GameArtworkProvider'
 import { formatRating } from '../categorization/RatingFormat'
 import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
@@ -29,14 +29,24 @@ const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 // Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
 // Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
 // doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
-// Pushed back out to -0.7 (was -0.35, itself brought in from -0.6 per a prior "too far away"
-// request) - direct request (2026-08-20), confirmed via flatscreen screenshot: -0.35 was tuned
-// against the CLOSED box (0.3m wide), but this same fixed offset also has to hold the OPEN box,
-// which spreads its three panels into roughly a 0.9m-wide row - at -0.35 that overflowed the
-// viewport (the right flap's text was visibly cut off past the screen edge). There's no separate
-// open-vs-closed distance yet (see GameBoxFoldModel - only scale/rotation are animated, position
-// is set once in attachToAnchor() below), so this single constant has to fit both states.
-const CAMERA_LOCAL_OFFSET = new THREE.Vector3(0, 0, -0.7)
+//
+// Camera-anchor distance is NOT a fixed constant (see computeCameraAnchorDistance() below) - a
+// fixed -0.35, then -0.7, was each tuned against whatever window aspect ratio happened to be open
+// at the time, and both overflowed at other aspect ratios: fovY is fixed (SceneManager's
+// CAMERA_FOV) but fovX depends on aspect, so a narrower/taller window has a narrower horizontal
+// FOV and the same physical-width open box (see GameBoxFoldModel.OPEN_BOX_HALF_WIDTH) fills more
+// of it - direct request (2026-08-21), confirmed via projection math: at the -0.7 distance that
+// fixed the wide-desktop case, anything narrower than roughly a square window (aspect < ~1) would
+// already overflow again. Recomputed at summon time; see FALLBACK_CAMERA_DISTANCE for the one case
+// (a non-PerspectiveCamera) where the real fov/aspect aren't available to compute from.
+const FALLBACK_CAMERA_DISTANCE = 0.7
+// How much of the camera's current horizontal FOV the open box's full width is allowed to fill -
+// leaves margin on both sides rather than framing it edge-to-edge.
+const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
+// Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
+// wide window) or absurdly far away, tiny-looking (very narrow window).
+const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
+const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
 // Pushed further from the grip (was -0.12) per direct request - held right at the hand, the box
 // ended up right in front of the player's face too. More separation from the grip reads as
 // "holding it out to look at" instead.
@@ -302,11 +312,26 @@ export class GameBoxFoldCoordinator {
         const camera = dm.get<THREE.Camera>(DataKey.MainCamera) ?? null
         if (camera) {
             camera.add(this.model.group)
-            this.model.group.position.copy(CAMERA_LOCAL_OFFSET)
+            const distance = camera instanceof THREE.PerspectiveCamera
+                ? this.computeCameraAnchorDistance(camera)
+                : FALLBACK_CAMERA_DISTANCE
+            this.model.group.position.set(0, 0, -distance)
             // Reset in case a previous summon this session was grip-anchored (pitch is
             // grip-only) - the same model.group is reused across summons, not recreated.
             this.model.group.rotation.x = 0
         }
+    }
+
+    /** How far in front of the camera the box needs to sit so its fully open width fits within
+     *  OPEN_BOX_SAFE_FOV_FRACTION of the camera's *current* horizontal FOV - see this file's
+     *  camera-anchor-distance doc comment for why this can't be a fixed constant. Recomputed each
+     *  summon, not continuously - a live window resize while a box is already open won't re-fit
+     *  until the next selection. */
+    private computeCameraAnchorDistance(camera: THREE.PerspectiveCamera): number {
+        const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
+        const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
+        const distance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
+        return THREE.MathUtils.clamp(distance, MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE)
     }
 
     private findGameByAppid(appid: string): SteamGameData | undefined {

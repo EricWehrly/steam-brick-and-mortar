@@ -56,7 +56,11 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
         fakeModelInstances.push(instance)
         return instance
     }),
-    PANEL_CANVAS_SIZE: 512
+    PANEL_CANVAS_SIZE: 512,
+    // Real value (see GameBoxFoldModel.ts) - GameBoxFoldCoordinator's computeCameraAnchorDistance()
+    // divides by this, so leaving it unmocked/undefined here would silently NaN the whole
+    // camera-anchor-distance calculation rather than fail loudly.
+    OPEN_BOX_HALF_WIDTH: 0.45
 }))
 
 const fakePixels = new Uint8ClampedArray(4)
@@ -151,6 +155,42 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({ name: 'Half-Life 3' }))
         expect(model.group.visible).toBe(true)
         expect(model.playOpen).toHaveBeenCalledTimes(1)
+    })
+
+    it('holds the open box further from a real PerspectiveCamera at a narrower aspect ratio, so the same physical-width open spread keeps fitting a narrower horizontal FOV', () => {
+        const wideCamera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
+        DataManager.getInstance().set(DataKey.MainCamera, wideCamera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const wideDistance = -fakeModelInstances[0].group.position.z
+        coordinator.dispose()
+        fakeModelInstances.length = 0
+
+        DataManager.resetInstance()
+        DataManager.getInstance().set('steam.games', [
+            { appid: 1, name: 'Half-Life 3', playtime_forever: 120 }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ] as any, { domain: DataDomain.SteamIntegration })
+        const narrowCamera = new THREE.PerspectiveCamera(70, 9 / 16, 0.1, 100)
+        DataManager.getInstance().set(DataKey.MainCamera, narrowCamera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+        const narrowDistance = -fakeModelInstances[0].group.position.z
+
+        expect(narrowDistance).toBeGreaterThan(wideDistance)
+        // Both stay within the sanity clamp, not runaway near/far values.
+        expect(wideDistance).toBeGreaterThanOrEqual(0.5)
+        expect(narrowDistance).toBeLessThanOrEqual(1.4)
+    })
+
+    it('falls back to a fixed distance when the published MainCamera is not a real PerspectiveCamera (no fov/aspect to compute from)', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        expect(fakeModelInstances[0].group.position.z).toBeCloseTo(-0.7)
     })
 
     it('builds rating/playtime/tags content from full game data - genres then top community '
