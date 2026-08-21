@@ -9,9 +9,27 @@ export interface XRControllerRay {
     direction: THREE.Vector3
 }
 
+export interface XRControllerRayInfo {
+    readonly index: number
+    readonly handedness: XRHandedness
+    /** The real XRTargetRaySpace, typed precisely (not plain Object3D) so consumers can register
+     *  for its 'selectstart'/'selectend'/... WebXR-specific events. */
+    readonly raySpace: THREE.XRTargetRaySpace
+    /** Live analog trigger depression (xr-standard button 0), 0 (released) to 1 (fully pressed) -
+     *  read fresh every call, not cached. Lets a VR pointer/cursor gate its raycast on "trigger
+     *  being held at all" rather than needing a separate poll. */
+    readonly triggerValue: number
+}
+
 export interface XRControllerRaySource {
     getPrimaryControllerRay(): XRControllerRay | null
     getPrimaryControllerGrip(): THREE.Object3D | null
+    /** All currently-connected controllers' real targetRaySpace Object3Ds (live three.js-managed
+     *  pose, not a derived snapshot) - for callers that want to drive a continuous VR pointer/
+     *  cursor per hand rather than the single trigger-resolved "primary" ray. Optional so existing
+     *  XRControllerRaySource fixtures across the test suite don't need touching for a capability
+     *  only the VR uikit pointer bridge uses so far. */
+    getControllerRaySpaces?(): ReadonlyArray<XRControllerRayInfo>
 }
 
 export interface XRControllerManagerConfig {
@@ -102,6 +120,13 @@ export class XRControllerManager implements XRControllerRaySource {
      * loaded yet to clear at connect time, and both loads land later regardless. Pruning every
      * frame instead makes "at most one child" a continuously-enforced invariant, correct
      * regardless of how the two connects' async loads interleave.
+     *
+     * Kept as "keep last-added" for now - a "keep first-added" attempt (on the theory that the
+     * generic fallback loads first) didn't visibly fix the generic-vs-recognized-model issue on
+     * real-headset re-test, still under investigation. Live-testing hypothesis worth checking
+     * first: XRControllerModelFactory's profile fetch may simply never be resolving to the
+     * recognized asset at all (no confirmed CDN reachability for @webxr-input-profiles/assets on
+     * this Tauri/WebView2 target), which would make pruning moot regardless of which child it keeps.
      */
     update(): void {
         this.controllerModels.forEach(model => this.pruneDuplicateChildren(model))
@@ -141,6 +166,39 @@ export class XRControllerManager implements XRControllerRaySource {
         return index === null ? null : this.controllerGrips[index]
     }
 
+    /**
+     * All connected controllers (not just the trigger-resolved "primary" one) - a VR pointer/
+     * cursor needs one entry per hand, not just whichever hand getPrimaryControllerRay() would
+     * pick. Each entry's triggerValue is read live, so callers can gate their own raycasting on it
+     * (e.g. only casting while the trigger is at least slightly depressed) without a separate poll.
+     */
+    getControllerRaySpaces(): ReadonlyArray<XRControllerRayInfo> {
+        const result: XRControllerRayInfo[] = []
+        this.handednessByIndex.forEach((handedness, index) => {
+            if (handedness !== null) {
+                result.push({ index, handedness, raySpace: this.controllers[index], triggerValue: this.getTriggerValue(handedness) })
+            }
+        })
+        return result
+    }
+
+    /** Live analog trigger depression for the given hand, 0 if no session or no matching input
+     *  source's gamepad reports one. Mirrors resolvePrimaryControllerIndex()'s inputSources scan.
+     *  inputSources is an external WebXR API boundary - see DeviceDetector's identical guard for
+     *  why this checks it explicitly rather than trusting a non-null session alone. */
+    private getTriggerValue(handedness: XRHandedness): number {
+        if (!this.session?.inputSources) {
+            return 0
+        }
+
+        for (const inputSource of this.session.inputSources) {
+            if (inputSource.handedness === handedness) {
+                return inputSource.gamepad?.buttons[TRIGGER_BUTTON_INDEX]?.value ?? 0
+            }
+        }
+        return 0
+    }
+
     dispose(): void {
         this.controllers.forEach((controller, i) => {
             controller.removeEventListener('connected', this.handleConnected[i])
@@ -160,8 +218,8 @@ export class XRControllerManager implements XRControllerRaySource {
 
     /**
      * Keeps only the most-recently-added child (see update()'s doc comment for why "most recent"
-     * is always correct), disposing the geometry/material of anything pruned so repeated duplicate
-     * loads don't leak GPU resources. It's only a backstop for a race in three.js's own
+     * is the current choice), disposing the geometry/material of anything pruned so repeated
+     * duplicate loads don't leak GPU resources. It's only a backstop for a race in three.js's own
      * XRControllerModelFactory (see update()'s doc comment) that may not reproduce every session.
      */
     private pruneDuplicateChildren(model: THREE.Object3D): void {
@@ -184,7 +242,9 @@ export class XRControllerManager implements XRControllerRaySource {
     }
 
     private resolvePrimaryControllerIndex(): number | null {
-        if (!this.session) {
+        // inputSources is an external WebXR API boundary - see DeviceDetector's identical guard
+        // for why this checks it explicitly rather than trusting a non-null session alone.
+        if (!this.session?.inputSources) {
             return null
         }
 

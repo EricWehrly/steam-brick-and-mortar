@@ -45,10 +45,11 @@ changed, the underlying requirements didn't. Items still genuinely unmet are mar
   texture, no refetch) — **(open)**: currently refetches through `GameArtworkProvider` rather than
   reusing a texture handle already resolved for the shelf instance; functionally fine (same
   pipeline, same caches) but not literally "no refetch" yet, see the plan doc's §3
-- Game metadata is legible and organized (name, genre, playtime, tags when available) — **(open)**:
-  placeholder canvas text only right now (name/genre/playtime); tags aren't wired in yet (still
-  waiting on the SteamSpy pipeline, same as before); this is the fold-open plan's "face content
-  design" follow-up, now mapped onto specific faces instead of panel sections
+- Game metadata is legible and organized (name, genre, playtime, tags when available) — met, and
+  grown well beyond the original scope (2026-08-12): front cover = name, rating, playtime, tags,
+  Steam categories, and the user's own Steam collections; center = header art (as a disc), Play
+  zone (reserved, not yet clickable), description, metacritic; second flap = raw debug JSON. See
+  the plan doc's addenda for the full per-panel breakdown.
 - Panel is usable in VR — appropriate sizing, controller-friendly interaction targets (met for
   sizing/attachment; dismiss-by-controller is still the "next pass" closing-gesture follow-up, see
   the plan doc)
@@ -61,23 +62,44 @@ changed, the underlying requirements didn't. Items still genuinely unmet are mar
 - The old `BinderGameDetailPanel` flow stays available behind a const gate
   (`USE_FOLD_OPEN_GAME_BOX_INTERACTION`) until the new mechanism is functionally equivalent (met)
 - Launch/action affordance is clear (what does "play"/clicking launch do in a WebXR context?) —
-  **(open)**, deferred, see plan doc
+  met: clicking the store panel's Play button raycasts against the held box and navigates to
+  `steam://run/<appid>` (`GameBoxFoldCoordinator.handleBoxClick()`); untested inside the Tauri
+  desktop webview specifically (no shell plugin installed), see the plan doc's addendum
 
 ## Stories / Tasks
 
 See [`docs/plans/game-box-open-interaction-plan.md`](../plans/game-box-open-interaction-plan.md)
 for the full task breakdown. Summary:
 
-- `GameBoxFoldModel` — hinged box geometry (center + two wing panels), `setOpenAmount()`
+- `GameBoxFoldModel` — hinged box geometry (center + two wing panels), animated via
+  `THREE.AnimationMixer`
 - `GameBoxFoldCoordinator` — selection handling, hand/camera anchoring, summon/open/close animation
 - Const gate + bootstrap wiring to swap the old panel out
-- **Face content design**: what actually goes on each of the 3 faces — explicit follow-up once the
-  technical mechanism is built and validated
-- **Data richness**: tags (SteamSpy pipeline when available), review scores (Metacritic/Steam) —
-  still relevant, now as candidate face content rather than panel sections
+- **Face content design (2026-08-12, `feature/game-box-detail-content`)**: front cover = name +
+  Steam rating (`RatingFormat.formatRating()`, shared with `BinderGameDetailPanel`); second flap =
+  total/recent playtime + genre/community tags (`GameBoxFoldCoordinator.buildTags()`). Metacritic
+  and the old panel's raw JSON/App ID/Spotlight-button sections were judged debug-only or not yet
+  available and left out — see the plan doc's addendum for the full extraction rationale.
+- **Data richness**: SteamSpy tags now wired in (`getTopSteamSpyTags`, same source `GroupResolver`
+  uses for tag-mode grouping); Metacritic score now wired in too. Screenshots/videos/DLC/
+  achievements gap researched in
+  [`game-box-store-data-research.md`](../plans/game-box-store-data-research.md) — DLC and
+  achievements are feasible from local Steam client files (this feature's established desktop-Rust
+  pattern); screenshots/videos realistically require the Store API.
+- **Interaction (2026-08-12)**: the held box's own faces are now raycast-hittable - clicking Play
+  launches the game, scrolling over the debug panel scrolls the JSON. See the plan doc's addendum.
 
 ## Notes / Open Questions
 
+- **Canvas-drawn faces vs. real HTML/CSS projection (resolved 2026-08-13)**: spiked projecting the
+  app's real settings menu via `THREE.CSS3DRenderer` to see if it could give hover/mouseover
+  feedback for free - see
+  [`css3d-panel-projection-spike.md`](../plans/css3d-panel-projection-spike.md). Confirmed (by
+  reading the renderer's own source, not assumed) that CSS3D content never reaches
+  `XRWebGLLayer` and so is invisible in an actual WebXR session, same root cause as the original
+  flat panel this feature replaced - staying with canvas-drawn faces + raycast-based hover
+  simulation (not yet built) for this box. CSS3D remains a good fit for genuinely flatscreen-only
+  UI (the settings menu itself), just not this one.
 - The `GameSelected` event → detail-interaction flow already exists (`SceneClickGameBoxRaycast`
   emits it); the fold-open plan reuses this unchanged, only swapping what listens on the other end
 - Steam review scores + Metacritic are noted as desired data (from Apr 6-7 session dossier) —
