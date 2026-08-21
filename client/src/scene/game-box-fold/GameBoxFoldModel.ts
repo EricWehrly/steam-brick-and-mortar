@@ -6,6 +6,14 @@ const BOX_WIDTH = 0.3
 const BOX_HEIGHT = 0.4
 const BOX_DEPTH = 0.08
 
+// Fully open, each flap's own center lands exactly BOX_WIDTH out from the box's center (its
+// hinge starts at BOX_WIDTH/2, and the 180-degree swing doubles that offset - see buildFlap()'s
+// doc comment). Add the panel's own half-width (BOX_WIDTH/2) to reach its outer edge: BOX_WIDTH +
+// BOX_WIDTH/2 = 1.5 * BOX_WIDTH from the box's center. Exported so GameBoxFoldCoordinator can size
+// the camera-anchor hold distance to the real open-box footprint instead of a guessed constant -
+// see its computeCameraAnchorDistance().
+export const OPEN_BOX_HALF_WIDTH = BOX_WIDTH * 1.5
+
 // Closed-state stacking: base, front cover, and second flap sit at the SAME X/Y footprint,
 // separated only by this much local Z, so they read as one closed box (front cover outermost,
 // hiding the other two) rather than three coplanar panels z-fighting in the same plane.
