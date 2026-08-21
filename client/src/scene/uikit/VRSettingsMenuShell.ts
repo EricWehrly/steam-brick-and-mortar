@@ -29,7 +29,13 @@ import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenu
 import { toUikitSafeText } from './UikitTextSanitizer'
 import { UIKIT_COLORS } from './UikitColorTokens'
 
-const SHELL_PIXEL_SIZE = 0.0008
+// Bumped from 0.0008 - direct request (2026-08-20): a flatscreen screenshot comparison against the
+// DOM menu showed the VR panel reading much smaller/denser despite occupying a similar screen
+// width, because every uikit-px (text, gaps, padding, controls) scales off this one factor. This is
+// the single lever for "the whole panel is too small," not a per-row font tweak. Exported so every
+// standalone uikit root (VRCategoryReferencePanel today) shares one real value instead of each
+// re-declaring its own copy of the same magic number.
+export const SHELL_PIXEL_SIZE = 0.0011
 const PANEL_WIDTH = 820
 // Fixed rather than autosized to whichever tab happens to be shortest - per direct request ("the
 // settings menu can be taller ... start with the tallest page, and work towards the most

@@ -16,9 +16,8 @@ import { Container, Text } from '@pmndrs/uikit'
 import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../../ui/CategoryReferencePanel'
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { UIKIT_COLORS } from '../UikitColorTokens'
-import { ALWAYS_ON_TOP_RENDER_ORDER } from '../VRSettingsMenuShell'
+import { ALWAYS_ON_TOP_RENDER_ORDER, SHELL_PIXEL_SIZE } from '../VRSettingsMenuShell'
 
-const SHELL_PIXEL_SIZE = 0.0008
 const PANEL_WIDTH = 480
 const PANEL_PADDING = 20
 const SECTION_GAP = 18
