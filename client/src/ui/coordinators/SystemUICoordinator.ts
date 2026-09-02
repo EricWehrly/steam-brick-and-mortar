@@ -250,12 +250,25 @@ export class SystemUICoordinator {
         this.toggleLightingControls()
     }
 
-    private readonly handleMenuOpen = (): void => {
+    // Filtered to 'pause' specifically - this handler's job is keeping PauseMenuManager's own
+    // open/closed state in sync with UIEventTypes.MenuOpen/MenuClose, not reacting to every menu
+    // that event now covers. Selecting a game box emits the same event with menuType:'game-box'
+    // (see GameBoxFoldCoordinator) so shelf raycasting and camera movement also stand down while
+    // one is open - unfiltered, this handler was calling pauseMenuManager.open() for THAT too,
+    // popping the real pause menu open behind the box (direct request, 2026-09-02: "why does the
+    // settings menu open when I open a game box?").
+    private readonly handleMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            return
+        }
         this.pauseMenuManager.open()
         this.updateReticleVisibility()
     }
 
-    private readonly handleMenuClose = (): void => {
+    private readonly handleMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            return
+        }
         this.pauseMenuManager.close()
         this.updateReticleVisibility()
     }
