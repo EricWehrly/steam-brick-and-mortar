@@ -20,12 +20,6 @@ import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
 // Community tags (SteamSpy) can run long - capped so the second flap's face stays legible.
 const MAX_TAGS_SHOWN = 6
-// Steam's own feature categories had no cap at all - a game with a long list (Steam Achievements,
-// Full controller support, Steam Cloud, Family Sharing, Steam Workshop, ...) could genuinely run
-// past ten, which was enough to push the debug face's content past its available height and
-// visibly overlap the cache-entry section below it (direct request, 2026-09-02: "the visuals are
-// very crowded"). Capped the same way tags are, for the same reason.
-const MAX_FEATURES_SHOWN = 8
 
 function dedupe(items: readonly string[]): string[] {
     const seenLowercase = new Set<string>()
@@ -221,7 +215,11 @@ export class GameBoxFoldCoordinator {
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
             genres: dedupe(game.genres?.map(g => g.description) ?? []),
             tags: this.buildTags(game),
-            categories: game.categories?.map(c => c.description).slice(0, MAX_FEATURES_SHOWN),
+            // Steam's own category list sometimes repeats an entry verbatim - deduped the same
+            // way tags are (direct request, 2026-09-02: "we need to de-duplicate it sometimes for
+            // some reason"). Not currently shown on any face - see GameBoxDebugPanel's own
+            // comment on parking the FEATURES section - but still worth passing through clean.
+            categories: dedupe(game.categories?.map(c => c.description) ?? []),
             userCollections: game.user_collections?.map(c => c.name),
             description: game.short_description,
             metacritic: game.metacritic ? `Metacritic: ${game.metacritic.score}` : undefined,
