@@ -90,6 +90,7 @@ These are detailed "how to build it" docs for specific features. Check these bef
 ### 🏛️ architecture/
 **Deep-dive technical design documents.**
 Read these when touching specific complex systems (WebXR, instancing, event-driven patterns, data management).
+- `in-scene-ui-substrate.md` — **read before building any UI that lives in the 3D scene.** `@pmndrs/uikit` is the single UI system for in-scene panels; hand-rolled canvas-on-a-mesh is retired except as a narrow escape hatch for freeform art.
 
 
 ### 🔬 research/ & 📦 archive/

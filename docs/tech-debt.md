@@ -278,17 +278,27 @@ shape. Plan: [`game-data-field-coverage-check-plan.md`](../plans/game-data-field
 
 ## id: game-box-canvas-ui-hit-testing
 **Priority**: Low
+**Status**: Being resolved — see "Fix (in progress)" below.
 **Context**: The game-box fold's faces are hand-drawn onto canvas textures (no DOM, no scene-graph
 widgets) - content, styling, and layout are all interleaved in one imperative draw call per face,
 and "buttons" like Play are just rects the draw call remembers, hit-tested via raycast UV -> canvas
 coords (`isPointInPlayButton`/`isPointInCacheEntry`). Flagged in PR #161 review (kludgey UI, no
 content/style/layout separation); both true, and both the same underlying shape, not fixable
 per-button or per-panel.
-**Precedent for the eventual fix**: the VR/DOM settings menus already solve this exact problem for
-their own surface via `SettingsSchema.ts` - one content schema, two renderers
-(`SettingsSchemaDomRenderer`/`SettingsSchemaUIKitRenderer`). The game box would need the canvas
-equivalent (a content schema + a canvas-drawing renderer), not a copy of that code, since canvas
-2D and DOM/uikit are different rendering substrates.
+**Fix (in progress, 2026-09-02)**: replace the canvas panels with `@pmndrs/uikit` panels parented to
+the existing hinge groups, so they still hinge open. uikit brings a real flexbox layout engine and
+real hover/click/scroll via `@pmndrs/pointer-events` - which removes both halves of this entry
+(hand-rolled layout arithmetic *and* remembered-pixel-rect hit testing) rather than reshaping them.
+See [`in-scene-ui-substrate.md`](architecture/in-scene-ui-substrate.md) for the decision to
+standardize on uikit and what it can't do.
+**Superseded framing**: this entry previously named `SettingsSchema.ts`'s dual-renderer split
+(`SettingsSchemaDomRenderer`/`SettingsSchemaUIKitRenderer`) as the precedent, on the assumption the
+game box would need a *canvas* renderer behind a content schema. It doesn't - the box moves onto the
+same uikit substrate the VR menu already uses, so there's no second rendering substrate to abstract
+over here. `SettingsSchema` remains the right pattern for the DOM/uikit settings panels; it just
+isn't this entry's fix.
+**Close when**: all three fold panels render through uikit and no `isPointIn*`-style canvas
+hit-testing remains in `GameBoxFoldModel`.
 **Related files**: `client/src/scene/game-box-fold/GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts`
 
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
