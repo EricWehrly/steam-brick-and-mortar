@@ -266,6 +266,64 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 - `external-tool/infrastructure/lambda-src/services/steam-api.js`
 - `external-tool/infrastructure/lambda-hydrator-src/index.js`
 
+## id: dev-tooling-cant-screenshot-backgrounded-tab
+**Priority**: Low
+**Effort**: Unknown - environment/tooling investigation, not app code (see Decision below)
+**Context**: This session's browser-automation tooling couldn't capture screenshots or read live
+render state reliably. Root cause turned out to be layered:
+1. `FocusCoordinator` voluntarily pauses the render loop on tab/window blur - already correctly
+   skippable via `?diagnostics=1` (unrelated to this entry, working as designed).
+2. Even with that pause skipped, `WebGLRenderer.setAnimationLoop()` schedules via
+   `requestAnimationFrame` internally, and a hidden/backgrounded tab gets its rAF throttled or
+   suspended by the browser itself - regardless of what the app wants. A real fix for this layer
+   was built and verified (`SceneManager.startRenderLoop()` driving the loop via `setInterval`
+   instead under `?diagnostics=1`) but then deliberately backed out (2026-08-21, direct request) -
+   see the patch below.
+3. Even with (1) and (2) both addressed, the screenshot tool itself still failed with "the Browser
+   pane is not displayed, so the page is not compositing frames" - a constraint on the *capture*
+   mechanism (likely OS/CDP-level compositor access), not on the page's own render loop. Layer 2's
+   fix couldn't have solved this on its own even if kept.
+
+**Decision (for now)**: don't chase this with more app code. The actual fix is environment-side -
+running the automated browser in the foreground when a real screenshot is needed - and that's a
+tooling/environment change, not something to solve by adding render-loop workarounds to product
+code. Layer 2's fix is preserved as a patch rather than discarded outright, in case it turns out to
+still be useful later (e.g. a genuinely unattended CI capture scenario that can't be foregrounded):
+[`docs/patches/diagnostics-render-loop-keep-alive.patch`](patches/diagnostics-render-loop-keep-alive.patch)
+(apply with `git apply docs/patches/diagnostics-render-loop-keep-alive.patch`).
+
+**Done when**: the foreground-window tooling approach is sorted out and screenshots work reliably
+for this kind of session - or, if that's not achievable, layer 2's patch gets reapplied as a real
+fix and this entry updates to reflect that.
+
+**Related files**:
+- `client/src/scene/SceneManager.ts` (`startRenderLoop()`)
+- `client/src/utils/UrlUtils.ts` (`isDiagnosticsEnabled()`)
+- `client/src/ui/coordinators/FocusCoordinator.ts`
+- `docs/patches/diagnostics-render-loop-keep-alive.patch`
+
+## id: xr-menu-button-mapping-unverified
+**Priority**: Low
+**Effort**: ~30 min once a real headset is on hand (connect, run the existing HID/gamepad button
+dump, read the real index off `gamepad.buttons`)
+**Context**: `InputProfile.ts`'s VR profile binds `OpenMenu` to raw `xr-standard` gamepad button
+index 4 - a best-effort guess, not verified against real hardware. The system/Oculus button is
+typically OS-reserved on Quest and may not be exposed to
+`gamepad.buttons` at all; where a secondary button *is* exposed, its index isn't guaranteed stable
+across controller families. See `docs/plans/vr-support-plan.md`.
+
+**Decision (for now)**: ship the guess, don't block sub-scope 1 on it. In-headset pause-menu access
+realistically belongs to VR Support's sub-scope 2 (spatial UI) anyway - low urgency until that's
+picked up.
+
+**Done when**:
+- Verified (or corrected) against at least one real headset's actual button index
+- If no exposed button exists on a given controller family, `OpenMenu` simply doesn't fire from XR
+  on that hardware (already the graceful behavior today, not a crash) - document that instead
+
+**Related files**:
+- `client/src/input/BindingResolver.ts`
+
 ## id: personal-data-in-git-history
 **Priority**: High (privacy exposure on a public repo, but no active harm — it's the author's own account, not a third party's)
 **Effort**: Not yet scoped — needs its own careful pass (history rewrite tooling: `git filter-repo` or BFG, plus a force-push and coordinating anyone else with a clone)

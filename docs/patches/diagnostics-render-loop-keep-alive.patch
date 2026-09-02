@@ -1,0 +1,116 @@
+﻿From b4144d35fb5d140b8fd59122022a1f89338cbd11 Mon Sep 17 00:00:00 2001
+From: EricWehrly <eric.wehrly@gmail.com>
+Date: Fri, 21 Aug 2026 02:04:49 -0700
+Subject: [PATCH] Make ?diagnostics=1 actually keep frames rendering in a
+ backgrounded tab
+
+FocusCoordinator's own voluntary pause was already skipped under
+?diagnostics=1, but that wasn't the whole story: WebGLRenderer.setAnimationLoop()
+schedules via requestAnimationFrame internally, and a hidden/backgrounded
+tab gets its rAF throttled or suspended by the browser itself, regardless
+of whether the app ever asked to pause. That's why frame counters stayed
+frozen and screenshot tooling timed out even with diagnostics on.
+
+SceneManager.startRenderLoop() now drives the same render callback via
+setInterval instead of setAnimationLoop when ?diagnostics=1 is set -
+browsers throttle setInterval far less aggressively while hidden (Chrome
+only clamps it to a 1-per-second floor after several minutes of continuous
+backgrounding). Off by default; only affects the diagnostics/capture
+opt-in path.
+---
+ client/src/scene/SceneManager.ts | 31 ++++++++++++++++++++++++++++---
+ client/src/utils/UrlUtils.ts     |  6 +++++-
+ 2 files changed, 33 insertions(+), 4 deletions(-)
+
+diff --git a/client/src/scene/SceneManager.ts b/client/src/scene/SceneManager.ts
+index 16529dae..053fb491 100644
+--- a/client/src/scene/SceneManager.ts
++++ b/client/src/scene/SceneManager.ts
+@@ -32,6 +32,18 @@ import { AppSettings } from '../core/AppSettings'
+ import type { SettingChangedEvent } from '../core/AppSettings'
+ import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
+ import type { VisibilityChangedEvent } from '../types/InteractionEvents'
++import { UrlUtils } from '../utils/UrlUtils'
++
++// A backgrounded/hidden tab's requestAnimationFrame gets throttled or fully suspended by the
++// browser itself - this is separate from, and not fixed by, FocusCoordinator's own voluntary
++// pause (which ?diagnostics=1 already skips - see its doc comment). WebGLRenderer.setAnimationLoop()
++// schedules via rAF internally with no override hook, so an unattended capture/screenshot session
++// in a backgrounded tab would still see the render loop stall even with the app's own pause
++// disabled. Direct request (2026-08-21): ?diagnostics=1 also drives the loop via setInterval
++// instead of setAnimationLoop, which browsers throttle far less aggressively while hidden (Chrome
++// only clamps it to a 1-per-second floor after several minutes of continuous backgrounding, not
++// immediately) - enough to keep real frames compositing for a short diagnostics/capture session.
++const DIAGNOSTICS_INTERVAL_MS = 16
+ 
+ export class SceneManager {
+     private scene: THREE.Scene
+@@ -228,6 +240,7 @@ export class SceneManager {
+     }
+ 
+     private renderLoopCallback: (() => void) | null = null
++    private diagnosticsIntervalId: number | null = null
+ 
+     public startRenderLoop() {
+         let lastTime = performance.now()
+@@ -237,10 +250,10 @@ export class SceneManager {
+             const now = performance.now()
+             const deltaTime = now - lastTime
+             lastTime = now
+-            
++
+             // Update frame budget scheduler (tracks frame times, processes pending tasks)
+             scheduler.onFrameStart(now)
+-            
++
+             // Execute all registered render loop callbacks
+             this.renderLoopRegistry.executeAll(now, deltaTime)
+ 
+@@ -252,7 +265,15 @@ export class SceneManager {
+             }
+             this.renderLoopRegistry.afterRender()
+         }
+-        this.renderer.setAnimationLoop(this.renderLoopCallback)
++
++        if (UrlUtils.isDiagnosticsEnabled()) {
++            // See this file's DIAGNOSTICS_INTERVAL_MS comment - bypasses setAnimationLoop's rAF
++            // scheduling entirely, since rAF itself (not just FocusCoordinator's own pause) is
++            // what a backgrounded tab throttles.
++            this.diagnosticsIntervalId = window.setInterval(() => this.renderLoopCallback?.(), DIAGNOSTICS_INTERVAL_MS)
++        } else {
++            this.renderer.setAnimationLoop(this.renderLoopCallback)
++        }
+     }
+ 
+     private pauseRenderLoop(): void {
+@@ -293,6 +314,10 @@ export class SceneManager {
+ 
+     public dispose() {
+         this.renderer.setAnimationLoop(null)
++        if (this.diagnosticsIntervalId !== null) {
++            window.clearInterval(this.diagnosticsIntervalId)
++            this.diagnosticsIntervalId = null
++        }
+         this.renderLoopCallback = null
+         this.skyboxManager.dispose()
+         this.propRenderer?.dispose()
+diff --git a/client/src/utils/UrlUtils.ts b/client/src/utils/UrlUtils.ts
+index 79b47d6c..6a240965 100644
+--- a/client/src/utils/UrlUtils.ts
++++ b/client/src/utils/UrlUtils.ts
+@@ -33,7 +33,11 @@ export class UrlUtils {
+      * too — checked here, not composed at each call site, so every diagnostics consumer agrees
+      * on what "enabled" means). Gates RenderLoopDiagnostics, RenderPipelineManagerDebug, and
+      * anything else that needs frames to keep rendering during an unattended capture — see
+-     * FocusCoordinator, which uses this to skip pausing the render loop on tab/window blur.
++     * FocusCoordinator (skips pausing the render loop on tab/window blur) and SceneManager
++     * (drives the loop via setInterval instead of WebGLRenderer.setAnimationLoop's rAF scheduling,
++     * since a hidden tab throttles rAF at the browser level regardless of whether the app itself
++     * ever asked to pause — the two are separate problems, both need this flag). Off by default;
++     * only meant for a screenshot/capture session, not normal use.
+      */
+     static isDiagnosticsEnabled(): boolean {
+         return UrlUtils.getSearchParams().get('diagnostics') === '1' || UrlUtils.isPerfSweepEnabled()
+-- 
+2.36.0.windows.1
+
