@@ -93,13 +93,21 @@ describe('InputActionResolver raw press resolution', () => {
         expect(cancelHandler).toHaveBeenCalledTimes(1)
     })
 
-    it('emits only CancelPressed for gamepad B/Circle (button 1), not OpenMenuPressed', () => {
+    it('marks Escape\'s CancelPressed as bundledWithOpenMenu - PauseMenuManager uses this to avoid '
+        + 'self-cancelling the open its own OpenMenuPressed handler just performed', () => {
+        resolver.handleRawKeyPress('Escape', getProfiles(InputProfileId.MouseKeyboard))
+
+        expect(cancelHandler.mock.calls[0][0].detail).toMatchObject({ bundledWithOpenMenu: true })
+    })
+
+    it('emits only CancelPressed for gamepad B/Circle (button 1), not OpenMenuPressed, and NOT bundled', () => {
         connectMockGamepad()
 
         resolver.handleGamepadButtonPress(1, getProfiles(InputProfileId.GamepadStandard))
 
         expect(cancelHandler).toHaveBeenCalledTimes(1)
         expect(openMenuHandler).not.toHaveBeenCalled()
+        expect(cancelHandler.mock.calls[0][0].detail).toMatchObject({ bundledWithOpenMenu: false })
     })
 
     it('emits both OpenMenuPressed and CancelPressed for gamepad Start (button 9), so opening the menu also dismisses other open UI', () => {
@@ -109,6 +117,7 @@ describe('InputActionResolver raw press resolution', () => {
 
         expect(openMenuHandler).toHaveBeenCalledTimes(1)
         expect(cancelHandler).toHaveBeenCalledTimes(1)
+        expect(cancelHandler.mock.calls[0][0].detail).toMatchObject({ bundledWithOpenMenu: true })
     })
 
     it('does not emit for a raw press with no matching binding', () => {

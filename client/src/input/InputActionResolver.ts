@@ -1,6 +1,6 @@
 import { EventManager, EventSource } from '../core/EventManager'
 import { AppSettings } from '../core/AppSettings'
-import { InputEventTypes, type InputDevicesChangedEvent } from '../types/InteractionEvents'
+import { InputEventTypes, type InputDevicesChangedEvent, type CancelPressedEvent } from '../types/InteractionEvents'
 import { InputAction } from './InputActions'
 import { BindingResolver, type LookTuning } from './BindingResolver'
 import { DeviceDetector, type InputDeviceInfo } from './DeviceDetector'
@@ -174,9 +174,23 @@ export class InputActionResolver {
         const connectedProfiles = enabledProfiles.filter(profile => this.connectedProfileIds.has(profile.id))
 
         for (const profile of connectedProfiles) {
-            for (const actionId of this.bindingResolver.findButtonActionsBoundTo(profile, matches)) {
+            const actionIds = this.bindingResolver.findButtonActionsBoundTo(profile, matches)
+            // Escape/Start are bound to both OpenMenu and Cancel (see InputProfile.ts), so a
+            // single press resolves both here - CancelPressedEvent.bundledWithOpenMenu records
+            // that, so PauseMenuManager (whose own OpenMenuPressed handler already resolves
+            // open/closed for this press) can tell it apart from a standalone Cancel, while every
+            // other Cancel consumer keeps reacting the same either way - see that field's own doc
+            // comment in InteractionEvents.ts.
+            const bundledWithOpenMenu = actionIds.includes(InputAction.OpenMenu) && actionIds.includes(InputAction.Cancel)
+
+            for (const actionId of actionIds) {
                 const eventType = SPECIFIC_PRESS_EVENTS[actionId]
-                if (eventType) {
+                if (!eventType) {
+                    continue
+                }
+                if (actionId === InputAction.Cancel) {
+                    this.eventManager.emit<CancelPressedEvent>(eventType, { bundledWithOpenMenu })
+                } else {
                     this.eventManager.emit(eventType, {}, EventSource.System)
                 }
             }
