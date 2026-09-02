@@ -6,12 +6,14 @@ import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { Logger } from '../../utils/Logger'
 import {
     GameEventTypes, InputEventTypes,
-    type GameSelectedEvent, type CancelPressedEvent,
-    type SceneCanvasClickEvent, type SceneCanvasWheelEvent
+    type GameSelectedEvent, type CancelPressedEvent
 } from '../../types/InteractionEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import type { XRControllerSource } from '../../webxr/XRControllerManager'
-import { GameBoxFoldModel, PANEL_CANVAS_SIZE, OPEN_BOX_HALF_WIDTH, type GameBoxFoldHeaderImage } from './GameBoxFoldModel'
+import { UikitPointerBridge } from '../uikit/UikitPointerBridge'
+import { GameBoxFoldModel } from './GameBoxFoldModel'
+import { OPEN_BOX_HALF_WIDTH } from './GameBoxFoldDimensions'
+import type { GameBoxFoldHeaderImage } from './GameBoxFoldContent'
 import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/GameArtworkProvider'
 import { formatRating } from '../categorization/RatingFormat'
 import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
@@ -87,6 +89,10 @@ const MIN_CONTROLLERS_FOR_GRIP_ANCHOR = 2
  * model.update() each frame and calls playOpen()/playClose() at the right moments. Selecting a
  * game while one is already open always plays close-then-reopen (see pendingSelection) rather
  * than re-texturing the still-open box in place, so every selection gets visible feedback.
+ *
+ * Interaction on the box's faces is uikit's own (a UikitPointerBridge routes mouse and WebXR
+ * controller input at the model's uikit pages), attached only while a box is summoned. This class
+ * knows nothing about which controls exist on which face.
  */
 export class GameBoxFoldCoordinator {
     private static readonly logger = Logger.createLogFunctions(GameBoxFoldCoordinator.name)
@@ -94,11 +100,11 @@ export class GameBoxFoldCoordinator {
     private readonly eventManager: EventManager
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly model: GameBoxFoldModel
+    private readonly pointerBridge: UikitPointerBridge
     private readonly artworkProvider = GameArtworkProvider.getInstance()
-    // Plain pixel bundles, not GPU textures - GameBoxFoldModel rasterizes them into a scratch
+    // Plain pixel bundles, not GPU textures - the store panel rasterizes them into a scratch
     // canvas itself, so there's nothing here to .dispose().
     private readonly headerImageCache = new Map<string, GameBoxFoldHeaderImage>()
-    private readonly raycaster = new THREE.Raycaster()
 
     private currentAppid: string | null = null
     // Set when GameEventTypes.Selected arrives while a box is already summoned - playClose()
@@ -110,9 +116,12 @@ export class GameBoxFoldCoordinator {
         this.eventManager = EventManager.getInstance()
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
-        this.model = new GameBoxFoldModel()
+        this.model = new GameBoxFoldModel(this.launchCurrentGame)
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
+        // Controller rays only ever need to hit this box, so the model's own group is the
+        // intersection root - not the whole scene.
+        this.pointerBridge = new UikitPointerBridge(this.model.group)
         this.model.onFullyClosed(() => {
             if (this.pendingSelection) {
                 const { appid, game } = this.pendingSelection
@@ -120,6 +129,7 @@ export class GameBoxFoldCoordinator {
                 this.summon(appid, game)
                 return
             }
+            this.pointerBridge.detach()
             this.model.group.visible = false
             this.model.group.removeFromParent()
             this.currentAppid = null
@@ -134,25 +144,15 @@ export class GameBoxFoldCoordinator {
             InputEventTypes.CancelPressed,
             this.handleCancelPressed
         )
-        this.eventManager.registerEventHandler<SceneCanvasClickEvent>(
-            InputEventTypes.SceneCanvasClick,
-            this.handleBoxClick
-        )
-        this.eventManager.registerEventHandler<SceneCanvasWheelEvent>(
-            InputEventTypes.SceneCanvasWheel,
-            this.handleBoxWheel
-        )
-
         this.renderLoopRegistry.register(this.constructor.name, this.update)
     }
 
     dispose(): void {
         this.eventManager.deregisterEventHandler(GameEventTypes.Selected, this.handleGameSelected)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
-        this.eventManager.deregisterEventHandler(InputEventTypes.SceneCanvasClick, this.handleBoxClick)
-        this.eventManager.deregisterEventHandler(InputEventTypes.SceneCanvasWheel, this.handleBoxWheel)
         this.renderLoopRegistry.unregister(this.constructor.name)
 
+        this.pointerBridge.detach()
         this.model.group.removeFromParent()
         this.model.dispose()
         this.headerImageCache.clear()
@@ -228,62 +228,24 @@ export class GameBoxFoldCoordinator {
     private readonly update = (_now: number, deltaTime: number): void => {
         // AnimationMixer's own unit is seconds; RenderLoopRegistry callbacks receive milliseconds.
         this.model.update(deltaTime / 1000)
+        // Attaching here rather than in summon() is what lets this be unconditional: attach() is a
+        // no-op once attached and a no-op again while the renderer/scene/camera aren't published
+        // yet, so a summon that lands before they exist just picks up on a later frame - no
+        // readiness handshake needed.
+        if (this.currentAppid !== null) {
+            this.pointerBridge.attach()
+        }
+        this.pointerBridge.update()
     }
 
-    private readonly handleBoxClick = (event: CustomEvent<SceneCanvasClickEvent>): void => {
-        if (event.detail.button !== 0) {
+    /** Handed to the store panel's Play control at construction - the panel owns the button, this
+     *  owns which game is loaded. */
+    private readonly launchCurrentGame = (): void => {
+        if (this.currentAppid === null) {
             return
         }
-        const hit = this.raycastAgainstBox(event.detail.ndcX, event.detail.ndcY)
-        if (hit?.face === 'store' && this.model.isPointInPlayButton(hit.canvasX, hit.canvasY) && this.currentAppid) {
-            GameBoxFoldCoordinator.logger.debug(`Play clicked for appid ${this.currentAppid}`)
-            window.location.href = `${STEAM_LAUNCH_URL_PREFIX}${this.currentAppid}`
-        }
-    }
-
-    private readonly handleBoxWheel = (event: CustomEvent<SceneCanvasWheelEvent>): void => {
-        const hit = this.raycastAgainstBox(event.detail.ndcX, event.detail.ndcY)
-        // Gated to the cache-entry viewport specifically (not the whole debug face) - direct
-        // request (2026-08-20): the scrollbar was firing from anywhere on the right flap,
-        // including over the description/tags text above it, which read as broken/oversensitive
-        // scrolling rather than "you're over the JSON viewport."
-        if (hit?.face === 'debug' && this.model.isPointInCacheEntry(hit.canvasY)) {
-            this.model.scrollDebugPanel(event.detail.deltaY)
-        }
-    }
-
-    /**
-     * Raycasts only against this box's own three content meshes (not the whole scene - the box
-     * is a small, self-contained held prop, and SceneClickGameBoxRaycast's shelf-wide raycast is a
-     * different concern with a different hit contract). Returns which panel was hit and the
-     * canvas-space point within it (via intersection.uv - see GameBoxFoldModel for the
-     * UV<->canvas mapping derivation), or null if nothing summoned, the ray misses, or it lands on
-     * one of a mesh's five blank faces rather than its content face.
-     */
-    private raycastAgainstBox(ndcX: number, ndcY: number): { face: 'store' | 'identity' | 'debug'; canvasX: number; canvasY: number } | null {
-        if (this.currentAppid === null || !this.model.group.visible) {
-            return null
-        }
-        const camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
-        if (!camera) {
-            return null
-        }
-
-        const meshes = this.model.getInteractiveMeshes()
-        this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
-        const intersections = this.raycaster.intersectObjects([meshes.store, meshes.identity, meshes.debug], false)
-        const hit = intersections[0]
-        if (!hit || !hit.uv) {
-            return null
-        }
-
-        const mesh = hit.object as THREE.Mesh
-        if (!this.model.isContentFaceHit(mesh, hit.face?.materialIndex)) {
-            return null
-        }
-
-        const face = mesh === meshes.store ? 'store' : mesh === meshes.debug ? 'debug' : 'identity'
-        return { face, canvasX: hit.uv.x * PANEL_CANVAS_SIZE, canvasY: (1 - hit.uv.y) * PANEL_CANVAS_SIZE }
+        GameBoxFoldCoordinator.logger.debug(`Play clicked for appid ${this.currentAppid}`)
+        window.location.href = `${STEAM_LAUNCH_URL_PREFIX}${this.currentAppid}`
     }
 
     private attachToAnchor(): void {
