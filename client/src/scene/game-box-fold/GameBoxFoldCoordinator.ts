@@ -16,9 +16,18 @@ import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/
 import { formatRating } from '../categorization/RatingFormat'
 import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
-// Genres first (usually 1-3, Steam's own categorization), then community tags (SteamSpy) - capped
-// so the second flap's face stays legible rather than listing everything available.
+// Community tags (SteamSpy) can run long - capped so the second flap's face stays legible.
 const MAX_TAGS_SHOWN = 6
+
+function dedupe(items: readonly string[]): string[] {
+    const seenLowercase = new Set<string>()
+    return items.filter(item => {
+        const key = item.toLowerCase()
+        const isNew = !seenLowercase.has(key)
+        seenLowercase.add(key)
+        return isNew
+    })
+}
 
 // steam:// URIs launch through the OS protocol handler, same mechanism the old
 // BinderGameDetailPanel used via a plain <a href="steam://run/..."> - there's no Tauri shell
@@ -183,6 +192,7 @@ export class GameBoxFoldCoordinator {
             rating: game.userscore !== undefined ? formatRating(game.userscore) : undefined,
             playtimeHours: game.playtime_forever ? Math.round(game.playtime_forever / 60) : undefined,
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
+            genres: dedupe(game.genres?.map(g => g.description) ?? []),
             tags: this.buildTags(game),
             categories: game.categories?.map(c => c.description),
             userCollections: game.user_collections?.map(c => c.name),
@@ -197,25 +207,13 @@ export class GameBoxFoldCoordinator {
         this.model.playOpen()
     }
 
-    /** Genres (Steam's own) followed by top community tags (SteamSpy, same source/fallback
-     *  GroupResolver uses for tag-mode grouping) - the two "what kind of game is this" sections
-     *  BinderGameDetailPanel showed separately, combined here since the flap has room for one
-     *  legible list, not two. */
+    /** Community tags (SteamSpy, same source/fallback GroupResolver uses for tag-mode grouping) -
+     *  shown as its own section, separate from Steam's own genres (direct request, 2026-09-01). */
     private buildTags(game: SteamGameData): string[] {
-        const genres = game.genres?.map(g => g.description) ?? []
         const communityTags = game.steamspy_top_tags?.length
             ? game.steamspy_top_tags
             : getTopSteamSpyTags(game.steamspy_tags)
-
-        const seen = new Set<string>()
-        const combined: string[] = []
-        for (const tag of [...genres, ...communityTags]) {
-            const key = tag.toLowerCase()
-            if (seen.has(key)) continue
-            seen.add(key)
-            combined.push(tag)
-        }
-        return combined.slice(0, MAX_TAGS_SHOWN)
+        return dedupe(communityTags).slice(0, MAX_TAGS_SHOWN)
     }
 
     private readonly handleCancelPressed = (): void => {
