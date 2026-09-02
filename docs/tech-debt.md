@@ -279,11 +279,16 @@ shape. Plan: [`game-data-field-coverage-check-plan.md`](../plans/game-data-field
 ## id: game-box-canvas-ui-hit-testing
 **Priority**: Low
 **Context**: The game-box fold's faces are hand-drawn onto canvas textures (no DOM, no scene-graph
-widgets) - "buttons" like Play are just rects the draw call remembers, hit-tested via raycast UV ->
-canvas coords (`GameBoxFoldModel.isPointInPlayButton`/`isPointInCacheEntry`). Flagged in PR #161
-review as kludgey; true, but it's the whole architecture's shape, not fixable per-button. A real
-fix means picking a widget system for the box faces (something closer to the VR uikit menu),
-which is a bigger call than one PR.
+widgets) - content, styling, and layout are all interleaved in one imperative draw call per face,
+and "buttons" like Play are just rects the draw call remembers, hit-tested via raycast UV -> canvas
+coords (`isPointInPlayButton`/`isPointInCacheEntry`). Flagged in PR #161 review (kludgey UI, no
+content/style/layout separation); both true, and both the same underlying shape, not fixable
+per-button or per-panel.
+**Precedent for the eventual fix**: the VR/DOM settings menus already solve this exact problem for
+their own surface via `SettingsSchema.ts` - one content schema, two renderers
+(`SettingsSchemaDomRenderer`/`SettingsSchemaUIKitRenderer`). The game box would need the canvas
+equivalent (a content schema + a canvas-drawing renderer), not a copy of that code, since canvas
+2D and DOM/uikit are different rendering substrates.
 **Related files**: `client/src/scene/game-box-fold/GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts`
 
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
