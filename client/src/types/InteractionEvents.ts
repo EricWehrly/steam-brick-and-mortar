@@ -221,20 +221,6 @@ export interface MenuCloseEvent extends BaseInteractionEvent {
     menuType: 'pause' | 'settings' | 'debug'
 }
 
-/**
- * Fired whenever the settings menu's visible panel changes - both directions. PauseMenuManager
- * emits it from showPanel() (guarded to skip a no-op re-show, which also prevents this event
- * looping between the two emitters) and reacts to it from the other side by calling its own
- * showPanel(); the VR uikit tab shell (VRSettingsMenuShell) does the same in reverse. Neither side
- * calls the other directly - see docs/plans/vr-uikit-menu-migration-plan.md's "who owns the
- * active panel" decision. panelId matches PauseMenuPanel.id / VRMenuTab.panelId; a receiver for
- * a panelId it doesn't recognize (the DOM menu has panels VR hasn't ported yet, or vice versa)
- * should ignore the event rather than clearing its own display.
- */
-export interface MenuPanelChangedEvent extends BaseInteractionEvent {
-    readonly panelId: string
-}
-
 export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
     // No additional data needed
 }
@@ -464,7 +450,6 @@ export const InputEventTypes = {
 export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
-    MenuPanelChanged: 'ui:menu-panel-changed',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
     ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',
