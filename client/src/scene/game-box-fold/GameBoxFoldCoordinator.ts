@@ -10,7 +10,7 @@ import {
     type SceneCanvasClickEvent, type SceneCanvasWheelEvent
 } from '../../types/InteractionEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
-import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
+import type { XRControllerSource } from '../../webxr/XRControllerManager'
 import { GameBoxFoldModel, PANEL_CANVAS_SIZE, OPEN_BOX_HALF_WIDTH, type GameBoxFoldHeaderImage } from './GameBoxFoldModel'
 import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/GameArtworkProvider'
 import { formatRating } from '../categorization/RatingFormat'
@@ -290,16 +290,16 @@ export class GameBoxFoldCoordinator {
 
     private attachToAnchor(): void {
         const dm = DataManager.getInstance()
-        const raySource = dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
+        const controllerSource = dm.get<XRControllerSource>(DataKey.XRControllerSource) ?? null
         // Grip-anchoring only makes sense with a spare hand: with a single controller connected,
         // that same controller is also whatever the player points/clicks with, so gluing the box
         // to it too means it swings every time they aim elsewhere. Direct request (2026-08-20):
         // with only one controller, camera-anchor instead - same behavior flatscreen already uses
         // with zero controllers, so this also makes "how many controllers" the only thing that
         // decides the anchor, not a separate VR-only special case.
-        const connectedControllerCount = raySource?.getControllerRaySpaces?.().length ?? 0
+        const connectedControllerCount = controllerSource?.getConnectedControllers?.().length ?? 0
         const grip = connectedControllerCount >= MIN_CONTROLLERS_FOR_GRIP_ANCHOR
-            ? raySource?.getPrimaryControllerGrip() ?? null
+            ? controllerSource?.getPrimaryControllerGrip() ?? null
             : null
 
         if (grip) {
