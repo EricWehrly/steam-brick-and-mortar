@@ -32,6 +32,16 @@ const HIT_MARKER_RADIUS = 0.015
 // depth-occluded right at the point that matters most: where the ray meets the target surface.
 const ON_TOP_RENDER_ORDER = ALWAYS_ON_TOP_RENDER_ORDER + 1
 
+/**
+ * renderOrder only sorts *within* a render list, and three.js draws the whole opaque list before
+ * the whole transparent one. An opaque beam therefore drew before every uikit panel no matter how
+ * high its renderOrder, which is why the cursor read as being behind the menus (direct request,
+ * 2026-09-02: "effectively 'behind' any menus"). Marking these transparent puts them in the same
+ * list uikit's panels are in, where ON_TOP_RENDER_ORDER actually wins. depthWrite off because a
+ * transparent overlay has no business occluding what's drawn after it.
+ */
+const ON_TOP_MATERIAL_PROPERTIES = { transparent: true, depthTest: false, depthWrite: false } as const
+
 // WebXR's reported targetRaySpace direction (local -Z) commonly points noticeably above the
 // physical barrel for Touch-style controllers (Oculus Touch/PICO Connect - see InputProfile.ts's
 // VR profile comment) - confirmed live: the beam read as aiming up and away rather than forward.
@@ -79,7 +89,7 @@ export class VRControllerPointer {
         // has to scale.y to the current length each frame, no geometry rebuild needed.
         const beamGeometry = new THREE.CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS, 1, 8)
         beamGeometry.translate(0, 0.5, 0)
-        this.beam = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({ color: BEAM_COLOR, depthTest: false }))
+        this.beam = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({ color: BEAM_COLOR, ...ON_TOP_MATERIAL_PROPERTIES }))
         this.beam.renderOrder = ON_TOP_RENDER_ORDER
         this.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), RAY_DIRECTION)
         this.beam.scale.y = BEAM_DEFAULT_LENGTH
@@ -87,7 +97,7 @@ export class VRControllerPointer {
 
         this.hitMarker = new THREE.Mesh(
             new THREE.SphereGeometry(HIT_MARKER_RADIUS, 12, 12),
-            new THREE.MeshBasicMaterial({ color: HIT_MARKER_COLOR, depthTest: false })
+            new THREE.MeshBasicMaterial({ color: HIT_MARKER_COLOR, ...ON_TOP_MATERIAL_PROPERTIES })
         )
         this.hitMarker.renderOrder = ON_TOP_RENDER_ORDER
         this.hitMarker.visible = false
