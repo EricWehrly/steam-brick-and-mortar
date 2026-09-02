@@ -23,19 +23,29 @@
  *
  * Shows/hides on the same UIEventTypes.MenuOpen/MenuClose events the DOM pause menu already
  * drives (see SystemUICoordinator's handlePauseMenuOpened/Closed) - VR's "Menu Button" already
- * flows into these via PauseMenuManager, so no new input wiring was needed. The DOM pause menu is
- * deliberately NOT suppressed while this panel is active; both can be open at once for now, an
- * accepted simplification while this panel stays behind the ?forceVRSettingsPanel=1 dev flag.
+ * flows into these via PauseMenuManager, so no new input wiring was needed.
  *
- * This class has no knowledge of that flag or of PauseMenuManager at all - activation is purely
- * MenuOpen/MenuClose, unconditionally, always. A previous version pre-activated independently at
- * init() when forced, which desynced this panel's active state from PauseMenuManager's real
- * isOpen (confirmed live 2026-08-20: the VR panel would already be showing at load, so the first
- * real Settings/OpenMenu press - which PauseMenuManager saw as "opening" a menu it thought was
- * closed - looked like a no-op, and the *second* press was the one that actually closed anything).
- * The flag's dev-preview behavior now lives at SystemUICoordinator's level instead: it calls the
- * real pauseMenuManager.open() once at startup when forced, so both surfaces open through the
- * exact same path and can never disagree about whether a menu is open.
+ * Which surface you actually get is decided by whether you're in a headset (direct request,
+ * 2026-09-02: "get the vr uikit menu to open when we open settings in vr ... and leave old
+ * settings menu when not in vr"). Two independent facts drive that - is a pause menu open, and is
+ * an immersive session presenting (WebXREventTypes.SessionStart/SessionEnd) - reconciled by
+ * syncVisibility() rather than either one activating directly, so entering or leaving VR with the
+ * menu already open lands on the right surface instead of only being handled at open time. In VR
+ * the DOM pause menu is still open underneath and deliberately not suppressed: it isn't visible
+ * inside an immersive session anyway (a DOM layer is never submitted through XRWebGLLayer), its
+ * state machine is what VRSettingsMenuShell's tab sync reads, and leaving it alone is what makes
+ * exiting VR mid-menu land back on a correct DOM menu.
+ *
+ * setShowOnFlatscreen() lifts the VR requirement - that's ?forceVRSettingsPanel=1's job, and the
+ * only way to look at this panel without a headset. This class has no knowledge of that flag or of
+ * PauseMenuManager: it's told, the same way PauseMenuManager.setDomVisualsSuppressed() is told.
+ * Activation still requires a real MenuOpen either way. A previous version pre-activated
+ * independently at init() when forced, which desynced this panel's active state from
+ * PauseMenuManager's real isOpen (confirmed live 2026-08-20: the VR panel would already be showing
+ * at load, so the first real Settings/OpenMenu press - which PauseMenuManager saw as "opening" a
+ * menu it thought was closed - looked like a no-op, and the *second* press was the one that
+ * actually closed anything). SystemUICoordinator instead calls the real pauseMenuManager.open()
+ * once at startup when forced, so both surfaces open through the exact same path.
  *
  * Anchor strategy (settled 2026-08-19 via live headset testing, see
  * docs/plans/vr-uikit-menu-migration-plan.md) is switchable via VRPanelAnchorMode:
@@ -53,7 +63,7 @@ import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
-import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
+import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRControllerManager'
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
@@ -110,6 +120,12 @@ export class VRSettingsPanelCoordinator {
     private readonly controllerPointers = new Map<number, VRControllerPointer>()
     private active = false
 
+    // The two facts syncVisibility() reconciles - tracked rather than acted on directly, so either
+    // one changing while the other already holds lands on the right surface.
+    private menuOpen = false
+    private inImmersiveSession = false
+    private showOnFlatscreen = false
+
     private resolvedScene: THREE.Scene | null = null
     private resolvedCamera: THREE.Camera | null = null
 
@@ -128,6 +144,15 @@ export class VRSettingsPanelCoordinator {
 
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
+    }
+
+    /** Lets this panel show outside a headset too - ?forceVRSettingsPanel=1's job, and the only way
+     *  to look at it without one. Off by default: on flatscreen the DOM pause menu is the menu. */
+    setShowOnFlatscreen(showOnFlatscreen: boolean): void {
+        this.showOnFlatscreen = showOnFlatscreen
+        this.syncVisibility()
     }
 
     init(renderer: THREE.WebGLRenderer): void {
@@ -145,14 +170,37 @@ export class VRSettingsPanelCoordinator {
         if (event.detail.menuType !== 'pause') {
             return
         }
-        this.activate()
+        this.menuOpen = true
+        this.syncVisibility()
     }
 
     private readonly handleMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
         if (event.detail.menuType !== 'pause') {
             return
         }
-        this.deactivate()
+        this.menuOpen = false
+        this.syncVisibility()
+    }
+
+    private readonly handleXRSessionStart = (): void => {
+        this.inImmersiveSession = true
+        this.syncVisibility()
+    }
+
+    private readonly handleXRSessionEnd = (): void => {
+        this.inImmersiveSession = false
+        this.syncVisibility()
+    }
+
+    /** The single place "should this panel be showing right now?" is decided. activate() and
+     *  deactivate() are both idempotent, so this can run on every input change without tracking
+     *  which one moved. */
+    private syncVisibility(): void {
+        if (this.menuOpen && (this.inImmersiveSession || this.showOnFlatscreen)) {
+            this.activate()
+        } else {
+            this.deactivate()
+        }
     }
 
     private getScene(): THREE.Scene | null {
@@ -340,6 +388,8 @@ export class VRSettingsPanelCoordinator {
 
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
+        this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
+        this.eventManager.deregisterEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
         this.menuShell.dispose()
 
         this.renderer = null

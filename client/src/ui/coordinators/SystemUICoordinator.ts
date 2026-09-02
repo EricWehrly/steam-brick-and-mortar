@@ -150,22 +150,29 @@ export class SystemUICoordinator {
 
         this.vrSettingsPanelCoordinator.init(renderer)
 
-        // ?forceVRSettingsPanel=1: switches to the VR uikit menu as the ONLY visible UI, including
-        // on flatscreen - direct request (2026-08-20), so the VR menu can be evaluated toward
-        // becoming the one final UI while the DOM menu is phased out, not just previewed alongside
-        // it. Opens the real pause menu at startup (so the VR uikit panel - which only ever
-        // activates via a real MenuOpen, see VRSettingsPanelCoordinator's doc comment - shows
-        // immediately without a manual Settings/OpenMenu press) but suppresses the DOM overlay's
-        // own visuals; the DOM menu's state machine (activePanel, MenuPanelChanged sync) keeps
-        // running underneath, since VRSettingsMenuShell's tab sync depends on it. Going through the
-        // same open() every real press uses means this panel's active state can never disagree with
-        // PauseMenuManager's - a previous version pre-activated the VR panel independently and the
-        // two desynced (confirmed live 2026-08-20: first real press looked like a no-op).
+        // Which settings surface you get is decided by whether you're in a headset, not by a flag:
+        // in an immersive session the VR uikit panel shows, on flatscreen the DOM pause menu does
+        // (direct request, 2026-09-02). Both open off the same MenuOpen, so nothing about opening
+        // the menu changes - see VRSettingsPanelCoordinator's own doc comment for how it reconciles
+        // "menu open" with "session presenting".
+        //
+        // ?forceVRSettingsPanel=1 lifts the headset requirement, making the VR uikit menu the ONLY
+        // visible UI on flatscreen too - direct request (2026-08-20), so the VR menu can be
+        // evaluated toward becoming the one final UI while the DOM menu is phased out. It opens the
+        // real pause menu at startup (so the panel - which only ever activates via a real MenuOpen -
+        // shows immediately without a manual Settings/OpenMenu press) and suppresses the DOM
+        // overlay's own visuals; the DOM menu's state machine (activePanel, MenuPanelChanged sync)
+        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it. Going
+        // through the same open() every real press uses means the panel's active state can never
+        // disagree with PauseMenuManager's - a previous version pre-activated the VR panel
+        // independently and the two desynced (confirmed live 2026-08-20: first real press looked
+        // like a no-op).
         //
         // Also stands up the standalone Category Reference world-lock trial (see
         // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
         // evaluating this VR menu system in flatscreen together, not two separate dev toggles.
         if (UrlUtils.isVRSettingsPanelForced()) {
+            this.vrSettingsPanelCoordinator.setShowOnFlatscreen(true)
             this.pauseMenuManager.setDomVisualsSuppressed(true)
             this.pauseMenuManager.open()
 
