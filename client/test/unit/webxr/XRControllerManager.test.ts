@@ -12,7 +12,7 @@ vi.mock('three/examples/jsm/webxr/XRControllerModelFactory.js', () => ({
     })
 }))
 
-import { XRControllerManager, type XRControllerRaySource } from '../../../src/webxr/XRControllerManager'
+import { XRControllerManager, type XRControllerSource } from '../../../src/webxr/XRControllerManager'
 
 function createFakeRenderer(controllers: THREE.Group[], grips: THREE.Group[]): THREE.WebGLRenderer {
     return {
@@ -78,10 +78,10 @@ describe('XRControllerManager', () => {
         expect(scene.children).not.toContain(grips[0])
     })
 
-    it('publishes itself under DataKey.XRControllerRaySource in setup()', () => {
+    it('publishes itself under DataKey.XRControllerSource in setup()', () => {
         manager.setup(renderer)
 
-        const published = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource)
+        const published = DataManager.getInstance().get<XRControllerSource>(DataKey.XRControllerSource)
         expect(published).toBe(manager)
     })
 
@@ -184,38 +184,38 @@ describe('XRControllerManager', () => {
         expect(controllerModel.children.length).toBe(0)
     })
 
-    it('getControllerRaySpaces() returns an empty list with no connected controllers', () => {
+    it('getConnectedControllers() returns an empty list with no connected controllers', () => {
         manager.setup(renderer)
-        expect(manager.getControllerRaySpaces()).toEqual([])
+        expect(manager.getConnectedControllers()).toEqual([])
     })
 
-    it('getControllerRaySpaces() returns every connected controller, not just the trigger-resolved primary one', () => {
+    it('getConnectedControllers() returns every connected controller, not just the trigger-resolved primary one', () => {
         manager.setup(renderer)
         dispatchConnected(controllers[0], 'left')
         dispatchConnected(controllers[1], 'right')
 
-        const raySpaces = manager.getControllerRaySpaces()
+        const connected = manager.getConnectedControllers()
 
-        expect(raySpaces).toHaveLength(2)
-        expect(raySpaces).toEqual(expect.arrayContaining([
-            { index: 0, handedness: 'left', raySpace: controllers[0], triggerValue: 0 },
-            { index: 1, handedness: 'right', raySpace: controllers[1], triggerValue: 0 }
+        expect(connected).toHaveLength(2)
+        expect(connected).toEqual(expect.arrayContaining([
+            { index: 0, handedness: 'left', targetRaySpace: controllers[0], triggerValue: 0 },
+            { index: 1, handedness: 'right', targetRaySpace: controllers[1], triggerValue: 0 }
         ]))
     })
 
-    it('getControllerRaySpaces() drops a controller once it disconnects', () => {
+    it('getConnectedControllers() drops a controller once it disconnects', () => {
         manager.setup(renderer)
         dispatchConnected(controllers[0], 'left')
         dispatchConnected(controllers[1], 'right')
 
         dispatchDisconnected(controllers[0])
 
-        expect(manager.getControllerRaySpaces()).toEqual([
-            { index: 1, handedness: 'right', raySpace: controllers[1], triggerValue: 0 }
+        expect(manager.getConnectedControllers()).toEqual([
+            { index: 1, handedness: 'right', targetRaySpace: controllers[1], triggerValue: 0 }
         ])
     })
 
-    it('getControllerRaySpaces() reports live analog trigger depression per hand', () => {
+    it('getConnectedControllers() reports live analog trigger depression per hand', () => {
         manager.setup(renderer)
         dispatchConnected(controllers[0], 'left')
         dispatchConnected(controllers[1], 'right')
@@ -225,10 +225,10 @@ describe('XRControllerManager', () => {
             { handedness: 'right', gamepad: createFakeGamepad(false) }
         ]))
 
-        const raySpaces = manager.getControllerRaySpaces()
+        const connected = manager.getConnectedControllers()
 
-        expect(raySpaces.find(entry => entry.handedness === 'left')?.triggerValue).toBeCloseTo(0.35)
-        expect(raySpaces.find(entry => entry.handedness === 'right')?.triggerValue).toBe(0)
+        expect(connected.find(entry => entry.handedness === 'left')?.triggerValue).toBeCloseTo(0.35)
+        expect(connected.find(entry => entry.handedness === 'right')?.triggerValue).toBe(0)
     })
 
     it('dispose() removes controller/grip groups from the camera rig', () => {

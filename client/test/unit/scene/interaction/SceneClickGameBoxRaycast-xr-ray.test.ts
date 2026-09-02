@@ -1,9 +1,9 @@
 /**
  * SceneClickGameBoxRaycast — controller-ray branch (VR).
  *
- * A published XRControllerRaySource should redirect the raycast origin/direction away from the
- * click's NDC position; with no ray source (or one returning null), behavior must be identical
- * to today's desktop/mouse/gamepad NDC-based raycast (explicit non-regression check).
+ * A published XRControllerSource should redirect the raycast origin/direction away from the
+ * click's NDC position; with no controller source (or one returning null), behavior must be
+ * identical to today's desktop/mouse/gamepad NDC-based raycast (explicit non-regression check).
  * See docs/plans/vr-support-plan.md.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -14,7 +14,7 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../../../src/types/InteractionEvents'
 import { SceneLayer } from '../../../../src/scene/SceneLayers'
 import { SceneClickGameBoxRaycast } from '../../../../src/scene/interaction/SceneClickGameBoxRaycast'
-import type { XRControllerRaySource } from '../../../../src/webxr/XRControllerManager'
+import type { XRControllerSource } from '../../../../src/webxr/XRControllerManager'
 
 function createGameBoxMesh(appid: number): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1))
@@ -64,7 +64,7 @@ describe('SceneClickGameBoxRaycast controller-ray branch', () => {
         DataManager.resetInstance()
     })
 
-    it('falls back to NDC/camera raycasting when no ray source is published (non-regression)', () => {
+    it('falls back to NDC/camera raycasting when no controller source is published (non-regression)', () => {
         const box = createGameBoxMesh(111)
         box.position.set(0, 0, -5) // directly ahead of the camera
         scene.add(box)
@@ -76,12 +76,12 @@ describe('SceneClickGameBoxRaycast controller-ray branch', () => {
         expect(selectedHandler.mock.calls[0][0].detail.appid).toBe(111)
     })
 
-    it('falls back to NDC/camera raycasting when the published ray source returns null', () => {
+    it('falls back to NDC/camera raycasting when the published controller source returns null', () => {
         const box = createGameBoxMesh(222)
         box.position.set(0, 0, -5)
         scene.add(box)
 
-        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => null
         }, { domain: DataDomain.Scene })
@@ -102,14 +102,14 @@ describe('SceneClickGameBoxRaycast controller-ray branch', () => {
         sideBox.position.set(5, 0, -5)
         scene.add(sideBox)
 
-        const fakeRaySource: XRControllerRaySource = {
+        const fakeControllerSource: XRControllerSource = {
             getPrimaryControllerRay: () => ({
                 origin: new THREE.Vector3(5, 0, 0),
                 direction: new THREE.Vector3(0, 0, -1)
             }),
             getPrimaryControllerGrip: () => null
         }
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, fakeRaySource, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, fakeControllerSource, { domain: DataDomain.Scene })
 
         syncWorldMatrices(scene, camera)
         emitCenterScreenClick(eventManager)

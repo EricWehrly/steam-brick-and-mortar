@@ -8,7 +8,7 @@ import {
     GameEventTypes, InputEventTypes,
     type GameSelectedEvent, type SceneCanvasClickEvent, type SceneCanvasWheelEvent
 } from '../../../../src/types/InteractionEvents'
-import type { XRControllerRaySource, XRControllerRayInfo } from '../../../../src/webxr/XRControllerManager'
+import type { XRControllerSource, XRControllerState } from '../../../../src/webxr/XRControllerManager'
 
 // Real (empty-geometry) THREE.Mesh instances shared between the model mock's
 // getInteractiveMeshes() and the intersectObjects() stubs below, so "which mesh got hit" can be
@@ -271,15 +271,15 @@ describe('GameBoxFoldCoordinator', () => {
     it('selecting with two connected XR controllers parents the model to the primary grip instead', () => {
         const camera = new THREE.Object3D()
         const grip = new THREE.Object3D()
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 },
-            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'left', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 },
+            { index: 1, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
         ]
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => grip,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => connectedControllers
         }, { domain: DataDomain.Scene })
 
         coordinator = new GameBoxFoldCoordinator()
@@ -294,14 +294,14 @@ describe('GameBoxFoldCoordinator', () => {
         + 'a lone controller needs to stay free for pointing/interacting, not glued to the box', () => {
         const camera = new THREE.Object3D()
         const grip = new THREE.Object3D()
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
         ]
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => grip,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => connectedControllers
         }, { domain: DataDomain.Scene })
 
         coordinator = new GameBoxFoldCoordinator()

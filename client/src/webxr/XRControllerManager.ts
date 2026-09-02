@@ -4,32 +4,49 @@ import { DataManager } from '../core/data/DataManager'
 import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { Logger } from '../utils/Logger'
 
+// Three distinct "ray"-adjacent concepts live in this file and its consumers, easy to conflate
+// under a shared "ray" vocabulary (direct request, 2026-08-31 PR review - the naming was making
+// this genuinely hard to follow):
+//   1. XRControllerRay - an actual geometric raycasting ray (origin + direction), meant to be
+//      copied straight into a THREE.Raycaster (see SceneClickGameBoxRaycast). This is the only
+//      one of the three that's really "a ray."
+//   2. XRControllerState - live per-controller data: which hand, its tracked pose anchor
+//      (targetRaySpace), and its current analog trigger pull (0-1, NOT a ray at all - see that
+//      field's own doc comment). Renamed from XRControllerRayInfo/getControllerRaySpaces(), which
+//      read as ray data when the trigger value in particular has nothing to do with rays.
+//   3. A visually-drawn pointer beam (a THREE.Mesh/Line in the scene) - not defined anywhere in
+//      this file. If you're looking for that, it lives with whatever VR pointer/cursor renders it.
+
 export interface XRControllerRay {
     origin: THREE.Vector3
     direction: THREE.Vector3
 }
 
-export interface XRControllerRayInfo {
+/** Live state for one connected controller - not a ray (see this file's top-of-file note). */
+export interface XRControllerState {
     readonly index: number
     readonly handedness: XRHandedness
-    /** The real XRTargetRaySpace, typed precisely (not plain Object3D) so consumers can register
-     *  for its 'selectstart'/'selectend'/... WebXR-specific events. */
-    readonly raySpace: THREE.XRTargetRaySpace
+    /** The real XRTargetRaySpace - the WebXR-tracked pose anchor for "where this controller
+     *  points," typed precisely (not plain Object3D) so consumers can register for its
+     *  'selectstart'/'selectend'/... WebXR-specific events. This is a *pose anchor* to parent
+     *  things onto or read a transform from - it does not by itself carry an origin/direction
+     *  pair the way XRControllerRay does. */
+    readonly targetRaySpace: THREE.XRTargetRaySpace
     /** Live analog trigger depression (xr-standard button 0), 0 (released) to 1 (fully pressed) -
      *  read fresh every call, not cached. Lets a VR pointer/cursor gate its raycast on "trigger
      *  being held at all" rather than needing a separate poll. */
     readonly triggerValue: number
 }
 
-export interface XRControllerRaySource {
+export interface XRControllerSource {
     getPrimaryControllerRay(): XRControllerRay | null
     getPrimaryControllerGrip(): THREE.Object3D | null
-    /** All currently-connected controllers' real targetRaySpace Object3Ds (live three.js-managed
-     *  pose, not a derived snapshot) - for callers that want to drive a continuous VR pointer/
-     *  cursor per hand rather than the single trigger-resolved "primary" ray. Optional so existing
-     *  XRControllerRaySource fixtures across the test suite don't need touching for a capability
+    /** Every currently-connected controller's live state (see XRControllerState) - for callers
+     *  that want to drive a continuous VR pointer/cursor per hand, or just count connected
+     *  controllers, rather than the single trigger-resolved "primary" ray. Optional so existing
+     *  XRControllerSource fixtures across the test suite don't need touching for a capability
      *  only the VR uikit pointer bridge uses so far. */
-    getControllerRaySpaces?(): ReadonlyArray<XRControllerRayInfo>
+    getConnectedControllers?(): ReadonlyArray<XRControllerState>
 }
 
 export interface XRControllerManagerConfig {
@@ -51,7 +68,7 @@ const CONTROLLER_FORWARD = new THREE.Vector3(0, 0, -1)
  * internally during renderer.render() - no manual XRFrame/getPose() plumbing needed. Owned by
  * WebXRCoordinator, mirroring its existing ownership of WebXRManager/InputManager.
  */
-export class XRControllerManager implements XRControllerRaySource {
+export class XRControllerManager implements XRControllerSource {
     private static readonly logger = Logger.createLogFunctions(XRControllerManager.name)
     private readonly cameraRig: THREE.Object3D
     private readonly controllerModelFactory = new XRControllerModelFactory()
@@ -102,7 +119,7 @@ export class XRControllerManager implements XRControllerRaySource {
             this.controllerGrips.push(grip)
         }
 
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, this, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, this, { domain: DataDomain.Scene })
     }
 
     setSession(session: XRSession | null): void {
@@ -172,11 +189,11 @@ export class XRControllerManager implements XRControllerRaySource {
      * pick. Each entry's triggerValue is read live, so callers can gate their own raycasting on it
      * (e.g. only casting while the trigger is at least slightly depressed) without a separate poll.
      */
-    getControllerRaySpaces(): ReadonlyArray<XRControllerRayInfo> {
-        const result: XRControllerRayInfo[] = []
+    getConnectedControllers(): ReadonlyArray<XRControllerState> {
+        const result: XRControllerState[] = []
         this.handednessByIndex.forEach((handedness, index) => {
             if (handedness !== null) {
-                result.push({ index, handedness, raySpace: this.controllers[index], triggerValue: this.getTriggerValue(handedness) })
+                result.push({ index, handedness, targetRaySpace: this.controllers[index], triggerValue: this.getTriggerValue(handedness) })
             }
         })
         return result

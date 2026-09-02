@@ -6,7 +6,7 @@ import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameS
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
-import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
+import type { XRControllerSource } from '../../webxr/XRControllerManager'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -35,7 +35,7 @@ export class SceneClickGameBoxRaycast {
 
     private resolvedScene: THREE.Scene | null = null
     private resolvedCamera: THREE.Camera | null = null
-    private resolvedRaySource: XRControllerRaySource | null = null
+    private resolvedControllerSource: XRControllerSource | null = null
 
     private readonly raycaster = new THREE.Raycaster()
     private readonly pointer = new THREE.Vector2()
@@ -105,9 +105,9 @@ export class SceneClickGameBoxRaycast {
         // VR: prefer a real controller ray over the click's NDC position when one's available -
         // null outside an active XR session (or before XRControllerManager.setup() has run), so
         // desktop/mouse/gamepad behavior below is unaffected. See docs/plans/vr-support-plan.md.
-        const raySource = this.resolvedRaySource ?? dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        this.resolvedRaySource = raySource
-        const controllerRay = raySource?.getPrimaryControllerRay() ?? null
+        const controllerSource = this.resolvedControllerSource ?? dm.get<XRControllerSource>(DataKey.XRControllerSource) ?? null
+        this.resolvedControllerSource = controllerSource
+        const controllerRay = controllerSource?.getPrimaryControllerRay() ?? null
 
         if (controllerRay) {
             this.raycaster.ray.origin.copy(controllerRay.origin)
