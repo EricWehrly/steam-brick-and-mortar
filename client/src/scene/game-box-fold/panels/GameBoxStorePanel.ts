@@ -5,14 +5,23 @@
  * source wired up yet. Description, rating, metacritic, genres, tags and features all live on the
  * debug face instead (see GameBoxDebugPanel).
  *
- * The disc is a plain uikit Container whose two top corners are rounded by half its width, with
- * overflow:'hidden' clipping the header Image inside it - the flexbox equivalent of the semicircle
- * the canvas version drew with ctx.arc(PI, 2*PI) + ctx.clip(). The sleeve is the next sibling, so
- * it paints over the disc's bottom edge and the disc reads as tucked behind it.
+ * The disc's semicircle is NOT a uikit clip: uikit's overflow:'hidden' clips to a plain axis-
+ * aligned rectangle regardless of border-radius (confirmed against clipping.js - ClippingRect is
+ * four straight planes, no rounding), so a full-bleed child Image inside a rounded-corner
+ * Container still shows square corners poking out past the rounded frame. This drew a visibly
+ * square image in an apparently-rounded box (direct request, 2026-09-02: "the disc isn't
+ * rounded"). The corners of the disc CONTAINER's own background/border fill do render correctly
+ * rounded (that fill is a real per-fragment rounded-rect shader, a different code path from child
+ * clipping) - so the fix is to make the header IMAGE ITSELF transparent outside the semicircle,
+ * letting that already-correct rounded fill show through in the corners. That transparency is
+ * drawn once per selection with the same ctx.arc(PI, 2*PI) + ctx.clip() the old canvas-only
+ * version used - this is the canvas escape hatch (see docs/architecture/in-scene-ui-substrate.md),
+ * used for exactly the freeform-shape case it exists for, not for the box's layout or text.
  *
- * Header art arrives as raw pixels (GameArtworkProvider's CORS-safe pipeline), so this owns the one
- * scratch canvas that turns them into a texture uikit can show. That canvas is a pixel *carrier*,
- * not a drawing surface - nothing here is hand-drawn.
+ * With the disc's own alpha already the correct shape, the sleeve no longer needs to overlap it to
+ * hide a square edge - it now just abuts, which also removes the small z-fight risk two sibling
+ * panels overlapping via negative margin had at equal depth (direct request, 2026-09-02: "z-order
+ * is a little weird, see the bottom of it").
  */
 
 import * as THREE from 'three'
@@ -32,14 +41,18 @@ const DISC_DIAMETER = PANEL_WIDTH_PX * 0.8
 const DISC_HEIGHT = DISC_DIAMETER / 2
 const DISC_EDGE_COLOR = '#0a0a0a'
 const DISC_EDGE_WIDTH = 2
-// Pulls the sleeve up over the disc's flat bottom edge so the two overlap rather than merely
-// abut - the "emerging from its sleeve" read.
-const SLEEVE_OVERLAP = 6
 const SECTION_GAP = 10
 const PLAY_BUTTON_RADIUS = 4
 const PLAY_BUTTON_PADDING_X = 14
 const PLAY_BUTTON_PADDING_Y = 6
 const PLAY_BUTTON_HOVER_BACKGROUND = '#2a3a2a'
+
+// The alpha-clipped disc texture's own resolution - independent of the source artwork's size (see
+// drawDiscTexture()) and independent of PANEL_WIDTH_PX (a layout unit, not a texture one). Fixed
+// 2:1 to match DISC_DIAMETER:DISC_HEIGHT exactly, so the Image can show it with a plain 'fill'
+// instead of doing its own crop.
+const DISC_TEXTURE_WIDTH = 256
+const DISC_TEXTURE_HEIGHT = DISC_TEXTURE_WIDTH / 2
 
 export class GameBoxStorePanel {
     readonly container: Container
@@ -50,10 +63,11 @@ export class GameBoxStorePanel {
     private readonly recentPlaytimeText: Text
     private readonly sleeveSections: Container
 
-    private headerCanvas: HTMLCanvasElement | null = null
-    private headerTexture: THREE.CanvasTexture | null = null
-    // Held as a plain Object3D: uikit's Image is generic over its src type, and detaching it is all
-    // this needs from it.
+    private readonly discCanvas: HTMLCanvasElement
+    private readonly discContext: CanvasRenderingContext2D
+    private readonly discTexture: THREE.CanvasTexture
+    // Held as a plain Object3D: uikit's Image is generic over its src type, and detaching it is
+    // all this needs from it.
     private headerImage: THREE.Object3D | null = null
 
     constructor(private readonly onPlay: () => void) {
@@ -66,6 +80,17 @@ export class GameBoxStorePanel {
         })
         this.playtimeText = new Text({ text: '', fontSize: LABEL_FONT_SIZE, color: PANEL_COLORS.body })
         this.recentPlaytimeText = new Text({ text: '', fontSize: LABEL_FONT_SIZE, color: PANEL_COLORS.body })
+
+        this.discCanvas = document.createElement('canvas')
+        this.discCanvas.width = DISC_TEXTURE_WIDTH
+        this.discCanvas.height = DISC_TEXTURE_HEIGHT
+        const discContext = this.discCanvas.getContext('2d')
+        if (!discContext) {
+            throw new Error('GameBoxStorePanel: failed to get 2D canvas context for the disc')
+        }
+        this.discContext = discContext
+        this.discTexture = new THREE.CanvasTexture(this.discCanvas)
+
         this.disc = this.buildDisc()
         this.sleeveSections = new Container({ flexDirection: 'column', gap: SECTION_GAP, width: '100%' })
 
@@ -89,36 +114,44 @@ export class GameBoxStorePanel {
         this.sleeveSections.add(buildComingSoonRows(['DLC', 'Achievements']))
     }
 
-    /** Rasterizes header-art pixels into the disc, or clears back to the plain placeholder. Reuses
-     *  one canvas/texture pair across selections rather than allocating per game. */
+    /** Rasterizes header-art pixels into the disc's alpha-clipped semicircle, or clears back to
+     *  the plain placeholder. The Image/texture pair is built once at construction and reused
+     *  across selections - only the canvas content changes. */
     setHeaderImage(image: GameBoxFoldHeaderImage | null): void {
         if (!image) {
             this.headerImage?.removeFromParent()
             this.headerImage = null
+            this.discContext.clearRect(0, 0, DISC_TEXTURE_WIDTH, DISC_TEXTURE_HEIGHT)
+            this.discTexture.needsUpdate = true
             return
         }
 
-        const canvas = this.resolveHeaderCanvas(image.width, image.height)
-        const context = canvas.getContext('2d')
-        if (!context) {
+        // Raw pixels arrive at whatever size GameArtworkProvider fetched - a small scratch canvas
+        // is just a way to hand drawImage() a source it can sample from and cover-scale; it isn't
+        // shown directly and doesn't need to persist between calls.
+        const source = document.createElement('canvas')
+        source.width = image.width
+        source.height = image.height
+        const sourceContext = source.getContext('2d')
+        if (!sourceContext) {
             throw new Error('GameBoxStorePanel: failed to get 2D canvas context for header image')
         }
         // createImageData() (not `new ImageData(...)`) - the global ImageData constructor isn't
         // guaranteed to exist in every environment this runs in (e.g. jsdom under vitest), while
         // every 2D context can always produce its own compatible instance.
-        const imageData = context.createImageData(image.width, image.height)
+        const imageData = sourceContext.createImageData(image.width, image.height)
         imageData.data.set(image.pixels)
-        context.putImageData(imageData, 0, 0)
+        sourceContext.putImageData(imageData, 0, 0)
 
-        this.headerTexture ??= new THREE.CanvasTexture(canvas)
-        this.headerTexture.needsUpdate = true
+        this.drawDiscTexture(source)
+        this.discTexture.needsUpdate = true
 
         if (!this.headerImage) {
             this.headerImage = new Image({
-                src: this.headerTexture,
+                src: this.discTexture,
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                objectFit: 'fill',
                 keepAspectRatio: false
             })
             this.disc.add(this.headerImage)
@@ -126,9 +159,33 @@ export class GameBoxStorePanel {
     }
 
     dispose(): void {
-        this.headerTexture?.dispose()
-        this.headerTexture = null
-        this.headerCanvas = null
+        this.discTexture.dispose()
+    }
+
+    /** Cover-scales source into the top half of a circle whose diameter matches the canvas width,
+     *  clipped so nothing paints outside it - same math the pre-uikit canvas panel used
+     *  (ctx.arc(PI, 2*PI)), reproduced here because it's the one thing overflow:'hidden' can't do
+     *  (see this file's class doc comment). Leaves the rest of the canvas at its cleared, fully
+     *  transparent state. */
+    private drawDiscTexture(source: HTMLCanvasElement): void {
+        const ctx = this.discContext
+        ctx.clearRect(0, 0, DISC_TEXTURE_WIDTH, DISC_TEXTURE_HEIGHT)
+
+        const centerX = DISC_TEXTURE_WIDTH / 2
+        const centerY = DISC_TEXTURE_HEIGHT // circle center sits at the bottom edge - only its
+        const radius = DISC_TEXTURE_HEIGHT  // top half (within the canvas) is ever visible
+
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI)
+        ctx.closePath()
+        ctx.clip()
+
+        const scale = Math.max((radius * 2) / source.width, (radius * 2) / source.height)
+        const drawWidth = source.width * scale
+        const drawHeight = source.height * scale
+        ctx.drawImage(source, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight)
+        ctx.restore()
     }
 
     private build(): Container {
@@ -172,7 +229,6 @@ export class GameBoxStorePanel {
             gap: SECTION_GAP,
             width: '100%',
             flexGrow: 1,
-            marginTop: -SLEEVE_OVERLAP,
             padding: PANEL_PADDING,
             backgroundColor: PANEL_COLORS.sleeve,
             borderTopWidth: DISC_EDGE_WIDTH,
@@ -226,22 +282,5 @@ export class GameBoxStorePanel {
         })
         button.add(new Text({ text: 'PLAY', fontSize: BODY_FONT_SIZE, color: PANEL_COLORS.play }))
         return button
-    }
-
-    private resolveHeaderCanvas(width: number, height: number): HTMLCanvasElement {
-        if (this.headerCanvas?.width === width && this.headerCanvas.height === height) {
-            return this.headerCanvas
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        this.headerCanvas = canvas
-        // A resized canvas is a different image source - the existing texture can't be pointed at
-        // it, so drop it and let setHeaderImage() build a fresh one.
-        this.headerTexture?.dispose()
-        this.headerTexture = null
-        this.headerImage?.removeFromParent()
-        this.headerImage = null
-        return canvas
     }
 }
