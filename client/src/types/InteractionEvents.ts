@@ -205,11 +205,14 @@ export interface GamepadButtonPressedEvent extends BaseInteractionEvent {
 // =============================================================================
 
 export interface MenuOpenEvent extends BaseInteractionEvent {
-    menuType: 'pause' | 'settings' | 'debug'
+    /** 'game-box' - a summoned GameBoxFoldCoordinator box - is the same functional role as any
+     *  other menuType here: a modal, focus-grabbing surface that world interaction (shelf-box
+     *  selection, camera movement) should get out of the way of while it's up. */
+    menuType: 'pause' | 'settings' | 'debug' | 'game-box'
 }
 
 export interface MenuCloseEvent extends BaseInteractionEvent {
-    menuType: 'pause' | 'settings' | 'debug'
+    menuType: 'pause' | 'settings' | 'debug' | 'game-box'
 }
 
 export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
