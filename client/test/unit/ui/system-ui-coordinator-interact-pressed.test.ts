@@ -113,11 +113,11 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
         expect(reticle?.style.display).toBe('block')
 
         isPauseMenuOpen = true
-        menuOpen?.(new CustomEvent('menu-open'))
+        menuOpen?.(new CustomEvent('menu-open', { detail: { menuType: 'pause' } }))
         expect(reticle?.style.display).toBe('none')
 
         isPauseMenuOpen = false
-        menuClose?.(new CustomEvent('menu-close'))
+        menuClose?.(new CustomEvent('menu-close', { detail: { menuType: 'pause' } }))
         expect(reticle?.style.display).toBe('block')
 
         emitDevices([{ id: 'mouse-keyboard', name: 'Mouse + Keyboard', kind: 'mouse-keyboard', connected: true, profileId: 'mouse-keyboard' }])
