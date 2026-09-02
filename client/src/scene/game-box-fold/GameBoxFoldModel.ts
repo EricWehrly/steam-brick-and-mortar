@@ -28,6 +28,14 @@ const SECOND_FLAP_DURATION_S = 0.2
 // Closing reads better snappier than the reveal - same clip played backward, just faster.
 const CLOSE_SPEED_MULTIPLIER = 2
 
+// Fully open stops just short of the flat 180-degree swing, so the two flaps angle in toward the
+// viewer slightly instead of lying perfectly coplanar with the base - direct request (2026-09-02:
+// "I want the game box flaps to angle in just a little when open"). A book held open naturally
+// cups toward the reader the same way; dead flat read as less like a physical object.
+// Exported so tests can assert against the real open angle instead of assuming a flat 180.
+export const FLAP_OPEN_INWARD_ANGLE_DEGREES = 9
+export const FLAP_OPEN_ROTATION = Math.PI - THREE.MathUtils.degToRad(FLAP_OPEN_INWARD_ANGLE_DEGREES)
+
 const HINGE_NAME = {
     frontCover: 'game-box-fold-front-cover-hinge',
     secondFlap: 'game-box-fold-second-flap-hinge'
@@ -230,8 +238,12 @@ export class GameBoxFoldModel {
      * depth offsets they need while stacked closed (STACK_GAP apart, so the cover reads as the
      * outermost layer of one solid box) all the way through to fully open, leaving the three
      * finished faces stair-stepped toward the viewer - the left face a full 2*STACK_GAP proud of
-     * the center, the right one STACK_GAP. Landing all three hinges at Z=0 makes the open box the
-     * flat triptych it's supposed to be, while the closed stack is unchanged.
+     * the center, the right one STACK_GAP. Landing both hinges' Z back at 0 removes that stagger,
+     * while the closed stack is unchanged.
+     *
+     * The rotation itself targets FLAP_OPEN_ROTATION, not a flat Math.PI - see that constant's own
+     * comment for why (both flaps tilt in toward the viewer together, a shallow cupped shape
+     * rather than a dead-flat triptych).
      */
     private buildOpenClip(): THREE.AnimationClip {
         const summonEnd = SUMMON_DURATION_S
@@ -246,7 +258,7 @@ export class GameBoxFoldModel {
         const frontCoverTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.frontCover}.rotation[y]`,
             [summonEnd, frontCoverEnd],
-            [0, Math.PI]
+            [0, FLAP_OPEN_ROTATION]
         )
         const frontCoverDepthTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.frontCover}.position[z]`,
@@ -256,7 +268,7 @@ export class GameBoxFoldModel {
         const secondFlapTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.secondFlap}.rotation[y]`,
             [frontCoverEnd, secondFlapEnd],
-            [0, Math.PI]
+            [0, FLAP_OPEN_ROTATION]
         )
         const secondFlapDepthTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.secondFlap}.position[z]`,

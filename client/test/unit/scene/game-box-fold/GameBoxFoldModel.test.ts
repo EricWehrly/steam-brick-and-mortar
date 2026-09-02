@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
+import { GameBoxFoldModel, FLAP_OPEN_ROTATION } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
+import { BOX_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
 
 // Matches GameBoxFoldModel's own SUMMON_DURATION_S/FRONT_COVER_DURATION_S/SECOND_FLAP_DURATION_S
 // (0.2s each) - kept here only as named waypoints for stepping the mixer in tests, not duplicated
@@ -37,15 +38,17 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('playOpen() ends with both hinges at PI and the group scaled to 1', () => {
+    it('playOpen() ends with both hinges at FLAP_OPEN_ROTATION (just short of a flat 180 - the '
+        + 'flaps angle in slightly rather than lying dead flat) and the group scaled to 1', () => {
         const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
 
         model.playOpen()
         model.update(FULL_OPEN_S + 1) // overshoot - LoopOnce + clampWhenFinished clamps to the end
 
-        expect(leftHinge.rotation.y).toBeCloseTo(Math.PI)
-        expect(rightHinge.rotation.y).toBeCloseTo(Math.PI)
+        expect(leftHinge.rotation.y).toBeCloseTo(FLAP_OPEN_ROTATION)
+        expect(rightHinge.rotation.y).toBeCloseTo(FLAP_OPEN_ROTATION)
+        expect(leftHinge.rotation.y).toBeLessThan(Math.PI)
         expect(model.group.scale.x).toBeCloseTo(1)
 
         model.dispose()
@@ -145,9 +148,10 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('fully open, all three pages end up coplanar and facing the viewer - the closed stack\'s Z '
-        + 'offsets animate back to zero, so the open box is a flat triptych rather than three '
-        + 'faces stair-stepped toward the viewer', () => {
+    it('fully open, both flaps face the viewer tilted in by FLAP_OPEN_INWARD_ANGLE_DEGREES rather '
+        + 'than lying dead flat, and stay close to the store panel\'s own plane - the closed '
+        + 'stack\'s Z offsets animate back to zero, so the open box reads as one shallow-cupped '
+        + 'object rather than three faces stair-stepped toward the viewer', () => {
         const model = buildModel()
 
         model.playOpen()
@@ -155,14 +159,25 @@ describe('GameBoxFoldModel', () => {
         model.group.updateMatrixWorld(true)
 
         const [storePage, identityPage, debugPage] = model.getPanelRoots() as unknown as THREE.Object3D[]
-        expect(pageWorldZ(identityPage)).toBeCloseTo(pageWorldZ(storePage), 5)
-        expect(pageWorldZ(debugPage)).toBeCloseTo(pageWorldZ(storePage), 5)
 
-        // The model's own -Z is what the coordinator turns toward the viewer, so every page's
-        // front normal should point that way once open.
-        for (const page of [storePage, identityPage, debugPage]) {
-            expect(pageFacing(page).z).toBeCloseTo(-1, 5)
-        }
+        // The store panel doesn't hinge - its facing is fixed regardless of the flap-angle
+        // change. The model's own -Z is what the coordinator turns toward the viewer.
+        expect(pageFacing(storePage).z).toBeCloseTo(-1, 5)
+
+        // Each flap's own front normal, rotated by FLAP_OPEN_ROTATION about Y from local +Z, is
+        // cos(FLAP_OPEN_ROTATION) - not -1, since the hinge stops short of a flat 180. Both hinges
+        // share this same target rotation, so both tilt in by the same amount.
+        const expectedFlapFacingZ = Math.cos(FLAP_OPEN_ROTATION)
+        expect(expectedFlapFacingZ).toBeLessThan(-0.9) // sanity: still mostly viewer-facing
+        expect(pageFacing(identityPage).z).toBeCloseTo(expectedFlapFacingZ, 5)
+        expect(pageFacing(debugPage).z).toBeCloseTo(expectedFlapFacingZ, 5)
+
+        // Not exact coplanarity anymore (the tilt itself shifts each hinge's own pivot by a small,
+        // real amount - see the class's buildOpenClip() comment) - bounded well under the hinge's
+        // own reach rather than pinned to an exact value, so this doesn't re-derive that geometry
+        // by hand while still catching a real regression back to whole-STACK_GAP-scale staggering.
+        expect(Math.abs(pageWorldZ(identityPage) - pageWorldZ(storePage))).toBeLessThan(BOX_WIDTH / 2)
+        expect(Math.abs(pageWorldZ(debugPage) - pageWorldZ(storePage))).toBeLessThan(BOX_WIDTH / 2)
 
         model.dispose()
     })
