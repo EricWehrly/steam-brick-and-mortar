@@ -169,10 +169,20 @@ export interface InteractPressedEvent extends BaseInteractionEvent {}
  * dismisses any other open overlay, mirroring what Escape already does for keyboard since it's
  * both a real DOM keydown each overlay could listen for directly and the OpenMenu binding).
  * Any overlay that closes itself on Escape today (GameLibraryBinderUI, BinderGameDetailPanel,
- * GameArtworkInspector, PauseMenuManager) should react to this instead of a raw keydown listener,
- * so gamepad gets the same "back/cancel" behavior for free.
+ * GameArtworkInspector) should react to this instead of a raw keydown listener, so gamepad gets
+ * the same "back/cancel" behavior for free.
+ *
+ * bundledWithOpenMenu is true when this Cancel was emitted alongside an OpenMenuPressed for the
+ * SAME physical press (Escape/Start, both bound to both actions) - PauseMenuManager checks this
+ * specifically, since its own OpenMenuPressed handler's toggle() already resolves open/closed for
+ * that key; reacting to Cancel too self-cancelled the open it had just performed (direct request,
+ * 2026-09-02: "the menu is not currently opening when I hit esc"). Every other Cancel consumer
+ * doesn't check this field and keeps reacting to every Cancel, bundled or not - dismissing the
+ * game library binder (say) when the pause menu opens is the whole point of bundling it.
  */
-export interface CancelPressedEvent extends BaseInteractionEvent {}
+export interface CancelPressedEvent extends BaseInteractionEvent {
+    bundledWithOpenMenu?: boolean
+}
 
 /**
  * Fired by InputActionResolver the moment SprintToggle is pressed - currently only the VR left

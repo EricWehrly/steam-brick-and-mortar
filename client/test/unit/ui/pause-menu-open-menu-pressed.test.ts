@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PauseMenuManager } from '../../../src/ui/pause/PauseMenuManager'
 import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
-import { InputEventTypes } from '../../../src/types/InteractionEvents'
+import { InputEventTypes, type CancelPressedEvent } from '../../../src/types/InteractionEvents'
 
 describe('PauseMenuManager OpenMenuPressed wiring', () => {
     let pauseMenuManager: PauseMenuManager
@@ -64,6 +64,33 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
         expect(pauseMenuManager.isOpen()).toBe(false)
 
         eventManager.emit(InputEventTypes.CancelPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
+
+    it('stays open when a Cancel bundled with the same OpenMenu press follows it - Escape/Start '
+        + 'bind to both actions, and OpenMenuPressed\'s own toggle() already resolved this press; '
+        + 'reacting to the bundled Cancel too self-cancelled the open (direct request, 2026-09-02: '
+        + '"the menu is not currently opening when I hit esc")', () => {
+        expect(pauseMenuManager.isOpen()).toBe(false)
+
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        expect(pauseMenuManager.isOpen()).toBe(true)
+
+        eventManager.emit<CancelPressedEvent>(InputEventTypes.CancelPressed, { bundledWithOpenMenu: true })
+
+        expect(pauseMenuManager.isOpen()).toBe(true)
+    })
+
+    it('still closes on a bundled Cancel if the menu was already open beforehand - only the '
+        + 'open THIS press just performed is protected, not the menu\'s whole prior state', () => {
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {}) // toggled back closed
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {}) // open again, by a THIRD press
+        expect(pauseMenuManager.isOpen()).toBe(true)
+
+        // A gamepad B/Circle Cancel (never bundled) still closes an already-open menu regardless.
+        eventManager.emit<CancelPressedEvent>(InputEventTypes.CancelPressed, { bundledWithOpenMenu: false })
 
         expect(pauseMenuManager.isOpen()).toBe(false)
     })

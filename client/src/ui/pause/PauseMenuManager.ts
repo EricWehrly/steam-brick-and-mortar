@@ -21,7 +21,7 @@ import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes, InputEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, CancelPressedEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
@@ -132,7 +132,16 @@ export class PauseMenuManager {
         this.toggle()
     }
 
-    private readonly handleCancelPressed = (): void => {
+    // Skips a Cancel bundled with the SAME OpenMenu press (Escape/Start bind to both - see
+    // CancelPressedEvent.bundledWithOpenMenu's own doc comment): handleOpenMenuPressed's toggle()
+    // already resolved open/closed for this press, so also closing here immediately undid an
+    // open it had just performed, reading as "Escape doesn't open the menu" (direct request,
+    // 2026-09-02). A standalone Cancel (gamepad B/Circle, or Escape/Start with nothing bound to
+    // OpenMenu) has no such flag and still closes normally.
+    private readonly handleCancelPressed = (event: CustomEvent<CancelPressedEvent>): void => {
+        if (event.detail?.bundledWithOpenMenu) {
+            return
+        }
         if (this.state.isOpen) {
             this.close()
         }
