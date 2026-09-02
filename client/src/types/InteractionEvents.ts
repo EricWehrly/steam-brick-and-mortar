@@ -132,15 +132,6 @@ export interface SceneCanvasClickEvent extends BaseInteractionEvent {
     ndcY: number
 }
 
-/** Mouse wheel over the render canvas, in the same NDC space SceneCanvasClickEvent uses - lets a
- *  handler raycast to find what's under the cursor, same as a click. Currently only consumed by
- *  GameBoxFoldCoordinator (scrolling the held box's debug panel). */
-export interface SceneCanvasWheelEvent extends BaseInteractionEvent {
-    ndcX: number
-    ndcY: number
-    deltaY: number
-}
-
 export interface InputDevicesChangedEvent extends BaseInteractionEvent {
     devices: ReadonlyArray<{
         id: string
@@ -437,7 +428,6 @@ export const InputEventTypes = {
     Pause: 'input:pause',
     Resume: 'input:resume',
     SceneCanvasClick: 'input:scene-canvas-click',
-    SceneCanvasWheel: 'input:scene-canvas-wheel',
     DevicesChanged: 'input:devices-changed',
     ProfileChanged: 'input:profile-changed',
     OpenMenuPressed: 'input:open-menu-pressed',
