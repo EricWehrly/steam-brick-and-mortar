@@ -3,6 +3,11 @@
 ## Related Documents
 - Visual style source of truth: `docs/guidelines/steam-ui-style-guide.md`
 - Token specification: `docs/plans/ui-design-tokens.md`
+- In-scene (3D) UI: `docs/architecture/in-scene-ui-substrate.md`
+
+**Scope**: everything below is about **DOM/CSS** UI. UI that lives in the 3D scene is
+`@pmndrs/uikit`, not templates and not hand-rolled canvas — see the substrate doc above before
+building one.
 
 ## Core Principles
 
