@@ -193,9 +193,9 @@ describe('GameBoxFoldCoordinator', () => {
         expect(fakeModelInstances[0].group.position.z).toBeCloseTo(-0.7)
     })
 
-    it('builds rating/playtime/tags content from full game data - genres then top community '
-        + 'tags, deduped and capped at MAX_TAGS_SHOWN - the sections carried over from '
-        + 'BinderGameDetailPanel', () => {
+    it('builds rating/playtime/genres/tags content from full game data - Steam genres and top '
+        + 'community tags kept as separate sections (not merged), tags deduped and capped at '
+        + 'MAX_TAGS_SHOWN', () => {
         DataManager.getInstance().set('steam.games', [{
             appid: 3,
             name: 'Deep Rock Galactic',
@@ -216,7 +216,8 @@ describe('GameBoxFoldCoordinator', () => {
             rating: '97% · Overwhelmingly Positive',
             playtimeHours: 10,
             recentPlaytimeHours: 2,
-            tags: ['Action', 'Indie', 'Co-op', 'FPS', 'Multiplayer', 'Mining']
+            genres: ['Action', 'Indie'],
+            tags: ['Action', 'Co-op', 'FPS', 'Multiplayer', 'Mining', 'Difficult']
         }))
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const content = model.setContent.mock.calls[0][0] as any

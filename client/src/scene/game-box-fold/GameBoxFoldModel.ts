@@ -73,7 +73,9 @@ export interface GameBoxFoldContent {
     readonly rating?: string
     readonly playtimeHours?: number
     readonly recentPlaytimeHours?: number
-    /** Genres + top community tags, pre-built/ordered/capped by the caller. */
+    /** Steam's own genres (Action, Indie, ...) - shown as their own section, separate from tags. */
+    readonly genres?: readonly string[]
+    /** Top community tags (SteamSpy), pre-built/ordered/capped by the caller. */
     readonly tags?: readonly string[]
     /** Steam's own feature categories (Single-player, Steam Achievements, ...), distinct from tags. */
     readonly categories?: readonly string[]
@@ -104,7 +106,7 @@ export interface GameBoxFoldHeaderImage {
  * docs/plans/game-box-open-interaction-plan.md. Each panel has a distinct role: front cover =
  * identity (screenshots/videos placeholders only - rating moved to the debug face, see
  * drawDebugPanel()); base/center = store page (title, header art on a disc, play zone, playtime,
- * collections); second flap = debug (description, rating, metacritic, tags, features, then the
+ * collections); second flap = debug (description, rating, metacritic, genres, tags, features, then the
  * raw cache-entry JSON). Owns its own animation via a THREE.AnimationMixer/AnimationClip
  * (playOpen()/playClose() play one clip forward/backward - see buildOpenClip()) rather than a
  * hand-rolled phase/progress state machine. Otherwise a pure display object: no events, no
@@ -467,7 +469,7 @@ export class GameBoxFoldModel {
     }
 
     /** Second flap face: the store-page-style content that doesn't fit the front cover or center
-     *  panel - description, rating, metacritic, tags, and features (moved here from either the
+     *  panel - description, rating, metacritic, genres, tags, and features (moved here from either the
      *  identity or store panel per explicit request - "metacritic ... should go under description
      *  on the right flap, along with tags", then rating and features 2026-08-20: "move 'unrated'
      *  to the right, under description" / "let's move Features on the right as well") - followed
@@ -522,6 +524,7 @@ export class GameBoxFoldModel {
             y += size * 0.07
         }
 
+        y = this.drawLabeledChipLines(ctx, y, 'GENRES', content?.genres, '#c9a0ff')
         y = this.drawLabeledChipLines(ctx, y, 'TAGS', content?.tags, '#8fc7ff')
         // Moved here from the store panel - direct request (2026-08-20).
         y = this.drawLabeledChipLines(ctx, y, 'FEATURES', content?.categories, '#a0d8a0')

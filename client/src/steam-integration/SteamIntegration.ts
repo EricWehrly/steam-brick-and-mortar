@@ -22,7 +22,6 @@ import { loadDemoLibrary } from './DemoLibraryLoader'
 import { handleImportLibrary } from './ImportLibraryHandler'
 import { BatchEmitter } from '../steam/BatchEmitter'
 import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
-import { warnIfFieldUncovered } from '../utils/DataCoverageCheck'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
@@ -107,10 +106,7 @@ export class SteamIntegration {
         const displayName = resolveDisplayName(gameLibraryState.userData?.vanity_url)
 
         SteamIntegration.logger.debug(`Storing ${games.length} games in DataManager`)
-        // Catches the "rating field is wired to nothing" class of bug (direct request,
-        // 2026-08-20) before it silently renders a placeholder for the whole library - see
-        // DataCoverageCheck.ts.
-        warnIfFieldUncovered(games, 'userscore', game => game.userscore !== undefined)
+        // TD: game-data-field-coverage-check
 
         const dataManager = DataManager.getInstance()
         dataManager.set<SteamGameData[]>('steam.games', games, {

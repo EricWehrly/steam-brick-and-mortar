@@ -266,6 +266,26 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 - `external-tool/infrastructure/lambda-src/services/steam-api.js`
 - `external-tool/infrastructure/lambda-hydrator-src/index.js`
 
+## id: game-data-field-coverage-check
+**Priority**: Low
+**Effort**: Small - see the plan doc
+**Context**: `SteamIntegration.ts` had a one-off, single-field version of this (`warnIfFieldUncovered`,
+hardcoded to `userscore`) - removed in PR #161's review as not worth committing in that narrow
+shape. Plan: [`game-data-field-coverage-check-plan.md`](../plans/game-data-field-coverage-check-plan.md).
+
+**Related files**:
+- `client/src/steam-integration/SteamIntegration.ts` (`// TD: game-data-field-coverage-check`)
+
+## id: game-box-canvas-ui-hit-testing
+**Priority**: Low
+**Context**: The game-box fold's faces are hand-drawn onto canvas textures (no DOM, no scene-graph
+widgets) - "buttons" like Play are just rects the draw call remembers, hit-tested via raycast UV ->
+canvas coords (`GameBoxFoldModel.isPointInPlayButton`/`isPointInCacheEntry`). Flagged in PR #161
+review as kludgey; true, but it's the whole architecture's shape, not fixable per-button. A real
+fix means picking a widget system for the box faces (something closer to the VR uikit menu),
+which is a bigger call than one PR.
+**Related files**: `client/src/scene/game-box-fold/GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts`
+
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low
 **Effort**: Unknown - environment/tooling investigation, not app code (see Decision below)
