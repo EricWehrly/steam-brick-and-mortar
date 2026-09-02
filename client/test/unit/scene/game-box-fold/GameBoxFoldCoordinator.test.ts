@@ -228,12 +228,14 @@ describe('GameBoxFoldCoordinator', () => {
         }))
     })
 
-    it('caps the features list at MAX_FEATURES_SHOWN - an uncapped list ran long enough to '
-        + "overflow the debug face's fixed height and visibly overlap the cache-entry section", () => {
+    it('de-duplicates Steam category descriptions - the raw list sometimes repeats an entry verbatim', () => {
         DataManager.getInstance().set('steam.games', [{
             appid: 6,
             name: 'Mudborne',
-            categories: Array.from({ length: 12 }, (_, i) => ({ description: `Feature ${i}` }))
+            categories: [
+                { description: 'Single-player' }, { description: 'Steam Achievements' },
+                { description: 'Single-player' }, { description: 'steam achievements' }
+            ]
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }] as any, { domain: DataDomain.SteamIntegration })
 
@@ -242,8 +244,7 @@ describe('GameBoxFoldCoordinator', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const content = fakeModelInstances[0].setContent.mock.calls[0][0] as any
-        expect(content.categories).toHaveLength(8)
-        expect(content.categories).toEqual(['Feature 0', 'Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5', 'Feature 6', 'Feature 7'])
+        expect(content.categories).toEqual(['Single-player', 'Steam Achievements'])
     })
 
     it('omits rating (not "Unrated") when userscore is genuinely missing, alongside undefined playtime/empty tags, for a game with no metadata beyond name', () => {
