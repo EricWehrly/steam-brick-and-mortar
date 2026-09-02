@@ -3,6 +3,7 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 import { DataManager } from '../core/data/DataManager'
 import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { Logger } from '../utils/Logger'
+import { CONTROLLER_AIM_DIRECTION } from './ControllerAimCorrection'
 
 // Three distinct "ray"-adjacent concepts live in this file and its consumers, easy to conflate
 // under a shared "ray" vocabulary (direct request, 2026-08-31 PR review - the naming was making
@@ -60,7 +61,6 @@ export interface XRControllerManagerConfig {
 const CONTROLLER_COUNT = 2
 /** xr-standard mapping: button 0 is always the trigger. */
 const TRIGGER_BUTTON_INDEX = 0
-const CONTROLLER_FORWARD = new THREE.Vector3(0, 0, -1)
 
 /**
  * Owns real WebXR controller pose tracking, parenting, and (for player feedback) visual models -
@@ -164,7 +164,10 @@ export class XRControllerManager implements XRControllerSource {
 
         const controller = this.controllers[index]
         const origin = controller.getWorldPosition(new THREE.Vector3())
-        const direction = CONTROLLER_FORWARD.clone()
+        // CONTROLLER_AIM_DIRECTION (not a raw local -Z) - see its own doc comment for why: this
+        // must stay identical to whatever direction VRControllerPointer's visible beam uses, or
+        // the beam and the box that actually gets selected disagree.
+        const direction = CONTROLLER_AIM_DIRECTION.clone()
             .applyQuaternion(controller.getWorldQuaternion(new THREE.Quaternion()))
             .normalize()
 

@@ -20,6 +20,7 @@ import * as THREE from 'three'
 import { createRayPointer } from '@pmndrs/pointer-events'
 import type { GetCamera, Pointer } from '@pmndrs/pointer-events'
 import { ALWAYS_ON_TOP_RENDER_ORDER } from './UikitRenderOrder'
+import { CONTROLLER_AIM_DIRECTION } from '../../webxr/ControllerAimCorrection'
 
 const BEAM_COLOR = 0x4da3ff
 // A THREE.Line's linewidth is not honored by WebGL on most platforms (browsers clamp it to 1px
@@ -42,16 +43,13 @@ const ON_TOP_RENDER_ORDER = ALWAYS_ON_TOP_RENDER_ORDER + 1
  */
 const ON_TOP_MATERIAL_PROPERTIES = { transparent: true, depthTest: false, depthWrite: false } as const
 
-// WebXR's reported targetRaySpace direction (local -Z) commonly points noticeably above the
-// physical barrel for Touch-style controllers (Oculus Touch/PICO Connect - see InputProfile.ts's
-// VR profile comment) - confirmed live: the beam read as aiming up and away rather than forward.
-// Pitching the ray/beam's local direction down compensates. First-pass empirical value, easy to
-// re-tune: adjust the degrees below and re-test in headset.
-const RAY_PITCH_CORRECTION_DEGREES = -15
-// Exported so tests can position targets along the real corrected direction instead of
+// CONTROLLER_AIM_DIRECTION (not a raw local -Z) - shared with XRControllerManager's shelf-box
+// selection ray, so this beam always points exactly where a click would actually land. The two
+// used to carry independent, differently-tuned corrections, which is why the beam and the box
+// that opened could disagree (direct request, 2026-09-02) - see ControllerAimCorrection.ts.
+// Re-exported so tests can position targets along the real corrected direction instead of
 // duplicating this rotation math.
-export const RAY_DIRECTION = new THREE.Vector3(0, 0, -1)
-    .applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(RAY_PITCH_CORRECTION_DEGREES))
+export const RAY_DIRECTION = CONTROLLER_AIM_DIRECTION
 
 export interface VRControllerPointerOptions {
     readonly raySpace: THREE.XRTargetRaySpace
