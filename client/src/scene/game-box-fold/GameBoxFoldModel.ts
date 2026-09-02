@@ -28,13 +28,27 @@ const SECOND_FLAP_DURATION_S = 0.2
 // Closing reads better snappier than the reveal - same clip played backward, just faster.
 const CLOSE_SPEED_MULTIPLIER = 2
 
-// Fully open stops just short of the flat 180-degree swing, so the two flaps angle in toward the
-// viewer slightly instead of lying perfectly coplanar with the base - direct request (2026-09-02:
-// "I want the game box flaps to angle in just a little when open"). A book held open naturally
-// cups toward the reader the same way; dead flat read as less like a physical object.
-// Exported so tests can assert against the real open angle instead of assuming a flat 180.
+// Fully open, each hinge stops a few degrees shy of (front cover) or past (second flap) a flat
+// 180, so both flaps' OUTER edges end up nearer the viewer than a dead-flat triptych would put
+// them - direct request (2026-09-02: "I want the game box flaps to angle in just a little when
+// open"). A book held open naturally cups toward the reader the same way.
+//
+// The two hinges need OPPOSITE offsets from Math.PI to achieve that SAME physical direction,
+// because they're mirror images of each other (FRONT_COVER_HINGE_X/SECOND_FLAP_HINGE_X have
+// opposite signs): rotating a hinge's local +X-offset mesh by an angle just short of PI moves its
+// far edge one way in local Z, and just past PI moves the mirrored hinge's far edge the SAME way
+// only if its own rotation target is mirrored too (verified by direct calculation, not just
+// assumed - a first pass here used the SAME target for both, which is what actually produced the
+// bug: the front cover receded away from the viewer while the second flap correctly came forward,
+// confirmed live 2026-09-02 - "the side flaps should be leaned towards camera from center, like
+// the right side is [but not the left]"). Both hinges' own FACING tilt (see FLAP_OPEN_ANGLE_RAD's
+// use in buildOpenClip) still ends up identical either way - cos(PI+x) equals cos(PI-x) - so this
+// only affects position, not which way each flap visually leans.
 export const FLAP_OPEN_INWARD_ANGLE_DEGREES = 9
-export const FLAP_OPEN_ROTATION = Math.PI - THREE.MathUtils.degToRad(FLAP_OPEN_INWARD_ANGLE_DEGREES)
+const FLAP_OPEN_ANGLE_RAD = THREE.MathUtils.degToRad(FLAP_OPEN_INWARD_ANGLE_DEGREES)
+// Exported so tests can assert against the real open angles instead of assuming a flat 180.
+export const FRONT_COVER_OPEN_ROTATION = Math.PI + FLAP_OPEN_ANGLE_RAD
+export const SECOND_FLAP_OPEN_ROTATION = Math.PI - FLAP_OPEN_ANGLE_RAD
 
 const HINGE_NAME = {
     frontCover: 'game-box-fold-front-cover-hinge',
@@ -241,9 +255,10 @@ export class GameBoxFoldModel {
      * the center, the right one STACK_GAP. Landing both hinges' Z back at 0 removes that stagger,
      * while the closed stack is unchanged.
      *
-     * The rotation itself targets FLAP_OPEN_ROTATION, not a flat Math.PI - see that constant's own
-     * comment for why (both flaps tilt in toward the viewer together, a shallow cupped shape
-     * rather than a dead-flat triptych).
+     * The rotations target FRONT_COVER_OPEN_ROTATION/SECOND_FLAP_OPEN_ROTATION, not a flat
+     * Math.PI for both - see those constants' own comment for why they're mirror-image offsets
+     * from PI rather than the same value (both flaps still tilt in toward the viewer together; a
+     * shallow cupped shape rather than a dead-flat triptych).
      */
     private buildOpenClip(): THREE.AnimationClip {
         const summonEnd = SUMMON_DURATION_S
@@ -258,7 +273,7 @@ export class GameBoxFoldModel {
         const frontCoverTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.frontCover}.rotation[y]`,
             [summonEnd, frontCoverEnd],
-            [0, FLAP_OPEN_ROTATION]
+            [0, FRONT_COVER_OPEN_ROTATION]
         )
         const frontCoverDepthTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.frontCover}.position[z]`,
@@ -268,7 +283,7 @@ export class GameBoxFoldModel {
         const secondFlapTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.secondFlap}.rotation[y]`,
             [frontCoverEnd, secondFlapEnd],
-            [0, FLAP_OPEN_ROTATION]
+            [0, SECOND_FLAP_OPEN_ROTATION]
         )
         const secondFlapDepthTrack = new THREE.NumberKeyframeTrack(
             `${HINGE_NAME.secondFlap}.position[z]`,
