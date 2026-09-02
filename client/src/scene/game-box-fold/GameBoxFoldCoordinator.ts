@@ -5,8 +5,8 @@ import { EventManager } from '../../core/EventManager'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { Logger } from '../../utils/Logger'
 import {
-    GameEventTypes, InputEventTypes,
-    type GameSelectedEvent, type CancelPressedEvent
+    GameEventTypes, InputEventTypes, UIEventTypes,
+    type GameSelectedEvent, type CancelPressedEvent, type MenuOpenEvent, type MenuCloseEvent
 } from '../../types/InteractionEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import type { XRControllerSource } from '../../webxr/XRControllerManager'
@@ -20,6 +20,12 @@ import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
 // Community tags (SteamSpy) can run long - capped so the second flap's face stays legible.
 const MAX_TAGS_SHOWN = 6
+// Steam's own feature categories had no cap at all - a game with a long list (Steam Achievements,
+// Full controller support, Steam Cloud, Family Sharing, Steam Workshop, ...) could genuinely run
+// past ten, which was enough to push the debug face's content past its available height and
+// visibly overlap the cache-entry section below it (direct request, 2026-09-02: "the visuals are
+// very crowded"). Capped the same way tags are, for the same reason.
+const MAX_FEATURES_SHOWN = 8
 
 function dedupe(items: readonly string[]): string[] {
     const seenLowercase = new Set<string>()
@@ -52,8 +58,15 @@ const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 // (a non-PerspectiveCamera) where the real fov/aspect aren't available to compute from.
 const FALLBACK_CAMERA_DISTANCE = 0.7
 // How much of the camera's current horizontal FOV the open box's full width is allowed to fill -
-// leaves margin on both sides rather than framing it edge-to-edge.
-const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
+// leaves margin on both sides rather than framing it edge-to-edge. Exported so a test can verify
+// the fit formula without duplicating it.
+export const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
+// Extra distance held in reserve, added on top of the FOV-fit calculation below - direct request
+// (2026-09-02: "I want ... the box to be a little further from the camera when open"). The
+// FOV-fit math alone frames the box as tightly as it safely can; this is a flat margin on top of
+// that, not a change to the fit itself. Exported so a test can verify against it directly instead
+// of re-deriving the fit formula.
+export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.15
 // Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
 // wide window) or absurdly far away, tiny-looking (very narrow window).
 const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
@@ -62,10 +75,19 @@ const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
 // ended up right in front of the player's face too. More separation from the grip reads as
 // "holding it out to look at" instead.
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.22)
+// Flatscreen-only (see attachToAnchor()'s connectedControllerCount === 0 check): held square to
+// the camera read as flat/2D - direct request (2026-09-02: "should be held at a bit of an angle
+// so as to give it some dimensionality, object believability"). A slight yaw plus a touch of
+// pitch is the standard "product shot" angle, revealing a sliver of the box's side/top rather
+// than presenting a flat rectangle. Not applied in VR (grip-anchored, or camera-anchored with a
+// single connected controller) - that framing wasn't asked for and the grip pitch already gives
+// VR its own deliberate angle.
+export const FLATSCREEN_TILT_YAW_DEGREES = -18
+export const FLATSCREEN_TILT_PITCH_DEGREES = -8
 // The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
-const MODEL_FACING_ROTATION_Y = Math.PI
+export const MODEL_FACING_ROTATION_Y = Math.PI
 // Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's own forward axis points roughly
 // "out and down" in a natural grip, so with only the Y-flip above the box's face ended up angled
 // down/back toward the palm - reading it meant over-extending the wrist, tilting the controller
@@ -133,6 +155,7 @@ export class GameBoxFoldCoordinator {
             this.model.group.visible = false
             this.model.group.removeFromParent()
             this.currentAppid = null
+            this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
         })
 
         this.eventManager.registerEventHandler<GameSelectedEvent>(
@@ -171,6 +194,10 @@ export class GameBoxFoldCoordinator {
         // re-texturing an already-open box in place skipped the animation entirely, which read as
         // selection just silently swapping the game with no feedback.
         if (this.currentAppid === null) {
+            // Emitted here, not in summon() - summon() also runs for a mid-close reopen (see the
+            // pendingSelection branch below and onFullyClosed's), where the box was never really
+            // "closed" from the world's point of view, so a second Open/Close pair would be noise.
+            this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
             this.summon(appid, game)
         } else {
             this.pendingSelection = { appid, game }
@@ -194,7 +221,7 @@ export class GameBoxFoldCoordinator {
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
             genres: dedupe(game.genres?.map(g => g.description) ?? []),
             tags: this.buildTags(game),
-            categories: game.categories?.map(c => c.description),
+            categories: game.categories?.map(c => c.description).slice(0, MAX_FEATURES_SHOWN),
             userCollections: game.user_collections?.map(c => c.name),
             description: game.short_description,
             metacritic: game.metacritic ? `Metacritic: ${game.metacritic.score}` : undefined,
@@ -266,6 +293,9 @@ export class GameBoxFoldCoordinator {
             grip.add(this.model.group)
             this.model.group.position.copy(GRIP_LOCAL_OFFSET)
             this.model.group.rotation.x = THREE.MathUtils.degToRad(GRIP_BOX_PITCH_DEGREES)
+            // Reset in case a previous summon this session was the flatscreen-only tilt below -
+            // the same model.group is reused across summons, not recreated.
+            this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
             return
         }
 
@@ -278,7 +308,12 @@ export class GameBoxFoldCoordinator {
             this.model.group.position.set(0, 0, -distance)
             // Reset in case a previous summon this session was grip-anchored (pitch is
             // grip-only) - the same model.group is reused across summons, not recreated.
-            this.model.group.rotation.x = 0
+            this.model.group.rotation.x = connectedControllerCount === 0
+                ? THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES)
+                : 0
+            this.model.group.rotation.y = connectedControllerCount === 0
+                ? MODEL_FACING_ROTATION_Y + THREE.MathUtils.degToRad(FLATSCREEN_TILT_YAW_DEGREES)
+                : MODEL_FACING_ROTATION_Y
         }
     }
 
@@ -291,7 +326,10 @@ export class GameBoxFoldCoordinator {
         const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
         const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
         const distance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
-        return THREE.MathUtils.clamp(distance, MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE)
+        return THREE.MathUtils.clamp(
+            distance + CAMERA_ANCHOR_DISTANCE_MARGIN,
+            MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE
+        )
     }
 
     private findGameByAppid(appid: string): SteamGameData | undefined {

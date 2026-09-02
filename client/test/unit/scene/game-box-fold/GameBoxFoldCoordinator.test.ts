@@ -53,7 +53,12 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
     ARTWORK_DIMENSIONS: { header: { width: 1, height: 1 } }
 }))
 
-import { GameBoxFoldCoordinator } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
+import {
+    GameBoxFoldCoordinator, MODEL_FACING_ROTATION_Y,
+    FLATSCREEN_TILT_YAW_DEGREES, FLATSCREEN_TILT_PITCH_DEGREES,
+    OPEN_BOX_SAFE_FOV_FRACTION, CAMERA_ANCHOR_DISTANCE_MARGIN
+} from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
+import { OPEN_BOX_HALF_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
 import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
 
 function selectGame(appid: number): void {
@@ -109,6 +114,34 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.setContent).toHaveBeenCalledWith(expect.objectContaining({ name: 'Half-Life 3' }))
         expect(model.group.visible).toBe(true)
         expect(model.playOpen).toHaveBeenCalledTimes(1)
+    })
+
+    it('holds the flatscreen (zero-controller) box at a slight yaw/pitch, not square to the '
+        + 'camera - a dead-on angle read as flat/2D rather than a real object', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y + THREE.MathUtils.degToRad(FLATSCREEN_TILT_YAW_DEGREES))
+        expect(model.group.rotation.x).toBeCloseTo(THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES))
+    })
+
+    it('holds the open box further from a real PerspectiveCamera than the FOV-fit calculation '
+        + 'alone would - CAMERA_ANCHOR_DISTANCE_MARGIN adds reserve distance on top of the tightest fit', () => {
+        const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
+        const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
+        const tightestFitDistance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
+
+        const actualDistance = -fakeModelInstances[0].group.position.z
+        expect(actualDistance).toBeCloseTo(tightestFitDistance + CAMERA_ANCHOR_DISTANCE_MARGIN)
     })
 
     it('holds the open box further from a real PerspectiveCamera at a narrower aspect ratio, so the same physical-width open spread keeps fitting a narrower horizontal FOV', () => {
@@ -195,6 +228,24 @@ describe('GameBoxFoldCoordinator', () => {
         }))
     })
 
+    it('caps the features list at MAX_FEATURES_SHOWN - an uncapped list ran long enough to '
+        + "overflow the debug face's fixed height and visibly overlap the cache-entry section", () => {
+        DataManager.getInstance().set('steam.games', [{
+            appid: 6,
+            name: 'Mudborne',
+            categories: Array.from({ length: 12 }, (_, i) => ({ description: `Feature ${i}` }))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any, { domain: DataDomain.SteamIntegration })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(6)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const content = fakeModelInstances[0].setContent.mock.calls[0][0] as any
+        expect(content.categories).toHaveLength(8)
+        expect(content.categories).toEqual(['Feature 0', 'Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5', 'Feature 6', 'Feature 7'])
+    })
+
     it('omits rating (not "Unrated") when userscore is genuinely missing, alongside undefined playtime/empty tags, for a game with no metadata beyond name', () => {
         coordinator = new GameBoxFoldCoordinator()
         selectGame(1) // fixture game 1 has no userscore/genres/tags/playtime_2weeks
@@ -243,6 +294,8 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(grip.children).toContain(model.group)
         expect(camera.children).not.toContain(model.group)
+        // Reset to baseline, not a stray flatscreen tilt from some earlier summon this session.
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
     })
 
     it('selecting with only one connected XR controller camera-anchors instead of grip-anchoring - '
@@ -265,6 +318,28 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(camera.children).toContain(model.group)
         expect(grip.children).not.toContain(model.group)
+    })
+
+    it('does not apply the flatscreen tilt when camera-anchored in VR with a single connected '
+        + 'controller - that framing is flatscreen-only', () => {
+        const camera = new THREE.Object3D()
+        const grip = new THREE.Object3D()
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => grip,
+            getConnectedControllers: () => connectedControllers
+        }, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
+        expect(model.group.rotation.x).toBeCloseTo(0)
     })
 
     it('selecting a second game while one is open plays close, waits for it to finish, then '

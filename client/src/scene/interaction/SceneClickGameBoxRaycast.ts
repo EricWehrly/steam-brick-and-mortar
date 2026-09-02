@@ -2,11 +2,19 @@ import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
-import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
+import {
+    InputEventTypes, GameEventTypes, UIEventTypes,
+    type SceneCanvasClickEvent, type GameSelectedEvent, type MenuOpenEvent, type MenuCloseEvent
+} from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
 import type { XRControllerSource } from '../../webxr/XRControllerManager'
+
+// Same surface a box's own material/animation could occupy - two coincident hits this close
+// together are "the same physical surface," not one genuinely in front of the other. Guards the
+// occlusion check below against raycaster float noise between its two passes.
+const OCCLUSION_EPSILON = 1e-4
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -37,6 +45,12 @@ export class SceneClickGameBoxRaycast {
     private resolvedCamera: THREE.Camera | null = null
     private resolvedControllerSource: XRControllerSource | null = null
 
+    // Any open menu - the DOM pause menu or a summoned game box (see GameBoxFoldCoordinator's own
+    // MenuOpen/MenuClose emits) - takes over what a click means, so the shelf shouldn't also be
+    // trying to open a box underneath it. Counted rather than boolean: more than one modal surface
+    // can be "open" at once in principle, and this only needs to go false once none are.
+    private openMenuCount = 0
+
     private readonly raycaster = new THREE.Raycaster()
     private readonly pointer = new THREE.Vector2()
     private readonly direction = new THREE.Vector3()
@@ -65,6 +79,8 @@ export class SceneClickGameBoxRaycast {
             InputEventTypes.SceneCanvasClick,
             this.handleSceneCanvasClick
         )
+        this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
+        this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
     }
 
     public dispose(): void {
@@ -72,6 +88,8 @@ export class SceneClickGameBoxRaycast {
             InputEventTypes.SceneCanvasClick,
             this.handleSceneCanvasClick
         )
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
 
         if (this.debugLine && this.resolvedScene) {
             this.resolvedScene.remove(this.debugLine)
@@ -82,10 +100,24 @@ export class SceneClickGameBoxRaycast {
         this.lineMaterial.dispose()
     }
 
+    private readonly handleMenuOpen = (): void => {
+        this.openMenuCount++
+    }
+
+    private readonly handleMenuClose = (): void => {
+        this.openMenuCount = Math.max(0, this.openMenuCount - 1)
+    }
+
     private readonly handleSceneCanvasClick = (event: CustomEvent<SceneCanvasClickEvent>): void => {
         const { button, ndcX, ndcY } = event.detail
 
         if (button !== 0) {
+            return
+        }
+
+        // A summoned game box or the pause menu already owns what a click means - the shelf
+        // shouldn't be racing it to open a second box underneath (direct request, 2026-09-02).
+        if (this.openMenuCount > 0) {
             return
         }
 
@@ -129,9 +161,26 @@ export class SceneClickGameBoxRaycast {
             this.updateDebugLine(lineStart, lineEnd, scene)
         }
 
+        // Shelf/wall/prop geometry doesn't carry SceneLayer.Interactable (only game-box artwork/
+        // label meshes do - see the constructor), so the layer-filtered pass below would find a
+        // box straight through a physically nearer, non-interactable occluder - a shelf panel, a
+        // wall - if that box happened to be the nearest INTERACTABLE thing on the ray, regardless
+        // of what the player can actually see (direct request, 2026-09-02: "rays can go through
+        // shelves ... need to only worry about essentially the pixels the player camera can
+        // see"). This unfiltered pass finds the nearest surface of ANY kind first, so the
+        // interactable pass below can be rejected once it goes past that.
+        this.raycaster.layers.enableAll()
+        const nearestVisible = this.raycaster.intersectObjects(scene.children, true)[0] ?? null
+        this.raycaster.layers.mask = 1 << SceneLayer.Interactable
+
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 
         for (const intersection of intersections) {
+            // Everything from here on is at least as far, so also at least as occluded - nothing
+            // further down the sorted list could be genuinely visible either.
+            if (nearestVisible && intersection.distance > nearestVisible.distance + OCCLUSION_EPSILON) {
+                break
+            }
             const hit = this.resolveGameBoxIntersection(intersection)
             if (hit) {
                 this.highlightHit(hit)
