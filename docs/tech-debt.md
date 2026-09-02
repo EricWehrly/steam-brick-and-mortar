@@ -276,30 +276,21 @@ shape. Plan: [`game-data-field-coverage-check-plan.md`](../plans/game-data-field
 **Related files**:
 - `client/src/steam-integration/SteamIntegration.ts` (`// TD: game-data-field-coverage-check`)
 
-## id: game-box-canvas-ui-hit-testing
+## id: game-box-features-icon-display
 **Priority**: Low
-**Status**: Being resolved — see "Fix (in progress)" below.
-**Context**: The game-box fold's faces are hand-drawn onto canvas textures (no DOM, no scene-graph
-widgets) - content, styling, and layout are all interleaved in one imperative draw call per face,
-and "buttons" like Play are just rects the draw call remembers, hit-tested via raycast UV -> canvas
-coords (`isPointInPlayButton`/`isPointInCacheEntry`). Flagged in PR #161 review (kludgey UI, no
-content/style/layout separation); both true, and both the same underlying shape, not fixable
-per-button or per-panel.
-**Fix (in progress, 2026-09-02)**: replace the canvas panels with `@pmndrs/uikit` panels parented to
-the existing hinge groups, so they still hinge open. uikit brings a real flexbox layout engine and
-real hover/click/scroll via `@pmndrs/pointer-events` - which removes both halves of this entry
-(hand-rolled layout arithmetic *and* remembered-pixel-rect hit testing) rather than reshaping them.
-See [`in-scene-ui-substrate.md`](architecture/in-scene-ui-substrate.md) for the decision to
-standardize on uikit and what it can't do.
-**Superseded framing**: this entry previously named `SettingsSchema.ts`'s dual-renderer split
-(`SettingsSchemaDomRenderer`/`SettingsSchemaUIKitRenderer`) as the precedent, on the assumption the
-game box would need a *canvas* renderer behind a content schema. It doesn't - the box moves onto the
-same uikit substrate the VR menu already uses, so there's no second rendering substrate to abstract
-over here. `SettingsSchema` remains the right pattern for the DOM/uikit settings panels; it just
-isn't this entry's fix.
-**Close when**: all three fold panels render through uikit and no `isPointIn*`-style canvas
-hit-testing remains in `GameBoxFoldModel`.
-**Related files**: `client/src/scene/game-box-fold/GameBoxFoldModel.ts`, `GameBoxFoldCoordinator.ts`
+**Effort**: Small - icon set + a small display change in `GameBoxDebugPanel`
+**Context**: Steam's raw feature-category strings ("Full controller support", "Steam Cloud", "Steam
+Workshop", ...) were shown as a plain uikit chip row (`FEATURES`, same treatment as GENRES/TAGS),
+but read as unhelpful clutter rather than useful information - direct request (2026-09-02): "the
+features section isn't that helpful. We need to deliberately park it until we can represent it with
+icons." The display is removed for now; `GameBoxFoldCoordinator` still builds a deduped
+`content.categories` list (the raw strings sometimes repeated an entry verbatim - dedupe fixed
+alongside parking the display), so the data is ready whenever an icon set exists.
+**Done when**: each Steam feature category maps to a small icon (or is dropped if it has none worth
+drawing), and `GameBoxDebugPanel` renders that icon row again instead of the parked plain-text chips.
+**Related files**:
+- `client/src/scene/game-box-fold/panels/GameBoxDebugPanel.ts` (`// TD: game-box-features-icon-display`)
+- `client/src/scene/game-box-fold/GameBoxFoldCoordinator.ts` (still builds `content.categories`)
 
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low
@@ -765,6 +756,15 @@ not a source of bugs.
 ---
 
 ## Resolved
+
+## id: game-box-canvas-ui-hit-testing
+**Status**: ✅ Resolved 2026-09-02 — the game-box fold's three faces were hand-drawn onto canvas
+textures, with content/style/layout interleaved in one imperative draw call per face and "buttons"
+hit-tested via raycast UV → canvas coords (`isPointInPlayButton`/`isPointInCacheEntry`). Replaced
+with `@pmndrs/uikit` panels parented to the existing hinge groups (real flexbox layout, real hover/
+click/scroll via `@pmndrs/pointer-events`) - see [`in-scene-ui-substrate.md`](architecture/in-scene-ui-substrate.md)
+for the decision to standardize on uikit. No `isPointIn*`-style hit-testing remains in
+`GameBoxFoldModel`.
 
 ## id: steam-integration-loading-strategy-split
 **Status**: ✅ Resolved 2026-07-22 — split into `OnlineLibraryLoader`/`DemoLibraryLoader`/`ImportLibraryHandler` (plain functions, not classes, matching `LocalSteamLibraryLoader`'s shape); `applyLibrary` stayed on `SteamIntegration` as shared substrate. `SteamIntegration.ts` dropped ~510 → ~365 lines.

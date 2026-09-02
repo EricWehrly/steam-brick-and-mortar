@@ -1,8 +1,8 @@
 /**
  * Second-flap face: the store-page-style content that doesn't fit the front cover or the store
- * panel - description, rating, metacritic, genres, tags and features (each moved here by explicit
- * request through 2026-08-20) - followed by a visually distinct, deliberately minor "cache entry"
- * section holding the raw JSON this box's content was built from.
+ * panel - description, rating, metacritic, genres and tags (each moved here by explicit request
+ * through 2026-08-20) - followed by a visually distinct, deliberately minor "cache entry" section
+ * holding the raw JSON this box's content was built from.
  *
  * That JSON sits in a uikit overflow:'scroll' viewport, which is the whole reason scrolling here no
  * longer needs gating: only the viewport scrolls, because only the viewport is scrollable. The
@@ -11,11 +11,10 @@
  *
  * The sections column above the cache entry is its OWN bounded, scrollable area rather than a
  * plain flex child sized however it happens to come out. Left unbounded, a verbose game's content
- * (description + rating + metacritic + genres + tags + an uncapped features list - see
- * GameBoxFoldCoordinator's MAX_FEATURES_SHOWN cap, added alongside this) could exceed the fixed
- * page height, and content that overflows a fixed-height flex column here visibly overlapped the
- * cache viewport below it rather than merely clipping (direct request, 2026-09-02: "the visuals
- * are very crowded"). A capped, scrollable area degrades to a scrollbar instead.
+ * could exceed the fixed page height, and content that overflows a fixed-height flex column here
+ * visibly overlapped the cache viewport below it rather than merely clipping (direct request,
+ * 2026-09-02: "the visuals are very crowded"). A capped, scrollable area degrades to a scrollbar
+ * instead.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
@@ -27,11 +26,14 @@ import {
     PANEL_COLORS, PANEL_PADDING, PANEL_ROOT_PROPERTIES
 } from './GameBoxPanelStyle'
 
-const SECTION_GAP = 8
-// The description gets a fixed share of the face rather than pushing everything below it around
-// from game to game - overflow:'hidden' clips a long one instead.
-const DESCRIPTION_MAX_LINES = 5
-const SECTIONS_MAX_HEIGHT = 220
+// More breathing room between rows than the box's other faces get away with - direct request
+// (2026-09-02: "vertical spacing between items on the right side").
+const SECTION_GAP = 14
+// More allowance than a single tight budget - direct request (2026-09-02: "give a little more
+// vertical space allowance for description"). overflow:'hidden' still clips a description longer
+// than this rather than pushing the sections below it around from game to game.
+const DESCRIPTION_MAX_LINES = 8
+const SECTIONS_MAX_HEIGHT = 260
 const DIVIDER_HEIGHT = 1
 // Fixed, not flexGrow - direct request (2026-09-02: "the cache entry needs to be smaller until we
 // can put it on a separate screen"). A flexGrow share of whatever's left over also meant its
@@ -85,10 +87,14 @@ export class GameBoxDebugPanel {
             this.sections.add(metacritic)
         }
 
+        // TD: game-box-features-icon-display - a plain chip row of Steam's raw category strings
+        // ("Full controller support", "Steam Cloud", ...) wasn't pulling its weight next to
+        // GENRES/TAGS - direct request (2026-09-02: "the features section isn't that helpful. We
+        // need to deliberately park it until we can represent it with icons"). content.categories
+        // is still built (deduped) by GameBoxFoldCoordinator; only the display is parked.
         for (const section of [
             buildChipSection('GENRES', content?.genres, PANEL_COLORS.genres),
-            buildChipSection('TAGS', content?.tags, PANEL_COLORS.tags),
-            buildChipSection('FEATURES', content?.categories, PANEL_COLORS.features)
+            buildChipSection('TAGS', content?.tags, PANEL_COLORS.tags)
         ]) {
             if (section) {
                 this.sections.add(section)
