@@ -1,8 +1,7 @@
 /**
  * Front-cover face: reserved rows for screenshots/videos until we have real data for them (see
- * docs/plans/game-box-store-data-research.md). The title itself lives on the store panel instead
- * (2026-08-12, "put the title at the middle top, above the disk"), and playtime/rating were both
- * moved off this face by later direct requests - so there is deliberately little here yet.
+ * docs/plans/game-box-store-data-research.md). Title, playtime, and rating all live on the store
+ * panel instead - deliberately little content here yet.
  */
 
 import { Container } from '@pmndrs/uikit'

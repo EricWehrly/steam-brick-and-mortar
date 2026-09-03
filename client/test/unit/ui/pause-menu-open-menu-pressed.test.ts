@@ -71,9 +71,8 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
     })
 
     it('stays open when a Cancel bundled with the same OpenMenu press follows it - Escape/Start '
-        + 'bind to both actions, and OpenMenuPressed\'s own toggle() already resolved this press; '
-        + 'reacting to the bundled Cancel too self-cancelled the open (direct request, 2026-09-02: '
-        + '"the menu is not currently opening when I hit esc")', () => {
+        + 'bind to both actions, and OpenMenuPressed\'s own toggle() already resolved this press, '
+        + 'so reacting to the bundled Cancel too would self-cancel the open', () => {
         expect(pauseMenuManager.isOpen()).toBe(false)
 
         eventManager.emit(InputEventTypes.OpenMenuPressed, {})
@@ -99,8 +98,7 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
 
     it('does not open while another menuType (e.g. a summoned game box) is up - that Escape press '
         + 'is meant to close the OTHER thing (its own CancelPressed handler), not also pop the '
-        + 'settings menu open behind it (direct request, 2026-09-02, round four: "esc to close '
-        + 'game box opens settings menu")', () => {
+        + 'settings menu open behind it', () => {
         eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
 
         eventManager.emit(InputEventTypes.OpenMenuPressed, {})

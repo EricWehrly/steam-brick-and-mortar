@@ -12,13 +12,9 @@
  * and UICoordinator.
  *
  * Used to also independently pause/resume on UIEventTypes.MenuOpen/MenuClose (uncounted - any
- * menu closing resumed input, even with another still open) alongside the reason-based
- * InputEventTypes.Pause/Resume path below - both ultimately just called
- * WebXRCoordinator.pauseInput()/resumeInput(), which is InputManager.pause()/resume(). Removed
- * (PR review request, 2026-09-03): InputManager now tracks menu-open state itself
- * (isMenuOpen()), counted, and folds it into the same gate pause()/resume() already drives - see
- * InputManager.isInputBlocked(). Reason-based Pause/Resume (the pause menu's own emission, a
- * binder overlay) is unrelated and still handled below.
+ * menu closing resumed input even with another still open). Removed once menu-open gating moved
+ * to InputManager.isInputPaused(), which consumers now ask directly. Reason-based Pause/Resume
+ * (the pause menu's own emission, a binder overlay) is unrelated and still handled below.
  */
 
 import { EventManager } from '../core/EventManager'

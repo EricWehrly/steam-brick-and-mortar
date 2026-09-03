@@ -3,18 +3,15 @@
  * unconditionally calling pauseMenuManager.open()/close() for ANY UIEventTypes.MenuOpen/MenuClose,
  * not just the DOM pause menu's own ('pause'). Once GameBoxFoldCoordinator started emitting the
  * same event with menuType:'game-box' (so world raycasting/camera movement stand down while a box
- * is open), this handler popped the real pause menu open behind it too - direct request
- * (2026-09-02): "why does the settings menu open when I open a game box?"
+ * is open), this handler popped the real pause menu open behind it too.
  *
- * PauseMenuManager now owns opening/closing itself and emits this event directly (PR review
- * request, 2026-09-03) - handleMenuOpen/handleMenuClose no longer call .open()/.close() at all
- * (that would just be redundant), only pointer-lock and reticle-visibility side effects, still
- * filtered to 'pause' - so the observable regression check here is pointer-lock, not a spy on
- * PauseMenuManager's own methods.
+ * PauseMenuManager now owns opening/closing itself and emits this event directly, so
+ * handleMenuOpen/handleMenuClose no longer call .open()/.close() at all (that would be redundant) -
+ * only pointer-lock and reticle-visibility side effects, still filtered to 'pause'. So the
+ * observable regression check here is pointer-lock, not a spy on PauseMenuManager's own methods.
  *
  * These same handlers also count EVERY open menuType (unfiltered) into a plain
- * InputEventTypes.Pause/Resume - "Shouldn't the UIManager or UICoordinator track 'is a menu
- * open'?" (PR review request, 2026-09-03) - covered below alongside the pointer-lock behavior.
+ * InputEventTypes.Pause/Resume, covered below alongside the pointer-lock behavior.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'

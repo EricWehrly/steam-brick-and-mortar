@@ -10,10 +10,10 @@
  * targetRaySpace directly, not through the app's gamepad-button input abstraction - simpler, and
  * exactly what three.js's own XR interaction examples do.
  *
- * The ray is always on while this instance exists, not trigger-gated - confirmed 2026-08-19 that
- * requiring a trigger pull just to see where you're pointing made a UI hard to use. Trigger-gating
- * a raycast is still the right call for the shelf-wide game-box pipeline (SceneClickGameBoxRaycast)
- * - that's a separate system, untouched by this class.
+ * The ray is always on while this instance exists, not trigger-gated - requiring a trigger pull
+ * just to see where you're pointing made the UI hard to use. Trigger-gating a raycast is still
+ * the right call for the shelf-wide game-box pipeline (SceneClickGameBoxRaycast), a separate
+ * system untouched by this class.
  *
  * // TD: vr-uikit-menu-sync-recheck
  */
@@ -32,18 +32,15 @@ const HIT_MARKER_COLOR = 0x4da3ff
 const HIT_MARKER_RADIUS = 0.015
 // Both the beam and hit marker need to render on top of whatever they're pointing at, or they get
 // depth-occluded right at the point that matters most: where the ray meets the target surface.
-// This was previously split into its own UikitRenderOrder.ts module for a floating VR settings
-// menu to share - removed (2026-09-02) since that menu isn't part of this branch and whether the
-// user-facing menu even wants this treatment is still an open question; this is this pointer's own
-// value until/unless a real second consumer shows up.
+// This is this pointer's own value; split it into a shared module only if a real second consumer
+// shows up.
 export const ON_TOP_RENDER_ORDER = 1001
 
 /**
  * renderOrder only sorts *within* a render list, and three.js draws the whole opaque list before
- * the whole transparent one. An opaque beam therefore drew before every uikit panel no matter how
- * high its renderOrder, which is why the cursor read as being behind the menus (direct request,
- * 2026-09-02: "effectively 'behind' any menus"). Marking these transparent puts them in the same
- * list uikit's panels are in, where ON_TOP_RENDER_ORDER actually wins. depthWrite off because a
+ * the whole transparent one - an opaque beam drew before every uikit panel no matter how high its
+ * renderOrder, reading as behind the menus. Marking these transparent puts them in the same list
+ * uikit's panels are in, where ON_TOP_RENDER_ORDER actually wins. depthWrite is off because a
  * transparent overlay has no business occluding what's drawn after it.
  */
 const ON_TOP_MATERIAL_PROPERTIES = { transparent: true, depthTest: false, depthWrite: false } as const
@@ -78,12 +75,8 @@ export class VRControllerPointer {
         this.scene = options.scene
 
         // CONTROLLER_AIM_DIRECTION (not a raw local -Z) - shared with XRControllerManager's
-        // shelf-box selection ray, so this beam always points exactly where a click would actually
-        // land. The two used to carry independent, differently-tuned corrections, which is why the
-        // beam and the box that opened could disagree (direct request, 2026-09-02) - see
-        // ControllerAimCorrection.ts. Used directly, not through a re-exported local alias (PR
-        // review request, 2026-09-03: "I don't like this! We should just use
-        // CONTROLLER_AIM_DIRECTION").
+        // shelf-box selection ray, so this beam always points exactly where a click would land.
+        // See ControllerAimCorrection.ts.
         this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {}, { direction: CONTROLLER_AIM_DIRECTION })
 
         // Unit-height cylinder, translated so it spans local Y [0, 1] instead of straddling the

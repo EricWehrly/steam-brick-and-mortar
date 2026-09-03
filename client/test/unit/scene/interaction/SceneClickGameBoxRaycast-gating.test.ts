@@ -1,15 +1,13 @@
 /**
- * SceneClickGameBoxRaycast — occlusion and input-paused gating (direct request, 2026-09-02):
- * "rays can go through shelves ... need to only worry about ... pixels the player camera can
- * see" and "if I have a UI/menu open, like the game box, the world raycast ... shouldn't be
- * active."
+ * SceneClickGameBoxRaycast - occlusion and input-paused gating: a ray should stop at the nearest
+ * surface the camera can actually see, and the raycast should stand down entirely while input
+ * is paused.
  *
- * This class asks InputManager.isInputPaused() rather than tracking menu-open state itself (PR
- * review request, 2026-09-03) - a real InputManager instance is constructed below so
- * InputManager.getActiveInstance() resolves the way it does at runtime. WHAT decides to call
- * pause()/resume() - SystemUICoordinator counts every open menuType app-wide - is out of scope
- * here (see SystemUICoordinator-menu-gating.test.ts for that); this only checks that the raycast
- * itself correctly stands down while InputManager reports paused, regardless of why.
+ * This class asks InputManager.isInputPaused() rather than tracking menu-open state itself, so a
+ * real InputManager instance is constructed below to make InputManager.getActiveInstance()
+ * resolve the way it does at runtime. WHAT decides to call pause()/resume() (SystemUICoordinator
+ * counts open menuTypes app-wide) is out of scope here - see
+ * SystemUICoordinator-menu-gating.test.ts for that.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
