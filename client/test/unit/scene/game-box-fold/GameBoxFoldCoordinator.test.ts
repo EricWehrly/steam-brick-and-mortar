@@ -56,7 +56,8 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
 import {
     GameBoxFoldCoordinator, MODEL_FACING_ROTATION_Y,
     FLATSCREEN_TILT_PITCH_DEGREES,
-    OPEN_BOX_SAFE_FOV_FRACTION, CAMERA_ANCHOR_DISTANCE_MARGIN
+    OPEN_BOX_SAFE_FOV_FRACTION, CAMERA_ANCHOR_DISTANCE_MARGIN, VR_CAMERA_ANCHOR_DISTANCE_MARGIN,
+    MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE
 } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
 import { OPEN_BOX_HALF_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
 import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
@@ -170,6 +171,33 @@ describe('GameBoxFoldCoordinator', () => {
         expect(actualDistance).toBeCloseTo(tightestFitDistance + CAMERA_ANCHOR_DISTANCE_MARGIN)
     })
 
+    it('uses VR_CAMERA_ANCHOR_DISTANCE_MARGIN instead when camera-anchored with a single connected '
+        + 'controller (VR) - flatscreen and VR share the same camera-anchor path but not the same '
+        + 'reserve distance (direct request, 2026-09-02, round six: VR still read as "too close" '
+        + 'after a flatscreen-only "closer" request had reduced the shared margin)', () => {
+        const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
+        const grip = new THREE.Object3D()
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => grip,
+            getConnectedControllers: () => connectedControllers
+        }, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
+        const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
+        const tightestFitDistance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
+
+        const actualDistance = -fakeModelInstances[0].group.position.z
+        expect(actualDistance).toBeCloseTo(tightestFitDistance + VR_CAMERA_ANCHOR_DISTANCE_MARGIN)
+    })
+
     it('holds the open box further from a real PerspectiveCamera at a narrower aspect ratio, so the same physical-width open spread keeps fitting a narrower horizontal FOV', () => {
         const wideCamera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
         DataManager.getInstance().set(DataKey.MainCamera, wideCamera, { domain: DataDomain.Scene })
@@ -192,8 +220,8 @@ describe('GameBoxFoldCoordinator', () => {
 
         expect(narrowDistance).toBeGreaterThan(wideDistance)
         // Both stay within the sanity clamp, not runaway near/far values.
-        expect(wideDistance).toBeGreaterThanOrEqual(0.5)
-        expect(narrowDistance).toBeLessThanOrEqual(1.4)
+        expect(wideDistance).toBeGreaterThanOrEqual(MIN_CAMERA_ANCHOR_DISTANCE)
+        expect(narrowDistance).toBeLessThanOrEqual(MAX_CAMERA_ANCHOR_DISTANCE)
     })
 
     it('falls back to a fixed distance when the published MainCamera is not a real PerspectiveCamera (no fov/aspect to compute from)', () => {
