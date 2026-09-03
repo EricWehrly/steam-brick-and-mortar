@@ -98,3 +98,15 @@ This document defines the system of CSS custom properties (tokens) that will be 
 2. **Steam Accent**: The blue accent is the primary brand identifier. It should be used sparingly for primary actions, toggles, and headers.
 3. **Accessibility**: Text colors must maintain high contrast against surfaces. `--color-text-primary` on `--color-surface-1` is the standard.
 4. **Transition from Hardcoded**: When migrating, any hardcoded `#333` should become `var(--color-surface-3)` or `var(--color-border)`. Any `rgba(0,0,0,0.85)` should become `var(--color-surface-overlay)`.
+
+## Non-DOM consumers (added 2026-09-03)
+
+DOM code reads these tokens the normal CSS-cascade way (`var(--color-surface-3)`) and needs nothing
+further. Code that can't read CSS custom properties at all - uikit/three.js surfaces, or any other
+TypeScript that isn't itself a styled DOM element - reads the same live values through
+`client/src/ui/ColorTokens.ts`'s `COLOR_TOKENS`, which resolves every token above once via
+`getComputedStyle` at module load. This module is deliberately generic, not scoped to any one
+consumer (direct request: "the color tokens aren't unique to UIKit... we want to build toward the
+generic implementation") - reuse an existing `COLOR_TOKENS` key before adding a new `--color-*`
+token or, worse, a bare hex literal in a non-DOM file. See `client/CLAUDE.md`'s "Colors" section and
+`docs/tech-debt.md`'s `generic-color-token-consumers` entry for the current state of adoption.

@@ -58,7 +58,9 @@ Use accent color for interaction and state, not for every heading.
 - Button variants should map to semantic intent (primary, secondary, warning), not per-panel custom color choices.
 
 ## Token Direction (What To Normalize Toward)
-Current project tokens split across `docs/plans/ui-design-tokens.md` and `client/src/styles/tokens.css` are a good base. For redesign consistency, align on these semantic roles:
+Current project tokens, defined per `docs/plans/ui-design-tokens.md` in `client/src/ui/tokens.css`
+(not `client/src/styles/tokens.css` - that's a separate, narrower panel-chrome-only file), are a
+good base. For redesign consistency, align on these semantic roles:
 
 - `--color-text-primary`: high-emphasis content
 - `--color-text-secondary`: default panel body text
@@ -67,7 +69,11 @@ Current project tokens split across `docs/plans/ui-design-tokens.md` and `client
 - `--color-surface-1..3`: panel, nested panel/input, and hover/divider layers
 - `--color-border`: neutral border/divider
 
-If a new style does not fit one of these semantic roles, add a semantic token first instead of hardcoding.
+If a new style does not fit one of these semantic roles, add a semantic token first instead of
+hardcoding - and that applies beyond DOM CSS too: non-DOM code (uikit/three.js, or anything else
+that can't read a CSS custom property directly) reads this same source through
+`client/src/ui/ColorTokens.ts`'s `COLOR_TOKENS`, a live `getComputedStyle` mirror deliberately kept
+generic rather than scoped to any one consumer.
 
 ## Component Pattern Baseline
 For panel normalization work:
