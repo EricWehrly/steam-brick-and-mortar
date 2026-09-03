@@ -173,7 +173,15 @@ export class GameBoxStorePanel {
             const scale = (radius * 2) / source.width
             const drawWidth = source.width * scale
             const drawHeight = source.height * scale
-            ctx.drawImage(source, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight)
+            // Top-aligned, not centered on the circle's true center (which sits at centerY, off
+            // the bottom of this canvas - only the semicircle above it is ever visible). A typical
+            // wide header image's scaled height is shorter than the disc's own radius, so centering
+            // it on that off-canvas point left a gap between the image and the TOP of the disc -
+            // exactly the "weird gray area at the top" reported (direct request, 2026-09-02, round
+            // four) - while any shortfall at the bottom instead blends into the sleeve immediately
+            // below it, which is far less noticeable.
+            const drawY = centerY - radius
+            ctx.drawImage(source, centerX - drawWidth / 2, drawY, drawWidth, drawHeight)
         } else {
             ctx.fillStyle = PANEL_COLORS.border
             ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
