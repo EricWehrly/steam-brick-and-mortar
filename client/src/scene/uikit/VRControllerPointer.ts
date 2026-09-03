@@ -46,14 +46,6 @@ export const ON_TOP_RENDER_ORDER = 1001
  */
 const ON_TOP_MATERIAL_PROPERTIES = { transparent: true, depthTest: false, depthWrite: false } as const
 
-// CONTROLLER_AIM_DIRECTION (not a raw local -Z) - shared with XRControllerManager's shelf-box
-// selection ray, so this beam always points exactly where a click would actually land. The two
-// used to carry independent, differently-tuned corrections, which is why the beam and the box
-// that opened could disagree (direct request, 2026-09-02) - see ControllerAimCorrection.ts.
-// Re-exported so tests can position targets along the real corrected direction instead of
-// duplicating this rotation math.
-export const RAY_DIRECTION = CONTROLLER_AIM_DIRECTION
-
 export interface VRControllerPointerOptions {
     readonly raySpace: THREE.XRTargetRaySpace
     readonly getCamera: GetCamera
@@ -83,16 +75,23 @@ export class VRControllerPointer {
         this.intersectRoot = options.intersectRoot
         this.scene = options.scene
 
-        this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {}, { direction: RAY_DIRECTION })
+        // CONTROLLER_AIM_DIRECTION (not a raw local -Z) - shared with XRControllerManager's
+        // shelf-box selection ray, so this beam always points exactly where a click would actually
+        // land. The two used to carry independent, differently-tuned corrections, which is why the
+        // beam and the box that opened could disagree (direct request, 2026-09-02) - see
+        // ControllerAimCorrection.ts. Used directly, not through a re-exported local alias (PR
+        // review request, 2026-09-03: "I don't like this! We should just use
+        // CONTROLLER_AIM_DIRECTION").
+        this.pointer = createRayPointer(options.getCamera, { current: this.raySpace }, {}, { direction: CONTROLLER_AIM_DIRECTION })
 
         // Unit-height cylinder, translated so it spans local Y [0, 1] instead of straddling the
-        // origin, then rotated so that local +Y axis points along RAY_DIRECTION - update() only
-        // has to scale.y to the current length each frame, no geometry rebuild needed.
+        // origin, then rotated so that local +Y axis points along CONTROLLER_AIM_DIRECTION -
+        // update() only has to scale.y to the current length each frame, no geometry rebuild needed.
         const beamGeometry = new THREE.CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS, 1, 8)
         beamGeometry.translate(0, 0.5, 0)
         this.beam = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({ color: BEAM_COLOR, ...ON_TOP_MATERIAL_PROPERTIES }))
         this.beam.renderOrder = ON_TOP_RENDER_ORDER
-        this.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), RAY_DIRECTION)
+        this.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), CONTROLLER_AIM_DIRECTION)
         this.beam.scale.y = BEAM_DEFAULT_LENGTH
         this.raySpace.add(this.beam)
 
