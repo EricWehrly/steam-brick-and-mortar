@@ -5,23 +5,21 @@
  * source wired up yet. Description, rating, metacritic, genres, tags and features all live on the
  * debug face instead (see GameBoxDebugPanel).
  *
- * The disc's semicircle is NOT a uikit clip: uikit's overflow:'hidden' clips to a plain axis-
- * aligned rectangle regardless of border-radius (confirmed against clipping.js - ClippingRect is
- * four straight planes, no rounding), so a full-bleed child Image inside a rounded-corner
- * Container still shows square corners poking out past the rounded frame. This drew a visibly
- * square image in an apparently-rounded box (direct request, 2026-09-02: "the disc isn't
- * rounded"). The corners of the disc CONTAINER's own background/border fill do render correctly
- * rounded (that fill is a real per-fragment rounded-rect shader, a different code path from child
- * clipping) - so the fix is to make the header IMAGE ITSELF transparent outside the semicircle,
- * letting that already-correct rounded fill show through in the corners. That transparency is
- * drawn once per selection with the same ctx.arc(PI, 2*PI) + ctx.clip() the old canvas-only
- * version used - this is the canvas escape hatch (see docs/architecture/in-scene-ui-substrate.md),
- * used for exactly the freeform-shape case it exists for, not for the box's layout or text.
+ * The disc's semicircle is entirely canvas-drawn - background fill, header art, and the edge
+ * stroke together, in one drawDiscTexture() call - rather than split between a uikit Container's
+ * own rounded-corner fill/border and a separately alpha-clipped child Image. That split looked
+ * almost right (uikit's rounded-rect fill/border shader is a real per-fragment curve, not a
+ * rectangle) but not quite: the two shapes are computed by different code paths that don't
+ * provably agree pixel-for-pixel, and in practice left small pointy artifacts at the top corners
+ * where they disagreed (direct request, 2026-09-02, screenshot markup: "thefuck stupid wings").
+ * Drawing the whole disc - fill, art, and stroke - from ONE ctx.arc(PI, 2*PI) path removes the
+ * second code path entirely, so there's nothing left to disagree with. This is the canvas escape
+ * hatch (see docs/architecture/in-scene-ui-substrate.md), used for exactly the freeform-shape case
+ * it exists for, not for the box's layout or text.
  *
- * With the disc's own alpha already the correct shape, the sleeve no longer needs to overlap it to
- * hide a square edge - it now just abuts, which also removes the small z-fight risk two sibling
- * panels overlapping via negative margin had at equal depth (direct request, 2026-09-02: "z-order
- * is a little weird, see the bottom of it").
+ * With the disc's own texture always the correct shape (placeholder or loaded), the sleeve doesn't
+ * need to overlap it to hide a square edge - it just abuts, which also avoids the z-fight risk two
+ * siblings overlapping via negative margin would have at equal depth.
  */
 
 import * as THREE from 'three'
@@ -47,10 +45,12 @@ const PLAY_BUTTON_PADDING_X = 14
 const PLAY_BUTTON_PADDING_Y = 6
 const PLAY_BUTTON_HOVER_BACKGROUND = '#2a3a2a'
 
-// The alpha-clipped disc texture's own resolution - independent of the source artwork's size (see
+// The disc texture's own resolution - independent of the source artwork's size (see
 // drawDiscTexture()) and independent of PANEL_WIDTH_PX (a layout unit, not a texture one). Fixed
 // 2:1 to match DISC_DIAMETER:DISC_HEIGHT exactly, so the Image can show it with a plain 'fill'
-// instead of doing its own crop.
+// instead of doing its own crop. The stroke width below is chosen in these texture pixels, not
+// DISC_EDGE_WIDTH's layout units - the two scales are close enough (256 texture px for a ~240
+// layout-px disc) that reusing the same number reads the same either way.
 const DISC_TEXTURE_WIDTH = 256
 const DISC_TEXTURE_HEIGHT = DISC_TEXTURE_WIDTH / 2
 
@@ -66,9 +66,6 @@ export class GameBoxStorePanel {
     private readonly discCanvas: HTMLCanvasElement
     private readonly discContext: CanvasRenderingContext2D
     private readonly discTexture: THREE.CanvasTexture
-    // Held as a plain Object3D: uikit's Image is generic over its src type, and detaching it is
-    // all this needs from it.
-    private headerImage: THREE.Object3D | null = null
 
     constructor(private readonly onPlay: () => void) {
         this.titleText = new Text({
@@ -90,6 +87,7 @@ export class GameBoxStorePanel {
         }
         this.discContext = discContext
         this.discTexture = new THREE.CanvasTexture(this.discCanvas)
+        this.drawDiscTexture(null)
 
         this.disc = this.buildDisc()
         this.sleeveSections = new Container({ flexDirection: 'column', gap: SECTION_GAP, width: '100%' })
@@ -114,14 +112,11 @@ export class GameBoxStorePanel {
         this.sleeveSections.add(buildComingSoonRows(['DLC', 'Achievements']))
     }
 
-    /** Rasterizes header-art pixels into the disc's alpha-clipped semicircle, or clears back to
-     *  the plain placeholder. The Image/texture pair is built once at construction and reused
-     *  across selections - only the canvas content changes. */
+    /** Rasterizes header-art pixels into the disc, or clears back to the plain placeholder. Reuses
+     *  the same canvas/texture/Image across selections - only the drawn content changes. */
     setHeaderImage(image: GameBoxFoldHeaderImage | null): void {
         if (!image) {
-            this.headerImage?.removeFromParent()
-            this.headerImage = null
-            this.discContext.clearRect(0, 0, DISC_TEXTURE_WIDTH, DISC_TEXTURE_HEIGHT)
+            this.drawDiscTexture(null)
             this.discTexture.needsUpdate = true
             return
         }
@@ -145,29 +140,16 @@ export class GameBoxStorePanel {
 
         this.drawDiscTexture(source)
         this.discTexture.needsUpdate = true
-
-        if (!this.headerImage) {
-            this.headerImage = new Image({
-                src: this.discTexture,
-                width: '100%',
-                height: '100%',
-                objectFit: 'fill',
-                keepAspectRatio: false
-            })
-            this.disc.add(this.headerImage)
-        }
     }
 
     dispose(): void {
         this.discTexture.dispose()
     }
 
-    /** Cover-scales source into the top half of a circle whose diameter matches the canvas width,
-     *  clipped so nothing paints outside it - same math the pre-uikit canvas panel used
-     *  (ctx.arc(PI, 2*PI)), reproduced here because it's the one thing overflow:'hidden' can't do
-     *  (see this file's class doc comment). Leaves the rest of the canvas at its cleared, fully
-     *  transparent state. */
-    private drawDiscTexture(source: HTMLCanvasElement): void {
+    /** Draws the disc's entire visible content - background fill or header art, plus the edge
+     *  stroke - clipped to one ctx.arc(PI, 2*PI) semicircle path, the same math the pre-uikit
+     *  canvas panel used. Pass null for the plain placeholder (no header art loaded yet/cleared). */
+    private drawDiscTexture(source: HTMLCanvasElement | null): void {
         const ctx = this.discContext
         ctx.clearRect(0, 0, DISC_TEXTURE_WIDTH, DISC_TEXTURE_HEIGHT)
 
@@ -181,11 +163,22 @@ export class GameBoxStorePanel {
         ctx.closePath()
         ctx.clip()
 
-        const scale = Math.max((radius * 2) / source.width, (radius * 2) / source.height)
-        const drawWidth = source.width * scale
-        const drawHeight = source.height * scale
-        ctx.drawImage(source, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight)
+        if (source) {
+            const scale = Math.max((radius * 2) / source.width, (radius * 2) / source.height)
+            const drawWidth = source.width * scale
+            const drawHeight = source.height * scale
+            ctx.drawImage(source, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight)
+        } else {
+            ctx.fillStyle = PANEL_COLORS.border
+            ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
+        }
         ctx.restore()
+
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI)
+        ctx.strokeStyle = DISC_EDGE_COLOR
+        ctx.lineWidth = DISC_EDGE_WIDTH
+        ctx.stroke()
     }
 
     private build(): Container {
@@ -207,20 +200,20 @@ export class GameBoxStorePanel {
     }
 
     private buildDisc(): Container {
-        return new Container({
+        const disc = new Container({
             width: DISC_DIAMETER,
             height: DISC_HEIGHT,
             alignSelf: 'center',
-            marginTop: PANEL_PADDING / 2,
-            overflow: 'hidden',
-            borderTopLeftRadius: DISC_HEIGHT,
-            borderTopRightRadius: DISC_HEIGHT,
-            borderTopWidth: DISC_EDGE_WIDTH,
-            borderLeftWidth: DISC_EDGE_WIDTH,
-            borderRightWidth: DISC_EDGE_WIDTH,
-            borderColor: DISC_EDGE_COLOR,
-            backgroundColor: PANEL_COLORS.border
+            marginTop: PANEL_PADDING / 2
         })
+        disc.add(new Image({
+            src: this.discTexture,
+            width: '100%',
+            height: '100%',
+            objectFit: 'fill',
+            keepAspectRatio: false
+        }))
+        return disc
     }
 
     private buildSleeve(): Container {

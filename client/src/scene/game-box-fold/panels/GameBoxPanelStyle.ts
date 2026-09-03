@@ -21,6 +21,12 @@ import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
 // reason the section accents below are local: tokens.css has no vocabulary for "the box's own
 // material color."
 const BOX_SURFACE_GRAY = '#3a3f44'
+// The store panel's sleeve (behind the disc/Play row) is a darker SHADE of the same gray, for
+// depth against the surface above it - not the separate near-black brown it used to be, which is
+// what was actually still reading as "full black" after BOX_SURFACE_GRAY only fixed the panels
+// that use PANEL_ROOT_PROPERTIES.backgroundColor directly (screenshot markup, 2026-09-02: "why
+// black", pointing at the sleeve specifically).
+const BOX_SLEEVE_GRAY = '#25292d'
 
 export const PANEL_WIDTH_PX = 300
 export const PANEL_HEIGHT_PX = PANEL_WIDTH_PX * (BOX_HEIGHT / BOX_WIDTH)
@@ -44,7 +50,7 @@ export const BODY_LINE_HEIGHT = 15
  */
 export const PANEL_COLORS = {
     surface: BOX_SURFACE_GRAY,
-    sleeve: '#241f1a',
+    sleeve: BOX_SLEEVE_GRAY,
     border: UIKIT_COLORS.border,
 
     title: UIKIT_COLORS.textPrimary,
