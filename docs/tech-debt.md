@@ -312,18 +312,45 @@ tokens.css." The actual mistake was narrower than "tokens.css has no vocabulary 
 pass only ever tried `--color-surface-1` (near-black), read that one failure as the whole ramp not
 fitting, and never tried `--color-surface-2`/`-3` (lighter members of the SAME "ordered
 deepest→lightest" ramp tokens.css already ships). Fixed: `GameBoxPanelStyle.ts`'s
-`BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY` now re-export `UIKIT_COLORS.surface3`/`.surface2` directly - no
-new tokens, no new resolver keys, just the existing ramp used one step further than before.
+`BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY` now re-export `COLOR_TOKENS.surface3`/`.surface2` directly - no
+new tokens, no new resolver keys, just the existing ramp used one step further than before. The
+resolver itself was also renamed and moved (round seven, 2026-09-03) - `UikitColorTokens.ts`/
+`UIKIT_COLORS` implied it was uikit-specific, which was never true (see the
+`generic-color-token-consumers` entry below) - it's now `client/src/ui/ColorTokens.ts`'s
+`COLOR_TOKENS`.
 **Done when**: the section accents (`play`/`rating`/`metacritic`/`genres`/`tags`/`features`/
 `collections`/`json`) and `GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR` also resolve from an existing
-`UIKIT_COLORS` key (or a new one, ONLY once the existing ramp is confirmed to genuinely have no
+`COLOR_TOKENS` key (or a new one, ONLY once the existing ramp is confirmed to genuinely have no
 reasonable fit) instead of a local hex literal. Still a stretch, not required.
 **Related files**:
 - `client/src/scene/game-box-fold/panels/GameBoxPanelStyle.ts` (`BOX_SURFACE_GRAY`, `PANEL_COLORS`)
 - `client/src/scene/game-box-fold/panels/GameBoxStorePanel.ts` (`DISC_EDGE_COLOR`)
 - `client/src/scene/game-box-fold/GameBoxFoldModel.ts` (`plainMaterial`, now reuses `BOX_SURFACE_GRAY`)
-- `client/src/scene/uikit/UikitColorTokens.ts` (`surface2`/`surface3` reused - the pattern to extend for the rest)
+- `client/src/ui/ColorTokens.ts` (`surface2`/`surface3` reused - the pattern to extend for the rest)
 - `client/src/ui/tokens.css` (`--color-surface-2`/`--color-surface-3` - the app's one real design-token source)
+
+## id: generic-color-token-consumers
+**Priority**: Low
+**Effort**: Medium - a survey pass across DOM UI code plus whatever new consumers show up as the VR
+settings-menu work (see `vr-uikit-menu-sync-recheck` below) eventually reconciles with this branch
+**Context**: `client/src/ui/ColorTokens.ts` (`COLOR_TOKENS`, renamed from `UikitColorTokens.ts`'s
+`UIKIT_COLORS` - direct request, 2026-09-03: "the color tokens aren't unique to UIKit, so our naming
+is bad... we want to build toward the generic implementation") resolves `tokens.css`'s `--color-*`
+custom properties live, for ANY TypeScript consumer, not just uikit/three.js surfaces. So far its
+only real consumers are still uikit-side (`GameBoxPanelStyle.ts`, and whatever the VR settings-menu
+branch's own copy of this same file evolves into once reconciled). Nothing has been done yet to
+route existing DOM-side UI code (which currently reads `tokens.css` the normal CSS-cascade way,
+needing no TypeScript mirror at all) through this same module, nor is there a clear case yet for why
+DOM code WOULD need to - CSS custom properties already just work there. This entry exists to track
+the direction ("build toward the generic implementation") without pretending there's a concrete
+migration plan yet; revisit once a second non-uikit consumer actually needs a live TS-side color
+value (a canvas-drawn surface, a WebGL shader uniform, ...).
+**Done when**: either a real second non-uikit-and-non-CSS consumer exists and uses `COLOR_TOKENS`
+directly (validating the generic name), or this gets closed as "renamed for honesty, no further
+action needed" if no such consumer materializes.
+**Related files**:
+- `client/src/ui/ColorTokens.ts`
+- `client/CLAUDE.md` (the "Colors" guidance pointing at this module)
 
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low

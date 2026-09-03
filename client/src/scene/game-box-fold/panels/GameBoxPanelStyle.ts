@@ -12,7 +12,7 @@
  */
 
 import { BOX_WIDTH, BOX_HEIGHT } from '../GameBoxFoldDimensions'
-import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
+import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 
 // Reuses the EXISTING surface ramp (tokens.css's own "ordered deepest->lightest" ladder) rather
 // than a bare hex literal, or a new box-specific token - direct request (2026-09-02, round six):
@@ -25,10 +25,10 @@ import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
 // instead of trying the REST of the existing ramp first - reverted. Re-exported under these names
 // (not just inlined into PANEL_COLORS below) so GameBoxFoldModel's plainMaterial keeps importing a
 // name that reads as "the box's own material," rather than reaching into a styling module for a
-// bare UIKIT_COLORS.surface3 that doesn't read as obviously relevant to a THREE.Mesh material two
+// bare COLOR_TOKENS.surface3 that doesn't read as obviously relevant to a THREE.Mesh material two
 // files away.
-export const BOX_SURFACE_GRAY = UIKIT_COLORS.surface3
-const BOX_SLEEVE_GRAY = UIKIT_COLORS.surface2
+export const BOX_SURFACE_GRAY = COLOR_TOKENS.surface3
+const BOX_SLEEVE_GRAY = COLOR_TOKENS.surface2
 
 export const PANEL_WIDTH_PX = 300
 export const PANEL_HEIGHT_PX = PANEL_WIDTH_PX * (BOX_HEIGHT / BOX_WIDTH)
@@ -48,16 +48,16 @@ export const BODY_LINE_HEIGHT = 15
  * stay local rather than being forced into a semantic token that doesn't mean this; see
  * docs/tech-debt.md's game-box-color-centralization entry if that changes. Everything else here -
  * text, borders, and the box's own surface/sleeve material (BOX_SURFACE_GRAY/BOX_SLEEVE_GRAY
- * above) - comes from tokens.css via UIKIT_COLORS.
+ * above) - comes from tokens.css via COLOR_TOKENS.
  */
 export const PANEL_COLORS = {
     surface: BOX_SURFACE_GRAY,
     sleeve: BOX_SLEEVE_GRAY,
-    border: UIKIT_COLORS.border,
+    border: COLOR_TOKENS.border,
 
-    title: UIKIT_COLORS.textPrimary,
-    body: UIKIT_COLORS.textSecondary,
-    label: UIKIT_COLORS.textTertiary,
+    title: COLOR_TOKENS.textPrimary,
+    body: COLOR_TOKENS.textSecondary,
+    label: COLOR_TOKENS.textTertiary,
     muted: '#555555',
 
     play: '#5fae5f',
