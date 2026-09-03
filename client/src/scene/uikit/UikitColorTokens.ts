@@ -5,6 +5,14 @@
  * with a stylesheet cascade - so this resolves each token once, at module load, into a plain
  * hex-string object every uikit surface imports instead of inventing its own hex literals.
  *
+ * Covers in-world "material" surfaces (the game box's own printed-cardboard color, boxSurface/
+ * boxSleeve below) as well as UI chrome - tokens.css is the one design-token source regardless of
+ * whether a color paints a DOM panel or a 3D mesh. Add a new semantic key here (and its
+ * `--color-*` custom property in tokens.css) before reaching for a bare hex literal in a scene
+ * file, even for something that reads as "content" rather than "UI" - direct request (2026-09-02,
+ * round five), after `GameBoxPanelStyle.ts` had done exactly that under the (reasonable-sounding,
+ * but wrong) assumption that tokens.css had no vocabulary for a box's own material color.
+ *
  * The FALLBACKS below (tokens.css's own shipped values) only kick in where getComputedStyle isn't
  * meaningful - non-browser test environments where tokens.css's <style> tag was never injected - so
  * tests keep seeing stable values without needing jsdom to load real CSS.
@@ -28,7 +36,10 @@ const FALLBACKS = {
     error: '#dc3545',
 
     border: '#333333',
-    borderBright: '#555555'
+    borderBright: '#555555',
+
+    boxSurface: '#3a3f44',
+    boxSleeve: '#30353a'
 } as const
 
 type UikitColorKey = keyof typeof FALLBACKS
@@ -51,7 +62,10 @@ const CSS_VAR_NAMES: Record<UikitColorKey, string> = {
     error: '--color-error',
 
     border: '--color-border',
-    borderBright: '--color-border-bright'
+    borderBright: '--color-border-bright',
+
+    boxSurface: '--color-box-surface',
+    boxSleeve: '--color-box-sleeve'
 }
 
 function readCssColorTokens(): Record<UikitColorKey, string> {

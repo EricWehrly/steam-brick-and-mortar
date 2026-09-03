@@ -14,25 +14,18 @@
 import { BOX_WIDTH, BOX_HEIGHT } from '../GameBoxFoldDimensions'
 import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
 
-// This is printed box art, not app chrome - tokens.css's --color-surface-1 (#1a1a1a) is a UI
-// panel background, near enough to black that the box read as flat black rather than the neutral
-// "Steam gray" cardboard/plastic-case look intended (direct request, 2026-09-02: "the box reads as
-// full black rather than our steam gray"). A local literal, not a semantic token, for the same
-// reason the section accents below are local: tokens.css has no vocabulary for "the box's own
-// material color." Exported (not just used via PANEL_COLORS.surface below) so GameBoxFoldModel's
-// plainMaterial - the raw BoxGeometry color visible wherever no uikit panel is mounted - can share
-// this ONE definition instead of its own independently-guessed hex literal, which is exactly what
-// was still reading as black at the box's center (direct request, 2026-09-02, round four: "center
-// of box is still black instead of gray"). Full centralization onto tokens.css (or an equivalent
-// steam-derived livery source) for this and the section accents below is tracked as tech debt -
-// see docs/tech-debt.md's game-box-color-centralization entry - rather than invented ad hoc here.
-export const BOX_SURFACE_GRAY = '#3a3f44'
-// The store panel's sleeve (behind the disc/Play row) is a darker SHADE of the same gray, for
-// depth against the surface above it - not the separate near-black brown it used to be, which is
-// what was actually still reading as "full black" after BOX_SURFACE_GRAY only fixed the panels
-// that use PANEL_ROOT_PROPERTIES.backgroundColor directly (screenshot markup, 2026-09-02: "why
-// black", pointing at the sleeve specifically).
-const BOX_SLEEVE_GRAY = '#25292d'
+// This IS in tokens.css (--color-box-surface/--color-box-sleeve, read here via UIKIT_COLORS same
+// as every other token below) - a prior pass here reasoned tokens.css had no vocabulary for "the
+// box's own material color" and reached for a local hex literal instead, which is what let this
+// and GameBoxFoldModel's plainMaterial drift out of sync in the first place (direct request,
+// 2026-09-02, round four: "center of box is still black instead of gray"). Corrected, direct
+// request round five: "we already have said tokens... colors should come from existing tokens."
+// Re-exported under these names (not just inlined into PANEL_COLORS below) so
+// GameBoxFoldModel's plainMaterial keeps importing a name that reads as "the box's own material,"
+// rather than reaching into a styling module for a bare UIKIT_COLORS.boxSurface that doesn't read
+// as obviously relevant to a THREE.Mesh material two files away.
+export const BOX_SURFACE_GRAY = UIKIT_COLORS.boxSurface
+const BOX_SLEEVE_GRAY = UIKIT_COLORS.boxSleeve
 
 export const PANEL_WIDTH_PX = 300
 export const PANEL_HEIGHT_PX = PANEL_WIDTH_PX * (BOX_HEIGHT / BOX_WIDTH)
@@ -49,10 +42,10 @@ export const BODY_LINE_HEIGHT = 15
 /**
  * Section accents carried over from the canvas panels this replaced, where they were bare hex
  * literals. They aren't in tokens.css - it has no vocabulary for "the genres section" - so they
- * stay local rather than being forced into a semantic token that doesn't mean this. Text and
- * borders come from tokens.css via UIKIT_COLORS since those really are the app's shared UI
- * palette; the box's own surface color is local too (see BOX_SURFACE_GRAY above) - it's the box's
- * printed material, not app chrome.
+ * stay local rather than being forced into a semantic token that doesn't mean this; see
+ * docs/tech-debt.md's game-box-color-centralization entry if that changes. Everything else here -
+ * text, borders, and the box's own surface/sleeve material (BOX_SURFACE_GRAY/BOX_SLEEVE_GRAY
+ * above) - comes from tokens.css via UIKIT_COLORS.
  */
 export const PANEL_COLORS = {
     surface: BOX_SURFACE_GRAY,

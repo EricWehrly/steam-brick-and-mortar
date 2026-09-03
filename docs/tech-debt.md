@@ -293,32 +293,36 @@ drawing), and `GameBoxDebugPanel` renders that icon row again instead of the par
 - `client/src/scene/game-box-fold/GameBoxFoldCoordinator.ts` (still builds `content.categories`)
 
 ## id: game-box-color-centralization
-**Priority**: Low
-**Effort**: Medium - new tokens.css entries, a resolver (likely extending `UikitColorTokens.ts`'s
-existing live-CSS-read pattern), and a pass replacing every local hex literal below with a token read
+**Priority**: Low - narrowed 2026-09-02 (round five) now that the minimum bar (surface/sleeve) is met
+**Effort**: Small - the resolver pattern and tokens.css entries already exist; what's left is
+migrating the remaining local hex literals below onto the same pattern, one at a time
 **Context**: The game box's own palette (`GameBoxPanelStyle.ts`'s `BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY`,
 its section accents `play`/`rating`/`metacritic`/`genres`/`tags`/`features`/`collections`/`json`, and
-`GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR`) are all local hex literals rather than tokens - deliberately,
-per `GameBoxPanelStyle.ts`'s own comment, since `tokens.css` (the app's one real design-token source,
-read live via `UikitColorTokens.ts`) has no vocabulary for "the box's own printed material" or "the
-genres section." That reasoning is sound for UI chrome vs. box art, but left `BOX_SURFACE_GRAY` and
+`GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR`) were all local hex literals rather than tokens -
+deliberately, per `GameBoxPanelStyle.ts`'s own comment (now corrected), reasoning that `tokens.css`
+had no vocabulary for "the box's own printed material." That reasoning left `BOX_SURFACE_GRAY` and
 `GameBoxFoldModel.ts`'s raw `plainMaterial` color as two independently-guessed literals that drifted
 out of sync - the actual cause of the box's center still reading black after the panels' own
-steam-gray fix (direct request, 2026-09-02, round four). That specific drift is fixed (both now share
-one `BOX_SURFACE_GRAY` export), but the broader ask stands - direct request, same round: "gray BTW and
-other colors should come from existing tokens or similar steam-derived livery... we should ideally be
-working towards one centralized definition for that."
-**Done when**: the box's own livery (surface/sleeve grays at minimum; section accents as a stretch)
-resolve from one shared, named source - either new `tokens.css` custom properties in the same
-resolved-live-at-module-load style as `UIKIT_COLORS`, or an equivalent steam-derived palette module -
-rather than hex literals sprinkled across `GameBoxPanelStyle.ts`/`GameBoxStorePanel.ts`/
-`GameBoxFoldModel.ts`.
+steam-gray fix (direct request, 2026-09-02, round four) - and, separately, the sleeve gray chosen
+was dark enough to still read as black in practice (round four again: "why black", pointing at the
+sleeve). Direct request, round five: "we already have said tokens... colors should come from
+existing tokens or similar steam-derived livery... one centralized definition for that." Fixed:
+`--color-box-surface`/`--color-box-sleeve` now exist in `client/src/ui/tokens.css`, resolved live via
+`UIKIT_COLORS.boxSurface`/`.boxSleeve` in `UikitColorTokens.ts` exactly like every other token there -
+`GameBoxPanelStyle.ts`'s `BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY` now just re-export those two resolved
+values instead of their own hex literals, and the sleeve's value was lightened in the same pass.
+**Done when**: the section accents (`play`/`rating`/`metacritic`/`genres`/`tags`/`features`/
+`collections`/`json`) and `GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR` also resolve from named
+`--color-*` tokens instead of local hex literals, following the same `UIKIT_COLORS` pattern the
+surface/sleeve grays now use. Still a stretch, not required - `GameBoxPanelStyle.ts`'s own comment on
+`PANEL_COLORS` explains why these were left local (no existing "the genres section" vocabulary in
+tokens.css) and that reasoning hasn't changed, only the surface/sleeve case that was actually broken.
 **Related files**:
 - `client/src/scene/game-box-fold/panels/GameBoxPanelStyle.ts` (`BOX_SURFACE_GRAY`, `PANEL_COLORS`)
 - `client/src/scene/game-box-fold/panels/GameBoxStorePanel.ts` (`DISC_EDGE_COLOR`)
 - `client/src/scene/game-box-fold/GameBoxFoldModel.ts` (`plainMaterial`, now reuses `BOX_SURFACE_GRAY`)
-- `client/src/scene/uikit/UikitColorTokens.ts` (the existing live-CSS-token-read pattern to extend)
-- `client/src/ui/tokens.css` (the app's one real design-token source)
+- `client/src/scene/uikit/UikitColorTokens.ts` (`boxSurface`/`boxSleeve` - the pattern to extend for the rest)
+- `client/src/ui/tokens.css` (`--color-box-surface`/`--color-box-sleeve` - the app's one real design-token source)
 
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low

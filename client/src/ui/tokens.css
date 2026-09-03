@@ -40,6 +40,13 @@
     --color-border:        #333333;
     --color-border-bright: #555555;   /* Active / focused */
 
+    /* ─── Game Box Material (in-world "printed box art", not UI chrome) ─
+       Read by client/src/scene/uikit/UikitColorTokens.ts alongside every other token above - a
+       3D-scene surface still belongs in this one file, it just isn't a *panel* color. See that
+       file's own header comment before adding a bare hex literal for a new in-world surface. */
+    --color-box-surface: #3a3f44;   /* Steam-gray cardboard/plastic case */
+    --color-box-sleeve:  #30353a;   /* Darker shade of the same gray, for depth under the surface */
+
     /* ─── Spacing ────────────────────────────────────────────────────── */
     --space-xs: 4px;
     --space-sm: 8px;
