@@ -87,7 +87,13 @@ const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
 // equidistant from the camera - verified both in raw 3D (no roll) and through the real camera's
 // projection matrix (no perspective-driven slope either) - so it can't reintroduce this regardless
 // of how close the box is held.
-export const FLATSCREEN_TILT_PITCH_DEGREES = -14
+//
+// Sign is positive, not the negative it looks like it should be at a glance: this rotation is
+// applied (via rotation.order 'YXZ') BEFORE the MODEL_FACING_ROTATION_Y flip below, and that
+// 180-degree flip negates the pitch's local Z contribution along with X - so a negative angle
+// here actually tips the top toward the camera once the facing flip is applied on top of it.
+// Direct request (2026-09-02, round three): "it's tilted towards us rather than away from us."
+export const FLATSCREEN_TILT_PITCH_DEGREES = 14
 // The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
