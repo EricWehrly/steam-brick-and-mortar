@@ -39,6 +39,13 @@ const DISC_DIAMETER = PANEL_WIDTH_PX * 0.8
 const DISC_HEIGHT = DISC_DIAMETER / 2
 const DISC_EDGE_COLOR = '#0a0a0a'
 const DISC_EDGE_WIDTH = 2
+// Matches the binder UI's own disc spindle-hole cutout (client/src/ui/binder/binder.css's
+// `.game-slot::before`, 18% of the disc's full diameter) - same disc motif, same proportion.
+// Direct request (2026-09-02, round five, on a green-circled screenshot markup): "can the disks
+// get a center hole like the binder disks have?"
+const DISC_HOLE_RADIUS_RATIO = 0.18
+const DISC_HOLE_COLOR = '#141414'
+const DISC_HOLE_RIM_COLOR = 'rgba(200, 195, 190, 0.35)'
 const SECTION_GAP = 10
 const PLAY_BUTTON_RADIUS = 4
 const PLAY_BUTTON_PADDING_X = 14
@@ -186,6 +193,20 @@ export class GameBoxStorePanel {
             ctx.fillStyle = PANEL_COLORS.border
             ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
         }
+
+        // Spindle hole - drawn as a full circle centered on the same point as the disc itself,
+        // still inside the disc's own clip from above: the clip's straight bottom edge (the
+        // diameter line, at centerY) cuts this circle's lower half away for free, leaving exactly
+        // the small upward notch a real disc's hole would show peeking above its sleeve.
+        const holeRadius = radius * DISC_HOLE_RADIUS_RATIO
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, holeRadius, 0, 2 * Math.PI)
+        ctx.fillStyle = DISC_HOLE_COLOR
+        ctx.fill()
+        ctx.lineWidth = 1
+        ctx.strokeStyle = DISC_HOLE_RIM_COLOR
+        ctx.stroke()
+
         ctx.restore()
 
         ctx.beginPath()
