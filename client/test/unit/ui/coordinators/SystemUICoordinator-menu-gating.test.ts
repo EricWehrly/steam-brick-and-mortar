@@ -5,50 +5,86 @@
  * same event with menuType:'game-box' (so world raycasting/camera movement stand down while a box
  * is open), this handler popped the real pause menu open behind it too - direct request
  * (2026-09-02): "why does the settings menu open when I open a game box?"
+ *
+ * PauseMenuManager now owns opening/closing itself and emits this event directly (PR review
+ * request, 2026-09-03) - handleMenuOpen/handleMenuClose no longer call .open()/.close() at all
+ * (that would just be redundant), only pointer-lock and reticle-visibility side effects, still
+ * filtered to 'pause' - so the observable regression check here is pointer-lock, not a spy on
+ * PauseMenuManager's own methods.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import * as THREE from 'three'
+import { SystemUICoordinator } from '../../../../src/ui/coordinators/SystemUICoordinator'
 import { EventManager } from '../../../../src/core/EventManager'
 import { AppSettings } from '../../../../src/core/AppSettings'
-import { PauseMenuManager } from '../../../../src/ui/pause/PauseMenuManager'
-import { SystemUICoordinator } from '../../../../src/ui/coordinators/SystemUICoordinator'
 import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../../src/types/InteractionEvents'
+
+vi.mock('../../../../src/ui/pause/PauseMenuManager', () => ({
+    PauseMenuManager: class {
+        init() {}
+        setSystemDependencies() {}
+        registerDefaultPanels() {}
+        isOpen() { return false }
+        dispose() {}
+    }
+}))
+
+vi.mock('../../../../src/ui/PerformanceMonitor', () => ({
+    PerformanceMonitorUI: class { start() {}; dispose() {}; updateRenderStats() {} }
+}))
+
+vi.mock('../../../../src/ui/LightingControlsPanel', () => ({
+    LightingControlsPanel: class { show() {}; hide() {}; toggle() {}; dispose() {} }
+}))
+
+function makeMockRenderer(
+    requestPointerLock: ReturnType<typeof vi.fn<(options?: PointerLockOptions) => Promise<void>>>
+): { domElement: HTMLCanvasElement } {
+    const domElement = document.createElement('canvas')
+    domElement.requestPointerLock = requestPointerLock
+    return { domElement } as unknown as { domElement: HTMLCanvasElement }
+}
 
 describe('SystemUICoordinator menu-open gating', () => {
     let coordinator: SystemUICoordinator
-    let openSpy: ReturnType<typeof vi.spyOn>
-    let closeSpy: ReturnType<typeof vi.spyOn>
+    let requestPointerLock: ReturnType<typeof vi.fn<(options?: PointerLockOptions) => Promise<void>>>
+    let exitPointerLock: ReturnType<typeof vi.fn<() => void>>
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        document.body.innerHTML = ''
         EventManager.getInstance().removeAllListeners()
-        // vi.spyOn returns the SAME mock across tests for a given prototype method - restore
-        // first so each test starts with a clean call history (same pitfall documented in
-        // SceneClickGameBoxRaycast-xr-ray.test.ts).
-        vi.restoreAllMocks()
-        openSpy = vi.spyOn(PauseMenuManager.prototype, 'open').mockImplementation(() => {})
-        closeSpy = vi.spyOn(PauseMenuManager.prototype, 'close').mockImplementation(() => {})
+        AppSettings.getInstance().setSetting('inputMouseLockEnabled', true)
+
+        requestPointerLock = vi.fn<(options?: PointerLockOptions) => Promise<void>>().mockResolvedValue(undefined)
+        exitPointerLock = vi.fn<() => void>()
+        document.exitPointerLock = exitPointerLock
 
         coordinator = new SystemUICoordinator(EventManager.getInstance(), AppSettings.getInstance())
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(coordinator as any).registerEventHandlers()
+        await coordinator.init(makeMockRenderer(requestPointerLock) as unknown as THREE.WebGLRenderer)
     })
 
-    it('opens the real pause menu when the pause menu itself emits MenuOpen', () => {
+    afterEach(() => {
+        coordinator?.dispose()
+        document.body.innerHTML = ''
+    })
+
+    it('releases pointer lock when the pause menu itself emits MenuOpen', () => {
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        expect(openSpy).toHaveBeenCalledTimes(1)
+        expect(exitPointerLock).toHaveBeenCalledTimes(1)
     })
 
-    it('does NOT open the pause menu when a game box emits MenuOpen', () => {
+    it('does NOT release pointer lock when a game box emits MenuOpen', () => {
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        expect(openSpy).not.toHaveBeenCalled()
+        expect(exitPointerLock).not.toHaveBeenCalled()
     })
 
-    it('does NOT close the pause menu when a game box emits MenuClose', () => {
+    it('does NOT request pointer lock when a game box emits MenuClose', () => {
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
-        expect(closeSpy).not.toHaveBeenCalled()
+        expect(requestPointerLock).not.toHaveBeenCalled()
     })
 
-    it('still closes the real pause menu when the pause menu itself emits MenuClose', () => {
+    it('still requests pointer lock when the pause menu itself emits MenuClose', () => {
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
-        expect(closeSpy).toHaveBeenCalledTimes(1)
+        expect(requestPointerLock).toHaveBeenCalledTimes(1)
     })
 })

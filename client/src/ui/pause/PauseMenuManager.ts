@@ -42,8 +42,6 @@ export interface PauseMenuConfig {
 export interface PauseMenuCallbacks {
     onPauseInput?: () => void
     onResumeInput?: () => void
-    onMenuOpen?: () => void
-    onMenuClose?: () => void
 }
 
 export interface SystemDependencies {
@@ -284,8 +282,12 @@ export class PauseMenuManager {
             this.showPanel(targetPanel)
         }
 
-        // Callbacks
-        this.callbacks.onMenuOpen?.()
+        // This class owns its own open/closed lifecycle - it emits UIEventTypes.MenuOpen itself
+        // rather than through a callback relayed by whichever coordinator happens to construct it
+        // (direct PR review request, 2026-09-03: "the pause menu manager should be handling this
+        // open/close itself"). Anything that reacts to a menu opening (SystemUICoordinator's
+        // pointer-lock/reticle handling, WebXREventHandler, ...) subscribes to this event directly.
+        this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
     }
 
     close(): void {
@@ -312,8 +314,8 @@ export class PauseMenuManager {
             this.state.previousFocus = null
         }
 
-        // Callbacks
-        this.callbacks.onMenuClose?.()
+        // See open()'s own comment - emitted directly, not via a callback.
+        this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
     }
 
     showPanel(panelId: string): void {
