@@ -65,10 +65,11 @@ export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.15
 // wide window) or absurdly far away, tiny-looking (very narrow window).
 const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
 const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
-// Pushed further from the grip (was -0.12) per direct request - held right at the hand, the box
-// ended up right in front of the player's face too. More separation from the grip reads as
-// "holding it out to look at" instead.
-const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.22)
+// Pushed further from the grip twice now (was -0.12, then -0.22) per direct request each time -
+// held right at the hand, the box ended up right in front of the player's face too, and even at
+// -0.22 it was still "a bit too close to read in VR" (2026-09-02). More separation from the grip
+// reads as "holding it out to look at" instead.
+const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
 // Flatscreen-only (see attachToAnchor()'s connectedControllerCount === 0 check): held square to
 // the camera read as flat/2D - direct request (2026-09-02: "should be held at a bit of an angle
 // so as to give it some dimensionality, object believability"). A slight yaw plus a touch of
@@ -133,6 +134,13 @@ export class GameBoxFoldCoordinator {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.model = new GameBoxFoldModel(this.launchCurrentGame)
+        // THREE's default Euler order ('XYZ') applies yaw BEFORE pitch, which - once the box has
+        // both a nonzero yaw and a nonzero pitch, as the flatscreen tilt below does - visibly
+        // rolls its top edge out of level (verified empirically: default order gave the top edge
+        // a real, nonzero vertical slope for pitch=-8deg/yaw=-18deg; 'YXZ' - pitch applied first,
+        // then yaw around the fixed vertical - measured exactly level). Direct request (2026-09-02,
+        // screenshot markup): "held at an angle on an axis I expect to be flat."
+        this.model.group.rotation.order = 'YXZ'
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
         // Controller rays only ever need to hit this box, so the model's own group is the
