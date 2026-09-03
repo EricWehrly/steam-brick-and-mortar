@@ -1,23 +1,31 @@
 /**
  * WebXR Event Handler
- * 
- * Handles all WebXR-related interaction workflows that were previously 
+ *
+ * Handles all WebXR-related interaction workflows that were previously
  * managed in SteamBrickAndMortarApp. This includes:
  * - WebXR session lifecycle management
  * - WebXR error handling
  * - WebXR capability updates
  * - Input pause/resume coordination
- * - Menu interaction coordination
- * 
+ *
  * Listens to interaction events and coordinates between WebXRCoordinator
  * and UICoordinator.
+ *
+ * Used to also independently pause/resume on UIEventTypes.MenuOpen/MenuClose (uncounted - any
+ * menu closing resumed input, even with another still open) alongside the reason-based
+ * InputEventTypes.Pause/Resume path below - both ultimately just called
+ * WebXRCoordinator.pauseInput()/resumeInput(), which is InputManager.pause()/resume(). Removed
+ * (PR review request, 2026-09-03): InputManager now tracks menu-open state itself
+ * (isMenuOpen()), counted, and folds it into the same gate pause()/resume() already drives - see
+ * InputManager.isInputBlocked(). Reason-based Pause/Resume (the pause menu's own emission, a
+ * binder overlay) is unrelated and still handled below.
  */
 
 import { EventManager } from '../core/EventManager'
 import { WebXRCoordinator } from './WebXRCoordinator'
 import { WebXRUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
-import { WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
+import { WebXREventTypes, InputEventTypes } from '../types/InteractionEvents'
 import type {
     WebXRToggleEvent,
     WebXRSessionStartEvent,
@@ -25,9 +33,7 @@ import type {
     WebXRErrorEvent,
     WebXRSupportChangeEvent,
     InputPauseEvent,
-    InputResumeEvent,
-    MenuOpenEvent,
-    MenuCloseEvent
+    InputResumeEvent
 } from '../types/InteractionEvents'
 
 export class WebXREventHandler {
@@ -53,9 +59,7 @@ export class WebXREventHandler {
             onWebXRError: this.onWebXRError.bind(this),
             onWebXRSupportChange: this.onWebXRSupportChange.bind(this),
             onInputPause: this.onInputPause.bind(this),
-            onInputResume: this.onInputResume.bind(this),
-            onMenuOpen: this.onMenuOpen.bind(this),
-            onMenuClose: this.onMenuClose.bind(this)
+            onInputResume: this.onInputResume.bind(this)
         }
         
         this.setupEventListeners()
@@ -70,8 +74,6 @@ export class WebXREventHandler {
         this.eventManager.registerEventHandler(WebXREventTypes.SupportChange, this.boundHandlers.onWebXRSupportChange)
         this.eventManager.registerEventHandler(InputEventTypes.Pause, this.boundHandlers.onInputPause)
         this.eventManager.registerEventHandler(InputEventTypes.Resume, this.boundHandlers.onInputResume)
-        this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, this.boundHandlers.onMenuOpen)
-        this.eventManager.registerEventHandler(UIEventTypes.MenuClose, this.boundHandlers.onMenuClose)
     }
 
     private onWebXRToggle = (event: CustomEvent<WebXRToggleEvent>) => {
@@ -100,14 +102,6 @@ export class WebXREventHandler {
 
     private onInputResume = (event: CustomEvent<InputResumeEvent>) => {
         this.handleInputResume(event.detail)
-    }
-
-    private onMenuOpen = (event: CustomEvent<MenuOpenEvent>) => {
-        this.handleMenuOpen(event.detail)
-    }
-
-    private onMenuClose = (event: CustomEvent<MenuCloseEvent>) => {
-        this.handleMenuClose(event.detail)
     }
 
     private async handleWebXRToggle(_event: WebXRToggleEvent): Promise<void> {
@@ -144,18 +138,6 @@ export class WebXREventHandler {
         this.webxrCoordinator.resumeInput()
     }
 
-    private handleMenuOpen(event: MenuOpenEvent): void {
-        WebXREventHandler.logger.debug(`Menu opened: ${event.menuType}`)
-        // Pause input when any menu opens
-        this.webxrCoordinator.pauseInput()
-    }
-
-    private handleMenuClose(event: MenuCloseEvent): void {
-        WebXREventHandler.logger.debug(`Menu closed: ${event.menuType}`)
-        // Resume input when menu closes
-        this.webxrCoordinator.resumeInput()
-    }
-
     dispose(): void {
         this.eventManager.deregisterEventHandler(WebXREventTypes.Toggle, this.boundHandlers.onWebXRToggle)
         this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.boundHandlers.onWebXRSessionStart)
@@ -164,9 +146,7 @@ export class WebXREventHandler {
         this.eventManager.deregisterEventHandler(WebXREventTypes.SupportChange, this.boundHandlers.onWebXRSupportChange)
         this.eventManager.deregisterEventHandler(InputEventTypes.Pause, this.boundHandlers.onInputPause)
         this.eventManager.deregisterEventHandler(InputEventTypes.Resume, this.boundHandlers.onInputResume)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.boundHandlers.onMenuOpen)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.boundHandlers.onMenuClose)
-        
+
         WebXREventHandler.logger.debug('WebXREventHandler disposed')
     }
 }

@@ -127,6 +127,19 @@ export class InputManager {
         return this.menuOpenCount > 0
     }
 
+    // Movement/rotation gating below checks both reasons together - explicit pause() (the pause
+    // menu's own reason-based InputEventTypes.Pause/Resume, a binder overlay, ...) and any open
+    // menuType. These used to reach the SAME effective gate (InputManager.pause()/resume()) two
+    // different ways: explicitly via pauseInput()/resumeInput()'s relay, and separately via
+    // WebXREventHandler independently listening for UIEventTypes.MenuOpen/MenuClose and calling
+    // WebXRCoordinator.pauseInput()/resumeInput() (itself just this.pause()/resume()) on ANY
+    // menuType, uncounted - which WebXREventHandler no longer needs to do now that this class
+    // already tracks the same menuOpenCount itself (PR review request, 2026-09-03: "dedup
+    // WebXREventHandler's pause on menu into InputManager's handling").
+    private isInputBlocked(): boolean {
+        return this.isPaused || this.isMenuOpen()
+    }
+
     updateFrame(): void {
         this.actionResolver.updateFrame(
             this.profileService.getEnabledProfiles(),
@@ -142,7 +155,7 @@ export class InputManager {
         // resolve every frame so a press can be detected and close the menu again.
         this.updateFrame()
 
-        if (this.isPaused) {
+        if (this.isInputBlocked()) {
             return
         }
 
@@ -155,7 +168,7 @@ export class InputManager {
     }
 
     updateCameraRotation(camera: THREE.Object3D): void {
-        if (this.isPaused) {
+        if (this.isInputBlocked()) {
             return
         }
 
