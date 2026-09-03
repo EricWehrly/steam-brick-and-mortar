@@ -16,6 +16,8 @@
  * VR, or the box's flatscreen anchor), which may want a different correction once someone can
  * actually test in a headset. Until then this is the single value both raycasts share, so at
  * least they can't drift apart from each other even if the value itself still needs tuning.
+ *
+ * // TD: vr-uikit-menu-sync-recheck
  */
 
 import * as THREE from 'three'

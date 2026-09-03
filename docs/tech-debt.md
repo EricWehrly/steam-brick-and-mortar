@@ -352,6 +352,55 @@ action needed" if no such consumer materializes.
 - `client/src/ui/ColorTokens.ts`
 - `client/CLAUDE.md` (the "Colors" guidance pointing at this module)
 
+## id: vr-uikit-menu-sync-recheck
+**Priority**: Low now, but re-evaluate the moment work resumes on the VR settings-menu PR/branch
+**Effort**: Medium - a real headset session plus a deliberate reconciliation pass across a handful
+of files that now exist twice, independently, on two different branches
+**Context**: This branch (`feature/game-box-uikit-panels`) and the sibling
+`feature/vr-uikit-menu-migration` (settings-menu uikit work, see
+[`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) on that branch - it
+doesn't exist here) both independently built uikit-based VR pointer/cursor handling after
+diverging from the same base commit. Comparing the two turned up real drift, not just cosmetic
+differences:
+- **Controller aim correction** - this branch centralizes the "-15 degree pitch correction" for
+  WebXR's raw targetRaySpace direction in `ControllerAimCorrection.ts`, shared by the shelf-select
+  raycast (`XRControllerManager`) and the uikit pointer (`VRControllerPointer`) specifically because
+  two independent copies previously drifted apart and the beam stopped lining up with what actually
+  got selected (direct request, 2026-09-02: "the blue ray line ... and the game box that actually
+  opens don't line up"). The sibling branch's `VRControllerPointer.ts` has its OWN independent
+  inline copy of the same "-15 degree" correction (`RAY_PITCH_CORRECTION_DEGREES`) - exactly the
+  class of duplication `ControllerAimCorrection.ts` exists to prevent, just recreated on the other
+  branch instead of shared.
+- **Render order** - this branch's `VRControllerPointer.ts` briefly had its own
+  `UikitRenderOrder.ts`/`ALWAYS_ON_TOP_RENDER_ORDER`, removed (2026-09-03) as premature with only
+  one consumer here. The sibling branch's real VR settings menu shell (`VRSettingsMenuShell.ts`)
+  owns an equivalent constant and its own `VRControllerPointer.ts` imports it - confirming the
+  *concept* is real once an actual floating menu exists, just not something to invent speculatively
+  on this branch alone.
+- **Text sanitizing** - `UikitTextSanitizer.ts` exists on both branches under the same name; this
+  branch's version is materially more capable (HTML-entity decoding for Steam's encoded text, a
+  separate multiline/raw-JSON variant for the debug face's cache viewer) than the sibling's simpler
+  original.
+- **None of this is live-verified in headset yet on this branch** - the tilt/pitch/distance/framing
+  work this whole session was iterated on screenshots and reasoning, not a real HMD session (direct
+  acknowledgment, 2026-09-03: "I think with the aiming we were going back and forth because it
+  wasn't properly connecting... we should verify when we ultimately load that branch up, and just
+  get it right there. We can assume our current branch is the correct, functioning implementation,
+  for the moment.").
+**Done when**: once the VR settings-menu branch/PR is actually picked back up, (1) put on a real
+headset and confirm the beam/cursor genuinely line up with both the shelf-select raycast and
+whatever a uikit surface is showing, on THIS branch's implementation, before assuming it's correct;
+(2) reconcile `ControllerAimCorrection.ts` against the sibling branch's inline copy - one shared
+definition, not two independently-tuned ones; (3) diff `UikitTextSanitizer.ts` between branches and
+merge forward rather than let an automatic merge/rebase silently pick one side; (4) recheck whether
+the render-order concept this branch removed as premature is now the shape the settings-menu branch
+actually needs, and use that shape rather than reinventing a third one.
+**Related files**:
+- `client/src/webxr/ControllerAimCorrection.ts`
+- `client/src/scene/uikit/VRControllerPointer.ts`
+- `client/src/scene/uikit/UikitTextSanitizer.ts`
+- (sibling branch `feature/vr-uikit-menu-migration`) `VRControllerPointer.ts`, `VRSettingsMenuShell.ts`
+
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low
 **Effort**: Unknown - environment/tooling investigation, not app code (see Decision below)
