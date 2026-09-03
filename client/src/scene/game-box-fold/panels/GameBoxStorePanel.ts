@@ -170,6 +170,20 @@ export class GameBoxStorePanel {
         ctx.closePath()
         ctx.clip()
 
+        // Base fill first, ALWAYS - not only in the no-source placeholder branch. A typical Steam
+        // header image's own aspect ratio (roughly 460x215, height/width ~0.47) is slightly
+        // SHORTER than this disc's own semicircle bounding box (height/width = 0.5 exactly), so
+        // fit-width scaling below leaves a small gap between the image's bottom edge and the
+        // disc's true bottom (the diameter line) for nearly every game - previously left fully
+        // transparent there, showing the panel root's own background color through: a gray,
+        // roughly rectangular sliver at the bottom of the disc (direct request, 2026-09-02, round
+        // six, on a screenshot: "there's a gray rectangle at the bottom of the disk... checked a
+        // few, it kept showing up" - consistent across games because it isn't game-specific, it's
+        // this aspect-ratio mismatch). Filling the whole shape with the same neutral color first
+        // means any such gap reads as part of the disc's own material, not a rendering leak.
+        ctx.fillStyle = PANEL_COLORS.border
+        ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
+
         if (source) {
             // Fit-width, not cover - direct request (2026-09-02): "can we have the game disc fit
             // width with the image? But retain aspect ratio." Cover-fit (matching whichever of
@@ -185,13 +199,12 @@ export class GameBoxStorePanel {
             // wide header image's scaled height is shorter than the disc's own radius, so centering
             // it on that off-canvas point left a gap between the image and the TOP of the disc -
             // exactly the "weird gray area at the top" reported (direct request, 2026-09-02, round
-            // four) - while any shortfall at the bottom instead blends into the sleeve immediately
-            // below it, which is far less noticeable.
+            // four) - while any shortfall at the bottom now just shows the base fill above, not a
+            // transparent leak. The exact amount of shortfall - "push down until we're reasonably
+            // at the width of the disk" - is a separate, deliberately deferred cosmetic tweak
+            // (same round six discussion), not what this base-fill change addresses.
             const drawY = centerY - radius
             ctx.drawImage(source, centerX - drawWidth / 2, drawY, drawWidth, drawHeight)
-        } else {
-            ctx.fillStyle = PANEL_COLORS.border
-            ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
         }
 
         // Spindle hole - drawn as a full circle centered on the same point as the disc itself,
