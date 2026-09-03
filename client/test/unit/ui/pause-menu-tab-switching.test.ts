@@ -29,17 +29,8 @@ describe('Pause Menu Tab Switching', () => {
             renderer: null as any
         }
 
-        // Mock callbacks
-        const mockCallbacks = {
-            onPauseInput: vi.fn(),
-            onResumeInput: vi.fn(),
-            onMenuOpen: vi.fn(),
-            onMenuClose: vi.fn()
-        }
-
         pauseMenuManager = new PauseMenuManager(
             {},
-            mockCallbacks,
             mockSystemDependencies,
             mockEventManager,
             mockAppSettings,

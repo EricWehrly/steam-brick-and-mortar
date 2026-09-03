@@ -21,7 +21,10 @@ import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
+import type {
+    SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent,
+    InputPauseEvent, InputResumeEvent
+} from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
@@ -37,11 +40,6 @@ export interface PauseMenuConfig {
     containerId?: string
     overlayClass?: string
     menuClass?: string
-}
-
-export interface PauseMenuCallbacks {
-    onPauseInput?: () => void
-    onResumeInput?: () => void
 }
 
 export interface SystemDependencies {
@@ -67,7 +65,6 @@ export class PauseMenuManager {
     }
 
     private config: Required<PauseMenuConfig>
-    private callbacks: PauseMenuCallbacks
     private systemDependencies: SystemDependencies | null = null
     private panels: Map<string, PauseMenuPanel> = new Map()
     private tabGroups: Map<string, PauseMenuTabGroup> = new Map()
@@ -87,8 +84,7 @@ export class PauseMenuManager {
     private readonly performanceMonitor: PerformanceMonitorUI
 
     constructor(
-        config: PauseMenuConfig = {}, 
-        callbacks: PauseMenuCallbacks = {}, 
+        config: PauseMenuConfig = {},
         systemDependencies: SystemDependencies | undefined,
         eventManager: EventManager,
         appSettings: AppSettings,
@@ -101,7 +97,6 @@ export class PauseMenuManager {
             menuClass: 'pause-menu',
             ...config
         }
-        this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
         this.eventManager = eventManager
         this.appSettings = appSettings
@@ -367,17 +362,22 @@ export class PauseMenuManager {
         return this.state.isOpen
     }
 
+    // Emitted directly, same reasoning as MenuOpen/MenuClose above (PR review request,
+    // 2026-09-03: "look into onPauseInput/onResumeInput") - these were the same callback-relay
+    // shape, just for InputEventTypes.Pause/Resume instead of UIEventTypes.MenuOpen/MenuClose.
+    // 'menu' matches the reason SystemUICoordinator's own now-removed relay used, so nothing
+    // downstream that filters on reason (WebXREventHandler's debug logging) sees any difference.
     private pauseInput(): void {
         if (!this.state.inputPaused) {
             this.state.inputPaused = true
-            this.callbacks.onPauseInput?.()
+            this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
         }
     }
 
     private resumeInput(): void {
         if (this.state.inputPaused) {
             this.state.inputPaused = false
-            this.callbacks.onResumeInput?.()
+            this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
         }
     }
 
