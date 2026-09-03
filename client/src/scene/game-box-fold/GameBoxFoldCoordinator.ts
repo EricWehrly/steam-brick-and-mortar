@@ -93,7 +93,9 @@ const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
 // 180-degree flip negates the pitch's local Z contribution along with X - so a negative angle
 // here actually tips the top toward the camera once the facing flip is applied on top of it.
 // Direct request (2026-09-02, round three): "it's tilted towards us rather than away from us."
-export const FLATSCREEN_TILT_PITCH_DEGREES = 14
+// Magnitude reduced 14 -> 9 - direct request (2026-09-02, round four): "reduce tilt from 14 to 9
+// degrees".
+export const FLATSCREEN_TILT_PITCH_DEGREES = 9
 // The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
