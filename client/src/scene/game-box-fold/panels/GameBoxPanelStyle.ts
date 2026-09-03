@@ -14,18 +14,21 @@
 import { BOX_WIDTH, BOX_HEIGHT } from '../GameBoxFoldDimensions'
 import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
 
-// This IS in tokens.css (--color-box-surface/--color-box-sleeve, read here via UIKIT_COLORS same
-// as every other token below) - a prior pass here reasoned tokens.css had no vocabulary for "the
-// box's own material color" and reached for a local hex literal instead, which is what let this
-// and GameBoxFoldModel's plainMaterial drift out of sync in the first place (direct request,
-// 2026-09-02, round four: "center of box is still black instead of gray"). Corrected, direct
-// request round five: "we already have said tokens... colors should come from existing tokens."
-// Re-exported under these names (not just inlined into PANEL_COLORS below) so
-// GameBoxFoldModel's plainMaterial keeps importing a name that reads as "the box's own material,"
-// rather than reaching into a styling module for a bare UIKIT_COLORS.boxSurface that doesn't read
-// as obviously relevant to a THREE.Mesh material two files away.
-export const BOX_SURFACE_GRAY = UIKIT_COLORS.boxSurface
-const BOX_SLEEVE_GRAY = UIKIT_COLORS.boxSleeve
+// Reuses the EXISTING surface ramp (tokens.css's own "ordered deepest->lightest" ladder) rather
+// than a bare hex literal, or a new box-specific token - direct request (2026-09-02, round six):
+// "we already have said tokens... there should already be steam colors present in tokens.css."
+// surface3 (lightest of the three) reads as the box's own steam-gray material; surface2 (one step
+// deeper) is the "nested panel" shade tokens.css already describes for exactly this kind of
+// depth-behind-the-surface look, reused here for the store panel's sleeve. A prior pass tried only
+// surface1 (near-black - "the box reads as full black"), read that single failure as "the whole
+// ramp doesn't have this vocabulary," and added new --color-box-surface/--color-box-sleeve tokens
+// instead of trying the REST of the existing ramp first - reverted. Re-exported under these names
+// (not just inlined into PANEL_COLORS below) so GameBoxFoldModel's plainMaterial keeps importing a
+// name that reads as "the box's own material," rather than reaching into a styling module for a
+// bare UIKIT_COLORS.surface3 that doesn't read as obviously relevant to a THREE.Mesh material two
+// files away.
+export const BOX_SURFACE_GRAY = UIKIT_COLORS.surface3
+const BOX_SLEEVE_GRAY = UIKIT_COLORS.surface2
 
 export const PANEL_WIDTH_PX = 300
 export const PANEL_HEIGHT_PX = PANEL_WIDTH_PX * (BOX_HEIGHT / BOX_WIDTH)
