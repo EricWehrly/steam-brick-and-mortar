@@ -129,6 +129,29 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.group.rotation.x).toBeCloseTo(THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES))
     })
 
+    it('keeps the box\'s top edge level despite combining a yaw and a pitch - THREE\'s default '
+        + 'Euler order applies yaw before pitch, which visibly rolls a top edge that starts level '
+        + '(verified empirically, not assumed) once both are nonzero; rotation.order must be '
+        + '\'YXZ\' (pitch first) for the combination to stay level (direct request, 2026-09-02, '
+        + 'screenshot markup: "held at an angle on an axis I expect to be flat")', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.order).toBe('YXZ')
+
+        // The model's own local X axis is the box's top-edge direction (BoxGeometry's width axis) -
+        // confirm it actually stays level (zero world-Y component) under the real combined rotation,
+        // not just that .order is set to the right string.
+        model.group.updateMatrixWorld(true)
+        const edgeStart = new THREE.Vector3(-1, 0, 0).applyMatrix4(model.group.matrixWorld)
+        const edgeEnd = new THREE.Vector3(1, 0, 0).applyMatrix4(model.group.matrixWorld)
+        expect(edgeEnd.y - edgeStart.y).toBeCloseTo(0, 5)
+    })
+
     it('holds the open box further from a real PerspectiveCamera than the FOV-fit calculation '
         + 'alone would - CAMERA_ANCHOR_DISTANCE_MARGIN adds reserve distance on top of the tightest fit', () => {
         const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
