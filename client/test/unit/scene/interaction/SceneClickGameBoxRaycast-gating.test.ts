@@ -3,6 +3,11 @@
  * "rays can go through shelves ... need to only worry about ... pixels the player camera can
  * see" and "if I have a UI/menu open, like the game box, the world raycast ... shouldn't be
  * active."
+ *
+ * Menu-open state itself lives in InputManager now, not this class (PR review request,
+ * 2026-09-03) - a real InputManager instance is constructed below so
+ * InputManager.getActiveInstance() resolves the way it does at runtime; the MenuOpen/MenuClose
+ * emits are unchanged, since InputManager listens for the same events this class used to.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
@@ -14,6 +19,7 @@ import {
 } from '../../../../src/types/InteractionEvents'
 import { SceneLayer } from '../../../../src/scene/SceneLayers'
 import { SceneClickGameBoxRaycast } from '../../../../src/scene/interaction/SceneClickGameBoxRaycast'
+import { InputManager } from '../../../../src/input/InputManager'
 
 function createGameBoxMesh(appid: number): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1))
@@ -45,6 +51,7 @@ describe('SceneClickGameBoxRaycast occlusion and menu gating', () => {
     let scene: THREE.Scene
     let camera: THREE.PerspectiveCamera
     let raycast: SceneClickGameBoxRaycast
+    let inputManager: InputManager
     let selectedHandler: ReturnType<typeof vi.fn<(event: CustomEvent<GameSelectedEvent>) => void>>
 
     beforeEach(() => {
@@ -57,12 +64,14 @@ describe('SceneClickGameBoxRaycast occlusion and menu gating', () => {
         selectedHandler = vi.fn<(event: CustomEvent<GameSelectedEvent>) => void>()
         eventManager.registerEventHandler<GameSelectedEvent>(GameEventTypes.Selected, selectedHandler)
 
+        inputManager = new InputManager()
         raycast = new SceneClickGameBoxRaycast({ scene, camera, maxDistance: 10 })
     })
 
     afterEach(() => {
         eventManager.deregisterEventHandler(GameEventTypes.Selected, selectedHandler)
         raycast.dispose()
+        inputManager.dispose()
         DataManager.resetInstance()
     })
 

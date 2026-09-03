@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InputManager } from '../../../src/input/InputManager'
 import { InputProfileId } from '../../../src/input/InputProfile'
 import { EventManager } from '../../../src/core/EventManager'
-import { InputEventTypes } from '../../../src/types/InteractionEvents'
+import { InputEventTypes, UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../src/types/InteractionEvents'
 
 function createGamepadWithButtonPressed(buttonIndex: number): Gamepad {
     return {
@@ -106,6 +106,36 @@ describe('InputManager pause()/resume()', () => {
         expect(camera.position.equals(positionBefore)).toBe(false)
 
         document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
+        manager.dispose()
+    })
+
+    it('isMenuOpen() reflects UIEventTypes.MenuOpen/MenuClose - the shared "is a menu up" check '
+        + 'input-adjacent classes (e.g. SceneClickGameBoxRaycast) query instead of tracking their '
+        + 'own menu-open state (PR review request, 2026-09-03)', () => {
+        const eventManager = EventManager.getInstance()
+        expect(manager.isMenuOpen()).toBe(false)
+
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        expect(manager.isMenuOpen()).toBe(true)
+
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        expect(manager.isMenuOpen()).toBe(false)
+
+        manager.dispose()
+    })
+
+    it('isMenuOpen() only clears once every open menu has closed - the pause menu and a game box '
+        + 'can be open independently', () => {
+        const eventManager = EventManager.getInstance()
+
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        expect(manager.isMenuOpen()).toBe(true)
+
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
+        expect(manager.isMenuOpen()).toBe(false)
+
         manager.dispose()
     })
 })
