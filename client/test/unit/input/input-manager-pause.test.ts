@@ -138,4 +138,25 @@ describe('InputManager pause()/resume()', () => {
 
         manager.dispose()
     })
+
+    it('suspends camera movement while any menu is open, even without an explicit pause() call - '
+        + 'the dedup that replaced WebXREventHandler independently reacting to '
+        + 'UIEventTypes.MenuOpen/MenuClose itself (PR review request, 2026-09-03: "dedup '
+        + 'WebXREventHandler\'s pause on menu into InputManager\'s handling")', () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+        const eventManager = EventManager.getInstance()
+
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        const positionBefore = camera.position.clone()
+        manager.updateCameraMovement(camera)
+
+        expect(camera.position.equals(positionBefore)).toBe(true)
+
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        manager.updateCameraMovement(camera)
+        expect(camera.position.equals(positionBefore)).toBe(false)
+
+        document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
+        manager.dispose()
+    })
 })
