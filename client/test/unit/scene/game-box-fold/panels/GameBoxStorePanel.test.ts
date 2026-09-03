@@ -61,6 +61,32 @@ describe('GameBoxStorePanel disc texture', () => {
         panel.dispose()
     })
 
+    it('draws a spindle hole at the disc\'s center, like the binder UI\'s own disc cutout - direct '
+        + 'request (2026-09-02, round five): "can the disks get a center hole like the binder disks '
+        + 'have?"', () => {
+        const panel = new GameBoxStorePanel(() => {})
+        panel.setHeaderImage(solidImage(4, 4, [200, 100, 50, 255]))
+
+        const canvas = discCanvas(panel)
+        const ctx = canvas.getContext('2d')!
+        const centerX = Math.floor(canvas.width / 2)
+        const centerY = canvas.height
+
+        // Just above the disc's true center - inside the hole's radius, so this should be the
+        // hole's own dark fill, not the header art drawn everywhere else on the disc.
+        const holePixel = ctx.getImageData(centerX, centerY - 4, 1, 1).data
+        expect(holePixel[3]).toBe(255) // opaque - a real shape, not left blank
+        expect(holePixel[0]).toBeLessThan(100) // dark hole fill, not the bright header art color
+
+        // Off to the side at the same height, outside the hole's radius but still within the disc -
+        // should still show the header art, confirming the hole didn't blank out the whole disc.
+        const artPixel = ctx.getImageData(centerX - 60, centerY - 4, 1, 1).data
+        expect(artPixel[3]).toBe(255)
+        expect(artPixel[0]).toBeGreaterThan(100) // the solid header color's red channel (200)
+
+        panel.dispose()
+    })
+
     it('the disc has exactly one Image, constructed once and reused across every selection', () => {
         const panel = new GameBoxStorePanel(() => {})
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
