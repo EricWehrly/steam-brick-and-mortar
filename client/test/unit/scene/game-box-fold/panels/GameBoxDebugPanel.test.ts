@@ -1,8 +1,6 @@
 /**
- * GameBoxDebugPanel - the two layout fixes from direct request (2026-09-02): the description
- * starting mid-sentence rather than at the top ("needs to start at the start ... not the weird
- * middle its at"), and the debug face's content visibly overlapping the cache-entry section
- * below it ("the visuals are very crowded").
+ * GameBoxDebugPanel - covers two layout fixes: the description starting mid-sentence instead of
+ * at the top, and the debug face's content visibly overlapping the cache-entry section below it.
  */
 import { describe, it, expect } from 'vitest'
 import { Text } from '@pmndrs/uikit'
@@ -44,11 +42,9 @@ describe('GameBoxDebugPanel layout', () => {
         expect(sectionsArea.inputProperties.maxHeight).toBeGreaterThan(0)
     })
 
-    it('declares flexDirection:\'column\' on both scrollable containers - uikit defaults an unset '
-        + 'flexDirection to \'row\' and unset alignItems to \'stretch\', which stomps a single '
-        + 'child to the container\'s own fixed height and makes maxScrollPosition compute to ~0 '
-        + '(confirmed live, 2026-09-03: scrollY stayed 0 on both scroll directions despite wheel '
-        + 'events reaching the canvas and uikit\'s own onScroll firing)', () => {
+    it('declares flexDirection:\'column\' on both scrollable containers - an unset flexDirection '
+        + 'defaults to \'row\' and unset alignItems to \'stretch\', which stomps a single child to '
+        + 'the container\'s own fixed height and makes maxScrollPosition compute to ~0', () => {
         const panel = new GameBoxDebugPanel()
 
         const sectionsArea = panel.container.children[0] as unknown as {

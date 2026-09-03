@@ -31,115 +31,59 @@ function dedupe(items: readonly string[]): string[] {
     })
 }
 
-// steam:// URIs launch through the OS protocol handler, same mechanism the old
-// BinderGameDetailPanel used via a plain <a href="steam://run/..."> - there's no Tauri shell
-// plugin in this project yet, so this is untested inside the desktop webview specifically; it's
-// not a regression either way since the old panel's own link was never verified there.
+// steam:// launches via the OS protocol handler (same mechanism the old BinderGameDetailPanel used
+// via a plain <a href>). Untested inside the desktop webview specifically (no Tauri shell plugin
+// yet) - not a regression either way, since the old link was never verified there either.
 const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 
-// Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
-// Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
-// doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
+// Parented local offsets so the box reads as "held," not intersecting the camera/hand. Flatscreen
+// centers in view; VR sits just in front of the grip.
 //
-// Camera-anchor distance is NOT a fixed constant (see computeCameraAnchorDistance() below) - a
-// fixed -0.35, then -0.7, was each tuned against whatever window aspect ratio happened to be open
-// at the time, and both overflowed at other aspect ratios: fovY is fixed (SceneManager's
-// CAMERA_FOV) but fovX depends on aspect, so a narrower/taller window has a narrower horizontal
-// FOV and the same physical-width open box (see GameBoxFoldModel.OPEN_BOX_HALF_WIDTH) fills more
-// of it - direct request (2026-08-21), confirmed via projection math: at the -0.7 distance that
-// fixed the wide-desktop case, anything narrower than roughly a square window (aspect < ~1) would
-// already overflow again. Recomputed at summon time; see FALLBACK_CAMERA_DISTANCE for the one case
-// (a non-PerspectiveCamera) where the real fov/aspect aren't available to compute from.
+// Camera-anchor distance isn't a fixed constant (see computeCameraAnchorDistance()): fovY is fixed
+// but fovX depends on aspect, so a fixed distance overflows some window shapes. Recomputed at
+// summon time from the real FOV; FALLBACK_CAMERA_DISTANCE covers the one case (non-
+// PerspectiveCamera) where FOV/aspect aren't available.
 const FALLBACK_CAMERA_DISTANCE = 0.7
-// How much of the camera's current horizontal FOV the open box's full width is allowed to fill -
-// leaves margin on both sides rather than framing it edge-to-edge. Exported so a test can verify
-// the fit formula without duplicating it.
-//
-// Raised 0.7 -> 0.85 - direct request (2026-09-02, round six, on a screenshot marked up with lines
-// from the box's corners out to the screen's own corners): "there's still a lot of space on screen
-// that I want filled with readable 'UI'." This alone only makes the existing box bigger/closer
-// (still bounded well under 1.0, so it never frames edge-to-edge) - it doesn't address the box's
-// own vertical footprint being smaller than its horizontal one (an open box's three side-by-side
-// panels are wider than they are tall), which is the other half of why the gap reads as large in a
-// short/wide window specifically. That's a separate, bigger question - whether to add more on-screen
-// content, reshape the open layout, or something else - flagged rather than guessed at here.
+// How much of the camera's horizontal FOV the open box's full width may fill - leaves margin
+// instead of framing edge-to-edge. Doesn't account for the open box being wider than it is tall
+// (three panels side by side), so some vertical margin is inherent regardless of this value.
 export const OPEN_BOX_SAFE_FOV_FRACTION = 0.85
-// Extra distance held in reserve, added on top of the FOV-fit calculation below - direct request
-// (2026-09-02: "I want ... the box to be a little further from the camera when open"). The
-// FOV-fit math alone frames the box as tightly as it safely can; this is a flat margin on top of
-// that, not a change to the fit itself. Exported so a test can verify against it directly instead
-// of re-deriving the fit formula.
-//
-// Reduced 0.15 -> 0.05 - direct request (2026-09-02, round five): "make the gamebox a little
-// closer in flat screen... [read] like a modal -- some margin off the edges of the screen." The
-// FOV-fit fraction above is what actually GUARANTEES that margin (deliberately < 1.0, regardless
-// of this reserve); this reserve only made the box smaller/further than that intentional framing
-// needed to, which is the "closer" this request is asking to partly give back - not a change to
-// how much margin is guaranteed, just how much extra distance is piled on top of it.
+// Extra distance held in reserve on top of the FOV-fit calculation - a flat margin, not a change
+// to the fit itself.
 export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.05
-// VR's own reserve for the SAME camera-anchor path (connectedControllerCount === 1 - see
-// attachToAnchor()) - kept separate from the flatscreen margin above rather than shared, because
-// they don't move together: the flatscreen-only "closer" request right above this pulled VR's
-// single-controller framing closer too when the two shared one constant, even though VR wanted
-// the opposite. Direct request (2026-09-02, round six): "regarding the VR / 'grip' length... I'm
-// currently doing the 1 controller thing in VR... Either way it's still too close. Need to push
-// it back a little. In VR." Not live-verified in headset - this is a first-pass magnitude, same as
-// GRIP_BOX_PITCH_DEGREES below; re-test and adjust further if it still reads wrong.
+// VR's own reserve for the same camera-anchor path (single connected controller) - kept separate
+// from the flatscreen margin above since the two don't move together (flatscreen wants closer, VR
+// wants further). Not live-verified in headset yet.
 export const VR_CAMERA_ANCHOR_DISTANCE_MARGIN = 0.3
-// Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
-// wide window) or absurdly far away, tiny-looking (very narrow window). Exported so a test can
-// verify against the clamp bounds directly instead of a duplicated literal.
-//
-// MIN lowered 0.5 -> 0.4 alongside the OPEN_BOX_SAFE_FOV_FRACTION raise above (2026-09-02, round
-// six) - a standard 16:9 window's fit+margin distance (~0.475) had dropped BELOW the old 0.5 floor,
-// so the floor - not the fraction - was silently the only thing still governing the box's size at
-// the most common aspect ratio, defeating the point of raising the fraction at all.
+// Clamped so an extreme aspect ratio can't push distance uncomfortably close or absurdly far.
+// MIN sits below OPEN_BOX_SAFE_FOV_FRACTION's own fit+margin distance at a standard 16:9 window,
+// so the fraction - not this floor - is what actually governs size at the common case.
 export const MIN_CAMERA_ANCHOR_DISTANCE = 0.4
 export const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
-// Pushed further from the grip twice now (was -0.12, then -0.22) per direct request each time -
-// held right at the hand, the box ended up right in front of the player's face too, and even at
-// -0.22 it was still "a bit too close to read in VR" (2026-09-02). More separation from the grip
-// reads as "holding it out to look at" instead.
+// Pushed out from the grip so the box reads as "held out to look at," not against the face.
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
-// Flatscreen-only (see attachToAnchor()'s connectedControllerCount === 0 check): held square to
-// the camera read as flat/2D - direct request (2026-09-02: "should be held at a bit of an angle
-// so as to give it some dimensionality, object believability"). Not applied in VR (grip-anchored,
-// or camera-anchored with a single connected controller) - that framing wasn't asked for and the
-// grip pitch already gives VR its own deliberate angle.
+
+// Flatscreen-only tilt for dimensionality - held dead square to the camera, the box read flat/2D.
+// Pitch only, deliberately no yaw: a yawed edge's two ends sit at different distances from the
+// camera this close (real perspective convergence, not a rotation bug), which reads as the box's
+// top edge sloping. Pitch alone keeps both ends of every horizontal edge equidistant, so it can't
+// reintroduce that regardless of how close the box is held.
 //
-// Pitch only, deliberately no yaw - a first pass paired this with a yaw for a fuller "product
-// shot" 3/4 angle, but held this close to the camera (see CAMERA_ANCHOR_DISTANCE_MARGIN's own
-// comment on how close that fit math keeps it), a yawed edge's two ends sit at genuinely different
-// distances from the camera - real perspective convergence, not a rotation bug, and it read as the
-// box's top edge sloping (screenshot markup, 2026-09-02, round two: "the line I drew is the flat
-// edge... slopes down and to the left... held at an angle on an axis I expect to be flat" - this
-// was reported AFTER the rotation-order fix below, meaning the residual slope was perspective, not
-// the composition bug that fix targets). Pitching alone keeps both ends of every horizontal edge
-// equidistant from the camera - verified both in raw 3D (no roll) and through the real camera's
-// projection matrix (no perspective-driven slope either) - so it can't reintroduce this regardless
-// of how close the box is held.
-//
-// Sign is positive, not the negative it looks like it should be at a glance: this rotation is
-// applied (via rotation.order 'YXZ') BEFORE the MODEL_FACING_ROTATION_Y flip below, and that
-// 180-degree flip negates the pitch's local Z contribution along with X - so a negative angle
-// here actually tips the top toward the camera once the facing flip is applied on top of it.
-// Direct request (2026-09-02, round three): "it's tilted towards us rather than away from us."
-// Magnitude reduced 14 -> 9 - direct request (2026-09-02, round four): "reduce tilt from 14 to 9
-// degrees".
+// Sign is positive, not the negative it looks like it should be: this rotation applies (via
+// rotation.order 'YXZ') BEFORE the MODEL_FACING_ROTATION_Y flip below, and that 180-degree flip
+// negates the pitch's local Z contribution along with X - so a negative value here actually tips
+// the top toward the camera once the flip is applied on top of it.
 export const FLATSCREEN_TILT_PITCH_DEGREES = 9
-// The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
-// camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
-// rotate it to face back toward whatever it's parented to.
+// The model's front cover faces its own local -Z; parented to a camera/grip whose forward is also
+// local -Z, it would face away from the viewer without this flip.
 export const MODEL_FACING_ROTATION_Y = Math.PI
-// Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's own forward axis points roughly
-// "out and down" in a natural grip, so with only the Y-flip above the box's face ended up angled
-// down/back toward the palm - reading it meant over-extending the wrist, tilting the controller
-// forward to bring the face up into view. Pitching the box forward by 90 degrees is meant to
-// bring the face up to a natural viewing angle without that wrist tilt. First-pass, unconfirmed
-// in headset - flip the sign below and re-test live if it ends up facing the wrong way.
+// Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's forward points "out and down" in a
+// natural grip, so with only the Y-flip the box's face angled down toward the palm. Pitching it
+// forward brings the face to a natural viewing angle. Unconfirmed in headset - flip the sign and
+// re-test if it faces the wrong way.
 const GRIP_BOX_PITCH_DEGREES = -90
-// See attachToAnchor()'s doc comment - below this many connected controllers, camera-anchor
-// instead of grip-anchor, so the player keeps a free hand to point/interact with.
+// Below this many connected controllers, camera-anchor instead of grip-anchor so the player keeps
+// a free hand to point/interact with.
 const MIN_CONTROLLERS_FOR_GRIP_ANCHOR = 2
 
 /**
@@ -182,12 +126,9 @@ export class GameBoxFoldCoordinator {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.model = new GameBoxFoldModel(this.launchCurrentGame)
-        // THREE's default Euler order ('XYZ') applies yaw BEFORE pitch, which - once the box has
-        // both a nonzero yaw and a nonzero pitch, as the flatscreen tilt below does - visibly
-        // rolls its top edge out of level (verified empirically: default order gave the top edge
-        // a real, nonzero vertical slope for pitch=-8deg/yaw=-18deg; 'YXZ' - pitch applied first,
-        // then yaw around the fixed vertical - measured exactly level). Direct request (2026-09-02,
-        // screenshot markup): "held at an angle on an axis I expect to be flat."
+        // THREE's default Euler order ('XYZ') applies yaw before pitch, which visibly rolls the
+        // top edge out of level once both are nonzero (as the flatscreen tilt below sets up).
+        // 'YXZ' - pitch first, then yaw around the fixed vertical - measures exactly level.
         this.model.group.rotation.order = 'YXZ'
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
@@ -239,14 +180,12 @@ export class GameBoxFoldCoordinator {
             return
         }
 
-        // Nothing summoned yet: open directly. Something already summoned (even the same game
-        // re-selected): close first, then reopen with the new content once onFullyClosed fires -
-        // re-texturing an already-open box in place skipped the animation entirely, which read as
-        // selection just silently swapping the game with no feedback.
+        // Nothing summoned: open directly. Something already open (even the same game re-selected):
+        // close first, reopen once onFullyClosed fires - re-texturing in place skipped the
+        // animation, which read as the selection silently swapping with no feedback.
         if (this.currentAppid === null) {
-            // Emitted here, not in summon() - summon() also runs for a mid-close reopen (see the
-            // pendingSelection branch below and onFullyClosed's), where the box was never really
-            // "closed" from the world's point of view, so a second Open/Close pair would be noise.
+            // Not emitted in summon() - that also runs for a mid-close reopen (pendingSelection
+            // below), where the box was never really "closed," so a second Open/Close would be noise.
             this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
             this.summon(appid, game)
         } else {
@@ -259,22 +198,18 @@ export class GameBoxFoldCoordinator {
         this.currentAppid = appid
         this.model.setContent({
             name: game.name,
-            // Distinct from "Steam reports 0/no reviews" (a real, meaningful value - see
-            // AppDetailsCache.ts's isDefined-based merge comment): userscore itself is
-            // undefined when we never got rating data for this game at all. Collapsing that
-            // into 0 (as this used to) made "no data" and "confirmed unrated" both render the
-            // same misleading "Unrated" text - direct request (2026-08-20), confirmed live that
-            // most boxes were actually hitting the no-data case. Omitting the field entirely
-            // here (GameBoxFoldContent.rating is optional) makes the debug panel skip the row.
+            // undefined (no rating data) is distinct from Steam's real "0/no reviews" value -
+            // collapsing both to 0 made "no data" and "confirmed unrated" render the same
+            // misleading "Unrated" text. Omitting the field (GameBoxFoldContent.rating is
+            // optional) makes the debug panel skip the row instead.
             rating: game.userscore !== undefined ? formatRating(game.userscore) : undefined,
             playtimeHours: game.playtime_forever ? Math.round(game.playtime_forever / 60) : undefined,
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
             genres: dedupe(game.genres?.map(g => g.description) ?? []),
             tags: this.buildTags(game),
-            // Steam's own category list sometimes repeats an entry verbatim - deduped the same
-            // way tags are (direct request, 2026-09-02: "we need to de-duplicate it sometimes for
-            // some reason"). Not currently shown on any face - see GameBoxDebugPanel's own
-            // comment on parking the FEATURES section - but still worth passing through clean.
+            // Steam's own category list sometimes repeats an entry verbatim. Not currently shown
+            // on any face (see GameBoxDebugPanel's FEATURES-parking comment) but worth passing
+            // through clean.
             categories: dedupe(game.categories?.map(c => c.description) ?? []),
             userCollections: game.user_collections?.map(c => c.name),
             description: game.short_description,
@@ -289,7 +224,7 @@ export class GameBoxFoldCoordinator {
     }
 
     /** Community tags (SteamSpy, same source/fallback GroupResolver uses for tag-mode grouping) -
-     *  shown as its own section, separate from Steam's own genres (direct request, 2026-09-01). */
+     *  shown as its own section, separate from Steam's own genres. */
     private buildTags(game: SteamGameData): string[] {
         const communityTags = game.steamspy_top_tags?.length
             ? game.steamspy_top_tags
@@ -332,12 +267,10 @@ export class GameBoxFoldCoordinator {
     private attachToAnchor(): void {
         const dm = DataManager.getInstance()
         const controllerSource = dm.get<XRControllerSource>(DataKey.XRControllerSource) ?? null
-        // Grip-anchoring only makes sense with a spare hand: with a single controller connected,
-        // that same controller is also whatever the player points/clicks with, so gluing the box
-        // to it too means it swings every time they aim elsewhere. Direct request (2026-08-20):
-        // with only one controller, camera-anchor instead - same behavior flatscreen already uses
-        // with zero controllers, so this also makes "how many controllers" the only thing that
-        // decides the anchor, not a separate VR-only special case.
+        // Grip-anchoring only makes sense with a spare hand - with one controller, it's also
+        // whatever the player points/clicks with, so gluing the box to it swings it on every aim.
+        // Camera-anchor instead with only one controller (same as flatscreen's zero-controller
+        // case), so "how many controllers" is the only thing deciding the anchor.
         const connectedControllerCount = controllerSource?.getConnectedControllers?.().length ?? 0
         const grip = connectedControllerCount >= MIN_CONTROLLERS_FOR_GRIP_ANCHOR
             ? controllerSource?.getPrimaryControllerGrip() ?? null
@@ -396,16 +329,12 @@ export class GameBoxFoldCoordinator {
 
     /**
      * Goes through the same GameArtworkProvider pixel pipeline the shelf's instanced boxes use,
-     * rather than a plain THREE.TextureLoader/<img> load - a raw cross-origin <img> load is
-     * subject to the browser's normal CORS enforcement and fails for CDN artwork with no CORS
-     * headers (confirmed via console: library_600x900.jpg blocked by CORS, appid 219680), while
-     * GameArtworkProvider's pipeline already resolves this same artwork successfully for the
-     * shelf instance. Bonus: reuses whatever the shelf's own request already fetched/decoded/
-     * disk-cached for this appid instead of a second network round-trip. Header format (not
-     * library) - the store panel presents it as a disc, see GameBoxFoldModel.redrawStorePanel().
-     * Hands the model plain pixels rather than building a THREE texture here: GameBoxFoldModel
-     * draws it into a canvas (for the disc clip/composite), which sidesteps DataTexture's flipY
-     * quirk entirely (canvas ImageData is already top-down, matching the pixel source).
+     * rather than a plain THREE.TextureLoader/<img> load - a raw cross-origin <img> load fails for
+     * CDN artwork with no CORS headers, while GameArtworkProvider already resolves it for the
+     * shelf instance (and this reuses whatever it already fetched/cached). Header format, not
+     * library - the store panel presents it as a disc. Hands the model plain pixels rather than a
+     * THREE texture: GameBoxFoldModel draws them into a canvas itself, sidestepping DataTexture's
+     * flipY quirk (canvas ImageData is already top-down).
      */
     private async applyHeaderImage(game: SteamGameData): Promise<void> {
         const appid = String(game.appid)

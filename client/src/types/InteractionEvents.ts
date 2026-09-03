@@ -173,11 +173,10 @@ export interface InteractPressedEvent extends BaseInteractionEvent {}
  * the same "back/cancel" behavior for free.
  *
  * bundledWithOpenMenu is true when this Cancel was emitted alongside an OpenMenuPressed for the
- * SAME physical press (Escape/Start, both bound to both actions) - PauseMenuManager checks this
- * specifically, since its own OpenMenuPressed handler's toggle() already resolves open/closed for
- * that key; reacting to Cancel too self-cancelled the open it had just performed (direct request,
- * 2026-09-02: "the menu is not currently opening when I hit esc"). Every other Cancel consumer
- * doesn't check this field and keeps reacting to every Cancel, bundled or not - dismissing the
+ * SAME physical press (Escape/Start, both bound to both actions). PauseMenuManager checks this
+ * specifically, since its OpenMenuPressed handler's toggle() already resolved open/closed for
+ * that key - reacting to Cancel too would self-cancel the open it just performed. Every other
+ * Cancel consumer ignores this field and reacts to every Cancel, bundled or not - dismissing the
  * game library binder (say) when the pause menu opens is the whole point of bundling it.
  */
 export interface CancelPressedEvent extends BaseInteractionEvent {

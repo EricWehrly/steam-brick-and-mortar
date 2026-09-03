@@ -175,12 +175,11 @@ export class InputActionResolver {
 
         for (const profile of connectedProfiles) {
             const actionIds = this.bindingResolver.findButtonActionsBoundTo(profile, matches)
-            // Escape/Start are bound to both OpenMenu and Cancel (see InputProfile.ts), so a
-            // single press resolves both here - CancelPressedEvent.bundledWithOpenMenu records
-            // that, so PauseMenuManager (whose own OpenMenuPressed handler already resolves
-            // open/closed for this press) can tell it apart from a standalone Cancel, while every
-            // other Cancel consumer keeps reacting the same either way - see that field's own doc
-            // comment in InteractionEvents.ts.
+            // Escape/Start are bound to both OpenMenu and Cancel (see InputProfile.ts), so a single
+            // press resolves both here - CancelPressedEvent.bundledWithOpenMenu records that, so
+            // PauseMenuManager (whose OpenMenuPressed handler already resolved open/closed for
+            // this press) can tell it apart from a standalone Cancel. See that field's doc comment
+            // in InteractionEvents.ts.
             const bundledWithOpenMenu = actionIds.includes(InputAction.OpenMenu) && actionIds.includes(InputAction.Cancel)
 
             for (const actionId of actionIds) {

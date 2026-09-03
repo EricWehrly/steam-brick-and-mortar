@@ -99,9 +99,9 @@ describe('Pause Menu Integration Tests', () => {
 
         // PauseMenuManager emits UIEventTypes.MenuOpen/MenuClose directly now, not via constructor
         // callbacks - listen for the real events instead. It no longer emits
-        // InputEventTypes.Pause/Resume itself either - SystemUICoordinator derives that from this
-        // same MenuOpen/MenuClose by counting every open menuType app-wide, which is out of scope
-        // for a PauseMenuManager-only integration test (no SystemUICoordinator constructed here).
+        // InputEventTypes.Pause/Resume itself either; SystemUICoordinator derives that from this
+        // event by counting every open menuType app-wide, out of scope here since no
+        // SystemUICoordinator is constructed in this PauseMenuManager-only test.
         menuOpenHandler = vi.fn<(event: CustomEvent) => void>()
         menuCloseHandler = vi.fn<(event: CustomEvent) => void>()
         eventManager.registerEventHandler(UIEventTypes.MenuOpen, menuOpenHandler)
@@ -315,12 +315,9 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.init()
         })
 
-        // Whether input actually pauses as a result is SystemUICoordinator's concern now (it
-        // counts every open menuType app-wide and derives InputEventTypes.Pause/Resume from it) -
-        // out of scope here, since no SystemUICoordinator is constructed in this
-        // PauseMenuManager-only integration test. This only checks the one thing PauseMenuManager
-        // itself is still responsible for: emitting MenuOpen/MenuClose on open()/close() directly,
-        // not just via toggle() (already covered above).
+        // Whether input actually pauses is SystemUICoordinator's concern now (out of scope here -
+        // see beforeEach above). This only checks that PauseMenuManager itself still emits
+        // MenuOpen/MenuClose on open()/close() directly, not just via toggle() (covered above).
         it('emits MenuOpen/MenuClose on open()/close() directly', () => {
             expect(menuOpenHandler).not.toHaveBeenCalled()
 

@@ -13,11 +13,10 @@ const NON_PRINTABLE_ASCII = /[^\x20-\x7E]/g
 const NON_PRINTABLE_ASCII_EXCEPT_NEWLINE = /[^\x20-\x7E\n]/g
 
 // Steam's own text fields (short_description in particular) come back HTML-entity-encoded, e.g.
-// "discovering &amp; breeding frogs" - a DOM overlay would render that as a literal ampersand for
-// free, but uikit's Text just shows the raw string, so it displayed the literal "&amp;" (direct
-// request, 2026-09-02, screenshot markup). A <textarea> is the standard entity-decoding trick: the
-// browser's own HTML parser does the work via .innerHTML, read back through .value. Real DOM
-// (browser) and jsdom (tests) both implement it; guarded for any other environment.
+// "discovering &amp; breeding frogs" - a DOM overlay decodes that for free, but uikit's Text just
+// shows the raw string. A <textarea> is the standard entity-decoding trick: the browser's own
+// HTML parser does the work via .innerHTML, read back through .value. Real DOM (browser) and
+// jsdom (tests) both implement it; guarded for any other environment.
 const entityDecoder = typeof document === 'undefined' ? null : document.createElement('textarea')
 
 function decodeHtmlEntities(text: string): string {

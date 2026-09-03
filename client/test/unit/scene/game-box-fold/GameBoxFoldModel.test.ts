@@ -152,13 +152,10 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('fully open, both flaps face the viewer tilted in by FLAP_OPEN_INWARD_ANGLE_DEGREES, by an '
+    it('fully open, both flaps face the viewer tilted in by FLAP_OPEN_INWARD_ANGLE_DEGREES by an '
         + 'IDENTICAL amount despite their mirror-image hinge rotations, and land at the SAME Z as '
         + 'each other, both nearer the viewer than the store panel\'s own plane - a book cupped '
-        + 'toward the reader, not one flap cupping in while the other cups away (the bug: "the '
-        + 'side flaps should be leaned towards camera from center, like the right side is" - only '
-        + 'the second flap was, before FRONT_COVER_OPEN_ROTATION/SECOND_FLAP_OPEN_ROTATION took '
-        + 'mirror-image offsets from PI instead of the same one)', () => {
+        + 'toward the reader, not one flap cupping in while the other cups away', () => {
         const model = buildModel()
 
         model.playOpen()

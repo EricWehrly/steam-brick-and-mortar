@@ -30,21 +30,12 @@ const SECOND_FLAP_DURATION_S = 0.2
 const CLOSE_SPEED_MULTIPLIER = 2
 
 // Fully open, each hinge stops a few degrees shy of (front cover) or past (second flap) a flat
-// 180, so both flaps' OUTER edges end up nearer the viewer than a dead-flat triptych would put
-// them - direct request (2026-09-02: "I want the game box flaps to angle in just a little when
-// open"). A book held open naturally cups toward the reader the same way.
-//
-// The two hinges need OPPOSITE offsets from Math.PI to achieve that SAME physical direction,
-// because they're mirror images of each other (FRONT_COVER_HINGE_X/SECOND_FLAP_HINGE_X have
-// opposite signs): rotating a hinge's local +X-offset mesh by an angle just short of PI moves its
-// far edge one way in local Z, and just past PI moves the mirrored hinge's far edge the SAME way
-// only if its own rotation target is mirrored too (verified by direct calculation, not just
-// assumed - a first pass here used the SAME target for both, which is what actually produced the
-// bug: the front cover receded away from the viewer while the second flap correctly came forward,
-// confirmed live 2026-09-02 - "the side flaps should be leaned towards camera from center, like
-// the right side is [but not the left]"). Both hinges' own FACING tilt (see FLAP_OPEN_ANGLE_RAD's
-// use in buildOpenClip) still ends up identical either way - cos(PI+x) equals cos(PI-x) - so this
-// only affects position, not which way each flap visually leans.
+// 180, so both flaps' outer edges cup toward the viewer like an open book instead of lying dead
+// flat. The two hinges need OPPOSITE offsets from Math.PI to produce that SAME physical direction,
+// since they're mirror images of each other (FRONT_COVER_HINGE_X/SECOND_FLAP_HINGE_X have opposite
+// signs) - using the same target for both sends one flap receding instead of cupping forward.
+// Each hinge's own facing tilt is unaffected either way (cos(PI+x) equals cos(PI-x)); only
+// position changes.
 export const FLAP_OPEN_INWARD_ANGLE_DEGREES = 9
 const FLAP_OPEN_ANGLE_RAD = THREE.MathUtils.degToRad(FLAP_OPEN_INWARD_ANGLE_DEGREES)
 // Exported so tests can assert against the real open angles instead of assuming a flat 180.
@@ -91,12 +82,11 @@ export class GameBoxFoldModel {
     private readonly leftHinge: THREE.Group
     private readonly rightHinge: THREE.Group
 
-    // Unlit (not MeshStandardMaterial): this is printed box art, not a physically-lit surface -
-    // PBR lighting response under this scene's lighting made the artwork look washed out. Color
-    // shares BOX_SURFACE_GRAY with the uikit panels' own background (GameBoxPanelStyle) rather than
-    // a separately-guessed literal - the two disagreeing is exactly what left the box's center
-    // (wherever the geometry itself shows through, outside the mounted uikit page) reading black
-    // even after the panels' own steam-gray fix (direct request, 2026-09-02, round four).
+    // Unlit (not MeshStandardMaterial): this is printed box art, not a physically-lit surface - PBR
+    // lighting response under this scene's lighting washed out the artwork. Shares BOX_SURFACE_GRAY
+    // with the uikit panels' own background (GameBoxPanelStyle) rather than a separately-guessed
+    // literal - a mismatch here is what makes the box's bare geometry (visible outside the mounted
+    // uikit page) read as a different gray, or black, from the panels sitting on it.
     private readonly plainMaterial: THREE.MeshBasicMaterial
 
     private readonly identityPanel = new GameBoxIdentityPanel()

@@ -64,14 +64,12 @@ export class SystemUICoordinator {
     private isXRSessionActive = false
     private reticleElement: HTMLElement | null = null
     private isNonPointerDeviceConnected = false
-    // Any menuType currently open, across the whole app (the pause menu, a summoned game box,
-    // ...) - owned here, not by InputManager, per PR review request (2026-09-03): "Shouldn't the
-    // UIManager or UICoordinator track 'is a menu open'?" Counted rather than boolean, since more
-    // than one modal surface can be open at once (the pause menu and a game box) and this should
-    // only clear once none are. On a 0<->positive transition this becomes a plain
-    // InputEventTypes.Pause/Resume - the same reason-based channel GameLibraryBinderUI's own,
-    // non-menu-typed overlay already uses directly - so InputManager only ever answers one simple
-    // question (is input paused) without needing to know what a "menu" is.
+    // Count of menuTypes currently open across the app (the pause menu, a summoned game box, ...) -
+    // owned here rather than InputManager. Counted rather than boolean since more than one modal
+    // surface can be open at once and this should only clear once none are. A 0<->positive
+    // transition becomes a plain InputEventTypes.Pause/Resume - the same reason-based channel
+    // GameLibraryBinderUI's own non-menu-typed overlay already uses - so InputManager only ever
+    // answers one simple question (is input paused) without needing to know what a "menu" is.
     private anyMenuOpenCount = 0
     private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
@@ -258,9 +256,8 @@ export class SystemUICoordinator {
     // pointer-lock/reticle handling below. Selecting a game box emits this same event with
     // menuType:'game-box' (see GameBoxFoldCoordinator) - the counting half reacts to that; the
     // pointer-lock/reticle half doesn't, since it's specifically about the DOM pause overlay, not
-    // any modal surface (direct request, 2026-09-02, on the pointer-lock/reticle half specifically:
-    // "why does the settings menu open when I open a game box?" - unfiltered, this used to call
-    // pauseMenuManager.open() for a game box too, popping the real pause menu open behind it).
+    // any modal surface. Unfiltered, this used to call pauseMenuManager.open() for a game box too,
+    // popping the real pause menu open behind it.
     private readonly handleMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
         this.anyMenuOpenCount++
         if (this.anyMenuOpenCount === 1) {

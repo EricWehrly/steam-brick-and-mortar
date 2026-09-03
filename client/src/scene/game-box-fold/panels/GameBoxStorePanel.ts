@@ -1,21 +1,18 @@
 /**
  * Base/center face, revealed once both flaps swing away: title, header art presented as a disc
- * emerging from its sleeve (2026-08-12 direction), a Play button sharing its row with a condensed
- * playtime summary, the user's own collections, and placeholder rows for sections with no data
- * source wired up yet. Description, rating, metacritic, genres, tags and features all live on the
- * debug face instead (see GameBoxDebugPanel).
+ * emerging from its sleeve, a Play button sharing its row with a condensed playtime summary, the
+ * user's own collections, and placeholder rows for sections with no data source wired up yet.
+ * Description, rating, metacritic, genres, tags and features all live on the debug face instead
+ * (see GameBoxDebugPanel).
  *
- * The disc's semicircle is entirely canvas-drawn - background fill, header art, and the edge
- * stroke together, in one drawDiscTexture() call - rather than split between a uikit Container's
- * own rounded-corner fill/border and a separately alpha-clipped child Image. That split looked
- * almost right (uikit's rounded-rect fill/border shader is a real per-fragment curve, not a
- * rectangle) but not quite: the two shapes are computed by different code paths that don't
- * provably agree pixel-for-pixel, and in practice left small pointy artifacts at the top corners
- * where they disagreed (direct request, 2026-09-02, screenshot markup: "thefuck stupid wings").
- * Drawing the whole disc - fill, art, and stroke - from ONE ctx.arc(PI, 2*PI) path removes the
- * second code path entirely, so there's nothing left to disagree with. This is the canvas escape
- * hatch (see docs/architecture/in-scene-ui-substrate.md), used for exactly the freeform-shape case
- * it exists for, not for the box's layout or text.
+ * The disc's semicircle is entirely canvas-drawn - background fill, header art, and edge stroke
+ * together, in one drawDiscTexture() call - rather than split between a uikit Container's own
+ * rounded-corner fill/border and a separately alpha-clipped child Image. That split looked almost
+ * right but left small pointy artifacts at the top corners, because the fill/border shader and the
+ * clipped Image are two different code paths that don't provably agree pixel-for-pixel. Drawing the
+ * whole disc from one ctx.arc(PI, 2*PI) path removes the second code path entirely. This is the
+ * canvas escape hatch (see docs/architecture/in-scene-ui-substrate.md), used for exactly the
+ * freeform-shape case it exists for, not for the box's layout or text.
  *
  * With the disc's own texture always the correct shape (placeholder or loaded), the sleeve doesn't
  * need to overlap it to hide a square edge - it just abuts, which also avoids the z-fight risk two
@@ -33,16 +30,14 @@ import {
 } from './GameBoxPanelStyle'
 
 const TITLE_MAX_HEIGHT = 50
-// Widened from the canvas version's original 0.28-of-width per direct request ("make the disc
-// bigger/wider"); 0.8 of the page still leaves a margin either side.
+// Fraction of panel width the disc spans - leaves margin either side; wider than the original
+// canvas-drawn version's 0.28.
 const DISC_DIAMETER = PANEL_WIDTH_PX * 0.8
 const DISC_HEIGHT = DISC_DIAMETER / 2
 const DISC_EDGE_COLOR = '#0a0a0a'
 const DISC_EDGE_WIDTH = 2
 // Matches the binder UI's own disc spindle-hole cutout (client/src/ui/binder/binder.css's
 // `.game-slot::before`, 18% of the disc's full diameter) - same disc motif, same proportion.
-// Direct request (2026-09-02, round five, on a green-circled screenshot markup): "can the disks
-// get a center hole like the binder disks have?"
 const DISC_HOLE_RADIUS_RATIO = 0.18
 const DISC_HOLE_COLOR = '#141414'
 const DISC_HOLE_RIM_COLOR = 'rgba(200, 195, 190, 0.35)'
@@ -53,11 +48,11 @@ const PLAY_BUTTON_PADDING_Y = 6
 const PLAY_BUTTON_HOVER_BACKGROUND = '#2a3a2a'
 
 // The disc texture's own resolution - independent of the source artwork's size (see
-// drawDiscTexture()) and independent of PANEL_WIDTH_PX (a layout unit, not a texture one). Fixed
-// 2:1 to match DISC_DIAMETER:DISC_HEIGHT exactly, so the Image can show it with a plain 'fill'
-// instead of doing its own crop. The stroke width below is chosen in these texture pixels, not
-// DISC_EDGE_WIDTH's layout units - the two scales are close enough (256 texture px for a ~240
-// layout-px disc) that reusing the same number reads the same either way.
+// drawDiscTexture()) and of PANEL_WIDTH_PX (a layout unit, not a texture one). Fixed 2:1 to match
+// DISC_DIAMETER:DISC_HEIGHT exactly, so the Image can show it with a plain 'fill' instead of doing
+// its own crop. The stroke width below is chosen in these texture pixels, not DISC_EDGE_WIDTH's
+// layout units, but the two scales are close enough (256 texture px for a ~240 layout-px disc) to
+// reuse the same number.
 const DISC_TEXTURE_WIDTH = 256
 const DISC_TEXTURE_HEIGHT = DISC_TEXTURE_WIDTH / 2
 
@@ -128,9 +123,9 @@ export class GameBoxStorePanel {
             return
         }
 
-        // Raw pixels arrive at whatever size GameArtworkProvider fetched - a small scratch canvas
-        // is just a way to hand drawImage() a source it can sample from and cover-scale; it isn't
-        // shown directly and doesn't need to persist between calls.
+        // Raw pixels arrive at whatever size GameArtworkProvider fetched - this scratch canvas just
+        // gives drawImage() a source to sample and cover-scale from; it isn't shown directly and
+        // doesn't need to persist between calls.
         const source = document.createElement('canvas')
         source.width = image.width
         source.height = image.height
@@ -171,38 +166,28 @@ export class GameBoxStorePanel {
         ctx.clip()
 
         // Base fill first, ALWAYS - not only in the no-source placeholder branch. A typical Steam
-        // header image's own aspect ratio (roughly 460x215, height/width ~0.47) is slightly
-        // SHORTER than this disc's own semicircle bounding box (height/width = 0.5 exactly), so
-        // fit-width scaling below leaves a small gap between the image's bottom edge and the
-        // disc's true bottom (the diameter line) for nearly every game - previously left fully
-        // transparent there, showing the panel root's own background color through: a gray,
-        // roughly rectangular sliver at the bottom of the disc (direct request, 2026-09-02, round
-        // six, on a screenshot: "there's a gray rectangle at the bottom of the disk... checked a
-        // few, it kept showing up" - consistent across games because it isn't game-specific, it's
-        // this aspect-ratio mismatch). Filling the whole shape with the same neutral color first
-        // means any such gap reads as part of the disc's own material, not a rendering leak.
+        // header image's aspect ratio (roughly 460x215, height/width ~0.47) is slightly SHORTER
+        // than this disc's semicircle bounding box (height/width = 0.5 exactly), so fit-width
+        // scaling below leaves a small gap between the image's bottom edge and the disc's true
+        // bottom for nearly every game. Filling the whole shape with this color first means that
+        // gap reads as part of the disc's own material, not a transparent rendering leak.
         ctx.fillStyle = PANEL_COLORS.border
         ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius)
 
         if (source) {
-            // Fit-width, not cover - direct request (2026-09-02): "can we have the game disc fit
-            // width with the image? But retain aspect ratio." Cover-fit (matching whichever of
-            // width/height needed the bigger scale) cropped the sides off a wide header image;
-            // this always matches the image's width to the disc's full diameter and lets height
-            // fall out proportionally - the arc clip above still cuts off anything that overshoots
-            // top/bottom, so a header taller than the disc's radius isn't a regression either way.
+            // Fit-width, not cover: cover-fit (matching whichever of width/height needed the bigger
+            // scale) cropped the sides off a wide header image. This always matches the image's
+            // width to the disc's full diameter and lets height fall out proportionally - the arc
+            // clip above still cuts off anything that overshoots top/bottom, so a header taller
+            // than the disc's radius isn't a regression either way.
             const scale = (radius * 2) / source.width
             const drawWidth = source.width * scale
             const drawHeight = source.height * scale
-            // Top-aligned, not centered on the circle's true center (which sits at centerY, off
-            // the bottom of this canvas - only the semicircle above it is ever visible). A typical
-            // wide header image's scaled height is shorter than the disc's own radius, so centering
-            // it on that off-canvas point left a gap between the image and the TOP of the disc -
-            // exactly the "weird gray area at the top" reported (direct request, 2026-09-02, round
-            // four) - while any shortfall at the bottom now just shows the base fill above, not a
-            // transparent leak. The exact amount of shortfall - "push down until we're reasonably
-            // at the width of the disk" - is a separate, deliberately deferred cosmetic tweak
-            // (same round six discussion), not what this base-fill change addresses.
+            // Top-aligned, not centered on the circle's true center (which sits at centerY, off the
+            // bottom of this canvas - only the semicircle above it is ever visible). A typical wide
+            // header image's scaled height is shorter than the disc's own radius, so centering it on
+            // that off-canvas point left a gap between the image and the TOP of the disc instead;
+            // any shortfall at the bottom now just shows the base fill above, not a transparent leak.
             const drawY = centerY - radius
             ctx.drawImage(source, centerX - drawWidth / 2, drawY, drawWidth, drawHeight)
         }
@@ -297,9 +282,8 @@ export class GameBoxStorePanel {
         return row
     }
 
-    /** Outlined rather than filled - the treatment it had while it was still only a drawn
-     *  rectangle. It's a real control now (uikit's own onClick, no raycast-to-UV hit-testing), but
-     *  the look is unchanged until it's had visual confirmation. */
+    /** Outlined rather than filled, matching the look it had as a drawn rectangle before becoming a
+     *  real control (uikit's own onClick, no raycast-to-UV hit-testing). */
     private buildPlayButton(): Container {
         const button = new Container({
             paddingLeft: PLAY_BUTTON_PADDING_X,
