@@ -25,6 +25,7 @@ import {
     BODY_LINE_HEIGHT, LABEL_FONT_SIZE, MONO_FONT_SIZE,
     PANEL_COLORS, PANEL_PADDING, PANEL_ROOT_PROPERTIES
 } from './GameBoxPanelStyle'
+import { Logger } from '../../../utils/Logger'
 
 // More breathing room between rows than the box's other faces get away with - direct request
 // (2026-09-02: "vertical spacing between items on the right side").
@@ -42,6 +43,8 @@ const DIVIDER_HEIGHT = 1
 const CACHE_VIEWPORT_HEIGHT = 70
 
 export class GameBoxDebugPanel {
+    private static readonly logger = Logger.createLogFunctions(GameBoxDebugPanel.name)
+
     readonly container: Container
 
     private readonly sections: Container
@@ -129,7 +132,15 @@ export class GameBoxDebugPanel {
             height: CACHE_VIEWPORT_HEIGHT,
             overflow: 'scroll',
             scrollbarColor: PANEL_COLORS.border,
-            scrollbarWidth: 3
+            scrollbarWidth: 3,
+            // TEMPORARY - remove once flatscreen wheel-scroll is confirmed working (direct
+            // request, 2026-09-02). Fires from inside uikit's own scroll.js the moment IT decides
+            // a scroll happened, so seeing this log (or not) tells us whether the wheel event ever
+            // reaches uikit's scroll handling at all, independent of whether the visual result is
+            // what's actually broken. Enable with setLogLevel('GameBoxDebugPanel', 'DEBUG').
+            onScroll: (scrollX: number, scrollY: number) => {
+                GameBoxDebugPanel.logger.debug('cache viewport onScroll fired', { scrollX, scrollY })
+            }
         })
         viewport.add(this.cacheText)
         root.add(viewport)
