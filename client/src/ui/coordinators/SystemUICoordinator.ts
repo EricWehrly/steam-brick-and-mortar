@@ -26,6 +26,8 @@ import {
     type SceneCanvasClickEvent,
     type MenuOpenEvent,
     type MenuCloseEvent,
+    type InputPauseEvent,
+    type InputResumeEvent,
     type InputDevicesChangedEvent
 } from '../../types/InteractionEvents'
 import type { SettingChangedEvent } from '../../core/AppSettings'
@@ -62,6 +64,15 @@ export class SystemUICoordinator {
     private isXRSessionActive = false
     private reticleElement: HTMLElement | null = null
     private isNonPointerDeviceConnected = false
+    // Any menuType currently open, across the whole app (the pause menu, a summoned game box,
+    // ...) - owned here, not by InputManager, per PR review request (2026-09-03): "Shouldn't the
+    // UIManager or UICoordinator track 'is a menu open'?" Counted rather than boolean, since more
+    // than one modal surface can be open at once (the pause menu and a game box) and this should
+    // only clear once none are. On a 0<->positive transition this becomes a plain
+    // InputEventTypes.Pause/Resume - the same reason-based channel GameLibraryBinderUI's own,
+    // non-menu-typed overlay already uses directly - so InputManager only ever answers one simple
+    // question (is input paused) without needing to know what a "menu" is.
+    private anyMenuOpenCount = 0
     private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
@@ -242,14 +253,20 @@ export class SystemUICoordinator {
         this.toggleLightingControls()
     }
 
-    // Filtered to 'pause' specifically - PauseMenuManager owns its own open/closed state and
-    // emits this event itself (PR review request, 2026-09-03: "the pause menu manager should be
-    // handling this open/close itself"); this handler only reacts to it. Selecting a game box
-    // emits the same event with menuType:'game-box' (see GameBoxFoldCoordinator) so shelf
-    // raycasting and camera movement also stand down while one is open - unfiltered, this handler
-    // used to call pauseMenuManager.open() for THAT too, popping the real pause menu open behind
-    // the box (direct request, 2026-09-02: "why does the settings menu open when I open a game box?").
+    // Two separate jobs share this one subscription: counting ANY open menuType into a plain
+    // InputEventTypes.Pause/Resume (see anyMenuOpenCount's own comment), and the 'pause'-specific
+    // pointer-lock/reticle handling below. Selecting a game box emits this same event with
+    // menuType:'game-box' (see GameBoxFoldCoordinator) - the counting half reacts to that; the
+    // pointer-lock/reticle half doesn't, since it's specifically about the DOM pause overlay, not
+    // any modal surface (direct request, 2026-09-02, on the pointer-lock/reticle half specifically:
+    // "why does the settings menu open when I open a game box?" - unfiltered, this used to call
+    // pauseMenuManager.open() for a game box too, popping the real pause menu open behind it).
     private readonly handleMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
+        this.anyMenuOpenCount++
+        if (this.anyMenuOpenCount === 1) {
+            this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
+        }
+
         if (event.detail.menuType !== 'pause') {
             return
         }
@@ -261,6 +278,11 @@ export class SystemUICoordinator {
     }
 
     private readonly handleMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
+        this.anyMenuOpenCount = Math.max(0, this.anyMenuOpenCount - 1)
+        if (this.anyMenuOpenCount === 0) {
+            this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
+        }
+
         if (event.detail.menuType !== 'pause') {
             return
         }

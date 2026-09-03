@@ -103,8 +103,12 @@ export class SceneClickGameBoxRaycast {
         // Asks InputManager rather than tracking menu-open state itself - PR review request,
         // 2026-09-03: "in terms of concept, logic, responsibility this should either be our
         // UIManager or our InputManager... These Input classes should be talking back to those...
-        // to facilitate blocking specific inputs for specific interface conditions."
-        if (InputManager.getActiveInstance()?.isMenuOpen()) {
+        // to facilitate blocking specific inputs for specific interface conditions." isInputPaused()
+        // is reason-agnostic by design (a later review comment: InputManager shouldn't need to
+        // know about UI concepts like "menuType" to answer this) - SystemUICoordinator is the one
+        // that counts open menus and turns that into a plain pause()/resume(), same channel
+        // GameLibraryBinderUI's own overlay already uses for its own, non-menu-typed reason.
+        if (InputManager.getActiveInstance()?.isInputPaused()) {
             return
         }
 
