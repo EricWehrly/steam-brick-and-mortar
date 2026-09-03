@@ -19,7 +19,6 @@
 import * as THREE from 'three'
 import { createRayPointer } from '@pmndrs/pointer-events'
 import type { GetCamera, Pointer } from '@pmndrs/pointer-events'
-import { ALWAYS_ON_TOP_RENDER_ORDER } from './UikitRenderOrder'
 import { CONTROLLER_AIM_DIRECTION } from '../../webxr/ControllerAimCorrection'
 
 const BEAM_COLOR = 0x4da3ff
@@ -31,7 +30,11 @@ const HIT_MARKER_COLOR = 0x4da3ff
 const HIT_MARKER_RADIUS = 0.015
 // Both the beam and hit marker need to render on top of whatever they're pointing at, or they get
 // depth-occluded right at the point that matters most: where the ray meets the target surface.
-const ON_TOP_RENDER_ORDER = ALWAYS_ON_TOP_RENDER_ORDER + 1
+// This was previously split into its own UikitRenderOrder.ts module for a floating VR settings
+// menu to share - removed (2026-09-02) since that menu isn't part of this branch and whether the
+// user-facing menu even wants this treatment is still an open question; this is this pointer's own
+// value until/unless a real second consumer shows up.
+export const ON_TOP_RENDER_ORDER = 1001
 
 /**
  * renderOrder only sorts *within* a render list, and three.js draws the whole opaque list before
