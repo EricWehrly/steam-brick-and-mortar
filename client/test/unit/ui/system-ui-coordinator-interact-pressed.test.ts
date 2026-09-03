@@ -60,7 +60,12 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
 }))
 
 function makeMockRenderer(): { domElement: HTMLCanvasElement } {
-    return { domElement: document.createElement('canvas') } as unknown as { domElement: HTMLCanvasElement }
+    const domElement = document.createElement('canvas')
+    // handleMenuClose now requests pointer lock directly (moved here from a PauseMenuManager
+    // callback - PR review request, 2026-09-03) - jsdom's canvas has no real implementation, so
+    // this needs a stub the same way system-ui-coordinator-pointer-lock.test.ts already does.
+    domElement.requestPointerLock = vi.fn().mockResolvedValue(undefined)
+    return { domElement } as unknown as { domElement: HTMLCanvasElement }
 }
 
 function emitInteractPressed(): void {

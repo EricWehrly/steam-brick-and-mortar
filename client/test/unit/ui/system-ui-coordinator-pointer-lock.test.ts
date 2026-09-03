@@ -12,14 +12,7 @@ import * as THREE from 'three'
 import { SystemUICoordinator } from '../../../src/ui/coordinators/SystemUICoordinator'
 import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
-import { WebXREventTypes } from '../../../src/types/InteractionEvents'
-
-interface CapturedPauseMenuCallbacks {
-    onMenuOpen?: () => void
-    onMenuClose?: () => void
-}
-
-let lastPauseMenuManager: { callbacks: CapturedPauseMenuCallbacks } | undefined
+import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../src/types/InteractionEvents'
 
 // vi.hoisted keeps this Map alive before vi.mock factories run - a plain module-scope
 // `let` here hits a TDZ ReferenceError, because SceneClickGameBoxRaycast's real (unmocked)
@@ -45,15 +38,13 @@ vi.mock('../../../src/core/EventManager', () => ({
     }
 }))
 
+// PauseMenuManager owns its own open/closed lifecycle and emits UIEventTypes.MenuOpen/MenuClose
+// itself now (rather than via constructor callbacks) - this mock only needs to exist so
+// SystemUICoordinator's constructor doesn't touch the real DOM-building class; the pointer-lock
+// behavior under test is driven directly through registeredHandlers, the same way
+// WebXREventTypes.SessionStart/SessionEnd already are below.
 vi.mock('../../../src/ui/pause/PauseMenuManager', () => ({
     PauseMenuManager: class {
-        callbacks: CapturedPauseMenuCallbacks
-
-        constructor(_config: unknown, callbacks: CapturedPauseMenuCallbacks) {
-            this.callbacks = callbacks
-            lastPauseMenuManager = this
-        }
-
         init() {}
         setSystemDependencies() {}
         registerDefaultPanels() {}
@@ -96,7 +87,6 @@ describe('SystemUICoordinator pointer lock wiring', () => {
     beforeEach(async () => {
         document.body.innerHTML = ''
         registeredHandlers.clear()
-        lastPauseMenuManager = undefined
 
         appSettings = AppSettings.getInstance()
         appSettings.setSetting('inputMouseLockEnabled', true)
@@ -116,8 +106,16 @@ describe('SystemUICoordinator pointer lock wiring', () => {
         document.body.innerHTML = ''
     })
 
+    function emitPauseMenuClose(): void {
+        registeredHandlers.get(UIEventTypes.MenuClose)?.({ detail: { menuType: 'pause' } as MenuCloseEvent })
+    }
+
+    function emitPauseMenuOpen(): void {
+        registeredHandlers.get(UIEventTypes.MenuOpen)?.({ detail: { menuType: 'pause' } as MenuOpenEvent })
+    }
+
     it('requests pointer lock on the canvas when the menu closes and the setting is enabled', () => {
-        lastPauseMenuManager!.callbacks.onMenuClose?.()
+        emitPauseMenuClose()
 
         expect(requestPointerLock).toHaveBeenCalledTimes(1)
     })
@@ -125,7 +123,7 @@ describe('SystemUICoordinator pointer lock wiring', () => {
     it('does not request pointer lock when the setting is disabled', () => {
         appSettings.setSetting('inputMouseLockEnabled', false)
 
-        lastPauseMenuManager!.callbacks.onMenuClose?.()
+        emitPauseMenuClose()
 
         expect(requestPointerLock).not.toHaveBeenCalled()
     })
@@ -133,7 +131,7 @@ describe('SystemUICoordinator pointer lock wiring', () => {
     it('does not request pointer lock while an XR session is active', () => {
         registeredHandlers.get(WebXREventTypes.SessionStart)?.({})
 
-        lastPauseMenuManager!.callbacks.onMenuClose?.()
+        emitPauseMenuClose()
 
         expect(requestPointerLock).not.toHaveBeenCalled()
     })
@@ -142,13 +140,13 @@ describe('SystemUICoordinator pointer lock wiring', () => {
         registeredHandlers.get(WebXREventTypes.SessionStart)?.({})
         registeredHandlers.get(WebXREventTypes.SessionEnd)?.({})
 
-        lastPauseMenuManager!.callbacks.onMenuClose?.()
+        emitPauseMenuClose()
 
         expect(requestPointerLock).toHaveBeenCalledTimes(1)
     })
 
     it('releases pointer lock when the menu opens', () => {
-        lastPauseMenuManager!.callbacks.onMenuOpen?.()
+        emitPauseMenuOpen()
 
         expect(exitPointerLock).toHaveBeenCalledTimes(1)
     })
