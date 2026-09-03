@@ -44,7 +44,7 @@ describe('GameBoxStorePanel disc texture', () => {
         panel.dispose()
     })
 
-    it('setHeaderImage(null) clears the disc back to fully transparent', () => {
+    it('the placeholder (before any header image, or after clearing one) is opaque within the semicircle and transparent outside it - a real shape, not a blank rect', () => {
         const panel = new GameBoxStorePanel(() => {})
         panel.setHeaderImage(solidImage(4, 4, [200, 100, 50, 255]))
 
@@ -53,25 +53,27 @@ describe('GameBoxStorePanel disc texture', () => {
         const canvas = discCanvas(panel)
         const ctx = canvas.getContext('2d')!
         const topCenter = ctx.getImageData(Math.floor(canvas.width / 2), 1, 1, 1).data
-        expect(topCenter[3]).toBe(0)
+        expect(topCenter[3]).toBe(255) // still a filled placeholder shape, not blank
+
+        const topLeftCorner = ctx.getImageData(0, 0, 1, 1).data
+        expect(topLeftCorner[3]).toBe(0) // outside the arc either way
 
         panel.dispose()
     })
 
-    it('adds the header Image to the disc only once an image is actually set', () => {
+    it('the disc has exactly one Image, constructed once and reused across every selection', () => {
         const panel = new GameBoxStorePanel(() => {})
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const disc = (panel as any).disc
-        const childrenBefore = disc.children.length
+        expect(disc.children).toHaveLength(1)
+        const image = disc.children[0]
 
         panel.setHeaderImage(solidImage(4, 4, [200, 100, 50, 255]))
-        expect(disc.children.length).toBe(childrenBefore + 1)
-
         panel.setHeaderImage(solidImage(4, 4, [10, 20, 30, 255]))
-        expect(disc.children.length).toBe(childrenBefore + 1) // reused, not re-added
-
         panel.setHeaderImage(null)
-        expect(disc.children.length).toBe(childrenBefore)
+
+        expect(disc.children).toHaveLength(1)
+        expect(disc.children[0]).toBe(image)
 
         panel.dispose()
     })
