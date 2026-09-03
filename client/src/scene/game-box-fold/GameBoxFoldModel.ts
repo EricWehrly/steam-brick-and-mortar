@@ -5,6 +5,7 @@ import type { GameBoxFoldContent, GameBoxFoldHeaderImage } from './GameBoxFoldCo
 import { GameBoxIdentityPanel } from './panels/GameBoxIdentityPanel'
 import { GameBoxStorePanel } from './panels/GameBoxStorePanel'
 import { GameBoxDebugPanel } from './panels/GameBoxDebugPanel'
+import { BOX_SURFACE_GRAY } from './panels/GameBoxPanelStyle'
 
 // Closed-state stacking: base, front cover, and second flap sit at the SAME X/Y footprint,
 // separated only by this much local Z, so they read as one closed box (front cover outermost,
@@ -91,7 +92,11 @@ export class GameBoxFoldModel {
     private readonly rightHinge: THREE.Group
 
     // Unlit (not MeshStandardMaterial): this is printed box art, not a physically-lit surface -
-    // PBR lighting response under this scene's lighting made the artwork look washed out.
+    // PBR lighting response under this scene's lighting made the artwork look washed out. Color
+    // shares BOX_SURFACE_GRAY with the uikit panels' own background (GameBoxPanelStyle) rather than
+    // a separately-guessed literal - the two disagreeing is exactly what left the box's center
+    // (wherever the geometry itself shows through, outside the mounted uikit page) reading black
+    // even after the panels' own steam-gray fix (direct request, 2026-09-02, round four).
     private readonly plainMaterial: THREE.MeshBasicMaterial
 
     private readonly identityPanel = new GameBoxIdentityPanel()
@@ -105,7 +110,7 @@ export class GameBoxFoldModel {
         this.group = new THREE.Group()
         this.group.name = 'game-box-fold-model'
 
-        this.plainMaterial = new THREE.MeshBasicMaterial({ color: 0x3a2a1a })
+        this.plainMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(BOX_SURFACE_GRAY) })
         this.storePanel = new GameBoxStorePanel(onPlay)
 
         // Base: bottom of the stack, furthest from the viewer (largest local Z). The store page
