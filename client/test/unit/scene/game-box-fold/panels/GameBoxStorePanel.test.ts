@@ -1,9 +1,8 @@
 /**
- * GameBoxStorePanel - the disc's alpha-clipped semicircle specifically (direct request,
- * 2026-09-02: "the disc isn't rounded"). uikit's overflow:'hidden' clips children to a plain
- * rectangle regardless of border-radius, so a full-bleed header Image needs its OWN transparent
- * corners to read as a semicircle - this is the one thing the class draws by hand, and the one
- * thing worth a dedicated regression test.
+ * GameBoxStorePanel - the disc's alpha-clipped semicircle specifically. uikit's overflow:'hidden'
+ * clips children to a plain rectangle regardless of border-radius, so a full-bleed header Image
+ * needs its OWN transparent corners to read as a semicircle - this is the one thing the class draws
+ * by hand, and the one thing worth a dedicated regression test.
  */
 import { describe, it, expect } from 'vitest'
 import { GameBoxStorePanel } from '../../../../../src/scene/game-box-fold/panels/GameBoxStorePanel'
@@ -61,9 +60,7 @@ describe('GameBoxStorePanel disc texture', () => {
         panel.dispose()
     })
 
-    it('draws a spindle hole at the disc\'s center, like the binder UI\'s own disc cutout - direct '
-        + 'request (2026-09-02, round five): "can the disks get a center hole like the binder disks '
-        + 'have?"', () => {
+    it('draws a spindle hole at the disc\'s center, like the binder UI\'s own disc cutout', () => {
         const panel = new GameBoxStorePanel(() => {})
         panel.setHeaderImage(solidImage(4, 4, [200, 100, 50, 255]))
 
@@ -88,11 +85,9 @@ describe('GameBoxStorePanel disc texture', () => {
     })
 
     it('fills the gap under a wide header image with the same neutral base color, not a '
-        + 'transparent leak through to the panel behind - direct request (2026-09-02, round six, '
-        + 'on a screenshot): "there\'s a gray rectangle at the bottom of the disk... checked a few, '
-        + 'it kept showing up." A typical Steam header image\'s aspect ratio (~460x215) is shorter '
-        + 'than the disc\'s own semicircle bounding box once fit to its width, leaving a gap at the '
-        + 'bottom for nearly every game - not game-specific, so it kept recurring.', () => {
+        + 'transparent leak through to the panel behind - a typical Steam header image\'s aspect '
+        + 'ratio (~460x215) is shorter than the disc\'s own semicircle bounding box once fit to its '
+        + 'width, leaving a gap at the bottom for nearly every game', () => {
         const panel = new GameBoxStorePanel(() => {})
         // Same ~2.14:1 aspect as a real Steam header image (460x215) - narrow enough that
         // fit-width scaling leaves height short of the disc's own semicircle bounding box.

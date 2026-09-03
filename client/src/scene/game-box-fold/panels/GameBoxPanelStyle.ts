@@ -14,19 +14,13 @@
 import { BOX_WIDTH, BOX_HEIGHT } from '../GameBoxFoldDimensions'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 
-// Reuses the EXISTING surface ramp (tokens.css's own "ordered deepest->lightest" ladder) rather
-// than a bare hex literal, or a new box-specific token - direct request (2026-09-02, round six):
-// "we already have said tokens... there should already be steam colors present in tokens.css."
-// surface3 (lightest of the three) reads as the box's own steam-gray material; surface2 (one step
-// deeper) is the "nested panel" shade tokens.css already describes for exactly this kind of
-// depth-behind-the-surface look, reused here for the store panel's sleeve. A prior pass tried only
-// surface1 (near-black - "the box reads as full black"), read that single failure as "the whole
-// ramp doesn't have this vocabulary," and added new --color-box-surface/--color-box-sleeve tokens
-// instead of trying the REST of the existing ramp first - reverted. Re-exported under these names
-// (not just inlined into PANEL_COLORS below) so GameBoxFoldModel's plainMaterial keeps importing a
-// name that reads as "the box's own material," rather than reaching into a styling module for a
-// bare COLOR_TOKENS.surface3 that doesn't read as obviously relevant to a THREE.Mesh material two
-// files away.
+// Reuses the EXISTING surface ramp (tokens.css's deepest->lightest ladder) rather than a bare hex
+// literal or new box-specific tokens: surface3 (lightest) reads as the box's own steam-gray
+// material, surface2 (one step deeper) is the "nested panel" shade already meant for exactly this
+// depth-behind-the-surface look, reused here for the store panel's sleeve. Re-exported under these
+// names (not just inlined into PANEL_COLORS below) so GameBoxFoldModel's plainMaterial imports a
+// name that reads as "the box's own material," rather than a bare COLOR_TOKENS.surface3 that
+// doesn't obviously read as box-relevant two files away.
 export const BOX_SURFACE_GRAY = COLOR_TOKENS.surface3
 const BOX_SLEEVE_GRAY = COLOR_TOKENS.surface2
 

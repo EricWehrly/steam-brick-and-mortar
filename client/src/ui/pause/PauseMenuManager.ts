@@ -118,21 +118,19 @@ export class PauseMenuManager {
         // it's open - a pure dismiss, not a toggle, so it never reopens a closed menu.
         this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
 
-        // Tracks other menuTypes ('game-box', ...) so handleOpenMenuPressed can tell "Escape/Start
-        // just closed that instead" apart from a genuine request to open THIS menu - see that
-        // handler's own comment. Filtered off 'pause' itself - this instance already tracks its
-        // own state via this.state.isOpen and doesn't need to hear its own MenuOpen/MenuClose back.
+        // Tracks other menuTypes ('game-box', ...) so handleOpenMenuPressed can tell an Escape/Start
+        // that closed one of those apart from a genuine request to open THIS menu. Filtered off
+        // 'pause' itself since this instance already tracks its own state via this.state.isOpen.
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleOtherMenuClose)
     }
 
     // Escape/Start is bound to BOTH OpenMenu and Cancel (see CancelPressedEvent.bundledWithOpenMenu's
     // own doc comment), and OpenMenuPressed fires unconditionally on every such press regardless of
-    // what else is currently open. With a game box open, that same Escape press is meant to close
-    // the box (GameBoxFoldCoordinator's own CancelPressed handler) - not ALSO pop the settings menu
-    // open behind it, which is what toggling unconditionally here did (direct request, 2026-09-02,
-    // round four: "esc to close game box opens settings menu"). Skipping the toggle whenever some
-    // other menuType is currently up leaves the normal case (nothing else open) unchanged.
+    // what else is open. With a game box open, that Escape press is meant to close the box
+    // (GameBoxFoldCoordinator's own CancelPressed handler), not ALSO pop this menu open behind it -
+    // which unconditional toggling used to do. Skipping the toggle while another menuType is up
+    // leaves the normal case (nothing else open) unchanged.
     private readonly handleOpenMenuPressed = (): void => {
         if (this.isOtherMenuOpen) {
             return
@@ -154,10 +152,9 @@ export class PauseMenuManager {
 
     // Skips a Cancel bundled with the SAME OpenMenu press (Escape/Start bind to both - see
     // CancelPressedEvent.bundledWithOpenMenu's own doc comment): handleOpenMenuPressed's toggle()
-    // already resolved open/closed for this press, so also closing here immediately undid an
-    // open it had just performed, reading as "Escape doesn't open the menu" (direct request,
-    // 2026-09-02). A standalone Cancel (gamepad B/Circle, or Escape/Start with nothing bound to
-    // OpenMenu) has no such flag and still closes normally.
+    // already resolved open/closed for this press, so also closing here would immediately undo an
+    // open it just performed. A standalone Cancel (gamepad B/Circle, or Escape/Start with nothing
+    // bound to OpenMenu) has no such flag and still closes normally.
     private readonly handleCancelPressed = (event: CustomEvent<CancelPressedEvent>): void => {
         if (event.detail?.bundledWithOpenMenu) {
             return
@@ -270,15 +267,12 @@ export class PauseMenuManager {
         }
 
         // This class owns its own open/closed lifecycle - it emits UIEventTypes.MenuOpen itself
-        // rather than through a callback relayed by whichever coordinator happens to construct it
-        // (direct PR review request, 2026-09-03: "the pause menu manager should be handling this
-        // open/close itself"). Anything that reacts to a menu opening (SystemUICoordinator's own
-        // pointer-lock/reticle handling and its menu-open counting that pauses InputManager,
-        // WebXREventHandler, ...) subscribes to this event directly - this class has no separate
-        // "pause input" concept of its own to emit (a prior pass here also emitted
-        // InputEventTypes.Pause/Resume directly, which was really the same thing SystemUICoordinator
-        // already derives from this exact event - removed per PR review request, 2026-09-03:
-        // "Shouldn't the UIManager or UICoordinator track 'is a menu open'?").
+        // rather than through a callback relayed by whichever coordinator constructs it. Anything
+        // that reacts to a menu opening (SystemUICoordinator's pointer-lock/reticle handling and its
+        // menu-open counting that pauses InputManager, WebXREventHandler, ...) subscribes to this
+        // event directly. This class has no separate "pause input" concept to emit itself - a prior
+        // pass here also emitted InputEventTypes.Pause/Resume directly, but that was the same thing
+        // SystemUICoordinator already derives from this event, so it was removed.
         this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
     }
 

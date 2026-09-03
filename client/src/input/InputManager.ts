@@ -26,15 +26,12 @@ export class InputManager {
     }
 
     private isListeningToEvents = false
-    // Reason-agnostic: WHY input should be paused (the pause menu, a summoned game box, a binder
-    // overlay, ...) is a UI-domain question this class deliberately stays ignorant of - whatever
-    // decides that (SystemUICoordinator counts open menus; GameLibraryBinderUI has its own reason)
-    // just tells this class via pause()/resume() or the InputEventTypes.Pause/Resume it's wired to
-    // elsewhere. An input-consuming class asks isInputPaused() - one simple question - instead of
-    // this class reaching into UI concepts (menuType, MenuOpen/MenuClose) to compute its own
-    // answer (PR review request, 2026-09-03: "Doesn't this still 'dedup' to the existing path of
-    // 'when an input happens, ask the input coordinator if it's in a state to want our events'?" -
-    // a prior pass had this class listening to UIEventTypes.MenuOpen/MenuClose directly instead).
+    // Reason-agnostic: WHY input should be paused (pause menu, summoned game box, binder overlay,
+    // ...) is a UI-domain question this class deliberately stays ignorant of - whatever decides
+    // that (SystemUICoordinator counts open menus; GameLibraryBinderUI has its own reason) just
+    // calls pause()/resume(), or the InputEventTypes.Pause/Resume it's wired to elsewhere. An
+    // input-consuming class asks isInputPaused() instead of this class reaching into UI concepts
+    // (menuType, MenuOpen/MenuClose) to compute its own answer.
     private isPaused = false
     /** Flipped by SprintTogglePressed (currently only VR's left-thumbstick-click) - a discrete
      *  toggle, distinct from Sprint's hold-based keyboard Shift/gamepad stick-press. */

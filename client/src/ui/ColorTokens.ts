@@ -1,21 +1,16 @@
 /**
  * Color tokens read live from this directory's own tokens.css --color-* custom properties (the
  * app's one real design-token source) via getComputedStyle, resolved once at module load into a
- * plain hex-string object any non-CSS-aware code can import - not specific to uikit, or to any
- * other consumer. Originally built (and named) for uikit's own three.js surfaces specifically,
- * since uikit can't read CSS custom properties itself - these become plain three.js materials/
- * instanced meshes, not a DOM tree with a stylesheet cascade. Renamed and moved out of scene/uikit
- * once it became clear the same need (any TypeScript code wanting a live CSS color value) isn't
- * unique to uikit at all (direct request, 2026-09-03: "the color tokens aren't unique to UIKit, so
- * our naming is bad... we want to build toward the generic implementation").
+ * plain hex-string object any non-CSS-aware code can import - not specific to uikit or any other
+ * consumer. uikit can't read CSS custom properties itself (its surfaces are plain three.js
+ * materials/instanced meshes, not a DOM tree with a stylesheet cascade), but the need for a live
+ * CSS color value in TypeScript isn't unique to uikit, hence the generic name and location.
  *
  * Covers in-world "material" surfaces (a game box's own printed-cardboard color, GameBoxPanelStyle's
  * PANEL_COLORS.surface/sleeve reusing surface3/surface2 below) as well as DOM UI chrome - this ramp
  * is the one design-token source regardless of what's consuming a color. Reuse an existing key here
  * before reaching for a bare hex literal anywhere, even for something that reads as "content" rather
- * than "UI" - direct request (2026-09-02): a prior pass added new tokens instead of trying the
- * existing surface ramp first ("we already have said tokens... there should already be steam colors
- * present in tokens.css").
+ * than "UI".
  *
  * The FALLBACKS below (tokens.css's own shipped values) only kick in where getComputedStyle isn't
  * meaningful - non-browser test environments where tokens.css's <style> tag was never injected - so

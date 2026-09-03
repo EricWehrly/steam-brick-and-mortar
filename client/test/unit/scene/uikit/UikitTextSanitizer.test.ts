@@ -1,7 +1,6 @@
 /**
- * UikitTextSanitizer - HTML entity decoding (direct request, 2026-09-02, screenshot markup:
- * Steam's short_description showed a literal "&amp;" instead of "&") alongside the existing
- * glyph-stripping/whitespace behavior.
+ * UikitTextSanitizer - HTML entity decoding (Steam's short_description otherwise shows a literal
+ * "&amp;" instead of "&") alongside the existing glyph-stripping/whitespace behavior.
  */
 import { describe, it, expect } from 'vitest'
 import { toUikitSafeText, toUikitSafeMultilineText } from '../../../../src/scene/uikit/UikitTextSanitizer'

@@ -134,10 +134,8 @@ describe('GameBoxFoldCoordinator', () => {
 
     it('keeps the box\'s top edge level under its real rotation - MODEL_FACING_ROTATION_Y\'s own '
         + '180-degree yaw combined with the flatscreen pitch - even though THREE\'s default Euler '
-        + 'order would roll a level edge once any yaw and any pitch are both nonzero (verified '
-        + 'empirically, not assumed); rotation.order must be \'YXZ\' (pitch first) to prevent that '
-        + '(direct request, 2026-09-02, screenshot markup: "held at an angle on an axis I expect '
-        + 'to be flat")', () => {
+        + 'order would roll a level edge once any yaw and any pitch are both nonzero; '
+        + 'rotation.order must be \'YXZ\' (pitch first) to prevent that', () => {
         const camera = new THREE.Object3D()
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
 
@@ -173,8 +171,7 @@ describe('GameBoxFoldCoordinator', () => {
 
     it('uses VR_CAMERA_ANCHOR_DISTANCE_MARGIN instead when camera-anchored with a single connected '
         + 'controller (VR) - flatscreen and VR share the same camera-anchor path but not the same '
-        + 'reserve distance (direct request, 2026-09-02, round six: VR still read as "too close" '
-        + 'after a flatscreen-only "closer" request had reduced the shared margin)', () => {
+        + 'reserve distance', () => {
         const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
         const grip = new THREE.Object3D()
         const connectedControllers: XRControllerState[] = [

@@ -99,15 +99,10 @@ export class SceneClickGameBoxRaycast {
         }
 
         // A summoned game box or the pause menu already owns what a click means - the shelf
-        // shouldn't be racing it to open a second box underneath (direct request, 2026-09-02).
-        // Asks InputManager rather than tracking menu-open state itself - PR review request,
-        // 2026-09-03: "in terms of concept, logic, responsibility this should either be our
-        // UIManager or our InputManager... These Input classes should be talking back to those...
-        // to facilitate blocking specific inputs for specific interface conditions." isInputPaused()
-        // is reason-agnostic by design (a later review comment: InputManager shouldn't need to
-        // know about UI concepts like "menuType" to answer this) - SystemUICoordinator is the one
-        // that counts open menus and turns that into a plain pause()/resume(), same channel
-        // GameLibraryBinderUI's own overlay already uses for its own, non-menu-typed reason.
+        // shouldn't race it to open a second box underneath. Asks InputManager rather than
+        // tracking menu-open state itself: isInputPaused() is reason-agnostic, and
+        // SystemUICoordinator is the one that counts open menus and turns that into a plain
+        // pause()/resume(), the same channel GameLibraryBinderUI's overlay already uses.
         if (InputManager.getActiveInstance()?.isInputPaused()) {
             return
         }
@@ -153,13 +148,11 @@ export class SceneClickGameBoxRaycast {
         }
 
         // Shelf/wall/prop geometry doesn't carry SceneLayer.Interactable (only game-box artwork/
-        // label meshes do - see the constructor), so the layer-filtered pass below would find a
-        // box straight through a physically nearer, non-interactable occluder - a shelf panel, a
-        // wall - if that box happened to be the nearest INTERACTABLE thing on the ray, regardless
-        // of what the player can actually see (direct request, 2026-09-02: "rays can go through
-        // shelves ... need to only worry about essentially the pixels the player camera can
-        // see"). This unfiltered pass finds the nearest surface of ANY kind first, so the
-        // interactable pass below can be rejected once it goes past that.
+        // label meshes do - see the constructor), so the layer-filtered pass below could find a
+        // box straight through a nearer, non-interactable occluder if that box were the nearest
+        // INTERACTABLE thing on the ray, regardless of what the player can actually see. This
+        // unfiltered pass finds the nearest surface of ANY kind first, so the interactable pass
+        // below can be rejected once it goes past that.
         this.raycaster.layers.enableAll()
         const nearestVisible = this.raycaster.intersectObjects(scene.children, true)[0] ?? null
         this.raycaster.layers.mask = 1 << SceneLayer.Interactable

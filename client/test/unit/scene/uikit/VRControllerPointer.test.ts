@@ -72,8 +72,7 @@ describe('VRControllerPointer', () => {
     })
 
     it('draws both the beam and the hit marker in the transparent pass, above uikit panels - an '
-        + 'opaque overlay is drawn before every transparent panel regardless of renderOrder, which '
-        + 'is what put the cursor visually behind the menus it was pointing at', () => {
+        + 'opaque overlay draws before every transparent panel regardless of renderOrder', () => {
         createPointer()
 
         const beam = raySpace.children[0] as THREE.Mesh

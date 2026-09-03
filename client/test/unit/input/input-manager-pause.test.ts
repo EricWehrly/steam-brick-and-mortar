@@ -109,13 +109,10 @@ describe('InputManager pause()/resume()', () => {
         manager.dispose()
     })
 
-    it('isInputPaused() reflects pause()/resume() - the one reason-agnostic question an '
+    it('isInputPaused() reflects pause()/resume() - the reason-agnostic question an '
         + 'input-consuming class (e.g. SceneClickGameBoxRaycast) asks instead of reaching into UI '
-        + 'concepts like "menuType" itself (PR review request, 2026-09-03: "Doesn\'t this still '
-        + '\'dedup\' to the existing path of \'when an input happens, ask the input coordinator if '
-        + 'it\'s in a state to want our events\'?"). WHAT decides to call pause()/resume() (menu-open '
-        + 'counting lives in SystemUICoordinator now, not here) is deliberately not this class\'s '
-        + 'concern.', () => {
+        + 'concepts like "menuType" itself. WHAT decides to call pause()/resume() (menu-open '
+        + 'counting lives in SystemUICoordinator, not here) is not this class\'s concern.', () => {
         expect(manager.isInputPaused()).toBe(false)
 
         manager.pause()

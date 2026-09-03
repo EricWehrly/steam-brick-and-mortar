@@ -1,31 +1,24 @@
 /**
  * Second-flap face: the store-page-style content that doesn't fit the front cover or the store
- * panel - description, rating, metacritic, genres and tags (each moved here by explicit request
- * through 2026-08-20) - followed by a visually distinct, deliberately minor "cache entry" section
- * holding the raw JSON this box's content was built from.
+ * panel - description, rating, metacritic, genres and tags - followed by a visually distinct,
+ * deliberately minor "cache entry" section holding the raw JSON this box's content was built from.
  *
- * That JSON sits in a uikit overflow:'scroll' viewport, which is the whole reason scrolling here no
- * longer needs gating: only the viewport scrolls, because only the viewport is scrollable. The
- * canvas version had to hit-test a wheel event's position against a remembered Y to stop the
- * description and chip rows above from scrolling the JSON too.
+ * That JSON sits in a uikit overflow:'scroll' viewport, which is why scrolling here no longer needs
+ * gating: only the viewport scrolls, because only the viewport is scrollable. The canvas version
+ * had to hit-test a wheel event's position against a remembered Y to stop the description and chip
+ * rows above from scrolling the JSON too.
  *
- * The sections column above the cache entry is its OWN bounded, scrollable area rather than a
- * plain flex child sized however it happens to come out. Left unbounded, a verbose game's content
- * could exceed the fixed page height, and content that overflows a fixed-height flex column here
- * visibly overlapped the cache viewport below it rather than merely clipping (direct request,
- * 2026-09-02: "the visuals are very crowded"). A capped, scrollable area degrades to a scrollbar
- * instead.
+ * The sections column above the cache entry is its OWN bounded, scrollable area rather than a plain
+ * flex child sized however it happens to come out - left unbounded, a verbose game's content could
+ * exceed the fixed page height and visibly overlap the cache viewport below it rather than merely
+ * clipping. A capped, scrollable area degrades to a scrollbar instead.
  *
  * Both scrollable Containers below (sectionsArea, the cache-entry viewport) declare
  * flexDirection:'column' explicitly - easy to leave off, since a single-child scroll area looks
  * right either way until you actually try to scroll it. uikit defaults an unset flexDirection to
- * 'row' and an unset alignItems to 'stretch' (confirmed against its own setter.js default-index
- * constants, not assumed): with 'row', height is the CROSS axis, so 'stretch' forces the single
- * child to exactly the container's fixed height regardless of its own real content size - which
- * makes maxScrollPosition compute to ~0 (there's nothing left to scroll to, because the child was
- * never allowed to be taller than the box in the first place). Confirmed live (2026-09-03): wheel
- * events reached the canvas and uikit's own onScroll fired every time, but scrollY stayed 0
- * regardless of scroll direction - exactly what a permanently-zero max scroll position produces.
+ * 'row' and an unset alignItems to 'stretch': with 'row', height is the CROSS axis, so 'stretch'
+ * forces the single child to exactly the container's fixed height regardless of its own real
+ * content size, which makes maxScrollPosition compute to ~0 (there's nothing left to scroll to).
  * 'column' makes height the MAIN axis instead, where a child lays out at its own natural size by
  * default.
  */
@@ -39,19 +32,16 @@ import {
     PANEL_COLORS, PANEL_PADDING, PANEL_ROOT_PROPERTIES
 } from './GameBoxPanelStyle'
 
-// More breathing room between rows than the box's other faces get away with - direct request
-// (2026-09-02: "vertical spacing between items on the right side").
+// More breathing room between rows than the box's other faces use.
 const SECTION_GAP = 14
-// More allowance than a single tight budget - direct request (2026-09-02: "give a little more
-// vertical space allowance for description"). overflow:'hidden' still clips a description longer
-// than this rather than pushing the sections below it around from game to game.
+// overflow:'hidden' still clips a description longer than this rather than pushing the sections
+// below it around from game to game.
 const DESCRIPTION_MAX_LINES = 8
 const SECTIONS_MAX_HEIGHT = 260
 const DIVIDER_HEIGHT = 1
-// Fixed, not flexGrow - direct request (2026-09-02: "the cache entry needs to be smaller until we
-// can put it on a separate screen"). A flexGrow share of whatever's left over also meant its
-// available height could shrink toward zero once the sections above it ran long, which was part
-// of the same overlap this file's class doc comment describes.
+// Fixed, not flexGrow - a flexGrow share of whatever's left over could shrink toward zero once the
+// sections above it ran long, contributing to the overlap described in this file's class doc
+// comment.
 const CACHE_VIEWPORT_HEIGHT = 70
 
 export class GameBoxDebugPanel {
@@ -79,8 +69,7 @@ export class GameBoxDebugPanel {
             // verticalAlign:'top' - uikit's own Text default is 'middle', which combined with
             // this area's overflow:'hidden' clip meant a description longer than
             // DESCRIPTION_MAX_LINES was centered then clipped top AND bottom, starting mid-
-            // sentence rather than at the start (direct request, 2026-09-02: "needs to start at
-            // the start if it's scrollable, not the end or the weird middle its at").
+            // sentence rather than at the start.
             description.setProperties({ verticalAlign: 'top' })
             const descriptionArea = new Container({
                 width: '100%',
@@ -102,9 +91,8 @@ export class GameBoxDebugPanel {
 
         // TD: game-box-features-icon-display - a plain chip row of Steam's raw category strings
         // ("Full controller support", "Steam Cloud", ...) wasn't pulling its weight next to
-        // GENRES/TAGS - direct request (2026-09-02: "the features section isn't that helpful. We
-        // need to deliberately park it until we can represent it with icons"). content.categories
-        // is still built (deduped) by GameBoxFoldCoordinator; only the display is parked.
+        // GENRES/TAGS, so display is parked until it can use icons instead. content.categories is
+        // still built (deduped) by GameBoxFoldCoordinator; only the display is parked.
         for (const section of [
             buildChipSection('GENRES', content?.genres, PANEL_COLORS.genres),
             buildChipSection('TAGS', content?.tags, PANEL_COLORS.tags)

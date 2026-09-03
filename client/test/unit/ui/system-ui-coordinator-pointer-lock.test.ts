@@ -39,10 +39,10 @@ vi.mock('../../../src/core/EventManager', () => ({
 }))
 
 // PauseMenuManager owns its own open/closed lifecycle and emits UIEventTypes.MenuOpen/MenuClose
-// itself now (rather than via constructor callbacks) - this mock only needs to exist so
-// SystemUICoordinator's constructor doesn't touch the real DOM-building class; the pointer-lock
-// behavior under test is driven directly through registeredHandlers, the same way
-// WebXREventTypes.SessionStart/SessionEnd already are below.
+// itself now (not via constructor callbacks) - this mock only needs to exist so
+// SystemUICoordinator's constructor doesn't touch the real DOM-building class. Pointer-lock
+// behavior is driven directly through registeredHandlers, same as WebXREventTypes.SessionStart/
+// SessionEnd below.
 vi.mock('../../../src/ui/pause/PauseMenuManager', () => ({
     PauseMenuManager: class {
         init() {}
