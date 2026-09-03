@@ -7,12 +7,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { VRControllerPointer, RAY_DIRECTION, ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/VRControllerPointer'
+import { VRControllerPointer, ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/VRControllerPointer'
+import { CONTROLLER_AIM_DIRECTION } from '../../../../src/webxr/ControllerAimCorrection'
 
 /** Places a target exactly one unit along the pointer's real (pitch-corrected) ray direction,
  *  so tests hit it regardless of the exact correction angle in use. */
 function positionOnRay(target: THREE.Object3D, distance = 1): void {
-    target.position.copy(RAY_DIRECTION).multiplyScalar(distance)
+    target.position.copy(CONTROLLER_AIM_DIRECTION).multiplyScalar(distance)
 }
 
 // Plain THREE.Group's addEventListener/dispatchEvent types only know Object3DEventMap - real
