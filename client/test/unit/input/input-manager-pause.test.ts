@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InputManager } from '../../../src/input/InputManager'
 import { InputProfileId } from '../../../src/input/InputProfile'
 import { EventManager } from '../../../src/core/EventManager'
-import { InputEventTypes, UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../src/types/InteractionEvents'
+import { InputEventTypes } from '../../../src/types/InteractionEvents'
 
 function createGamepadWithButtonPressed(buttonIndex: number): Gamepad {
     return {
@@ -109,54 +109,21 @@ describe('InputManager pause()/resume()', () => {
         manager.dispose()
     })
 
-    it('isMenuOpen() reflects UIEventTypes.MenuOpen/MenuClose - the shared "is a menu up" check '
-        + 'input-adjacent classes (e.g. SceneClickGameBoxRaycast) query instead of tracking their '
-        + 'own menu-open state (PR review request, 2026-09-03)', () => {
-        const eventManager = EventManager.getInstance()
-        expect(manager.isMenuOpen()).toBe(false)
+    it('isInputPaused() reflects pause()/resume() - the one reason-agnostic question an '
+        + 'input-consuming class (e.g. SceneClickGameBoxRaycast) asks instead of reaching into UI '
+        + 'concepts like "menuType" itself (PR review request, 2026-09-03: "Doesn\'t this still '
+        + '\'dedup\' to the existing path of \'when an input happens, ask the input coordinator if '
+        + 'it\'s in a state to want our events\'?"). WHAT decides to call pause()/resume() (menu-open '
+        + 'counting lives in SystemUICoordinator now, not here) is deliberately not this class\'s '
+        + 'concern.', () => {
+        expect(manager.isInputPaused()).toBe(false)
 
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        expect(manager.isMenuOpen()).toBe(true)
+        manager.pause()
+        expect(manager.isInputPaused()).toBe(true)
 
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
-        expect(manager.isMenuOpen()).toBe(false)
+        manager.resume()
+        expect(manager.isInputPaused()).toBe(false)
 
-        manager.dispose()
-    })
-
-    it('isMenuOpen() only clears once every open menu has closed - the pause menu and a game box '
-        + 'can be open independently', () => {
-        const eventManager = EventManager.getInstance()
-
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
-        expect(manager.isMenuOpen()).toBe(true)
-
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
-        expect(manager.isMenuOpen()).toBe(false)
-
-        manager.dispose()
-    })
-
-    it('suspends camera movement while any menu is open, even without an explicit pause() call - '
-        + 'the dedup that replaced WebXREventHandler independently reacting to '
-        + 'UIEventTypes.MenuOpen/MenuClose itself (PR review request, 2026-09-03: "dedup '
-        + 'WebXREventHandler\'s pause on menu into InputManager\'s handling")', () => {
-        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
-        const eventManager = EventManager.getInstance()
-
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        const positionBefore = camera.position.clone()
-        manager.updateCameraMovement(camera)
-
-        expect(camera.position.equals(positionBefore)).toBe(true)
-
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
-        manager.updateCameraMovement(camera)
-        expect(camera.position.equals(positionBefore)).toBe(false)
-
-        document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
         manager.dispose()
     })
 })

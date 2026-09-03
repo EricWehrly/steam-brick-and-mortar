@@ -21,17 +21,13 @@ import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
-import type {
-    SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent,
-    InputPauseEvent, InputResumeEvent
-} from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
 export interface PauseMenuState {
     isOpen: boolean
     activePanel: string | null
-    inputPaused: boolean
     previousFocus: HTMLElement | null
 }
 
@@ -60,7 +56,6 @@ export class PauseMenuManager {
     private state: PauseMenuState = {
         isOpen: false,
         activePanel: null,
-        inputPaused: false,
         previousFocus: null
     }
 
@@ -262,10 +257,7 @@ export class PauseMenuManager {
 
         this.state.isOpen = true
         this.state.previousFocus = document.activeElement as HTMLElement
-        
-        // Pause input
-        this.pauseInput()
-        
+
         // Show overlay
         if (this.overlay) {
             this.overlay.style.display = 'flex'
@@ -280,8 +272,13 @@ export class PauseMenuManager {
         // This class owns its own open/closed lifecycle - it emits UIEventTypes.MenuOpen itself
         // rather than through a callback relayed by whichever coordinator happens to construct it
         // (direct PR review request, 2026-09-03: "the pause menu manager should be handling this
-        // open/close itself"). Anything that reacts to a menu opening (SystemUICoordinator's
-        // pointer-lock/reticle handling, WebXREventHandler, ...) subscribes to this event directly.
+        // open/close itself"). Anything that reacts to a menu opening (SystemUICoordinator's own
+        // pointer-lock/reticle handling and its menu-open counting that pauses InputManager,
+        // WebXREventHandler, ...) subscribes to this event directly - this class has no separate
+        // "pause input" concept of its own to emit (a prior pass here also emitted
+        // InputEventTypes.Pause/Resume directly, which was really the same thing SystemUICoordinator
+        // already derives from this exact event - removed per PR review request, 2026-09-03:
+        // "Shouldn't the UIManager or UICoordinator track 'is a menu open'?").
         this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
     }
 
@@ -300,9 +297,6 @@ export class PauseMenuManager {
             this.overlay.style.display = 'none'
         }
 
-        // Resume input
-        this.resumeInput()
-        
         // Restore focus
         if (this.state.previousFocus) {
             this.state.previousFocus.focus()
@@ -360,25 +354,6 @@ export class PauseMenuManager {
 
     isOpen(): boolean {
         return this.state.isOpen
-    }
-
-    // Emitted directly, same reasoning as MenuOpen/MenuClose above (PR review request,
-    // 2026-09-03: "look into onPauseInput/onResumeInput") - these were the same callback-relay
-    // shape, just for InputEventTypes.Pause/Resume instead of UIEventTypes.MenuOpen/MenuClose.
-    // 'menu' matches the reason SystemUICoordinator's own now-removed relay used, so nothing
-    // downstream that filters on reason (WebXREventHandler's debug logging) sees any difference.
-    private pauseInput(): void {
-        if (!this.state.inputPaused) {
-            this.state.inputPaused = true
-            this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
-        }
-    }
-
-    private resumeInput(): void {
-        if (this.state.inputPaused) {
-            this.state.inputPaused = false
-            this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
-        }
     }
 
     private createMenuStructure(): void {

@@ -11,13 +11,20 @@
  * (that would just be redundant), only pointer-lock and reticle-visibility side effects, still
  * filtered to 'pause' - so the observable regression check here is pointer-lock, not a spy on
  * PauseMenuManager's own methods.
+ *
+ * These same handlers also count EVERY open menuType (unfiltered) into a plain
+ * InputEventTypes.Pause/Resume - "Shouldn't the UIManager or UICoordinator track 'is a menu
+ * open'?" (PR review request, 2026-09-03) - covered below alongside the pointer-lock behavior.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { SystemUICoordinator } from '../../../../src/ui/coordinators/SystemUICoordinator'
 import { EventManager } from '../../../../src/core/EventManager'
 import { AppSettings } from '../../../../src/core/AppSettings'
-import { UIEventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../../../src/types/InteractionEvents'
+import {
+    UIEventTypes, InputEventTypes,
+    type MenuOpenEvent, type MenuCloseEvent
+} from '../../../../src/types/InteractionEvents'
 
 vi.mock('../../../../src/ui/pause/PauseMenuManager', () => ({
     PauseMenuManager: class {
@@ -86,5 +93,34 @@ describe('SystemUICoordinator menu-open gating', () => {
     it('still requests pointer lock when the pause menu itself emits MenuClose', () => {
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
         expect(requestPointerLock).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits InputEventTypes.Pause on the first open menu of any type, and Resume once the '
+        + 'last one closes - not per menuType, so InputManager only ever hears one pause/resume '
+        + 'pair for however many menus are actually up at once', () => {
+        const eventManager = EventManager.getInstance()
+        const pauseHandler = vi.fn()
+        const resumeHandler = vi.fn()
+        eventManager.registerEventHandler(InputEventTypes.Pause, pauseHandler)
+        eventManager.registerEventHandler(InputEventTypes.Resume, resumeHandler)
+
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+        expect(pauseHandler).toHaveBeenCalledTimes(1)
+
+        // A second, different menuType opening on top shouldn't emit a second Pause - InputManager
+        // only needs to hear about the 0->1 transition.
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        expect(pauseHandler).toHaveBeenCalledTimes(1)
+
+        // Closing just the game box (one of two open menus) shouldn't resume yet - the pause menu
+        // is still up.
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        expect(resumeHandler).not.toHaveBeenCalled()
+
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
+        expect(resumeHandler).toHaveBeenCalledTimes(1)
+
+        eventManager.deregisterEventHandler(InputEventTypes.Pause, pauseHandler)
+        eventManager.deregisterEventHandler(InputEventTypes.Resume, resumeHandler)
     })
 })

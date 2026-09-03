@@ -1,21 +1,23 @@
 /**
- * SceneClickGameBoxRaycast — occlusion and menu-open gating (direct request, 2026-09-02):
+ * SceneClickGameBoxRaycast — occlusion and input-paused gating (direct request, 2026-09-02):
  * "rays can go through shelves ... need to only worry about ... pixels the player camera can
  * see" and "if I have a UI/menu open, like the game box, the world raycast ... shouldn't be
  * active."
  *
- * Menu-open state itself lives in InputManager now, not this class (PR review request,
- * 2026-09-03) - a real InputManager instance is constructed below so
- * InputManager.getActiveInstance() resolves the way it does at runtime; the MenuOpen/MenuClose
- * emits are unchanged, since InputManager listens for the same events this class used to.
+ * This class asks InputManager.isInputPaused() rather than tracking menu-open state itself (PR
+ * review request, 2026-09-03) - a real InputManager instance is constructed below so
+ * InputManager.getActiveInstance() resolves the way it does at runtime. WHAT decides to call
+ * pause()/resume() - SystemUICoordinator counts every open menuType app-wide - is out of scope
+ * here (see SystemUICoordinator-menu-gating.test.ts for that); this only checks that the raycast
+ * itself correctly stands down while InputManager reports paused, regardless of why.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
 import {
-    InputEventTypes, GameEventTypes, UIEventTypes,
-    type SceneCanvasClickEvent, type GameSelectedEvent, type MenuOpenEvent, type MenuCloseEvent
+    InputEventTypes, GameEventTypes,
+    type SceneCanvasClickEvent, type GameSelectedEvent
 } from '../../../../src/types/InteractionEvents'
 import { SceneLayer } from '../../../../src/scene/SceneLayers'
 import { SceneClickGameBoxRaycast } from '../../../../src/scene/interaction/SceneClickGameBoxRaycast'
@@ -118,43 +120,29 @@ describe('SceneClickGameBoxRaycast occlusion and menu gating', () => {
         expect(selectedHandler.mock.calls[0][0].detail.appid).toBe(333)
     })
 
-    it('ignores clicks entirely while any menu is open', () => {
+    it('ignores clicks entirely while InputManager reports input paused', () => {
         const box = createGameBoxMesh(444)
         box.position.set(0, 0, -5)
         scene.add(box)
         syncWorldMatrices(scene, camera)
 
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        inputManager.pause()
         emitCenterScreenClick(eventManager)
 
         expect(selectedHandler).not.toHaveBeenCalled()
     })
 
-    it('resumes handling clicks once the menu closes', () => {
+    it('resumes handling clicks once InputManager resumes', () => {
         const box = createGameBoxMesh(555)
         box.position.set(0, 0, -5)
         scene.add(box)
         syncWorldMatrices(scene, camera)
 
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        inputManager.pause()
+        inputManager.resume()
         emitCenterScreenClick(eventManager)
 
         expect(selectedHandler).toHaveBeenCalledTimes(1)
         expect(selectedHandler.mock.calls[0][0].detail.appid).toBe(555)
-    })
-
-    it('two menus opening and only one closing still blocks - the pause menu and a game box can be open independently', () => {
-        const box = createGameBoxMesh(666)
-        box.position.set(0, 0, -5)
-        scene.add(box)
-        syncWorldMatrices(scene, camera)
-
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
-        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
-        emitCenterScreenClick(eventManager)
-
-        expect(selectedHandler).not.toHaveBeenCalled()
     })
 })

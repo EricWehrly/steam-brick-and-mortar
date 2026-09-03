@@ -11,10 +11,7 @@ import { InputActionResolver } from './InputActionResolver'
 import { InputEventAdapter } from './InputEventAdapter'
 import { InputProfileService } from './InputProfileService'
 import { InputStateTracker } from './InputStateTracker'
-import {
-    InputEventTypes, UIEventTypes,
-    type GamepadButtonPressedEvent, type SprintTogglePressedEvent, type MenuOpenEvent, type MenuCloseEvent
-} from '../types/InteractionEvents'
+import { InputEventTypes, type GamepadButtonPressedEvent, type SprintTogglePressedEvent } from '../types/InteractionEvents'
 
 export type { InputCallbacks, InputState, MovementOptions } from './InputContracts'
 
@@ -29,17 +26,16 @@ export class InputManager {
     }
 
     private isListeningToEvents = false
+    // Reason-agnostic: WHY input should be paused (the pause menu, a summoned game box, a binder
+    // overlay, ...) is a UI-domain question this class deliberately stays ignorant of - whatever
+    // decides that (SystemUICoordinator counts open menus; GameLibraryBinderUI has its own reason)
+    // just tells this class via pause()/resume() or the InputEventTypes.Pause/Resume it's wired to
+    // elsewhere. An input-consuming class asks isInputPaused() - one simple question - instead of
+    // this class reaching into UI concepts (menuType, MenuOpen/MenuClose) to compute its own
+    // answer (PR review request, 2026-09-03: "Doesn't this still 'dedup' to the existing path of
+    // 'when an input happens, ask the input coordinator if it's in a state to want our events'?" -
+    // a prior pass had this class listening to UIEventTypes.MenuOpen/MenuClose directly instead).
     private isPaused = false
-    // Any open menu (pause menu, a summoned game box, ...) blocks input the same way, regardless
-    // of WHICH interface it is - PR review request, 2026-09-03: an input-adjacent class
-    // (SceneClickGameBoxRaycast) was independently subscribing to UIEventTypes.MenuOpen/MenuClose
-    // and keeping its own open-menu count just to gate its own clicks, which is exactly the kind
-    // of "blocking specific inputs for specific interface conditions" this class should own
-    // instead ("this should either be our UIManager or our InputManager... These Input classes
-    // should be talking back to those"). Counted, not boolean: more than one modal surface can be
-    // open at once (the pause menu and a game box, for instance), and this should only clear once
-    // none are.
-    private menuOpenCount = 0
     /** Flipped by SprintTogglePressed (currently only VR's left-thumbstick-click) - a discrete
      *  toggle, distinct from Sprint's hold-based keyboard Shift/gamepad stick-press. */
     private sprintToggled = false
@@ -70,8 +66,6 @@ export class InputManager {
 
         this.eventManager.registerEventHandler<GamepadButtonPressedEvent>(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
         this.eventManager.registerEventHandler<SprintTogglePressedEvent>(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
-        this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
-        this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
 
         InputManager.activeInstance = this
     }
@@ -120,24 +114,11 @@ export class InputManager {
         this.isPaused = false
     }
 
-    /** Any menuType currently open (see UIEventTypes.MenuOpen/MenuClose) - the shared "is
-     *  something modal up right now" check for input-adjacent classes that need to stand down
-     *  while one is, instead of each independently tracking menu-open state itself. */
-    isMenuOpen(): boolean {
-        return this.menuOpenCount > 0
-    }
-
-    // Movement/rotation gating below checks both reasons together - explicit pause() (the pause
-    // menu's own reason-based InputEventTypes.Pause/Resume, a binder overlay, ...) and any open
-    // menuType. These used to reach the SAME effective gate (InputManager.pause()/resume()) two
-    // different ways: explicitly via pauseInput()/resumeInput()'s relay, and separately via
-    // WebXREventHandler independently listening for UIEventTypes.MenuOpen/MenuClose and calling
-    // WebXRCoordinator.pauseInput()/resumeInput() (itself just this.pause()/resume()) on ANY
-    // menuType, uncounted - which WebXREventHandler no longer needs to do now that this class
-    // already tracks the same menuOpenCount itself (PR review request, 2026-09-03: "dedup
-    // WebXREventHandler's pause on menu into InputManager's handling").
-    private isInputBlocked(): boolean {
-        return this.isPaused || this.isMenuOpen()
+    /** The one question an input-consuming class (SceneClickGameBoxRaycast, camera movement/
+     *  rotation below) needs answered - "should I act on input right now" - without needing to
+     *  know WHY it might be paused. */
+    isInputPaused(): boolean {
+        return this.isPaused
     }
 
     updateFrame(): void {
@@ -155,7 +136,7 @@ export class InputManager {
         // resolve every frame so a press can be detected and close the menu again.
         this.updateFrame()
 
-        if (this.isInputBlocked()) {
+        if (this.isPaused) {
             return
         }
 
@@ -168,7 +149,7 @@ export class InputManager {
     }
 
     updateCameraRotation(camera: THREE.Object3D): void {
-        if (this.isInputBlocked()) {
+        if (this.isPaused) {
             return
         }
 
@@ -209,14 +190,6 @@ export class InputManager {
         this.sprintToggled = !this.sprintToggled
     }
 
-    private readonly handleMenuOpen = (): void => {
-        this.menuOpenCount++
-    }
-
-    private readonly handleMenuClose = (): void => {
-        this.menuOpenCount = Math.max(0, this.menuOpenCount - 1)
-    }
-
     dispose(): void {
         this.stopListening()
         this.stateTracker.clearCallbacks()
@@ -225,8 +198,6 @@ export class InputManager {
         this.actionResolver.dispose()
         this.eventManager.deregisterEventHandler(InputEventTypes.GamepadButtonPressed, this.handleGamepadButtonPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.SprintTogglePressed, this.handleSprintTogglePressed)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
 
         if (InputManager.activeInstance === this) {
             InputManager.activeInstance = null
