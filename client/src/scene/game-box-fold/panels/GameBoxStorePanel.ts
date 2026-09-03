@@ -164,7 +164,13 @@ export class GameBoxStorePanel {
         ctx.clip()
 
         if (source) {
-            const scale = Math.max((radius * 2) / source.width, (radius * 2) / source.height)
+            // Fit-width, not cover - direct request (2026-09-02): "can we have the game disc fit
+            // width with the image? But retain aspect ratio." Cover-fit (matching whichever of
+            // width/height needed the bigger scale) cropped the sides off a wide header image;
+            // this always matches the image's width to the disc's full diameter and lets height
+            // fall out proportionally - the arc clip above still cuts off anything that overshoots
+            // top/bottom, so a header taller than the disc's radius isn't a regression either way.
+            const scale = (radius * 2) / source.width
             const drawWidth = source.width * scale
             const drawHeight = source.height * scale
             ctx.drawImage(source, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight)
