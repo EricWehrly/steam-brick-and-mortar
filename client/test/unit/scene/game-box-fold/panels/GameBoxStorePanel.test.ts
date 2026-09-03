@@ -87,6 +87,30 @@ describe('GameBoxStorePanel disc texture', () => {
         panel.dispose()
     })
 
+    it('fills the gap under a wide header image with the same neutral base color, not a '
+        + 'transparent leak through to the panel behind - direct request (2026-09-02, round six, '
+        + 'on a screenshot): "there\'s a gray rectangle at the bottom of the disk... checked a few, '
+        + 'it kept showing up." A typical Steam header image\'s aspect ratio (~460x215) is shorter '
+        + 'than the disc\'s own semicircle bounding box once fit to its width, leaving a gap at the '
+        + 'bottom for nearly every game - not game-specific, so it kept recurring.', () => {
+        const panel = new GameBoxStorePanel(() => {})
+        // Same ~2.14:1 aspect as a real Steam header image (460x215) - narrow enough that
+        // fit-width scaling leaves height short of the disc's own semicircle bounding box.
+        panel.setHeaderImage(solidImage(46, 21, [200, 100, 50, 255]))
+
+        const canvas = discCanvas(panel)
+        const ctx = canvas.getContext('2d')!
+        const centerX = Math.floor(canvas.width / 2)
+
+        // Near the disc's true bottom edge (the diameter line) - below where the scaled image's
+        // own content reaches, so this used to be left fully transparent.
+        const bottomGapPixel = ctx.getImageData(centerX, canvas.height - 4, 1, 1).data
+        expect(bottomGapPixel[3]).toBe(255) // opaque now - base fill, not a transparent leak
+        expect(bottomGapPixel[0]).toBeLessThan(100) // the neutral border-gray fill, not the art's red (200)
+
+        panel.dispose()
+    })
+
     it('the disc has exactly one Image, constructed once and reused across every selection', () => {
         const panel = new GameBoxStorePanel(() => {})
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
