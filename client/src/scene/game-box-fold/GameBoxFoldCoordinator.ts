@@ -60,7 +60,14 @@ export const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
 // FOV-fit math alone frames the box as tightly as it safely can; this is a flat margin on top of
 // that, not a change to the fit itself. Exported so a test can verify against it directly instead
 // of re-deriving the fit formula.
-export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.15
+//
+// Reduced 0.15 -> 0.05 - direct request (2026-09-02, round five): "make the gamebox a little
+// closer in flat screen... [read] like a modal -- some margin off the edges of the screen." The
+// FOV-fit fraction above is what actually GUARANTEES that margin (deliberately < 1.0, regardless
+// of this reserve); this reserve only made the box smaller/further than that intentional framing
+// needed to, which is the "closer" this request is asking to partly give back - not a change to
+// how much margin is guaranteed, just how much extra distance is piled on top of it.
+export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.05
 // Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
 // wide window) or absurdly far away, tiny-looking (very narrow window).
 const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
