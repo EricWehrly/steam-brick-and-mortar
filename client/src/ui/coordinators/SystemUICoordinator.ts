@@ -24,8 +24,6 @@ import {
     WebXREventTypes,
     AppSettingsEventTypes,
     type SceneCanvasClickEvent,
-    type InputPauseEvent,
-    type InputResumeEvent,
     type MenuOpenEvent,
     type MenuCloseEvent,
     type InputDevicesChangedEvent
@@ -87,10 +85,6 @@ export class SystemUICoordinator {
 
         this.pauseMenuManager = new PauseMenuManager(
             {},
-            {
-                onPauseInput: this.handlePauseInput,
-                onResumeInput: this.handleResumeInput
-            },
             undefined,
             this.eventManager,
             this.appSettings,
@@ -316,14 +310,6 @@ export class SystemUICoordinator {
 
     private readonly handleXRSessionEnd = (): void => {
         this.isXRSessionActive = false
-    }
-
-    private readonly handlePauseInput = (): void => {
-        this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
-    }
-
-    private readonly handleResumeInput = (): void => {
-        this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
     }
 
     private requestPointerLockIfEnabled(): void {
