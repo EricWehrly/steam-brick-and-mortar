@@ -25,7 +25,6 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
 
         pauseMenuManager = new PauseMenuManager(
             {},
-            {},
             undefined,
             eventManager,
             AppSettings.getInstance(),

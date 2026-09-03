@@ -12,6 +12,7 @@ import { ControlsPanel } from '../../src/ui/pause/panels/ControlsPanel'
 import { ApplicationPanel } from '../../src/ui/pause/panels/ApplicationPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
+import { UIEventTypes, InputEventTypes } from '../../src/types/InteractionEvents'
 
 // Mock DOM environment
 function createMockDOM() {
@@ -53,10 +54,13 @@ function createMockDOM() {
 
 describe('Pause Menu Integration Tests', () => {
     let pauseMenuManager: PauseMenuManager
-    let mockCallbacks: any
     let mockDOM: ReturnType<typeof createMockDOM>
     let eventManager: EventManager
     let appSettings: AppSettings
+    let menuOpenHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
+    let menuCloseHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
+    let pauseHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
+    let resumeHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
 
     beforeEach(async () => {
         // Setup DOM mocks
@@ -92,16 +96,19 @@ describe('Pause Menu Integration Tests', () => {
             }
         })
 
-        // Setup callbacks
-        mockCallbacks = {
-            onPauseInput: vi.fn(),
-            onResumeInput: vi.fn(),
-            onMenuOpen: vi.fn(),
-            onMenuClose: vi.fn()
-        }
-
         eventManager = EventManager.getInstance()
         appSettings = AppSettings.getInstance()
+
+        // PauseMenuManager emits UIEventTypes.MenuOpen/MenuClose and InputEventTypes.Pause/Resume
+        // directly now, not via constructor callbacks - listen for the real events instead.
+        menuOpenHandler = vi.fn<(event: CustomEvent) => void>()
+        menuCloseHandler = vi.fn<(event: CustomEvent) => void>()
+        pauseHandler = vi.fn<(event: CustomEvent) => void>()
+        resumeHandler = vi.fn<(event: CustomEvent) => void>()
+        eventManager.registerEventHandler(UIEventTypes.MenuOpen, menuOpenHandler)
+        eventManager.registerEventHandler(UIEventTypes.MenuClose, menuCloseHandler)
+        eventManager.registerEventHandler(InputEventTypes.Pause, pauseHandler)
+        eventManager.registerEventHandler(InputEventTypes.Resume, resumeHandler)
 
         const mockSystemDependencies = {
             performanceMonitor: null as any,
@@ -111,7 +118,6 @@ describe('Pause Menu Integration Tests', () => {
         // Create pause menu manager
         pauseMenuManager = new PauseMenuManager(
             {},
-            mockCallbacks,
             mockSystemDependencies,
             eventManager,
             appSettings,
@@ -121,6 +127,10 @@ describe('Pause Menu Integration Tests', () => {
 
     afterEach(() => {
         pauseMenuManager?.dispose()
+        eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, menuOpenHandler)
+        eventManager.deregisterEventHandler(UIEventTypes.MenuClose, menuCloseHandler)
+        eventManager.deregisterEventHandler(InputEventTypes.Pause, pauseHandler)
+        eventManager.deregisterEventHandler(InputEventTypes.Resume, resumeHandler)
         vi.restoreAllMocks()
         vi.unstubAllGlobals()
 
@@ -160,13 +170,13 @@ describe('Pause Menu Integration Tests', () => {
             
             pauseMenuManager.toggle()
             expect(pauseMenuManager.isOpen()).toBe(true)
-            expect(mockCallbacks.onMenuOpen).toHaveBeenCalled()
-            expect(mockCallbacks.onPauseInput).toHaveBeenCalled()
-            
+            expect(menuOpenHandler).toHaveBeenCalled()
+            expect(pauseHandler).toHaveBeenCalled()
+
             pauseMenuManager.toggle()
             expect(pauseMenuManager.isOpen()).toBe(false)
-            expect(mockCallbacks.onMenuClose).toHaveBeenCalled()
-            expect(mockCallbacks.onResumeInput).toHaveBeenCalled()
+            expect(menuCloseHandler).toHaveBeenCalled()
+            expect(resumeHandler).toHaveBeenCalled()
         })
 
         it('should open specific panel', () => {
