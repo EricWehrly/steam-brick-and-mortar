@@ -17,13 +17,15 @@ Use `UIComponentUtils` for form controls — see `src/utils/UIComponentUtils.ts`
 **Colors**: `src/ui/tokens.css`'s `--color-*` custom properties are the one design-token source for
 the whole app — DOM UI chrome AND in-scene/3D surfaces alike (a game box's own printed-material
 color is still a color the rest of the app might need to reuse or reference later; it doesn't get a
-separate palette just because it renders as a mesh instead of a `<div>`). uikit/three.js code can't
-read CSS custom properties directly, so `src/scene/uikit/UikitColorTokens.ts` resolves each token
-once at module load into `UIKIT_COLORS`, a plain hex-string object every uikit/3D surface imports.
-Before writing a bare hex literal anywhere, check whether an existing `UIKIT_COLORS` key already
-means what you need; if the *concept* doesn't exist yet (not just the color), add a new
-`--color-*` token to tokens.css and a matching key to `UikitColorTokens.ts` rather than inlining a
-literal "because this is content/box-art, not app chrome" — that reasoning has been wrong before.
+separate palette just because it renders as a mesh instead of a `<div>`). Non-DOM code (uikit/
+three.js, or any other TypeScript that isn't itself a styled DOM element) can't read CSS custom
+properties directly, so `src/ui/ColorTokens.ts` resolves each token once at module load into
+`COLOR_TOKENS`, a plain hex-string object anything can import — deliberately generic, not scoped to
+uikit specifically, even though that was its first consumer. Before writing a bare hex literal
+anywhere, check whether an existing `COLOR_TOKENS` key already means what you need; if the *concept*
+doesn't exist yet (not just the color), add a new `--color-*` token to tokens.css and a matching key
+to `ColorTokens.ts` rather than inlining a literal "because this is content/box-art, not app chrome"
+— that reasoning has been wrong before.
 
 Event handler binding:
 ```typescript
