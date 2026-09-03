@@ -36,14 +36,6 @@ export class UikitPointerBridge {
     private readonly controllerPointers = new Map<number, VRControllerPointer>()
     private forwardedEvents: { update: () => void; destroy: () => void } | null = null
     private attached = false
-    // TEMPORARY - remove once flatscreen wheel-scroll is confirmed working or its real cause is
-    // found (direct request, 2026-09-02: "write some temporary diagnostics for us to get to the
-    // bottom of it" - flatscreen mouse-wheel scroll over the debug face's cache-entry viewport
-    // produces no visible scroll and no console output at all - round two: still no output, so
-    // this is now a plain console.log rather than Logger.debug(), which needed an easy-to-miss
-    // setLogLevel(...) console command first).
-    private rawWheelListener: ((event: WheelEvent) => void) | null = null
-    private wheelListenerElement: HTMLElement | null = null
 
     constructor(
         private readonly intersectRoot: THREE.Object3D,
@@ -70,28 +62,6 @@ export class UikitPointerBridge {
 
         this.forwardedEvents = this.forwardEvents(renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
         this.attached = true
-        // eslint-disable-next-line no-console
-        console.log('[UikitPointerBridge TEMP DIAGNOSTIC] attached to renderer.domElement', {
-            canvasSize: [renderer.domElement.width, renderer.domElement.height]
-        })
-
-        // TEMPORARY - see the field's own doc comment. Independent of forwardHtmlEvents entirely:
-        // this only tells us whether the raw browser 'wheel' event reaches the canvas at all,
-        // ruling in/out anything upstream (focus, another element capturing the event, CSS
-        // pointer-events) before even considering uikit/pointer-events' own handling of it.
-        this.rawWheelListener = (event: WheelEvent) => {
-            // eslint-disable-next-line no-console
-            console.log('[UikitPointerBridge TEMP DIAGNOSTIC] raw wheel event reached the canvas', {
-                deltaY: event.deltaY,
-                clientX: event.clientX,
-                clientY: event.clientY
-            })
-        }
-        this.wheelListenerElement = renderer.domElement
-        // passive: true - this listener only reads the event, never calls preventDefault(); the
-        // violation warning without it was drowning out the one console line this is actually
-        // trying to produce.
-        this.wheelListenerElement.addEventListener('wheel', this.rawWheelListener, { passive: true })
     }
 
     /** Call once per frame while attached, before or after the root's own update(). */
@@ -114,12 +84,6 @@ export class UikitPointerBridge {
     detach(): void {
         this.forwardedEvents?.destroy()
         this.forwardedEvents = null
-
-        if (this.rawWheelListener && this.wheelListenerElement) {
-            this.wheelListenerElement.removeEventListener('wheel', this.rawWheelListener)
-        }
-        this.rawWheelListener = null
-        this.wheelListenerElement = null
 
         for (const pointer of this.controllerPointers.values()) {
             pointer.dispose()

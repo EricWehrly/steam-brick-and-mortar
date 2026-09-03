@@ -43,4 +43,23 @@ describe('GameBoxDebugPanel layout', () => {
         expect(sectionsArea.inputProperties.overflow).toBe('scroll')
         expect(sectionsArea.inputProperties.maxHeight).toBeGreaterThan(0)
     })
+
+    it('declares flexDirection:\'column\' on both scrollable containers - uikit defaults an unset '
+        + 'flexDirection to \'row\' and unset alignItems to \'stretch\', which stomps a single '
+        + 'child to the container\'s own fixed height and makes maxScrollPosition compute to ~0 '
+        + '(confirmed live, 2026-09-03: scrollY stayed 0 on both scroll directions despite wheel '
+        + 'events reaching the canvas and uikit\'s own onScroll firing)', () => {
+        const panel = new GameBoxDebugPanel()
+
+        const sectionsArea = panel.container.children[0] as unknown as {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            inputProperties: any
+        }
+        const viewport = panel.container.children[panel.container.children.length - 1] as unknown as {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            inputProperties: any
+        }
+        expect(sectionsArea.inputProperties.flexDirection).toBe('column')
+        expect(viewport.inputProperties.flexDirection).toBe('column')
+    })
 })
