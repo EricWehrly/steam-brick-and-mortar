@@ -15,6 +15,19 @@
  * visibly overlapped the cache viewport below it rather than merely clipping (direct request,
  * 2026-09-02: "the visuals are very crowded"). A capped, scrollable area degrades to a scrollbar
  * instead.
+ *
+ * Both scrollable Containers below (sectionsArea, the cache-entry viewport) declare
+ * flexDirection:'column' explicitly - easy to leave off, since a single-child scroll area looks
+ * right either way until you actually try to scroll it. uikit defaults an unset flexDirection to
+ * 'row' and an unset alignItems to 'stretch' (confirmed against its own setter.js default-index
+ * constants, not assumed): with 'row', height is the CROSS axis, so 'stretch' forces the single
+ * child to exactly the container's fixed height regardless of its own real content size - which
+ * makes maxScrollPosition compute to ~0 (there's nothing left to scroll to, because the child was
+ * never allowed to be taller than the box in the first place). Confirmed live (2026-09-03): wheel
+ * events reached the canvas and uikit's own onScroll fired every time, but scrollY stayed 0
+ * regardless of scroll direction - exactly what a permanently-zero max scroll position produces.
+ * 'column' makes height the MAIN axis instead, where a child lays out at its own natural size by
+ * default.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
@@ -112,6 +125,7 @@ export class GameBoxDebugPanel {
         })
 
         const sectionsArea = new Container({
+            flexDirection: 'column',
             width: '100%',
             maxHeight: SECTIONS_MAX_HEIGHT,
             overflow: 'scroll',
@@ -125,22 +139,12 @@ export class GameBoxDebugPanel {
         root.add(new Text({ text: 'CACHE ENTRY', fontSize: LABEL_FONT_SIZE, color: PANEL_COLORS.label }))
 
         const viewport = new Container({
+            flexDirection: 'column',
             width: '100%',
             height: CACHE_VIEWPORT_HEIGHT,
             overflow: 'scroll',
             scrollbarColor: PANEL_COLORS.border,
-            scrollbarWidth: 3,
-            // TEMPORARY - remove once flatscreen wheel-scroll is confirmed working (direct
-            // request, 2026-09-02, round two: still no console output at all with the
-            // Logger.debug() version of this, which needed setLogLevel(...) run first - plain
-            // console.log needs no setup). Fires from inside uikit's own scroll.js the moment IT
-            // decides a scroll happened, so seeing this log (or not) tells us whether the wheel
-            // event ever reaches uikit's scroll handling at all, independent of whether the
-            // visual result is what's actually broken.
-            onScroll: (scrollX: number, scrollY: number) => {
-                // eslint-disable-next-line no-console
-                console.log('[GameBoxDebugPanel TEMP DIAGNOSTIC] cache viewport onScroll fired', { scrollX, scrollY })
-            }
+            scrollbarWidth: 3
         })
         viewport.add(this.cacheText)
         root.add(viewport)
