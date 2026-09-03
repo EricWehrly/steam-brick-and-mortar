@@ -3,13 +3,14 @@ import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
 import {
-    InputEventTypes, GameEventTypes, UIEventTypes,
-    type SceneCanvasClickEvent, type GameSelectedEvent, type MenuOpenEvent, type MenuCloseEvent
+    InputEventTypes, GameEventTypes,
+    type SceneCanvasClickEvent, type GameSelectedEvent
 } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
 import type { XRControllerSource } from '../../webxr/XRControllerManager'
+import { InputManager } from '../../input/InputManager'
 
 // Same surface a box's own material/animation could occupy - two coincident hits this close
 // together are "the same physical surface," not one genuinely in front of the other. Guards the
@@ -45,12 +46,6 @@ export class SceneClickGameBoxRaycast {
     private resolvedCamera: THREE.Camera | null = null
     private resolvedControllerSource: XRControllerSource | null = null
 
-    // Any open menu - the DOM pause menu or a summoned game box (see GameBoxFoldCoordinator's own
-    // MenuOpen/MenuClose emits) - takes over what a click means, so the shelf shouldn't also be
-    // trying to open a box underneath it. Counted rather than boolean: more than one modal surface
-    // can be "open" at once in principle, and this only needs to go false once none are.
-    private openMenuCount = 0
-
     private readonly raycaster = new THREE.Raycaster()
     private readonly pointer = new THREE.Vector2()
     private readonly direction = new THREE.Vector3()
@@ -79,8 +74,6 @@ export class SceneClickGameBoxRaycast {
             InputEventTypes.SceneCanvasClick,
             this.handleSceneCanvasClick
         )
-        this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
-        this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
     }
 
     public dispose(): void {
@@ -88,8 +81,6 @@ export class SceneClickGameBoxRaycast {
             InputEventTypes.SceneCanvasClick,
             this.handleSceneCanvasClick
         )
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
 
         if (this.debugLine && this.resolvedScene) {
             this.resolvedScene.remove(this.debugLine)
@@ -98,14 +89,6 @@ export class SceneClickGameBoxRaycast {
 
         this.lineGeometry.dispose()
         this.lineMaterial.dispose()
-    }
-
-    private readonly handleMenuOpen = (): void => {
-        this.openMenuCount++
-    }
-
-    private readonly handleMenuClose = (): void => {
-        this.openMenuCount = Math.max(0, this.openMenuCount - 1)
     }
 
     private readonly handleSceneCanvasClick = (event: CustomEvent<SceneCanvasClickEvent>): void => {
@@ -117,7 +100,11 @@ export class SceneClickGameBoxRaycast {
 
         // A summoned game box or the pause menu already owns what a click means - the shelf
         // shouldn't be racing it to open a second box underneath (direct request, 2026-09-02).
-        if (this.openMenuCount > 0) {
+        // Asks InputManager rather than tracking menu-open state itself - PR review request,
+        // 2026-09-03: "in terms of concept, logic, responsibility this should either be our
+        // UIManager or our InputManager... These Input classes should be talking back to those...
+        // to facilitate blocking specific inputs for specific interface conditions."
+        if (InputManager.getActiveInstance()?.isMenuOpen()) {
             return
         }
 
