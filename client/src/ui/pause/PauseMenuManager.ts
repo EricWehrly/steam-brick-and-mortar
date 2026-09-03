@@ -20,8 +20,8 @@ import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
 import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
-import { SteamEventTypes, InputEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent, CancelPressedEvent } from '../../types/InteractionEvents'
+import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
@@ -81,6 +81,9 @@ export class PauseMenuManager {
     private menuContainer: HTMLElement | null = null
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
+    // Tracks any OTHER menuType ('game-box', ...) currently up - see handleOpenMenuPressed's own
+    // comment for why this exists.
+    private isOtherMenuOpen = false
     private eventManager: EventManager
     private appSettings: AppSettings
     private readonly performanceMonitor: PerformanceMonitorUI
@@ -126,10 +129,39 @@ export class PauseMenuManager {
         // Cancel (gamepad B/Circle, or Escape/Start alongside OpenMenu above) closes the menu if
         // it's open - a pure dismiss, not a toggle, so it never reopens a closed menu.
         this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+
+        // Tracks other menuTypes ('game-box', ...) so handleOpenMenuPressed can tell "Escape/Start
+        // just closed that instead" apart from a genuine request to open THIS menu - see that
+        // handler's own comment. Filtered off 'pause' itself - this instance already tracks its
+        // own state via this.state.isOpen and doesn't need to hear its own MenuOpen/MenuClose back.
+        this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
+        this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleOtherMenuClose)
     }
 
+    // Escape/Start is bound to BOTH OpenMenu and Cancel (see CancelPressedEvent.bundledWithOpenMenu's
+    // own doc comment), and OpenMenuPressed fires unconditionally on every such press regardless of
+    // what else is currently open. With a game box open, that same Escape press is meant to close
+    // the box (GameBoxFoldCoordinator's own CancelPressed handler) - not ALSO pop the settings menu
+    // open behind it, which is what toggling unconditionally here did (direct request, 2026-09-02,
+    // round four: "esc to close game box opens settings menu"). Skipping the toggle whenever some
+    // other menuType is currently up leaves the normal case (nothing else open) unchanged.
     private readonly handleOpenMenuPressed = (): void => {
+        if (this.isOtherMenuOpen) {
+            return
+        }
         this.toggle()
+    }
+
+    private readonly handleOtherMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            this.isOtherMenuOpen = true
+        }
+    }
+
+    private readonly handleOtherMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            this.isOtherMenuOpen = false
+        }
     }
 
     // Skips a Cancel bundled with the SAME OpenMenu press (Escape/Start bind to both - see
@@ -569,6 +601,8 @@ export class PauseMenuManager {
         )
         this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleOtherMenuClose)
 
         // Dispose all panels
         this.panels.forEach(panel => {

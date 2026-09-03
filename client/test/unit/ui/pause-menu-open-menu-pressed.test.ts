@@ -11,7 +11,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PauseMenuManager } from '../../../src/ui/pause/PauseMenuManager'
 import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
-import { InputEventTypes, type CancelPressedEvent } from '../../../src/types/InteractionEvents'
+import {
+    InputEventTypes, UIEventTypes,
+    type CancelPressedEvent, type MenuOpenEvent, type MenuCloseEvent
+} from '../../../src/types/InteractionEvents'
 
 describe('PauseMenuManager OpenMenuPressed wiring', () => {
     let pauseMenuManager: PauseMenuManager
@@ -91,6 +94,37 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
 
         // A gamepad B/Circle Cancel (never bundled) still closes an already-open menu regardless.
         eventManager.emit<CancelPressedEvent>(InputEventTypes.CancelPressed, { bundledWithOpenMenu: false })
+
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
+
+    it('does not open while another menuType (e.g. a summoned game box) is up - that Escape press '
+        + 'is meant to close the OTHER thing (its own CancelPressed handler), not also pop the '
+        + 'settings menu open behind it (direct request, 2026-09-02, round four: "esc to close '
+        + 'game box opens settings menu")', () => {
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(false)
+    })
+
+    it('opens on OpenMenuPressed again once the other menuType has closed', () => {
+        eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        expect(pauseMenuManager.isOpen()).toBe(false)
+
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+
+        expect(pauseMenuManager.isOpen()).toBe(true)
+    })
+
+    it('still lets an already-open pause menu close via OpenMenuPressed when no other menuType is up', () => {
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
+        expect(pauseMenuManager.isOpen()).toBe(true)
+
+        eventManager.emit(InputEventTypes.OpenMenuPressed, {})
 
         expect(pauseMenuManager.isOpen()).toBe(false)
     })
