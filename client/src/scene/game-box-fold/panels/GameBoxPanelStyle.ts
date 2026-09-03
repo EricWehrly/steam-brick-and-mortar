@@ -19,8 +19,14 @@ import { UIKIT_COLORS } from '../../uikit/UikitColorTokens'
 // "Steam gray" cardboard/plastic-case look intended (direct request, 2026-09-02: "the box reads as
 // full black rather than our steam gray"). A local literal, not a semantic token, for the same
 // reason the section accents below are local: tokens.css has no vocabulary for "the box's own
-// material color."
-const BOX_SURFACE_GRAY = '#3a3f44'
+// material color." Exported (not just used via PANEL_COLORS.surface below) so GameBoxFoldModel's
+// plainMaterial - the raw BoxGeometry color visible wherever no uikit panel is mounted - can share
+// this ONE definition instead of its own independently-guessed hex literal, which is exactly what
+// was still reading as black at the box's center (direct request, 2026-09-02, round four: "center
+// of box is still black instead of gray"). Full centralization onto tokens.css (or an equivalent
+// steam-derived livery source) for this and the section accents below is tracked as tech debt -
+// see docs/tech-debt.md's game-box-color-centralization entry - rather than invented ad hoc here.
+export const BOX_SURFACE_GRAY = '#3a3f44'
 // The store panel's sleeve (behind the disc/Play row) is a darker SHADE of the same gray, for
 // depth against the surface above it - not the separate near-black brown it used to be, which is
 // what was actually still reading as "full black" after BOX_SURFACE_GRAY only fixed the panels
