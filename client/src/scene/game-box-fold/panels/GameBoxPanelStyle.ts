@@ -6,9 +6,9 @@
  * dimensions, so a face-size change can't silently leave the page the wrong shape. Every layout
  * number in ./ is therefore readable as "pixels on a 300x400 page".
  *
- * Panels depth-test normally (no depthTest:false / ALWAYS_ON_TOP_RENDER_ORDER, unlike the floating
- * VR settings menu): they sit flush on a real surface that hinges through the scene, so they should
- * occlude and be occluded like the geometry they're mounted to.
+ * Panels depth-test normally (no depthTest:false / always-on-top render order, unlike a floating
+ * overlay menu would need): they sit flush on a real surface that hinges through the scene, so they
+ * should occlude and be occluded like the geometry they're mounted to.
  */
 
 import { BOX_WIDTH, BOX_HEIGHT } from '../GameBoxFoldDimensions'

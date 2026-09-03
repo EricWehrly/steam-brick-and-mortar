@@ -7,8 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { VRControllerPointer, RAY_DIRECTION } from '../../../../src/scene/uikit/VRControllerPointer'
-import { ALWAYS_ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/UikitRenderOrder'
+import { VRControllerPointer, RAY_DIRECTION, ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/VRControllerPointer'
 
 /** Places a target exactly one unit along the pointer's real (pitch-corrected) ray direction,
  *  so tests hit it regardless of the exact correction angle in use. */
@@ -84,7 +83,7 @@ describe('VRControllerPointer', () => {
             expect(material.transparent).toBe(true)
             expect(material.depthTest).toBe(false)
             expect(material.depthWrite).toBe(false)
-            expect(mesh.renderOrder).toBeGreaterThan(ALWAYS_ON_TOP_RENDER_ORDER)
+            expect(mesh.renderOrder).toBe(ON_TOP_RENDER_ORDER)
         }
     })
 
