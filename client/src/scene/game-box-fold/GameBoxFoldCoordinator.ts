@@ -54,7 +54,16 @@ const FALLBACK_CAMERA_DISTANCE = 0.7
 // How much of the camera's current horizontal FOV the open box's full width is allowed to fill -
 // leaves margin on both sides rather than framing it edge-to-edge. Exported so a test can verify
 // the fit formula without duplicating it.
-export const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
+//
+// Raised 0.7 -> 0.85 - direct request (2026-09-02, round six, on a screenshot marked up with lines
+// from the box's corners out to the screen's own corners): "there's still a lot of space on screen
+// that I want filled with readable 'UI'." This alone only makes the existing box bigger/closer
+// (still bounded well under 1.0, so it never frames edge-to-edge) - it doesn't address the box's
+// own vertical footprint being smaller than its horizontal one (an open box's three side-by-side
+// panels are wider than they are tall), which is the other half of why the gap reads as large in a
+// short/wide window specifically. That's a separate, bigger question - whether to add more on-screen
+// content, reshape the open layout, or something else - flagged rather than guessed at here.
+export const OPEN_BOX_SAFE_FOV_FRACTION = 0.85
 // Extra distance held in reserve, added on top of the FOV-fit calculation below - direct request
 // (2026-09-02: "I want ... the box to be a little further from the camera when open"). The
 // FOV-fit math alone frames the box as tightly as it safely can; this is a flat margin on top of
@@ -68,10 +77,25 @@ export const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
 // needed to, which is the "closer" this request is asking to partly give back - not a change to
 // how much margin is guaranteed, just how much extra distance is piled on top of it.
 export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.05
+// VR's own reserve for the SAME camera-anchor path (connectedControllerCount === 1 - see
+// attachToAnchor()) - kept separate from the flatscreen margin above rather than shared, because
+// they don't move together: the flatscreen-only "closer" request right above this pulled VR's
+// single-controller framing closer too when the two shared one constant, even though VR wanted
+// the opposite. Direct request (2026-09-02, round six): "regarding the VR / 'grip' length... I'm
+// currently doing the 1 controller thing in VR... Either way it's still too close. Need to push
+// it back a little. In VR." Not live-verified in headset - this is a first-pass magnitude, same as
+// GRIP_BOX_PITCH_DEGREES below; re-test and adjust further if it still reads wrong.
+export const VR_CAMERA_ANCHOR_DISTANCE_MARGIN = 0.3
 // Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
-// wide window) or absurdly far away, tiny-looking (very narrow window).
-const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
-const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
+// wide window) or absurdly far away, tiny-looking (very narrow window). Exported so a test can
+// verify against the clamp bounds directly instead of a duplicated literal.
+//
+// MIN lowered 0.5 -> 0.4 alongside the OPEN_BOX_SAFE_FOV_FRACTION raise above (2026-09-02, round
+// six) - a standard 16:9 window's fit+margin distance (~0.475) had dropped BELOW the old 0.5 floor,
+// so the floor - not the fraction - was silently the only thing still governing the box's size at
+// the most common aspect ratio, defeating the point of raising the fraction at all.
+export const MIN_CAMERA_ANCHOR_DISTANCE = 0.4
+export const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
 // Pushed further from the grip twice now (was -0.12, then -0.22) per direct request each time -
 // held right at the hand, the box ended up right in front of the player's face too, and even at
 // -0.22 it was still "a bit too close to read in VR" (2026-09-02). More separation from the grip
@@ -330,8 +354,15 @@ export class GameBoxFoldCoordinator {
         const camera = dm.get<THREE.Camera>(DataKey.MainCamera) ?? null
         if (camera) {
             camera.add(this.model.group)
+            // Flatscreen (0 controllers) and VR-single-controller both camera-anchor via this same
+            // path, but want a different amount of reserve distance held back beyond the tightest
+            // FOV-fit - see VR_CAMERA_ANCHOR_DISTANCE_MARGIN's own comment for why they aren't one
+            // shared constant.
+            const distanceMargin = connectedControllerCount === 0
+                ? CAMERA_ANCHOR_DISTANCE_MARGIN
+                : VR_CAMERA_ANCHOR_DISTANCE_MARGIN
             const distance = camera instanceof THREE.PerspectiveCamera
-                ? this.computeCameraAnchorDistance(camera)
+                ? this.computeCameraAnchorDistance(camera, distanceMargin)
                 : FALLBACK_CAMERA_DISTANCE
             this.model.group.position.set(0, 0, -distance)
             // Reset in case a previous summon this session was grip-anchored (pitch is
@@ -348,12 +379,12 @@ export class GameBoxFoldCoordinator {
      *  camera-anchor-distance doc comment for why this can't be a fixed constant. Recomputed each
      *  summon, not continuously - a live window resize while a box is already open won't re-fit
      *  until the next selection. */
-    private computeCameraAnchorDistance(camera: THREE.PerspectiveCamera): number {
+    private computeCameraAnchorDistance(camera: THREE.PerspectiveCamera, distanceMargin: number): number {
         const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
         const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
         const distance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
         return THREE.MathUtils.clamp(
-            distance + CAMERA_ANCHOR_DISTANCE_MARGIN,
+            distance + distanceMargin,
             MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE
         )
     }
