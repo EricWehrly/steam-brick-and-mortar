@@ -14,6 +14,8 @@
  * requiring a trigger pull just to see where you're pointing made a UI hard to use. Trigger-gating
  * a raycast is still the right call for the shelf-wide game-box pipeline (SceneClickGameBoxRaycast)
  * - that's a separate system, untouched by this class.
+ *
+ * // TD: vr-uikit-menu-sync-recheck
  */
 
 import * as THREE from 'three'
