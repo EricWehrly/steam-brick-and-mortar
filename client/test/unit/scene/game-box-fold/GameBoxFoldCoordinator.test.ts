@@ -55,7 +55,7 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
 
 import {
     GameBoxFoldCoordinator, MODEL_FACING_ROTATION_Y,
-    FLATSCREEN_TILT_YAW_DEGREES, FLATSCREEN_TILT_PITCH_DEGREES,
+    FLATSCREEN_TILT_PITCH_DEGREES,
     OPEN_BOX_SAFE_FOV_FRACTION, CAMERA_ANCHOR_DISTANCE_MARGIN
 } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
 import { OPEN_BOX_HALF_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
@@ -116,8 +116,10 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.playOpen).toHaveBeenCalledTimes(1)
     })
 
-    it('holds the flatscreen (zero-controller) box at a slight yaw/pitch, not square to the '
-        + 'camera - a dead-on angle read as flat/2D rather than a real object', () => {
+    it('holds the flatscreen (zero-controller) box at a slight pitch, not square to the camera - '
+        + 'a dead-on angle read as flat/2D rather than a real object. Pitch only, deliberately no '
+        + 'yaw - see FLATSCREEN_TILT_PITCH_DEGREES\' own comment for why a yaw was tried and '
+        + 'dropped', () => {
         const camera = new THREE.Object3D()
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
 
@@ -125,15 +127,16 @@ describe('GameBoxFoldCoordinator', () => {
         selectGame(1)
 
         const model = fakeModelInstances[0]
-        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y + THREE.MathUtils.degToRad(FLATSCREEN_TILT_YAW_DEGREES))
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
         expect(model.group.rotation.x).toBeCloseTo(THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES))
     })
 
-    it('keeps the box\'s top edge level despite combining a yaw and a pitch - THREE\'s default '
-        + 'Euler order applies yaw before pitch, which visibly rolls a top edge that starts level '
-        + '(verified empirically, not assumed) once both are nonzero; rotation.order must be '
-        + '\'YXZ\' (pitch first) for the combination to stay level (direct request, 2026-09-02, '
-        + 'screenshot markup: "held at an angle on an axis I expect to be flat")', () => {
+    it('keeps the box\'s top edge level under its real rotation - MODEL_FACING_ROTATION_Y\'s own '
+        + '180-degree yaw combined with the flatscreen pitch - even though THREE\'s default Euler '
+        + 'order would roll a level edge once any yaw and any pitch are both nonzero (verified '
+        + 'empirically, not assumed); rotation.order must be \'YXZ\' (pitch first) to prevent that '
+        + '(direct request, 2026-09-02, screenshot markup: "held at an angle on an axis I expect '
+        + 'to be flat")', () => {
         const camera = new THREE.Object3D()
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
 

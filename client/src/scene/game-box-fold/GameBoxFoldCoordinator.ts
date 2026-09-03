@@ -72,13 +72,22 @@ const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
 const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
 // Flatscreen-only (see attachToAnchor()'s connectedControllerCount === 0 check): held square to
 // the camera read as flat/2D - direct request (2026-09-02: "should be held at a bit of an angle
-// so as to give it some dimensionality, object believability"). A slight yaw plus a touch of
-// pitch is the standard "product shot" angle, revealing a sliver of the box's side/top rather
-// than presenting a flat rectangle. Not applied in VR (grip-anchored, or camera-anchored with a
-// single connected controller) - that framing wasn't asked for and the grip pitch already gives
-// VR its own deliberate angle.
-export const FLATSCREEN_TILT_YAW_DEGREES = -18
-export const FLATSCREEN_TILT_PITCH_DEGREES = -8
+// so as to give it some dimensionality, object believability"). Not applied in VR (grip-anchored,
+// or camera-anchored with a single connected controller) - that framing wasn't asked for and the
+// grip pitch already gives VR its own deliberate angle.
+//
+// Pitch only, deliberately no yaw - a first pass paired this with a yaw for a fuller "product
+// shot" 3/4 angle, but held this close to the camera (see CAMERA_ANCHOR_DISTANCE_MARGIN's own
+// comment on how close that fit math keeps it), a yawed edge's two ends sit at genuinely different
+// distances from the camera - real perspective convergence, not a rotation bug, and it read as the
+// box's top edge sloping (screenshot markup, 2026-09-02, round two: "the line I drew is the flat
+// edge... slopes down and to the left... held at an angle on an axis I expect to be flat" - this
+// was reported AFTER the rotation-order fix below, meaning the residual slope was perspective, not
+// the composition bug that fix targets). Pitching alone keeps both ends of every horizontal edge
+// equidistant from the camera - verified both in raw 3D (no roll) and through the real camera's
+// projection matrix (no perspective-driven slope either) - so it can't reintroduce this regardless
+// of how close the box is held.
+export const FLATSCREEN_TILT_PITCH_DEGREES = -14
 // The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
 // camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
 // rotate it to face back toward whatever it's parented to.
@@ -299,8 +308,6 @@ export class GameBoxFoldCoordinator {
             grip.add(this.model.group)
             this.model.group.position.copy(GRIP_LOCAL_OFFSET)
             this.model.group.rotation.x = THREE.MathUtils.degToRad(GRIP_BOX_PITCH_DEGREES)
-            // Reset in case a previous summon this session was the flatscreen-only tilt below -
-            // the same model.group is reused across summons, not recreated.
             this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
             return
         }
@@ -317,9 +324,7 @@ export class GameBoxFoldCoordinator {
             this.model.group.rotation.x = connectedControllerCount === 0
                 ? THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES)
                 : 0
-            this.model.group.rotation.y = connectedControllerCount === 0
-                ? MODEL_FACING_ROTATION_Y + THREE.MathUtils.degToRad(FLATSCREEN_TILT_YAW_DEGREES)
-                : MODEL_FACING_ROTATION_Y
+            this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         }
     }
 
