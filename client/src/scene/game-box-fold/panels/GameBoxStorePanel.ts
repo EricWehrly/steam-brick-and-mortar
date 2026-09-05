@@ -22,7 +22,7 @@
 import * as THREE from 'three'
 import { Container, Image, Text } from '@pmndrs/uikit'
 import type { GameBoxFoldContent, GameBoxFoldHeaderImage } from '../GameBoxFoldContent'
-import { buildChipSection, buildComingSoonRows } from './GameBoxPanelParts'
+import { buildChipSection, buildComingSoonRows, roundedCorners } from './GameBoxPanelParts'
 import { toUikitSafeText } from '../../uikit/UikitTextSanitizer'
 import {
     BODY_FONT_SIZE, LABEL_FONT_SIZE, PANEL_COLORS, PANEL_PADDING,
@@ -290,10 +290,7 @@ export class GameBoxStorePanel {
             paddingRight: PLAY_BUTTON_PADDING_X,
             paddingTop: PLAY_BUTTON_PADDING_Y,
             paddingBottom: PLAY_BUTTON_PADDING_Y,
-            borderTopLeftRadius: PLAY_BUTTON_RADIUS,
-            borderTopRightRadius: PLAY_BUTTON_RADIUS,
-            borderBottomLeftRadius: PLAY_BUTTON_RADIUS,
-            borderBottomRightRadius: PLAY_BUTTON_RADIUS,
+            ...roundedCorners(PLAY_BUTTON_RADIUS),
             borderTopWidth: DISC_EDGE_WIDTH,
             borderLeftWidth: DISC_EDGE_WIDTH,
             borderRightWidth: DISC_EDGE_WIDTH,
