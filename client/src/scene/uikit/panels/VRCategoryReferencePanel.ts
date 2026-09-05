@@ -15,7 +15,7 @@
 import { Container, Text } from '@pmndrs/uikit'
 import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../../ui/CategoryReferencePanel'
 import { toUikitSafeText } from '../UikitTextSanitizer'
-import { UIKIT_COLORS } from '../UikitColorTokens'
+import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 import { ALWAYS_ON_TOP_RENDER_ORDER, SHELL_PIXEL_SIZE } from '../VRSettingsMenuShell'
 
 const PANEL_WIDTH = 480
@@ -24,16 +24,16 @@ const SECTION_GAP = 18
 const ROW_GAP = 4
 const TITLE_FONT_SIZE = 18
 const SECTION_HEADING_FONT_SIZE = 13
-const SECTION_HEADING_COLOR = UIKIT_COLORS.accent
+const SECTION_HEADING_COLOR = COLOR_TOKENS.accent
 const ROW_LABEL_FONT_SIZE = 13
-const ROW_LABEL_COLOR = UIKIT_COLORS.textPrimary
+const ROW_LABEL_COLOR = COLOR_TOKENS.textPrimary
 // Mirrors category-reference-panel.css's .cat-row--<status> intent (live/planned/idea), sourced
 // from tokens.css's status colors - "idea" isn't really an error, so it maps to the muted
 // tertiary-text tone rather than being forced into the error color.
 const STATUS_COLOR: Record<CategoryEntry['status'], string> = {
-    live: UIKIT_COLORS.success,
-    planned: UIKIT_COLORS.warning,
-    idea: UIKIT_COLORS.textTertiary
+    live: COLOR_TOKENS.success,
+    planned: COLOR_TOKENS.warning,
+    idea: COLOR_TOKENS.textTertiary
 }
 const SCROLL_HEIGHT = 460
 
@@ -53,13 +53,13 @@ export class VRCategoryReferencePanel {
             pixelSize: SHELL_PIXEL_SIZE,
             depthTest: false,
             renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
-            backgroundColor: UIKIT_COLORS.surface1,
+            backgroundColor: COLOR_TOKENS.surface1,
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
             borderBottomLeftRadius: 12,
             borderBottomRightRadius: 12
         })
-        root.add(new Text({ text: 'Category Reference', fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
+        root.add(new Text({ text: 'Category Reference', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
 
         const scroll = new Container({
             flexDirection: 'column',

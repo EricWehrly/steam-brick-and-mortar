@@ -29,21 +29,21 @@ import { DebugStatsProvider } from '../../../ui/pause/panels/DebugStatsProvider'
 import type { DebugStats } from '../../../ui/pause/panels/DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../../ui/PerformanceMonitor'
 import { toUikitSafeText } from '../UikitTextSanitizer'
-import { UIKIT_COLORS } from '../UikitColorTokens'
+import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
 const ROW_GAP = 6
 const ROW_LABEL_FONT_SIZE = 13
-const ROW_LABEL_COLOR = UIKIT_COLORS.textSecondary
-const ROW_VALUE_COLOR = UIKIT_COLORS.textPrimary
+const ROW_LABEL_COLOR = COLOR_TOKENS.textSecondary
+const ROW_VALUE_COLOR = COLOR_TOKENS.textPrimary
 const SCROLL_HEIGHT = 460
 const LOADING_TEXT = 'loading...'
 // Mirrors DebugPanel.getPerformanceClass()'s good/caution/warning thresholds and traffic-light
 // intent, sourced from tokens.css's status colors rather than ad-hoc hex values.
-const GOOD_COLOR = UIKIT_COLORS.success
-const CAUTION_COLOR = UIKIT_COLORS.warning
-const WARNING_COLOR = UIKIT_COLORS.error
+const GOOD_COLOR = COLOR_TOKENS.success
+const CAUTION_COLOR = COLOR_TOKENS.warning
+const WARNING_COLOR = COLOR_TOKENS.error
 
 // The DOM DebugPanel (debug-panel.css's .debug-sections) lays out its four stat groups as a
 // responsive card grid, not one long flat list - direct request (2026-08-20): "it doesn't seem to
@@ -52,10 +52,10 @@ const WARNING_COLOR = UIKIT_COLORS.error
 const GRID_GAP = 16
 const CARD_WIDTH = 350
 const CARD_PADDING = 14
-const CARD_BACKGROUND = UIKIT_COLORS.surface2
+const CARD_BACKGROUND = COLOR_TOKENS.surface2
 const CARD_RADIUS = 10
 const CARD_HEADING_FONT_SIZE = 13
-const CARD_HEADING_COLOR = UIKIT_COLORS.accent
+const CARD_HEADING_COLOR = COLOR_TOKENS.accent
 
 interface StatRowSpec {
     readonly key: keyof typeof ROW_FORMATTERS
@@ -173,7 +173,7 @@ export class VRDebugPanel {
 
     private build(): Container {
         const root = new Container({ flexDirection: 'column', gap: ROW_GAP, padding: PANEL_PADDING, width: '100%' })
-        root.add(new Text({ text: 'Debug', fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
+        root.add(new Text({ text: 'Debug', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
 
         const scroll = new Container({
             flexDirection: 'row',
@@ -189,7 +189,7 @@ export class VRDebugPanel {
         root.add(scroll)
 
         const refreshButton = new Button({ variant: 'secondary', onClick: () => void this.refresh() })
-        refreshButton.add(new Text({ text: 'Refresh', color: UIKIT_COLORS.textPrimary }))
+        refreshButton.add(new Text({ text: 'Refresh', color: COLOR_TOKENS.textPrimary }))
         root.add(refreshButton)
 
         return root
