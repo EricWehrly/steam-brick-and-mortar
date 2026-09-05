@@ -178,10 +178,19 @@ export interface InteractPressedEvent extends BaseInteractionEvent {}
  * dismisses any other open overlay, mirroring what Escape already does for keyboard since it's
  * both a real DOM keydown each overlay could listen for directly and the OpenMenu binding).
  * Any overlay that closes itself on Escape today (GameLibraryBinderUI, BinderGameDetailPanel,
- * GameArtworkInspector, PauseMenuManager) should react to this instead of a raw keydown listener,
- * so gamepad gets the same "back/cancel" behavior for free.
+ * GameArtworkInspector) should react to this instead of a raw keydown listener, so gamepad gets
+ * the same "back/cancel" behavior for free.
+ *
+ * bundledWithOpenMenu is true when this Cancel was emitted alongside an OpenMenuPressed for the
+ * SAME physical press (Escape/Start, both bound to both actions). PauseMenuManager checks this
+ * specifically, since its OpenMenuPressed handler's toggle() already resolved open/closed for
+ * that key - reacting to Cancel too would self-cancel the open it just performed. Every other
+ * Cancel consumer ignores this field and reacts to every Cancel, bundled or not - dismissing the
+ * game library binder (say) when the pause menu opens is the whole point of bundling it.
  */
-export interface CancelPressedEvent extends BaseInteractionEvent {}
+export interface CancelPressedEvent extends BaseInteractionEvent {
+    bundledWithOpenMenu?: boolean
+}
 
 /**
  * Fired by InputActionResolver the moment SprintToggle is pressed - currently only the VR left
@@ -214,11 +223,14 @@ export interface GamepadButtonPressedEvent extends BaseInteractionEvent {
 // =============================================================================
 
 export interface MenuOpenEvent extends BaseInteractionEvent {
-    menuType: 'pause' | 'settings' | 'debug'
+    /** 'game-box' - a summoned GameBoxFoldCoordinator box - is the same functional role as any
+     *  other menuType here: a modal, focus-grabbing surface that world interaction (shelf-box
+     *  selection, camera movement) should get out of the way of while it's up. */
+    menuType: 'pause' | 'settings' | 'debug' | 'game-box'
 }
 
 export interface MenuCloseEvent extends BaseInteractionEvent {
-    menuType: 'pause' | 'settings' | 'debug'
+    menuType: 'pause' | 'settings' | 'debug' | 'game-box'
 }
 
 /**

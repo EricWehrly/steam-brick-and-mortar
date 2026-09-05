@@ -21,14 +21,13 @@ import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent, MenuPanelChangedEvent } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, MenuPanelChangedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
 export interface PauseMenuState {
     isOpen: boolean
     activePanel: string | null
-    inputPaused: boolean
     previousFocus: HTMLElement | null
 }
 
@@ -37,13 +36,6 @@ export interface PauseMenuConfig {
     containerId?: string
     overlayClass?: string
     menuClass?: string
-}
-
-export interface PauseMenuCallbacks {
-    onPauseInput?: () => void
-    onResumeInput?: () => void
-    onMenuOpen?: () => void
-    onMenuClose?: () => void
 }
 
 export interface SystemDependencies {
@@ -64,12 +56,10 @@ export class PauseMenuManager {
     private state: PauseMenuState = {
         isOpen: false,
         activePanel: null,
-        inputPaused: false,
         previousFocus: null
     }
 
     private config: Required<PauseMenuConfig>
-    private callbacks: PauseMenuCallbacks
     private systemDependencies: SystemDependencies | null = null
     private panels: Map<string, PauseMenuPanel> = new Map()
     private tabGroups: Map<string, PauseMenuTabGroup> = new Map()
@@ -88,13 +78,15 @@ export class PauseMenuManager {
     private domVisualsSuppressed = false
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
+    // Tracks any OTHER menuType ('game-box', ...) currently up - see handleOpenMenuPressed's own
+    // comment for why this exists.
+    private isOtherMenuOpen = false
     private eventManager: EventManager
     private appSettings: AppSettings
     private readonly performanceMonitor: PerformanceMonitorUI
 
     constructor(
-        config: PauseMenuConfig = {}, 
-        callbacks: PauseMenuCallbacks = {}, 
+        config: PauseMenuConfig = {},
         systemDependencies: SystemDependencies | undefined,
         eventManager: EventManager,
         appSettings: AppSettings,
@@ -107,7 +99,6 @@ export class PauseMenuManager {
             menuClass: 'pause-menu',
             ...config
         }
-        this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
         this.eventManager = eventManager
         this.appSettings = appSettings
@@ -139,6 +130,12 @@ export class PauseMenuManager {
         // directly - see docs/plans/vr-uikit-menu-migration-plan.md. showPanel() below emits this
         // event too, guarded to skip a no-op re-show, which is what keeps this from looping.
         this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+
+        // Tracks other menuTypes ('game-box', ...) so handleOpenMenuPressed can tell an Escape/Start
+        // that closed one of those apart from a genuine request to open THIS menu. Filtered off
+        // 'pause' itself since this instance already tracks its own state via this.state.isOpen.
+        this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
+        this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleOtherMenuClose)
     }
 
     private readonly handleMenuPanelChanged = (event: CustomEvent<MenuPanelChangedEvent>): void => {
@@ -150,34 +147,38 @@ export class PauseMenuManager {
         this.showPanel(event.detail.panelId)
     }
 
-    // Escape (and gamepad Menu/Start) are bound to BOTH OpenMenu and Cancel - InputActionResolver
-    // fires every action bound to a physical key from one press, synchronously, in the same pass
-    // (see emitSpecificPressEvents). Without this guard, opening from closed would immediately
-    // self-cancel: OpenMenuPressed opens it, then CancelPressed (same keypress, same synchronous
-    // batch) sees isOpen=true and closes it right back - so Escape looked like it did nothing.
-    // The reset is deferred to a microtask (not cleared synchronously right after open()) because
-    // emitSpecificPressEvents' for-loop calls emit() once per bound action as separate, fully
-    // synchronous dispatches - by the time CancelPressed's own emit() runs, this handler has
-    // already returned, so a synchronous reset would have already cleared the flag before Cancel
-    // ever saw it. A microtask still resolves before any *later*, independent keypress (a new
-    // browser input event is always a new task, always after pending microtasks drain), so it
-    // doesn't suppress a genuinely separate Cancel-driven close.
-    private suppressNextCancelClose = false
-
+    // Escape/Start is bound to BOTH OpenMenu and Cancel (see CancelPressedEvent.bundledWithOpenMenu's
+    // own doc comment), and OpenMenuPressed fires unconditionally on every such press regardless of
+    // what else is open. With a game box open, that Escape press is meant to close the box
+    // (GameBoxFoldCoordinator's own CancelPressed handler), not ALSO pop this menu open behind it -
+    // which unconditional toggling used to do. Skipping the toggle while another menuType is up
+    // leaves the normal case (nothing else open) unchanged.
     private readonly handleOpenMenuPressed = (): void => {
-        if (this.state.isOpen) {
-            this.close()
+        if (this.isOtherMenuOpen) {
             return
         }
-        this.suppressNextCancelClose = true
-        this.open()
-        void Promise.resolve().then(() => {
-            this.suppressNextCancelClose = false
-        })
+        this.toggle()
     }
 
-    private readonly handleCancelPressed = (): void => {
-        if (this.suppressNextCancelClose) {
+    private readonly handleOtherMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            this.isOtherMenuOpen = true
+        }
+    }
+
+    private readonly handleOtherMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
+        if (event.detail.menuType !== 'pause') {
+            this.isOtherMenuOpen = false
+        }
+    }
+
+    // Skips a Cancel bundled with the SAME OpenMenu press (Escape/Start bind to both - see
+    // CancelPressedEvent.bundledWithOpenMenu's own doc comment): handleOpenMenuPressed's toggle()
+    // already resolved open/closed for this press, so also closing here would immediately undo an
+    // open it just performed. A standalone Cancel (gamepad B/Circle, or Escape/Start with nothing
+    // bound to OpenMenu) has no such flag and still closes normally.
+    private readonly handleCancelPressed = (event: CustomEvent<CancelPressedEvent>): void => {
+        if (event.detail?.bundledWithOpenMenu) {
             return
         }
         if (this.state.isOpen) {
@@ -284,10 +285,7 @@ export class PauseMenuManager {
 
         this.state.isOpen = true
         this.state.previousFocus = document.activeElement as HTMLElement
-        
-        // Pause input
-        this.pauseInput()
-        
+
         // Show overlay - unless the VR uikit menu is standing in as the only visible UI (see
         // domVisualsSuppressed's doc comment).
         if (this.overlay && !this.domVisualsSuppressed) {
@@ -300,8 +298,14 @@ export class PauseMenuManager {
             this.showPanel(targetPanel)
         }
 
-        // Callbacks
-        this.callbacks.onMenuOpen?.()
+        // This class owns its own open/closed lifecycle - it emits UIEventTypes.MenuOpen itself
+        // rather than through a callback relayed by whichever coordinator constructs it. Anything
+        // that reacts to a menu opening (SystemUICoordinator's pointer-lock/reticle handling and its
+        // menu-open counting that pauses InputManager, WebXREventHandler, ...) subscribes to this
+        // event directly. This class has no separate "pause input" concept to emit itself - a prior
+        // pass here also emitted InputEventTypes.Pause/Resume directly, but that was the same thing
+        // SystemUICoordinator already derives from this event, so it was removed.
+        this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
     }
 
     close(): void {
@@ -319,17 +323,14 @@ export class PauseMenuManager {
             this.overlay.style.display = 'none'
         }
 
-        // Resume input
-        this.resumeInput()
-        
         // Restore focus
         if (this.state.previousFocus) {
             this.state.previousFocus.focus()
             this.state.previousFocus = null
         }
 
-        // Callbacks
-        this.callbacks.onMenuClose?.()
+        // See open()'s own comment - emitted directly, not via a callback.
+        this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
     }
 
     showPanel(panelId: string): void {
@@ -388,20 +389,6 @@ export class PauseMenuManager {
 
     isOpen(): boolean {
         return this.state.isOpen
-    }
-
-    private pauseInput(): void {
-        if (!this.state.inputPaused) {
-            this.state.inputPaused = true
-            this.callbacks.onPauseInput?.()
-        }
-    }
-
-    private resumeInput(): void {
-        if (this.state.inputPaused) {
-            this.state.inputPaused = false
-            this.callbacks.onResumeInput?.()
-        }
     }
 
     private createMenuStructure(): void {
@@ -627,6 +614,8 @@ export class PauseMenuManager {
         this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleOtherMenuClose)
 
         // Dispose all panels
         this.panels.forEach(panel => {

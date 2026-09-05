@@ -80,3 +80,9 @@ VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stabl
 - VR controller interaction and raycasting connects to the raycast drag suppression work already in the subagent threads.
 - See `docs/architecture/webxr-architecture.md` for the foundational design decisions.
 - **Next step is scoping, not code**: write `docs/plans/vr-support-plan.md` covering at least sub-scope 1 (VR Controllers) — the WebXR infrastructure audit above should feed directly into it. Get sign-off before writing any implementation code, per this project's planning rules.
+- **Before resuming sub-scope 2 (spatial UI/settings menu) work**: read `docs/tech-debt.md`'s
+  `vr-uikit-menu-sync-recheck` entry first. A sibling branch (`feature/vr-uikit-menu-migration`)
+  already has real uikit-based VR pointer/cursor work in progress there, diverging independently
+  from controller-aim correction and text-sanitizing code that also exists on
+  `feature/game-box-uikit-panels` - real drift, not just cosmetic difference, and neither branch's
+  pointer/cursor behavior has been re-verified in a real headset since.

@@ -12,6 +12,7 @@ import { ControlsPanel } from '../../src/ui/pause/panels/ControlsPanel'
 import { ApplicationPanel } from '../../src/ui/pause/panels/ApplicationPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
+import { UIEventTypes } from '../../src/types/InteractionEvents'
 
 // Mock DOM environment
 function createMockDOM() {
@@ -53,10 +54,11 @@ function createMockDOM() {
 
 describe('Pause Menu Integration Tests', () => {
     let pauseMenuManager: PauseMenuManager
-    let mockCallbacks: any
     let mockDOM: ReturnType<typeof createMockDOM>
     let eventManager: EventManager
     let appSettings: AppSettings
+    let menuOpenHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
+    let menuCloseHandler: ReturnType<typeof vi.fn<(event: CustomEvent) => void>>
 
     beforeEach(async () => {
         // Setup DOM mocks
@@ -92,16 +94,18 @@ describe('Pause Menu Integration Tests', () => {
             }
         })
 
-        // Setup callbacks
-        mockCallbacks = {
-            onPauseInput: vi.fn(),
-            onResumeInput: vi.fn(),
-            onMenuOpen: vi.fn(),
-            onMenuClose: vi.fn()
-        }
-
         eventManager = EventManager.getInstance()
         appSettings = AppSettings.getInstance()
+
+        // PauseMenuManager emits UIEventTypes.MenuOpen/MenuClose directly now, not via constructor
+        // callbacks - listen for the real events instead. It no longer emits
+        // InputEventTypes.Pause/Resume itself either; SystemUICoordinator derives that from this
+        // event by counting every open menuType app-wide, out of scope here since no
+        // SystemUICoordinator is constructed in this PauseMenuManager-only test.
+        menuOpenHandler = vi.fn<(event: CustomEvent) => void>()
+        menuCloseHandler = vi.fn<(event: CustomEvent) => void>()
+        eventManager.registerEventHandler(UIEventTypes.MenuOpen, menuOpenHandler)
+        eventManager.registerEventHandler(UIEventTypes.MenuClose, menuCloseHandler)
 
         const mockSystemDependencies = {
             performanceMonitor: null as any,
@@ -111,7 +115,6 @@ describe('Pause Menu Integration Tests', () => {
         // Create pause menu manager
         pauseMenuManager = new PauseMenuManager(
             {},
-            mockCallbacks,
             mockSystemDependencies,
             eventManager,
             appSettings,
@@ -121,6 +124,8 @@ describe('Pause Menu Integration Tests', () => {
 
     afterEach(() => {
         pauseMenuManager?.dispose()
+        eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, menuOpenHandler)
+        eventManager.deregisterEventHandler(UIEventTypes.MenuClose, menuCloseHandler)
         vi.restoreAllMocks()
         vi.unstubAllGlobals()
 
@@ -160,13 +165,11 @@ describe('Pause Menu Integration Tests', () => {
             
             pauseMenuManager.toggle()
             expect(pauseMenuManager.isOpen()).toBe(true)
-            expect(mockCallbacks.onMenuOpen).toHaveBeenCalled()
-            expect(mockCallbacks.onPauseInput).toHaveBeenCalled()
-            
+            expect(menuOpenHandler).toHaveBeenCalled()
+
             pauseMenuManager.toggle()
             expect(pauseMenuManager.isOpen()).toBe(false)
-            expect(mockCallbacks.onMenuClose).toHaveBeenCalled()
-            expect(mockCallbacks.onResumeInput).toHaveBeenCalled()
+            expect(menuCloseHandler).toHaveBeenCalled()
         })
 
         it('should open specific panel', () => {
@@ -307,22 +310,22 @@ describe('Pause Menu Integration Tests', () => {
         })
     })
 
-    describe('Input State Management', () => {
+    describe('Open/Close Event Emission', () => {
         beforeEach(() => {
             pauseMenuManager.init()
         })
 
-        it('should track input pause state correctly', () => {
-            const state = pauseMenuManager.getState()
-            expect(state.inputPaused).toBe(false)
-            
+        // Whether input actually pauses is SystemUICoordinator's concern now (out of scope here -
+        // see beforeEach above). This only checks that PauseMenuManager itself still emits
+        // MenuOpen/MenuClose on open()/close() directly, not just via toggle() (covered above).
+        it('emits MenuOpen/MenuClose on open()/close() directly', () => {
+            expect(menuOpenHandler).not.toHaveBeenCalled()
+
             pauseMenuManager.open()
-            const pausedState = pauseMenuManager.getState()
-            expect(pausedState.inputPaused).toBe(true)
-            
+            expect(menuOpenHandler).toHaveBeenCalledTimes(1)
+
             pauseMenuManager.close()
-            const resumedState = pauseMenuManager.getState()
-            expect(resumedState.inputPaused).toBe(false)
+            expect(menuCloseHandler).toHaveBeenCalledTimes(1)
         })
 
         it('should preserve focus correctly', () => {

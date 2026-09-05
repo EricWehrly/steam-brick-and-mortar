@@ -7,13 +7,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { VRControllerPointer, RAY_DIRECTION } from '../../../../src/scene/uikit/VRControllerPointer'
-import { ALWAYS_ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/VRSettingsMenuShell'
+import { VRControllerPointer, ON_TOP_RENDER_ORDER } from '../../../../src/scene/uikit/VRControllerPointer'
+import { CONTROLLER_AIM_DIRECTION } from '../../../../src/webxr/ControllerAimCorrection'
 
 /** Places a target exactly one unit along the pointer's real (pitch-corrected) ray direction,
  *  so tests hit it regardless of the exact correction angle in use. */
 function positionOnRay(target: THREE.Object3D, distance = 1): void {
-    target.position.copy(RAY_DIRECTION).multiplyScalar(distance)
+    target.position.copy(CONTROLLER_AIM_DIRECTION).multiplyScalar(distance)
 }
 
 // Plain THREE.Group's addEventListener/dispatchEvent types only know Object3DEventMap - real
@@ -72,8 +72,7 @@ describe('VRControllerPointer', () => {
     })
 
     it('draws both the beam and the hit marker in the transparent pass, above uikit panels - an '
-        + 'opaque overlay is drawn before every transparent panel regardless of renderOrder, which '
-        + 'is what put the cursor visually behind the menus it was pointing at', () => {
+        + 'opaque overlay draws before every transparent panel regardless of renderOrder', () => {
         createPointer()
 
         const beam = raySpace.children[0] as THREE.Mesh
@@ -84,7 +83,7 @@ describe('VRControllerPointer', () => {
             expect(material.transparent).toBe(true)
             expect(material.depthTest).toBe(false)
             expect(material.depthWrite).toBe(false)
-            expect(mesh.renderOrder).toBeGreaterThan(ALWAYS_ON_TOP_RENDER_ORDER)
+            expect(mesh.renderOrder).toBe(ON_TOP_RENDER_ORDER)
         }
     })
 

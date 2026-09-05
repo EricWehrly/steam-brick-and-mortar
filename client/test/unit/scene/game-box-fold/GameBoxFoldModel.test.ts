@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
+import {
+    GameBoxFoldModel, FRONT_COVER_OPEN_ROTATION, SECOND_FLAP_OPEN_ROTATION, FLAP_OPEN_INWARD_ANGLE_DEGREES
+} from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
+import { BOX_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
 
 // Matches GameBoxFoldModel's own SUMMON_DURATION_S/FRONT_COVER_DURATION_S/SECOND_FLAP_DURATION_S
 // (0.2s each) - kept here only as named waypoints for stepping the mixer in tests, not duplicated
@@ -9,13 +12,26 @@ const SUMMON_END_S = 0.2
 const FRONT_COVER_END_S = 0.4
 const FULL_OPEN_S = 0.6
 
+function buildModel(): GameBoxFoldModel {
+    return new GameBoxFoldModel(() => {})
+}
+
 function getHinges(model: GameBoxFoldModel): [THREE.Group, THREE.Group] {
     return model.group.children.slice(1) as [THREE.Group, THREE.Group]
 }
 
+/** Where a panel's page sits, and which way it faces, in the model group's own space. */
+function pageWorldZ(page: THREE.Object3D): number {
+    return page.getWorldPosition(new THREE.Vector3()).z
+}
+
+function pageFacing(page: THREE.Object3D): THREE.Vector3 {
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(page.getWorldQuaternion(new THREE.Quaternion()))
+}
+
 describe('GameBoxFoldModel', () => {
     it('starts closed - both hinges at rotation 0, before any playOpen()', () => {
-        const model = new GameBoxFoldModel()
+        const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
 
         expect(leftHinge.rotation.y).toBe(0)
@@ -24,15 +40,19 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('playOpen() ends with both hinges at PI and the group scaled to 1', () => {
-        const model = new GameBoxFoldModel()
+    it('playOpen() ends with the front cover just PAST a flat 180 and the second flap just SHORT '
+        + 'of it (mirror-image offsets, not the same angle - see FRONT_COVER_OPEN_ROTATION\'s own '
+        + 'comment for why) and the group scaled to 1', () => {
+        const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
 
         model.playOpen()
         model.update(FULL_OPEN_S + 1) // overshoot - LoopOnce + clampWhenFinished clamps to the end
 
-        expect(leftHinge.rotation.y).toBeCloseTo(Math.PI)
-        expect(rightHinge.rotation.y).toBeCloseTo(Math.PI)
+        expect(leftHinge.rotation.y).toBeCloseTo(FRONT_COVER_OPEN_ROTATION)
+        expect(rightHinge.rotation.y).toBeCloseTo(SECOND_FLAP_OPEN_ROTATION)
+        expect(leftHinge.rotation.y).toBeGreaterThan(Math.PI)
+        expect(rightHinge.rotation.y).toBeLessThan(Math.PI)
         expect(model.group.scale.x).toBeCloseTo(1)
 
         model.dispose()
@@ -43,7 +63,7 @@ describe('GameBoxFoldModel', () => {
         + 'model (MODEL_FACING_ROTATION_Y) - the model\'s own local +X/-X are each other\'s viewer-'
         + 'relative side once that outer rotation is composed in; a bug here previously had them '
         + 'swapped because that composition was never checked, only the model\'s own local frame', () => {
-        const model = new GameBoxFoldModel()
+        const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
         const [leftMesh] = leftHinge.children as THREE.Mesh[]
         const [rightMesh] = rightHinge.children as THREE.Mesh[]
@@ -67,7 +87,7 @@ describe('GameBoxFoldModel', () => {
     })
 
     it('opens the front cover (left) before the second flap (right) - sequential, not simultaneous', () => {
-        const model = new GameBoxFoldModel()
+        const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
 
         model.playOpen()
@@ -81,7 +101,7 @@ describe('GameBoxFoldModel', () => {
     })
 
     it('playClose() reverses fully open back to closed and small', () => {
-        const model = new GameBoxFoldModel()
+        const model = buildModel()
         const [leftHinge, rightHinge] = getHinges(model)
 
         model.playOpen()
@@ -98,7 +118,7 @@ describe('GameBoxFoldModel', () => {
     })
 
     it('onFullyClosed() fires when playClose() finishes, not when playOpen() finishes', () => {
-        const model = new GameBoxFoldModel()
+        const model = buildModel()
         const callback = vi.fn()
         model.onFullyClosed(callback)
 
@@ -113,39 +133,96 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('setContent() redraws in place - the underlying texture objects are reused, not reallocated', () => {
-        const model = new GameBoxFoldModel()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const internal = model as any
-        const leftTextureBefore = internal.leftTexture
-        const rightTextureBefore = internal.rightTexture
+    it('closed, the three panels are stacked at the same X/Y footprint and separated only by Z - '
+        + 'front cover nearest the viewer, then the second flap, then the base', () => {
+        const model = buildModel()
+        const [leftHinge, rightHinge] = getHinges(model)
+        const [leftMesh] = leftHinge.children as THREE.Mesh[]
+        const [rightMesh] = rightHinge.children as THREE.Mesh[]
+        const baseMesh = model.group.children[0]
 
-        model.setContent({ name: 'Half-Life 3' })
-        model.setContent({ name: 'Portal 3', rating: '92% · Overwhelmingly Positive', playtimeHours: 12, tags: ['Puzzle'] })
+        // In each hinge's own local space (rotation 0 = closed), the mesh sits centered on the
+        // group's origin - hingeX and the mesh's local offset cancel out.
+        expect(leftHinge.position.x + leftMesh.position.x).toBeCloseTo(0)
+        expect(rightHinge.position.x + rightMesh.position.x).toBeCloseTo(0)
 
-        expect(internal.leftTexture).toBe(leftTextureBefore)
-        expect(internal.rightTexture).toBe(rightTextureBefore)
-
-        model.dispose()
-    })
-
-    it('setContent() marks both content textures dirty (version bump - Texture.needsUpdate is write-only)', () => {
-        const model = new GameBoxFoldModel()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const internal = model as any
-        const leftVersionBefore = internal.leftTexture.version
-        const rightVersionBefore = internal.rightTexture.version
-
-        model.setContent({ name: 'Half-Life 3' })
-
-        expect(internal.leftTexture.version).toBeGreaterThan(leftVersionBefore)
-        expect(internal.rightTexture.version).toBeGreaterThan(rightVersionBefore)
+        expect(leftHinge.position.z).toBeLessThan(rightHinge.position.z)
+        expect(rightHinge.position.z).toBeLessThan(baseMesh.position.z)
 
         model.dispose()
     })
 
-    it('setContent() handles long names, many tags, and missing optional fields without throwing', () => {
-        const model = new GameBoxFoldModel()
+    it('fully open, both flaps face the viewer tilted in by FLAP_OPEN_INWARD_ANGLE_DEGREES by an '
+        + 'IDENTICAL amount despite their mirror-image hinge rotations, and land at the SAME Z as '
+        + 'each other, both nearer the viewer than the store panel\'s own plane - a book cupped '
+        + 'toward the reader, not one flap cupping in while the other cups away', () => {
+        const model = buildModel()
+
+        model.playOpen()
+        model.update(FULL_OPEN_S + 1)
+        model.group.updateMatrixWorld(true)
+
+        const [storePage, identityPage, debugPage] = model.getPanelRoots() as unknown as THREE.Object3D[]
+
+        // The store panel doesn't hinge - its facing is fixed regardless of the flap-angle
+        // change. The model's own -Z is what the coordinator turns toward the viewer.
+        expect(pageFacing(storePage).z).toBeCloseTo(-1, 5)
+
+        // Each flap's own front normal, rotated about Y from local +Z, is cos(rotation) - not -1,
+        // since neither hinge stops at a flat 180. cos(PI+x) equals cos(PI-x), so both flaps'
+        // facing tilts land on the same value despite their opposite rotation targets.
+        const expectedFlapFacingZ = -Math.cos(THREE.MathUtils.degToRad(FLAP_OPEN_INWARD_ANGLE_DEGREES))
+        expect(expectedFlapFacingZ).toBeLessThan(-0.9) // sanity: still mostly viewer-facing
+        expect(pageFacing(identityPage).z).toBeCloseTo(expectedFlapFacingZ, 5)
+        expect(pageFacing(debugPage).z).toBeCloseTo(expectedFlapFacingZ, 5)
+
+        // Position: both flaps end up strictly nearer the viewer (more negative Z) than the store
+        // panel's own plane - true cupping, not one flap receding behind it - and, since the
+        // mirror-image rotation targets are chosen specifically to cancel out each hinge's
+        // opposite-signed X offset, at the SAME Z as each other.
+        expect(pageWorldZ(identityPage)).toBeLessThan(pageWorldZ(storePage))
+        expect(pageWorldZ(debugPage)).toBeLessThan(pageWorldZ(storePage))
+        expect(pageWorldZ(identityPage)).toBeCloseTo(pageWorldZ(debugPage), 5)
+        // Still a shallow cup, not a wild stagger - bounded well under the hinge's own reach
+        // rather than pinned to an exact value, so this doesn't re-derive that geometry by hand
+        // while still catching a regression back to whole-STACK_GAP-scale staggering.
+        expect(Math.abs(pageWorldZ(identityPage) - pageWorldZ(storePage))).toBeLessThan(BOX_WIDTH / 2)
+
+        model.dispose()
+    })
+
+    it('closed, the flap pages are tucked behind the base panel rather than sitting proud of it', () => {
+        const model = buildModel()
+        model.group.updateMatrixWorld(true)
+
+        const [storePage, identityPage, debugPage] = model.getPanelRoots() as unknown as THREE.Object3D[]
+        // -Z is toward the viewer: the store page is the frontmost thing the pages themselves
+        // reach while closed, with both flap pages behind it (greater Z), hidden inside the stack.
+        expect(pageWorldZ(identityPage)).toBeGreaterThan(pageWorldZ(storePage))
+        expect(pageWorldZ(debugPage)).toBeGreaterThan(pageWorldZ(storePage))
+
+        model.dispose()
+    })
+
+    it('mounts one uikit page per face, each parented to the panel mesh it belongs to so it '
+        + 'inherits that face\'s swing and the group\'s summon scale', () => {
+        const model = buildModel()
+        const [leftHinge, rightHinge] = getHinges(model)
+        const baseMesh = model.group.children[0]
+
+        const pages = model.getPanelRoots() as unknown as THREE.Object3D[]
+        expect(pages).toHaveLength(3)
+        expect(pages[0].parent).toBe(baseMesh)
+        expect(pages[1].parent).toBe(leftHinge.children[0])
+        expect(pages[2].parent).toBe(rightHinge.children[0])
+
+        model.dispose()
+    })
+
+    it('setContent() handles long names, many tags, and missing optional fields without throwing, '
+        + 'and reuses the same page roots across selections', () => {
+        const model = buildModel()
+        const pagesBefore = model.getPanelRoots()
 
         expect(() => model.setContent({
             name: 'A Very Long Game Title That Should Wrap Across Multiple Lines On The Front Cover'
@@ -156,6 +233,7 @@ describe('GameBoxFoldModel', () => {
             rating: '100% · Overwhelmingly Positive',
             playtimeHours: 999,
             recentPlaytimeHours: 40,
+            genres: ['Action', 'Indie'],
             tags: ['Action', 'Indie', 'Roguelike', 'Co-op', 'Difficult', 'Pixel Graphics'],
             categories: ['Single-player', 'Steam Achievements', 'Full controller support'],
             userCollections: ['Backlog', 'Favorites'],
@@ -165,11 +243,13 @@ describe('GameBoxFoldModel', () => {
             debugJson: JSON.stringify({ appid: 1, nested: { a: 1, b: [1, 2, 3] } }, null, 2)
         })).not.toThrow()
 
+        expect(model.getPanelRoots()).toEqual(pagesBefore)
+
         model.dispose()
     })
 
-    it('setHeaderImage() rasterizes pixel data into the store panel without throwing, and null clears it back to a placeholder', () => {
-        const model = new GameBoxFoldModel()
+    it('setHeaderImage() rasterizes pixel data into the store panel\'s disc, and null clears it back to the placeholder', () => {
+        const model = buildModel()
         const width = 4
         const height = 2
         const pixels = new Uint8ClampedArray(width * height * 4).fill(200)
@@ -180,135 +260,19 @@ describe('GameBoxFoldModel', () => {
         model.dispose()
     })
 
-    it('getInteractiveMeshes() returns the base mesh and each hinge\'s single content mesh', () => {
-        const model = new GameBoxFoldModel()
-        const [leftHinge, rightHinge] = getHinges(model)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const internal = model as any
+    it('update() drives both the animation mixer (seconds) and every uikit page root (milliseconds)', () => {
+        const model = buildModel()
+        const pageUpdateSpies = model.getPanelRoots().map(page => vi.spyOn(page, 'update'))
 
-        const meshes = model.getInteractiveMeshes()
+        model.update(0.016)
 
-        expect(meshes.store).toBe(internal.baseMesh)
-        expect(meshes.identity).toBe(leftHinge.children[0])
-        expect(meshes.debug).toBe(rightHinge.children[0])
+        pageUpdateSpies.forEach(spy => expect(spy).toHaveBeenCalledWith(16))
 
         model.dispose()
     })
 
-    it('isContentFaceHit() only accepts the -Z face on the store mesh and the +Z face on the flap meshes', () => {
-        const model = new GameBoxFoldModel()
-        const meshes = model.getInteractiveMeshes()
-
-        expect(model.isContentFaceHit(meshes.store, 5)).toBe(true) // negZ
-        expect(model.isContentFaceHit(meshes.store, 4)).toBe(false) // posZ - not the store's content face
-        expect(model.isContentFaceHit(meshes.identity, 4)).toBe(true) // posZ
-        expect(model.isContentFaceHit(meshes.identity, 5)).toBe(false)
-        expect(model.isContentFaceHit(meshes.debug, 4)).toBe(true)
-        expect(model.isContentFaceHit(meshes.store, undefined)).toBe(false)
-
-        model.dispose()
-    })
-
-    it('isPointInPlayButton() reflects the Play button\'s last-drawn canvas rect, and is false before any content is drawn', () => {
-        const model = new GameBoxFoldModel()
-
-        expect(model.isPointInPlayButton(10, 10)).toBe(false)
-
-        model.setContent({ name: 'Half-Life 3' })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rect = (model as any).playButtonRect as { x: number; y: number; width: number; height: number }
-        expect(rect).toBeTruthy()
-
-        expect(model.isPointInPlayButton(rect.x + 1, rect.y + 1)).toBe(true)
-        expect(model.isPointInPlayButton(rect.x + rect.width - 1, rect.y + rect.height - 1)).toBe(true)
-        expect(model.isPointInPlayButton(rect.x - 5, rect.y)).toBe(false)
-        expect(model.isPointInPlayButton(rect.x + rect.width + 5, rect.y)).toBe(false)
-
-        model.dispose()
-    })
-
-    it('isPointInCacheEntry() reflects the cache-entry section\'s last-drawn start Y, gating the debug face\'s static text (description/rating/tags/features) out of scroll range', () => {
-        const model = new GameBoxFoldModel()
-
-        // Before any content, cacheEntryStartY defaults to 0 - everything reads as "in" the
-        // section, which is harmless since there's nothing to scroll yet either.
-        expect(model.isPointInCacheEntry(0)).toBe(true)
-
-        model.setContent({
-            name: 'Half-Life 3',
-            description: 'A description long enough to occupy real vertical space on the debug face.',
-            rating: '92% · Overwhelmingly Positive',
-            tags: ['Action'],
-            categories: ['Single-player'],
-            debugJson: '{"appid": 1}'
-        })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const startY = (model as any).cacheEntryStartY as number
-        expect(startY).toBeGreaterThan(0)
-
-        expect(model.isPointInCacheEntry(startY - 1)).toBe(false)
-        expect(model.isPointInCacheEntry(startY)).toBe(true)
-        expect(model.isPointInCacheEntry(startY + 50)).toBe(true)
-
-        model.dispose()
-    })
-
-    it('scrollDebugPanel() clamps to [0, maxScroll], resets to 0 on the next setContent(), and is a no-op with no debugJson', () => {
-        const model = new GameBoxFoldModel()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const internal = model as any
-
-        // No debugJson at all - shouldn't throw, and there's nothing to scroll.
-        expect(() => model.scrollDebugPanel(1)).not.toThrow()
-        expect(internal.debugScrollLine).toBe(0)
-
-        const manyLines = Array.from({ length: 30 }, (_, i) => `"line${i}": ${i}`).join(',\n')
-        model.setContent({ name: 'Half-Life 3', debugJson: `{\n${manyLines}\n}` })
-        expect(internal.debugScrollLine).toBe(0) // reset on every new selection
-
-        model.scrollDebugPanel(1)
-        expect(internal.debugScrollLine).toBeGreaterThan(0)
-
-        // Scrolling far past the end clamps rather than growing unbounded.
-        for (let i = 0; i < 20; i++) model.scrollDebugPanel(1)
-        const maxed = internal.debugScrollLine
-        expect(maxed).toBe(internal.debugMaxScrollLine)
-        model.scrollDebugPanel(1)
-        expect(internal.debugScrollLine).toBe(maxed)
-
-        // Scrolling back up clamps at 0, not negative.
-        for (let i = 0; i < 20; i++) model.scrollDebugPanel(-1)
-        expect(internal.debugScrollLine).toBe(0)
-
-        model.dispose()
-    })
-
-    it('closed panels are stacked at the same X/Y footprint, separated only by Z', () => {
-        const model = new GameBoxFoldModel()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const internal = model as any
-        const [leftHinge, rightHinge] = getHinges(model)
-        const [leftMesh] = leftHinge.children as THREE.Mesh[]
-        const [rightMesh] = rightHinge.children as THREE.Mesh[]
-
-        // In each hinge's own local space (rotation 0 = closed), the mesh sits centered on the
-        // group's origin - hingeX and the mesh's local offset cancel out.
-        const leftWorldX = leftHinge.position.x + leftMesh.position.x
-        const rightWorldX = rightHinge.position.x + rightMesh.position.x
-        expect(leftWorldX).toBeCloseTo(0)
-        expect(rightWorldX).toBeCloseTo(0)
-
-        // Front cover (leftHinge) is closer to the viewer (more negative Z) than the second flap
-        // (rightHinge), which is closer than the base (Z=0) - see FACE_INDEX's "-Z toward viewer"
-        // comment in the source.
-        expect(leftHinge.position.z).toBeLessThan(rightHinge.position.z)
-        expect(rightHinge.position.z).toBeLessThan(internal.baseMesh.position.z)
-
-        model.dispose()
-    })
-
-    it('dispose() frees geometry and materials it owns, and stops the mixer', () => {
-        const model = new GameBoxFoldModel()
+    it('dispose() frees geometry, materials and page roots it owns, and stops the mixer', () => {
+        const model = buildModel()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const internal = model as any
 
@@ -316,15 +280,15 @@ describe('GameBoxFoldModel', () => {
             const meshes = child instanceof THREE.Mesh ? [child] : (child as THREE.Group).children
             return meshes.map(mesh => vi.spyOn((mesh as THREE.Mesh).geometry, 'dispose'))
         })
-        const leftTextureDispose = vi.spyOn(internal.leftTexture, 'dispose')
-        const rightTextureDispose = vi.spyOn(internal.rightTexture, 'dispose')
+        const pageDisposeSpies = model.getPanelRoots().map(page => vi.spyOn(page, 'dispose'))
+        const materialDispose = vi.spyOn(internal.plainMaterial, 'dispose')
         const stopAllActionSpy = vi.spyOn(internal.mixer, 'stopAllAction')
 
         model.dispose()
 
         geometryDisposeSpies.forEach(spy => expect(spy).toHaveBeenCalledTimes(1))
-        expect(leftTextureDispose).toHaveBeenCalledTimes(1)
-        expect(rightTextureDispose).toHaveBeenCalledTimes(1)
+        pageDisposeSpies.forEach(spy => expect(spy).toHaveBeenCalledTimes(1))
+        expect(materialDispose).toHaveBeenCalledTimes(1)
         expect(stopAllActionSpy).toHaveBeenCalledTimes(1)
     })
 })

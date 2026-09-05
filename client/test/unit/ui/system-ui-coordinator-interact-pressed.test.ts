@@ -60,10 +60,12 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
 }))
 
 function makeMockRenderer(): { domElement: HTMLCanvasElement } {
-    return {
-        domElement: document.createElement('canvas'),
-        setTransparentSort: vi.fn()
-    } as unknown as { domElement: HTMLCanvasElement }
+    const domElement = document.createElement('canvas')
+    // handleMenuClose now requests pointer lock directly (moved here from a PauseMenuManager
+    // callback) - jsdom's canvas has no real implementation, so this needs a stub the same way
+    // system-ui-coordinator-pointer-lock.test.ts already does.
+    domElement.requestPointerLock = vi.fn().mockResolvedValue(undefined)
+    return { domElement } as unknown as { domElement: HTMLCanvasElement }
 }
 
 function emitInteractPressed(): void {
@@ -127,11 +129,11 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
         expect(reticle?.style.display).toBe('block')
 
         isPauseMenuOpen = true
-        menuOpen?.(new CustomEvent('menu-open'))
+        menuOpen?.(new CustomEvent('menu-open', { detail: { menuType: 'pause' } }))
         expect(reticle?.style.display).toBe('none')
 
         isPauseMenuOpen = false
-        menuClose?.(new CustomEvent('menu-close'))
+        menuClose?.(new CustomEvent('menu-close', { detail: { menuType: 'pause' } }))
         expect(reticle?.style.display).toBe('block')
 
         emitDevices([{ id: 'mouse-keyboard', name: 'Mouse + Keyboard', kind: 'mouse-keyboard', connected: true, profileId: 'mouse-keyboard' }])

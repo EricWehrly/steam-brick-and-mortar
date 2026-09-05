@@ -4,18 +4,8 @@ import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../../../src/core/data/DataTypes'
 import { EventManager } from '../../../../src/core/EventManager'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
-import {
-    GameEventTypes, InputEventTypes,
-    type GameSelectedEvent, type SceneCanvasClickEvent, type SceneCanvasWheelEvent
-} from '../../../../src/types/InteractionEvents'
-import type { XRControllerRaySource, XRControllerRayInfo } from '../../../../src/webxr/XRControllerManager'
-
-// Real (empty-geometry) THREE.Mesh instances shared between the model mock's
-// getInteractiveMeshes() and the intersectObjects() stubs below, so "which mesh got hit" can be
-// asserted by reference equality the same way the real raycastAgainstBox() does.
-const fakeStoreMesh = new THREE.Mesh()
-const fakeIdentityMesh = new THREE.Mesh()
-const fakeDebugMesh = new THREE.Mesh()
+import { GameEventTypes, InputEventTypes, type GameSelectedEvent } from '../../../../src/types/InteractionEvents'
+import type { XRControllerSource, XRControllerState } from '../../../../src/webxr/XRControllerManager'
 
 const fakeModelInstances: Array<{
     group: THREE.Group
@@ -25,18 +15,17 @@ const fakeModelInstances: Array<{
     update: ReturnType<typeof vi.fn>
     setContent: ReturnType<typeof vi.fn>
     setHeaderImage: ReturnType<typeof vi.fn>
-    getInteractiveMeshes: ReturnType<typeof vi.fn>
-    isContentFaceHit: ReturnType<typeof vi.fn>
-    isPointInPlayButton: ReturnType<typeof vi.fn>
-    isPointInCacheEntry: ReturnType<typeof vi.fn>
-    scrollDebugPanel: ReturnType<typeof vi.fn>
+    getPanelRoots: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
     fullyClosedCallback: (() => void) | null
+    /** The Play handler the coordinator hands the store panel at construction - the only way this
+     *  class can be asked to launch a game now that hit-testing lives inside uikit. */
+    playHandler: (() => void) | null
 }> = []
 
 vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
     // Must be a real function (not an arrow) - the real class is invoked with `new`.
-    GameBoxFoldModel: vi.fn().mockImplementation(function () {
+    GameBoxFoldModel: vi.fn().mockImplementation(function (onPlay: () => void) {
         const instance = {
             group: new THREE.Group(),
             playOpen: vi.fn(),
@@ -45,22 +34,14 @@ vi.mock('../../../../src/scene/game-box-fold/GameBoxFoldModel', () => ({
             update: vi.fn(),
             setContent: vi.fn(),
             setHeaderImage: vi.fn(),
-            getInteractiveMeshes: vi.fn(() => ({ store: fakeStoreMesh, identity: fakeIdentityMesh, debug: fakeDebugMesh })),
-            isContentFaceHit: vi.fn(() => true),
-            isPointInPlayButton: vi.fn(() => false),
-            isPointInCacheEntry: vi.fn(() => true),
-            scrollDebugPanel: vi.fn(),
+            getPanelRoots: vi.fn(() => []),
             dispose: vi.fn(),
-            fullyClosedCallback: null as (() => void) | null
+            fullyClosedCallback: null as (() => void) | null,
+            playHandler: onPlay as (() => void) | null
         }
         fakeModelInstances.push(instance)
         return instance
-    }),
-    PANEL_CANVAS_SIZE: 512,
-    // Real value (see GameBoxFoldModel.ts) - GameBoxFoldCoordinator's computeCameraAnchorDistance()
-    // divides by this, so leaving it unmocked/undefined here would silently NaN the whole
-    // camera-anchor-distance calculation rather than fail loudly.
-    OPEN_BOX_HALF_WIDTH: 0.45
+    })
 }))
 
 const fakePixels = new Uint8ClampedArray(4)
@@ -72,7 +53,13 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
     ARTWORK_DIMENSIONS: { header: { width: 1, height: 1 } }
 }))
 
-import { GameBoxFoldCoordinator } from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
+import {
+    GameBoxFoldCoordinator, MODEL_FACING_ROTATION_Y,
+    FLATSCREEN_TILT_PITCH_DEGREES,
+    OPEN_BOX_SAFE_FOV_FRACTION, CAMERA_ANCHOR_DISTANCE_MARGIN, VR_CAMERA_ANCHOR_DISTANCE_MARGIN,
+    MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE
+} from '../../../../src/scene/game-box-fold/GameBoxFoldCoordinator'
+import { OPEN_BOX_HALF_WIDTH } from '../../../../src/scene/game-box-fold/GameBoxFoldDimensions'
 import { GameBoxFoldModel } from '../../../../src/scene/game-box-fold/GameBoxFoldModel'
 
 function selectGame(appid: number): void {
@@ -81,28 +68,6 @@ function selectGame(appid: number): void {
 
 function cancel(): void {
     EventManager.getInstance().emit(InputEventTypes.CancelPressed, {})
-}
-
-function click(button = 0, ndcX = 0, ndcY = 0): void {
-    EventManager.getInstance().emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
-        clientX: 0, clientY: 0, button, ndcX, ndcY
-    })
-}
-
-function wheel(deltaY: number, ndcX = 0, ndcY = 0): void {
-    EventManager.getInstance().emit<SceneCanvasWheelEvent>(InputEventTypes.SceneCanvasWheel, { ndcX, ndcY, deltaY })
-}
-
-/** Stubs THREE.Raycaster.intersectObjects for one call to report a hit on the given mesh, uv at
- *  its center. raycastAgainstBox() only reads .object/.uv/.face.materialIndex off the result. */
-function stubRaycastHit(mesh: THREE.Mesh): void {
-    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValueOnce([
-        { object: mesh, uv: new THREE.Vector2(0.5, 0.5), face: { materialIndex: 0 } } as unknown as THREE.Intersection
-    ])
-}
-
-function stubRaycastMiss(): void {
-    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValueOnce([])
 }
 
 describe('GameBoxFoldCoordinator', () => {
@@ -120,15 +85,10 @@ describe('GameBoxFoldCoordinator', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any, { domain: DataDomain.SteamIntegration })
 
-        // Stubbed so "clicking Play navigates to steam://run/..." can assert against it without
-        // jsdom's real (unimplemented) navigation logging noise.
+        // Stubbed so "Play navigates to steam://run/..." can assert against it without jsdom's
+        // real (unimplemented) navigation logging noise.
         originalLocation = window.location
         Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true })
-
-        // vi.spyOn returns the SAME mock across tests for a given prototype method - reset its
-        // call history/queued mockReturnValueOnce values so one test's stubs can't leak into the
-        // next (or, via an unreached early-return, into a later call within the same test).
-        vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReset()
     })
 
     afterEach(() => {
@@ -157,6 +117,84 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.playOpen).toHaveBeenCalledTimes(1)
     })
 
+    it('holds the flatscreen (zero-controller) box at a slight pitch, not square to the camera - '
+        + 'a dead-on angle read as flat/2D rather than a real object. Pitch only, deliberately no '
+        + 'yaw - see FLATSCREEN_TILT_PITCH_DEGREES\' own comment for why a yaw was tried and '
+        + 'dropped', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
+        expect(model.group.rotation.x).toBeCloseTo(THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES))
+    })
+
+    it('keeps the box\'s top edge level under its real rotation - MODEL_FACING_ROTATION_Y\'s own '
+        + '180-degree yaw combined with the flatscreen pitch - even though THREE\'s default Euler '
+        + 'order would roll a level edge once any yaw and any pitch are both nonzero; '
+        + 'rotation.order must be \'YXZ\' (pitch first) to prevent that', () => {
+        const camera = new THREE.Object3D()
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.order).toBe('YXZ')
+
+        // The model's own local X axis is the box's top-edge direction (BoxGeometry's width axis) -
+        // confirm it actually stays level (zero world-Y component) under the real combined rotation,
+        // not just that .order is set to the right string.
+        model.group.updateMatrixWorld(true)
+        const edgeStart = new THREE.Vector3(-1, 0, 0).applyMatrix4(model.group.matrixWorld)
+        const edgeEnd = new THREE.Vector3(1, 0, 0).applyMatrix4(model.group.matrixWorld)
+        expect(edgeEnd.y - edgeStart.y).toBeCloseTo(0, 5)
+    })
+
+    it('holds the open box further from a real PerspectiveCamera than the FOV-fit calculation '
+        + 'alone would - CAMERA_ANCHOR_DISTANCE_MARGIN adds reserve distance on top of the tightest fit', () => {
+        const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
+        const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
+        const tightestFitDistance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
+
+        const actualDistance = -fakeModelInstances[0].group.position.z
+        expect(actualDistance).toBeCloseTo(tightestFitDistance + CAMERA_ANCHOR_DISTANCE_MARGIN)
+    })
+
+    it('uses VR_CAMERA_ANCHOR_DISTANCE_MARGIN instead when camera-anchored with a single connected '
+        + 'controller (VR) - flatscreen and VR share the same camera-anchor path but not the same '
+        + 'reserve distance', () => {
+        const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
+        const grip = new THREE.Object3D()
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => grip,
+            getConnectedControllers: () => connectedControllers
+        }, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
+        const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
+        const tightestFitDistance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
+
+        const actualDistance = -fakeModelInstances[0].group.position.z
+        expect(actualDistance).toBeCloseTo(tightestFitDistance + VR_CAMERA_ANCHOR_DISTANCE_MARGIN)
+    })
+
     it('holds the open box further from a real PerspectiveCamera at a narrower aspect ratio, so the same physical-width open spread keeps fitting a narrower horizontal FOV', () => {
         const wideCamera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100)
         DataManager.getInstance().set(DataKey.MainCamera, wideCamera, { domain: DataDomain.Scene })
@@ -179,8 +217,8 @@ describe('GameBoxFoldCoordinator', () => {
 
         expect(narrowDistance).toBeGreaterThan(wideDistance)
         // Both stay within the sanity clamp, not runaway near/far values.
-        expect(wideDistance).toBeGreaterThanOrEqual(0.5)
-        expect(narrowDistance).toBeLessThanOrEqual(1.4)
+        expect(wideDistance).toBeGreaterThanOrEqual(MIN_CAMERA_ANCHOR_DISTANCE)
+        expect(narrowDistance).toBeLessThanOrEqual(MAX_CAMERA_ANCHOR_DISTANCE)
     })
 
     it('falls back to a fixed distance when the published MainCamera is not a real PerspectiveCamera (no fov/aspect to compute from)', () => {
@@ -193,9 +231,9 @@ describe('GameBoxFoldCoordinator', () => {
         expect(fakeModelInstances[0].group.position.z).toBeCloseTo(-0.7)
     })
 
-    it('builds rating/playtime/tags content from full game data - genres then top community '
-        + 'tags, deduped and capped at MAX_TAGS_SHOWN - the sections carried over from '
-        + 'BinderGameDetailPanel', () => {
+    it('builds rating/playtime/genres/tags content from full game data - Steam genres and top '
+        + 'community tags kept as separate sections (not merged), tags deduped and capped at '
+        + 'MAX_TAGS_SHOWN', () => {
         DataManager.getInstance().set('steam.games', [{
             appid: 3,
             name: 'Deep Rock Galactic',
@@ -216,7 +254,8 @@ describe('GameBoxFoldCoordinator', () => {
             rating: '97% · Overwhelmingly Positive',
             playtimeHours: 10,
             recentPlaytimeHours: 2,
-            tags: ['Action', 'Indie', 'Co-op', 'FPS', 'Multiplayer', 'Mining']
+            genres: ['Action', 'Indie'],
+            tags: ['Action', 'Co-op', 'FPS', 'Multiplayer', 'Mining', 'Difficult']
         }))
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const content = model.setContent.mock.calls[0][0] as any
@@ -238,6 +277,25 @@ describe('GameBoxFoldCoordinator', () => {
         expect(fakeModelInstances[0].setContent).toHaveBeenCalledWith(expect.objectContaining({
             categories: ['Co-op', 'Steam Achievements']
         }))
+    })
+
+    it('de-duplicates Steam category descriptions - the raw list sometimes repeats an entry verbatim', () => {
+        DataManager.getInstance().set('steam.games', [{
+            appid: 6,
+            name: 'Mudborne',
+            categories: [
+                { description: 'Single-player' }, { description: 'Steam Achievements' },
+                { description: 'Single-player' }, { description: 'steam achievements' }
+            ]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any, { domain: DataDomain.SteamIntegration })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(6)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const content = fakeModelInstances[0].setContent.mock.calls[0][0] as any
+        expect(content.categories).toEqual(['Single-player', 'Steam Achievements'])
     })
 
     it('omits rating (not "Unrated") when userscore is genuinely missing, alongside undefined playtime/empty tags, for a game with no metadata beyond name', () => {
@@ -271,15 +329,15 @@ describe('GameBoxFoldCoordinator', () => {
     it('selecting with two connected XR controllers parents the model to the primary grip instead', () => {
         const camera = new THREE.Object3D()
         const grip = new THREE.Object3D()
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 },
-            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'left', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 },
+            { index: 1, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
         ]
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => grip,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => connectedControllers
         }, { domain: DataDomain.Scene })
 
         coordinator = new GameBoxFoldCoordinator()
@@ -288,20 +346,22 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(grip.children).toContain(model.group)
         expect(camera.children).not.toContain(model.group)
+        // Reset to baseline, not a stray flatscreen tilt from some earlier summon this session.
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
     })
 
     it('selecting with only one connected XR controller camera-anchors instead of grip-anchoring - '
         + 'a lone controller needs to stay free for pointing/interacting, not glued to the box', () => {
         const camera = new THREE.Object3D()
         const grip = new THREE.Object3D()
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
         ]
         DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        DataManager.getInstance().set<XRControllerRaySource>(DataKey.XRControllerRaySource, {
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => grip,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => connectedControllers
         }, { domain: DataDomain.Scene })
 
         coordinator = new GameBoxFoldCoordinator()
@@ -310,6 +370,28 @@ describe('GameBoxFoldCoordinator', () => {
         const model = fakeModelInstances[0]
         expect(camera.children).toContain(model.group)
         expect(grip.children).not.toContain(model.group)
+    })
+
+    it('does not apply the flatscreen tilt when camera-anchored in VR with a single connected '
+        + 'controller - that framing is flatscreen-only', () => {
+        const camera = new THREE.Object3D()
+        const grip = new THREE.Object3D()
+        const connectedControllers: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 0 }
+        ]
+        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+        DataManager.getInstance().set<XRControllerSource>(DataKey.XRControllerSource, {
+            getPrimaryControllerRay: () => null,
+            getPrimaryControllerGrip: () => grip,
+            getConnectedControllers: () => connectedControllers
+        }, { domain: DataDomain.Scene })
+
+        coordinator = new GameBoxFoldCoordinator()
+        selectGame(1)
+
+        const model = fakeModelInstances[0]
+        expect(model.group.rotation.y).toBeCloseTo(MODEL_FACING_ROTATION_Y)
+        expect(model.group.rotation.x).toBeCloseTo(0)
     })
 
     it('selecting a second game while one is open plays close, waits for it to finish, then '
@@ -353,8 +435,8 @@ describe('GameBoxFoldCoordinator', () => {
     })
 
     it('fetches header (not library) format art and hands the model plain pixels for the store '
-        + "panel's disc - GameBoxFoldModel rasterizes it into a canvas itself, so there's no "
-        + 'THREE texture (and no DataTexture flipY quirk) to build here anymore', async () => {
+        + "panel's disc - the store panel rasterizes it into a canvas itself, so there's no "
+        + 'THREE texture (and no DataTexture flipY quirk) to build here', async () => {
         coordinator = new GameBoxFoldCoordinator()
         selectGame(1)
         await Promise.resolve()
@@ -416,127 +498,22 @@ describe('GameBoxFoldCoordinator', () => {
         expect(model.update).toHaveBeenCalledWith(0.016)
     })
 
-    it('clicking the Play button (button 0, hit on the store mesh, within the button rect) launches steam://run/<appid>', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+    it('the Play handler it hands the store panel launches steam://run/<appid> for whatever is currently summoned', () => {
         coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        const model = fakeModelInstances[0]
-        model.isPointInPlayButton.mockReturnValue(true)
-
-        stubRaycastHit(fakeStoreMesh)
-        click(0)
-
-        expect(window.location.href).toBe('steam://run/1')
-    })
-
-    it('does not launch when the hit is on the store mesh but outside the Play button rect', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(false)
-
-        stubRaycastHit(fakeStoreMesh)
-        click(0)
-
-        expect(window.location.href).toBe('')
-    })
-
-    it('does not launch on a non-primary button - never even reaches the raycaster', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(true)
-        const intersectSpy = vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects')
-
-        click(2) // right-click, not the primary button SceneClickGameBoxRaycast itself also gates on
-
-        expect(intersectSpy).not.toHaveBeenCalled()
-        expect(window.location.href).toBe('')
-    })
-
-    it('does not launch on a raycast miss', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        fakeModelInstances[0].isPointInPlayButton.mockReturnValue(true)
-
-        stubRaycastMiss()
-        click(0)
-
-        expect(window.location.href).toBe('')
-    })
-
-    it('does not launch when the hit lands on one of the store mesh\'s five blank faces', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        const model = fakeModelInstances[0]
-        model.isPointInPlayButton.mockReturnValue(true)
-        model.isContentFaceHit.mockReturnValue(false)
-
-        stubRaycastHit(fakeStoreMesh)
-        click(0)
-
-        expect(window.location.href).toBe('')
-    })
-
-    it('a click before any game is summoned never reaches the raycaster', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        const intersectSpy = vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects')
-
-        click(0)
-
-        expect(intersectSpy).not.toHaveBeenCalled()
-        expect(window.location.href).toBe('')
-    })
-
-    it('scrolling over the debug panel forwards deltaY to scrollDebugPanel()', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
         const model = fakeModelInstances[0]
 
-        stubRaycastHit(fakeDebugMesh)
-        wheel(240)
+        selectGame(2)
+        model.playHandler?.()
 
-        expect(model.scrollDebugPanel).toHaveBeenCalledWith(240)
+        expect(window.location.href).toBe('steam://run/2')
     })
 
-    it('scrolling over the store or identity panel does not touch the debug panel', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
+    it('the Play handler is inert while nothing is summoned', () => {
         coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        const model = fakeModelInstances[0]
 
-        stubRaycastHit(fakeStoreMesh)
-        wheel(100)
-        stubRaycastHit(fakeIdentityMesh)
-        wheel(100)
+        fakeModelInstances[0].playHandler?.()
 
-        expect(model.scrollDebugPanel).not.toHaveBeenCalled()
-    })
-
-    it('scrolling over the debug panel but outside the cache-entry viewport does not scroll it', () => {
-        const camera = new THREE.Object3D()
-        DataManager.getInstance().set(DataKey.MainCamera, camera, { domain: DataDomain.Scene })
-        coordinator = new GameBoxFoldCoordinator()
-        selectGame(1)
-        const model = fakeModelInstances[0]
-        model.isPointInCacheEntry.mockReturnValue(false)
-
-        stubRaycastHit(fakeDebugMesh)
-        wheel(240)
-
-        expect(model.scrollDebugPanel).not.toHaveBeenCalled()
+        expect(window.location.href).toBe('')
     })
 
     it('dispose() frees the model and unregisters from the render loop', () => {

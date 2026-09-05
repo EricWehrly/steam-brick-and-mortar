@@ -2,11 +2,20 @@ import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
-import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
+import {
+    InputEventTypes, GameEventTypes,
+    type SceneCanvasClickEvent, type GameSelectedEvent
+} from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
-import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
+import type { XRControllerSource } from '../../webxr/XRControllerManager'
+import { InputManager } from '../../input/InputManager'
+
+// Same surface a box's own material/animation could occupy - two coincident hits this close
+// together are "the same physical surface," not one genuinely in front of the other. Guards the
+// occlusion check below against raycaster float noise between its two passes.
+const OCCLUSION_EPSILON = 1e-4
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -35,7 +44,7 @@ export class SceneClickGameBoxRaycast {
 
     private resolvedScene: THREE.Scene | null = null
     private resolvedCamera: THREE.Camera | null = null
-    private resolvedRaySource: XRControllerRaySource | null = null
+    private resolvedControllerSource: XRControllerSource | null = null
 
     private readonly raycaster = new THREE.Raycaster()
     private readonly pointer = new THREE.Vector2()
@@ -89,6 +98,15 @@ export class SceneClickGameBoxRaycast {
             return
         }
 
+        // A summoned game box or the pause menu already owns what a click means - the shelf
+        // shouldn't race it to open a second box underneath. Asks InputManager rather than
+        // tracking menu-open state itself: isInputPaused() is reason-agnostic, and
+        // SystemUICoordinator is the one that counts open menus and turns that into a plain
+        // pause()/resume(), the same channel GameLibraryBinderUI's overlay already uses.
+        if (InputManager.getActiveInstance()?.isInputPaused()) {
+            return
+        }
+
         // Lazy-resolve scene/camera: DataManager may not be populated at construction time
         const dm = DataManager.getInstance()
         const scene = this.resolvedScene ?? (this.sceneOption ?? dm.get<THREE.Scene>(DataKey.MainScene) ?? null)
@@ -105,9 +123,9 @@ export class SceneClickGameBoxRaycast {
         // VR: prefer a real controller ray over the click's NDC position when one's available -
         // null outside an active XR session (or before XRControllerManager.setup() has run), so
         // desktop/mouse/gamepad behavior below is unaffected. See docs/plans/vr-support-plan.md.
-        const raySource = this.resolvedRaySource ?? dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        this.resolvedRaySource = raySource
-        const controllerRay = raySource?.getPrimaryControllerRay() ?? null
+        const controllerSource = this.resolvedControllerSource ?? dm.get<XRControllerSource>(DataKey.XRControllerSource) ?? null
+        this.resolvedControllerSource = controllerSource
+        const controllerRay = controllerSource?.getPrimaryControllerRay() ?? null
 
         if (controllerRay) {
             this.raycaster.ray.origin.copy(controllerRay.origin)
@@ -129,9 +147,24 @@ export class SceneClickGameBoxRaycast {
             this.updateDebugLine(lineStart, lineEnd, scene)
         }
 
+        // Shelf/wall/prop geometry doesn't carry SceneLayer.Interactable (only game-box artwork/
+        // label meshes do - see the constructor), so the layer-filtered pass below could find a
+        // box straight through a nearer, non-interactable occluder if that box were the nearest
+        // INTERACTABLE thing on the ray, regardless of what the player can actually see. This
+        // unfiltered pass finds the nearest surface of ANY kind first, so the interactable pass
+        // below can be rejected once it goes past that.
+        this.raycaster.layers.enableAll()
+        const nearestVisible = this.raycaster.intersectObjects(scene.children, true)[0] ?? null
+        this.raycaster.layers.mask = 1 << SceneLayer.Interactable
+
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 
         for (const intersection of intersections) {
+            // Everything from here on is at least as far, so also at least as occluded - nothing
+            // further down the sorted list could be genuinely visible either.
+            if (nearestVisible && intersection.distance > nearestVisible.distance + OCCLUSION_EPSILON) {
+                break
+            }
             const hit = this.resolveGameBoxIntersection(intersection)
             if (hit) {
                 this.highlightHit(hit)

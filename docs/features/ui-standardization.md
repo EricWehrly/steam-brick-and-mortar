@@ -44,3 +44,9 @@ The UI has grown organically and lacks a unified design token system. Inconsiste
 - Related plan: `docs/plans/ui-design-tokens.md` — CSS custom property token spec (palette, spacing, typography).
 - Related plan: `docs/plans/ui-normalization-audit.md` — inventory of hardcoded values and inconsistencies across all UI components.
 - Related plan: `docs/plans/ui-normalization-plan.md` — phased migration plan (audit → base components → panel migration → tag components).
+- **In-scene UI substrate (decided 2026-09-02)**: anything that lives in the 3D scene is
+  `@pmndrs/uikit`, not hand-rolled canvas — see
+  [`in-scene-ui-substrate.md`](../architecture/in-scene-ui-substrate.md). That decision is about
+  *panels*, and deliberately doesn't claim this feature's signage work (7.5.1.3's "2D signage → 3D
+  cube elements") or the omnibar's 3D box element: uikit panels are flat and single-faced, so signs
+  keep their own renderer.

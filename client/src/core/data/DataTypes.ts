@@ -40,11 +40,11 @@ export enum DataKey {
      */
     RoomFrame = 'core.roomFrame',
     /**
-     * XRControllerManager itself (implements XRControllerRaySource) - published once at XR setup
+     * XRControllerManager itself (implements XRControllerSource) - published once at XR setup
      * time so SceneClickGameBoxRaycast (owned by a different coordinator) can look up the current
      * controller ray without a direct cross-class reference. See docs/plans/vr-support-plan.md.
      */
-    XRControllerRaySource = 'webxr.controllerRaySource',
+    XRControllerSource = 'webxr.controllerSource',
     /**
      * PerformanceMonitorUI (SystemUICoordinator constructs and owns it) - published so
      * VRDebugPanel can look it up without a direct cross-coordinator reference, the same

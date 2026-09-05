@@ -91,7 +91,15 @@ for the full task breakdown. Summary:
 
 ## Notes / Open Questions
 
-- **Canvas-drawn faces vs. real HTML/CSS projection (resolved 2026-08-13)**: spiked projecting the
+- **Panel substrate: uikit, not canvas (decided 2026-09-02, supersedes the note below)**: the three
+  faces are moving from hand-drawn canvas textures to `@pmndrs/uikit` panels parented to the
+  existing hinge groups, so they still hinge open. Same reason the 2026-08-13 note rejected CSS3D —
+  it has to render in an immersive session — but uikit does render there, which canvas-vs-CSS3D
+  wasn't the real choice between. This also converges the box onto the one UI system the VR settings
+  menu already uses. See [`in-scene-ui-substrate.md`](../architecture/in-scene-ui-substrate.md) for
+  the decision, uikit's limits, and the narrow canvas escape hatch (the store panel's circular
+  header-art disc is the one surviving canvas instance).
+- **Canvas-drawn faces vs. real HTML/CSS projection (resolved 2026-08-13, superseded above)**: spiked projecting the
   app's real settings menu via `THREE.CSS3DRenderer` to see if it could give hover/mouseover
   feedback for free - see
   [`css3d-panel-projection-spike.md`](../plans/css3d-panel-projection-spike.md). Confirmed (by

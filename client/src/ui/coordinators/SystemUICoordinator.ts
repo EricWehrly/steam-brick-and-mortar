@@ -27,10 +27,10 @@ import {
     AppSettingsEventTypes,
     type SceneCanvasClickEvent,
     type SceneCanvasWheelEvent,
-    type InputPauseEvent,
-    type InputResumeEvent,
     type MenuOpenEvent,
     type MenuCloseEvent,
+    type InputPauseEvent,
+    type InputResumeEvent,
     type InputDevicesChangedEvent
 } from '../../types/InteractionEvents'
 import type { SettingChangedEvent } from '../../core/AppSettings'
@@ -72,6 +72,13 @@ export class SystemUICoordinator {
     private isXRSessionActive = false
     private reticleElement: HTMLElement | null = null
     private isNonPointerDeviceConnected = false
+    // Count of menuTypes currently open across the app (the pause menu, a summoned game box, ...) -
+    // owned here rather than InputManager. Counted rather than boolean since more than one modal
+    // surface can be open at once and this should only clear once none are. A 0<->positive
+    // transition becomes a plain InputEventTypes.Pause/Resume - the same reason-based channel
+    // GameLibraryBinderUI's own non-menu-typed overlay already uses - so InputManager only ever
+    // answers one simple question (is input paused) without needing to know what a "menu" is.
+    private anyMenuOpenCount = 0
     private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
@@ -99,12 +106,6 @@ export class SystemUICoordinator {
 
         this.pauseMenuManager = new PauseMenuManager(
             {},
-            {
-                onPauseInput: this.handlePauseInput,
-                onResumeInput: this.handleResumeInput,
-                onMenuOpen: this.handlePauseMenuOpened,
-                onMenuClose: this.handlePauseMenuClosed
-            },
             undefined,
             this.eventManager,
             this.appSettings,
@@ -300,13 +301,39 @@ export class SystemUICoordinator {
         this.toggleLightingControls()
     }
 
-    private readonly handleMenuOpen = (): void => {
-        this.pauseMenuManager.open()
+    // Two separate jobs share this one subscription: counting ANY open menuType into a plain
+    // InputEventTypes.Pause/Resume (see anyMenuOpenCount's own comment), and the 'pause'-specific
+    // pointer-lock/reticle handling below. Selecting a game box emits this same event with
+    // menuType:'game-box' (see GameBoxFoldCoordinator) - the counting half reacts to that; the
+    // pointer-lock/reticle half doesn't, since it's specifically about the DOM pause overlay, not
+    // any modal surface. Unfiltered, this used to call pauseMenuManager.open() for a game box too,
+    // popping the real pause menu open behind it.
+    private readonly handleMenuOpen = (event: CustomEvent<MenuOpenEvent>): void => {
+        this.anyMenuOpenCount++
+        if (this.anyMenuOpenCount === 1) {
+            this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
+        }
+
+        if (event.detail.menuType !== 'pause') {
+            return
+        }
+        // Release the cursor so it's free to use the menu - needed even though Escape already
+        // triggers the browser's own pointer-unlock, because a gamepad-bound OpenMenu press
+        // doesn't touch Escape at all and would otherwise open the menu with the cursor still captured.
+        document.exitPointerLock?.()
         this.updateReticleVisibility()
     }
 
-    private readonly handleMenuClose = (): void => {
-        this.pauseMenuManager.close()
+    private readonly handleMenuClose = (event: CustomEvent<MenuCloseEvent>): void => {
+        this.anyMenuOpenCount = Math.max(0, this.anyMenuOpenCount - 1)
+        if (this.anyMenuOpenCount === 0) {
+            this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
+        }
+
+        if (event.detail.menuType !== 'pause') {
+            return
+        }
+        this.requestPointerLockIfEnabled()
         this.updateReticleVisibility()
     }
 
@@ -363,34 +390,6 @@ export class SystemUICoordinator {
 
     private readonly handleXRSessionEnd = (): void => {
         this.isXRSessionActive = false
-    }
-
-    private readonly handlePauseInput = (): void => {
-        if (!this.appSettings.getSetting('lockMovementWhileMenuOpen')) {
-            return
-        }
-        this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
-    }
-
-    private readonly handleResumeInput = (): void => {
-        if (!this.appSettings.getSetting('lockMovementWhileMenuOpen')) {
-            return
-        }
-        this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
-    }
-
-    private readonly handlePauseMenuOpened = (): void => {
-        this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-
-        // Release the cursor so it's free to use the menu - needed even though Escape already
-        // triggers the browser's own pointer-unlock, because a gamepad-bound OpenMenu press
-        // doesn't touch Escape at all and would otherwise open the menu with the cursor still captured.
-        document.exitPointerLock?.()
-    }
-
-    private readonly handlePauseMenuClosed = (): void => {
-        this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
-        this.requestPointerLockIfEnabled()
     }
 
     private requestPointerLockIfEnabled(): void {

@@ -266,6 +266,141 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 - `external-tool/infrastructure/lambda-src/services/steam-api.js`
 - `external-tool/infrastructure/lambda-hydrator-src/index.js`
 
+## id: game-data-field-coverage-check
+**Priority**: Low
+**Effort**: Small - see the plan doc
+**Context**: `SteamIntegration.ts` had a one-off, single-field version of this (`warnIfFieldUncovered`,
+hardcoded to `userscore`) - removed in PR #161's review as not worth committing in that narrow
+shape. Plan: [`game-data-field-coverage-check-plan.md`](../plans/game-data-field-coverage-check-plan.md).
+
+**Related files**:
+- `client/src/steam-integration/SteamIntegration.ts` (`// TD: game-data-field-coverage-check`)
+
+## id: game-box-features-icon-display
+**Priority**: Low
+**Effort**: Small - icon set + a small display change in `GameBoxDebugPanel`
+**Context**: Steam's raw feature-category strings ("Full controller support", "Steam Cloud", "Steam
+Workshop", ...) were shown as a plain uikit chip row (`FEATURES`, same treatment as GENRES/TAGS),
+but read as unhelpful clutter rather than useful information - direct request (2026-09-02): "the
+features section isn't that helpful. We need to deliberately park it until we can represent it with
+icons." The display is removed for now; `GameBoxFoldCoordinator` still builds a deduped
+`content.categories` list (the raw strings sometimes repeated an entry verbatim - dedupe fixed
+alongside parking the display), so the data is ready whenever an icon set exists.
+**Done when**: each Steam feature category maps to a small icon (or is dropped if it has none worth
+drawing), and `GameBoxDebugPanel` renders that icon row again instead of the parked plain-text chips.
+**Related files**:
+- `client/src/scene/game-box-fold/panels/GameBoxDebugPanel.ts` (`// TD: game-box-features-icon-display`)
+- `client/src/scene/game-box-fold/GameBoxFoldCoordinator.ts` (still builds `content.categories`)
+
+## id: game-box-color-centralization
+**Priority**: Low - narrowed 2026-09-02 (round six) now that the minimum bar (surface/sleeve) is met
+**Effort**: Small - the resolver pattern already exists and already has enough range (the surface
+ramp); what's left is migrating the remaining local hex literals below onto it, one at a time
+**Context**: The game box's own palette (`GameBoxPanelStyle.ts`'s `BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY`,
+its section accents `play`/`rating`/`metacritic`/`genres`/`tags`/`features`/`collections`/`json`, and
+`GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR`) were all local hex literals rather than tokens -
+deliberately, per `GameBoxPanelStyle.ts`'s own comment (now corrected), reasoning that `tokens.css`
+had no vocabulary for "the box's own printed material." That reasoning left `BOX_SURFACE_GRAY` and
+`GameBoxFoldModel.ts`'s raw `plainMaterial` color as two independently-guessed literals that drifted
+out of sync - the actual cause of the box's center still reading black after the panels' own
+steam-gray fix (direct request, 2026-09-02, round four) - and, separately, the sleeve gray chosen
+was dark enough to still read as black in practice (round four again: "why black", pointing at the
+sleeve). A first attempt at fixing this (round five) added brand-new `--color-box-surface`/
+`--color-box-sleeve` tokens - overcorrected: direct request, round six: "I don't think we need new
+css / token variables. We have existing ones. There should already be steam colors present in
+tokens.css." The actual mistake was narrower than "tokens.css has no vocabulary for this" - a prior
+pass only ever tried `--color-surface-1` (near-black), read that one failure as the whole ramp not
+fitting, and never tried `--color-surface-2`/`-3` (lighter members of the SAME "ordered
+deepest→lightest" ramp tokens.css already ships). Fixed: `GameBoxPanelStyle.ts`'s
+`BOX_SURFACE_GRAY`/`BOX_SLEEVE_GRAY` now re-export `COLOR_TOKENS.surface3`/`.surface2` directly - no
+new tokens, no new resolver keys, just the existing ramp used one step further than before. The
+resolver itself was also renamed and moved (round seven, 2026-09-03) - `UikitColorTokens.ts`/
+`UIKIT_COLORS` implied it was uikit-specific, which was never true (see the
+`generic-color-token-consumers` entry below) - it's now `client/src/ui/ColorTokens.ts`'s
+`COLOR_TOKENS`.
+**Done when**: the section accents (`play`/`rating`/`metacritic`/`genres`/`tags`/`features`/
+`collections`/`json`) and `GameBoxStorePanel.ts`'s `DISC_EDGE_COLOR` also resolve from an existing
+`COLOR_TOKENS` key (or a new one, ONLY once the existing ramp is confirmed to genuinely have no
+reasonable fit) instead of a local hex literal. Still a stretch, not required.
+**Related files**:
+- `client/src/scene/game-box-fold/panels/GameBoxPanelStyle.ts` (`BOX_SURFACE_GRAY`, `PANEL_COLORS`)
+- `client/src/scene/game-box-fold/panels/GameBoxStorePanel.ts` (`DISC_EDGE_COLOR`)
+- `client/src/scene/game-box-fold/GameBoxFoldModel.ts` (`plainMaterial`, now reuses `BOX_SURFACE_GRAY`)
+- `client/src/ui/ColorTokens.ts` (`surface2`/`surface3` reused - the pattern to extend for the rest)
+- `client/src/ui/tokens.css` (`--color-surface-2`/`--color-surface-3` - the app's one real design-token source)
+
+## id: generic-color-token-consumers
+**Priority**: Low
+**Effort**: Medium - a survey pass across DOM UI code plus whatever new consumers show up as the VR
+settings-menu work (see `vr-uikit-menu-sync-recheck` below) eventually reconciles with this branch
+**Context**: `client/src/ui/ColorTokens.ts` (`COLOR_TOKENS`, renamed from `UikitColorTokens.ts`'s
+`UIKIT_COLORS` - direct request, 2026-09-03: "the color tokens aren't unique to UIKit, so our naming
+is bad... we want to build toward the generic implementation") resolves `tokens.css`'s `--color-*`
+custom properties live, for ANY TypeScript consumer, not just uikit/three.js surfaces. So far its
+only real consumers are still uikit-side (`GameBoxPanelStyle.ts`, and whatever the VR settings-menu
+branch's own copy of this same file evolves into once reconciled). Nothing has been done yet to
+route existing DOM-side UI code (which currently reads `tokens.css` the normal CSS-cascade way,
+needing no TypeScript mirror at all) through this same module, nor is there a clear case yet for why
+DOM code WOULD need to - CSS custom properties already just work there. This entry exists to track
+the direction ("build toward the generic implementation") without pretending there's a concrete
+migration plan yet; revisit once a second non-uikit consumer actually needs a live TS-side color
+value (a canvas-drawn surface, a WebGL shader uniform, ...).
+**Done when**: either a real second non-uikit-and-non-CSS consumer exists and uses `COLOR_TOKENS`
+directly (validating the generic name), or this gets closed as "renamed for honesty, no further
+action needed" if no such consumer materializes.
+**Related files**:
+- `client/src/ui/ColorTokens.ts`
+- `client/CLAUDE.md` (the "Colors" guidance pointing at this module)
+
+## id: vr-uikit-menu-sync-recheck
+**Priority**: Low now, but re-evaluate the moment work resumes on the VR settings-menu PR/branch
+**Effort**: Medium - a real headset session plus a deliberate reconciliation pass across a handful
+of files that now exist twice, independently, on two different branches
+**Context**: This branch (`feature/game-box-uikit-panels`) and the sibling
+`feature/vr-uikit-menu-migration` (settings-menu uikit work, see
+[`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) on that branch - it
+doesn't exist here) both independently built uikit-based VR pointer/cursor handling after
+diverging from the same base commit. Comparing the two turned up real drift, not just cosmetic
+differences:
+- **Controller aim correction** - this branch centralizes the "-15 degree pitch correction" for
+  WebXR's raw targetRaySpace direction in `ControllerAimCorrection.ts`, shared by the shelf-select
+  raycast (`XRControllerManager`) and the uikit pointer (`VRControllerPointer`) specifically because
+  two independent copies previously drifted apart and the beam stopped lining up with what actually
+  got selected (direct request, 2026-09-02: "the blue ray line ... and the game box that actually
+  opens don't line up"). The sibling branch's `VRControllerPointer.ts` has its OWN independent
+  inline copy of the same "-15 degree" correction (`RAY_PITCH_CORRECTION_DEGREES`) - exactly the
+  class of duplication `ControllerAimCorrection.ts` exists to prevent, just recreated on the other
+  branch instead of shared.
+- **Render order** - this branch's `VRControllerPointer.ts` briefly had its own
+  `UikitRenderOrder.ts`/`ALWAYS_ON_TOP_RENDER_ORDER`, removed (2026-09-03) as premature with only
+  one consumer here. The sibling branch's real VR settings menu shell (`VRSettingsMenuShell.ts`)
+  owns an equivalent constant and its own `VRControllerPointer.ts` imports it - confirming the
+  *concept* is real once an actual floating menu exists, just not something to invent speculatively
+  on this branch alone.
+- **Text sanitizing** - `UikitTextSanitizer.ts` exists on both branches under the same name; this
+  branch's version is materially more capable (HTML-entity decoding for Steam's encoded text, a
+  separate multiline/raw-JSON variant for the debug face's cache viewer) than the sibling's simpler
+  original.
+- **None of this is live-verified in headset yet on this branch** - the tilt/pitch/distance/framing
+  work this whole session was iterated on screenshots and reasoning, not a real HMD session (direct
+  acknowledgment, 2026-09-03: "I think with the aiming we were going back and forth because it
+  wasn't properly connecting... we should verify when we ultimately load that branch up, and just
+  get it right there. We can assume our current branch is the correct, functioning implementation,
+  for the moment.").
+**Done when**: once the VR settings-menu branch/PR is actually picked back up, (1) put on a real
+headset and confirm the beam/cursor genuinely line up with both the shelf-select raycast and
+whatever a uikit surface is showing, on THIS branch's implementation, before assuming it's correct;
+(2) reconcile `ControllerAimCorrection.ts` against the sibling branch's inline copy - one shared
+definition, not two independently-tuned ones; (3) diff `UikitTextSanitizer.ts` between branches and
+merge forward rather than let an automatic merge/rebase silently pick one side; (4) recheck whether
+the render-order concept this branch removed as premature is now the shape the settings-menu branch
+actually needs, and use that shape rather than reinventing a third one.
+**Related files**:
+- `client/src/webxr/ControllerAimCorrection.ts`
+- `client/src/scene/uikit/VRControllerPointer.ts`
+- `client/src/scene/uikit/UikitTextSanitizer.ts`
+- (sibling branch `feature/vr-uikit-menu-migration`) `VRControllerPointer.ts`, `VRSettingsMenuShell.ts`
+
 ## id: dev-tooling-cant-screenshot-backgrounded-tab
 **Priority**: Low
 **Effort**: Unknown - environment/tooling investigation, not app code (see Decision below)
@@ -730,6 +865,15 @@ not a source of bugs.
 ---
 
 ## Resolved
+
+## id: game-box-canvas-ui-hit-testing
+**Status**: ✅ Resolved 2026-09-02 — the game-box fold's three faces were hand-drawn onto canvas
+textures, with content/style/layout interleaved in one imperative draw call per face and "buttons"
+hit-tested via raycast UV → canvas coords (`isPointInPlayButton`/`isPointInCacheEntry`). Replaced
+with `@pmndrs/uikit` panels parented to the existing hinge groups (real flexbox layout, real hover/
+click/scroll via `@pmndrs/pointer-events`) - see [`in-scene-ui-substrate.md`](architecture/in-scene-ui-substrate.md)
+for the decision to standardize on uikit. No `isPointIn*`-style hit-testing remains in
+`GameBoxFoldModel`.
 
 ## id: steam-integration-loading-strategy-split
 **Status**: ✅ Resolved 2026-07-22 — split into `OnlineLibraryLoader`/`DemoLibraryLoader`/`ImportLibraryHandler` (plain functions, not classes, matching `LocalSteamLibraryLoader`'s shape); `applyLibrary` stayed on `SteamIntegration` as shared substrate. `SteamIntegration.ts` dropped ~510 → ~365 lines.

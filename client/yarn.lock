@@ -184,46 +184,30 @@
   dependencies:
     playwright "1.59.1"
 
-"@pmndrs/msdfonts@^1.0.75":
-  version "1.0.75"
-  resolved "https://registry.yarnpkg.com/@pmndrs/msdfonts/-/msdfonts-1.0.75.tgz#934ad849629b8c316643d52def6fb8c83f66816e"
-  integrity sha512-sqcAzsSJe6dOwEEf2S4LCC19rA2nXTxrPp3PSSRqcdePqippBIW7Bt0z3BIYH7c4iUMi4dOiKb1+bsAqtrG/qg==
+"@pmndrs/msdfonts@^1.0.76":
+  version "1.0.76"
+  resolved "https://registry.yarnpkg.com/@pmndrs/msdfonts/-/msdfonts-1.0.76.tgz#c6ef37192f1004e059d4f8920b6157b6c759ffd5"
+  integrity sha512-NKBJIOIrEoJovhes8TzAAmRtUuOPJIpyHjiCSMVfJLoV2MGRsArXiPkEm6+BDCk1N8eiHWuWGlw4/+LoCmHB2A==
 
 "@pmndrs/pointer-events@^6.6.30":
   version "6.6.30"
   resolved "https://registry.yarnpkg.com/@pmndrs/pointer-events/-/pointer-events-6.6.30.tgz#b7b3fc4794a533836c670fb3160a98cccb85b4b0"
   integrity sha512-YD2jWdgEqqAWJNOOZ1WZMunUby8jwuQyOMk8zbeqC39R4nkZnGvu1Pa5EMGbV1zd2vZTxXDxYcAVxtQuhVwf3g==
 
-"@pmndrs/uikit-default@^1.0.75":
-  version "1.0.75"
-  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-default/-/uikit-default-1.0.75.tgz#8671169c19c9c3b02bd339e27fe33f5047957672"
-  integrity sha512-PDG+FsgmGNz+YCkRp0zioE8JpCPKAWFO5D5rovoJdE4VG1pPtIQACEKStkTMNXxBrckxhBvNlcdBFyoccYpuQg==
-  dependencies:
-    "@pmndrs/uikit" "^1.0.75"
-    "@pmndrs/uikit-lucide" "^1.0.75"
-    zod "^4.4.3"
-
-"@pmndrs/uikit-lucide@^1.0.75":
-  version "1.0.75"
-  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-lucide/-/uikit-lucide-1.0.75.tgz#be949ee0dfc30f8c321e1ba170e37f55f476948d"
-  integrity sha512-OdM3+hkZYyMXavSb8UyYsyU4cHV7iXb6ZTJcJhGE4VwCW4x/tFgF6j3FNkatTE0Kh81ODrWrtG6xRrjtftLYkQ==
-  dependencies:
-    "@pmndrs/uikit" "^1.0.75"
-
-"@pmndrs/uikit-pub-sub@^1.0.75":
-  version "1.0.75"
-  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-pub-sub/-/uikit-pub-sub-1.0.75.tgz#3ff98c3c145bfd7ac2caae30149bac8ee3315f12"
-  integrity sha512-mDQj95VfYtOcmUVse2C1h3E6KIC4p2t63wXjeNR5OkgTJSElb+Aaq4pEB1IFJUbwrbC4ft54W8LVUzi9PSFlyg==
+"@pmndrs/uikit-pub-sub@^1.0.76":
+  version "1.0.76"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-pub-sub/-/uikit-pub-sub-1.0.76.tgz#5de4f09182eb7c5ae4962ff517630dcfa4915656"
+  integrity sha512-+DVXInyj+/GAJJDTvElLrVqh8b1kmnPGZW1UQApUIwxZmhzCPmr2cAz0j1/vNyDG5VQNLWWmkItLi50/chKcwA==
   dependencies:
     "@preact/signals-core" "^1.8.0"
 
 "@pmndrs/uikit@^1.0.75":
-  version "1.0.75"
-  resolved "https://registry.yarnpkg.com/@pmndrs/uikit/-/uikit-1.0.75.tgz#c8b66c7621f32adbf6a3920c0d80df9991f338d5"
-  integrity sha512-5UWP2aqZb6//9DUnGhGlMCN1QPkCMCtzFLqPBujz9i/oF1GHNrY+sHyw9u9pAohMCh2vkdweubSdWSNtfo4olA==
+  version "1.0.76"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit/-/uikit-1.0.76.tgz#7e801b38727146eee10d1e7956376377606cd127"
+  integrity sha512-qLE7kGaW5LGE4YdFzCQZaCiB6NvfL9JJ2NxaBSw8Z0lu/0uiUfA49vKHFxk/1qiGvTu+esrDCAydI+H2aN1kYg==
   dependencies:
-    "@pmndrs/msdfonts" "^1.0.75"
-    "@pmndrs/uikit-pub-sub" "^1.0.75"
+    "@pmndrs/msdfonts" "^1.0.76"
+    "@pmndrs/uikit-pub-sub" "^1.0.76"
     "@preact/signals-core" "^1.5.1"
     "@zappar/msdf-generator" "^1.2.4"
     yoga-layout "^3.2.1"
@@ -234,7 +218,7 @@
   resolved "https://registry.yarnpkg.com/@polka/url/-/url-1.0.0-next.29.tgz#5a40109a1ab5f84d6fd8fc928b19f367cbe7e7b1"
   integrity sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==
 
-"@preact/signals-core@^1.14.4", "@preact/signals-core@^1.5.1", "@preact/signals-core@^1.8.0":
+"@preact/signals-core@^1.5.1", "@preact/signals-core@^1.8.0":
   version "1.14.4"
   resolved "https://registry.yarnpkg.com/@preact/signals-core/-/signals-core-1.14.4.tgz#d3588cbda237fcb3c8a8e478f6cc370653609eb7"
   integrity sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==
@@ -1771,6 +1755,6 @@ yoga-layout@^3.2.1:
   integrity sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ==
 
 zod@^4.4.3:
-  version "4.4.3"
-  resolved "https://registry.yarnpkg.com/zod/-/zod-4.4.3.tgz#b680f172885d18bbebf21a834ea25e55a1bbf356"
-  integrity sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==
+  version "4.5.4"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-4.5.4.tgz#e215c62420c528dd7951e31fb52c5438f1fd184a"
+  integrity sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==

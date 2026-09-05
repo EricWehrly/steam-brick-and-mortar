@@ -609,7 +609,10 @@ the next pick-up:
 8. **Feature category icons.** Nice-to-have, probably won't get picked up - see the addendum above.
    Needs an actual icon source (Steam's category API data has none) before it's worth re-adding.
 9. ~~Whether these panels should be hand-drawn canvas at all, vs. real HTML/CSS projected onto the
-   surface via `CSS3DRenderer`.~~ **Resolved (2026-08-13) via
+   surface via `CSS3DRenderer`.~~ **Re-resolved (2026-09-02): the panels become `@pmndrs/uikit`
+   panels parented to the hinge groups — see the addendum below.** The 2026-08-13 resolution
+   (stay canvas) stands only in its narrow finding, that CSS3D can't work in an immersive session:
+   **Resolved (2026-08-13) via
    [`css3d-panel-projection-spike.md`](css3d-panel-projection-spike.md): stay with canvas-drawn +
    raycast hover-simulation for this box.** Confirmed by reading `CSS3DRenderer.js` directly (not
    assumed): CSS3D content is a plain absolutely-positioned DOM layer with a CSS `matrix3d`
@@ -618,8 +621,39 @@ the next pick-up:
    `BinderGameDetailPanel` invisible in VR in the first place (see this doc's Goal section). CSS3D
    stays a legitimate tool for genuinely flatscreen-only surfaces (the settings menu itself, per
    the spike) - just not this box, which has to work identically on both platforms.
-10. **Manual hover-simulation for the box's own faces**, now the recommended path per the spike
+10. ~~**Manual hover-simulation for the box's own faces**, now the recommended path per the spike
     above (raycasting to detect "pointer is over this button-shaped region," reusing
-    `GameBoxFoldCoordinator.raycastAgainstBox()`'s existing infrastructure) - not built yet, no
-    interactive element currently needs it beyond the Play button, which already has working click
-    handling without hover feedback.
+    `GameBoxFoldCoordinator.raycastAgainstBox()`'s existing infrastructure).~~ **Dropped
+    (2026-09-02)** - `@pmndrs/pointer-events` gives real hover/click/scroll on uikit panels, so
+    there is nothing left to simulate. See the addendum below.
+
+## Addendum (2026-09-02): the three panels move from canvas to `@pmndrs/uikit`
+
+Decision, ahead of the implementation on `feature/game-box-uikit-panels`: replace the three
+canvas-drawn faces with `@pmndrs/uikit` panels parented to the existing hinge groups, so the box
+still hinges open exactly as it does today. Geometry, animation, summon/dismiss lifecycle, and
+anchoring are unchanged - only what draws the *content* changes.
+
+Why now, and why this over the previous "stay with canvas" call:
+
+- The VR settings menu (`client/src/scene/uikit/`) proved uikit in this app's own scene: real
+  flexbox layout, real hover/click/scroll via `@pmndrs/pointer-events`, and - unlike CSS3D or
+  `HTMLMesh` - it genuinely renders inside an immersive session. The 2026-08-13 spike ruled out DOM
+  projection; it never established that hand-rolled canvas was the best remaining option, because
+  uikit wasn't on the table yet.
+- It retires this doc's two worst mechanisms in one move: the `y += size * 0.07` layout arithmetic
+  plus hand-written word-wrap, and the "buttons are pixel rects the draw call remembers,
+  hit-tested via raycast UV -> canvas coords" scheme
+  ([`game-box-canvas-ui-hit-testing`](../tech-debt.md#id-game-box-canvas-ui-hit-testing)).
+- It leaves the app with one in-scene UI system instead of two.
+
+What stays canvas: the store panel's header art presented as a circular disc emerging from a sleeve.
+That is freeform art, not UI - no layout, no text flow, no hit targets - and is the escape hatch
+described in [`in-scene-ui-substrate.md`](../architecture/in-scene-ui-substrate.md). Everything with
+rows, labels, or click targets goes to uikit.
+
+Constraints to design around (full list in the architecture doc): flat rounded-rect panels only;
+msdf text, so no emoji and no assumed em-dash - strip unsupported glyphs before they reach a `Text`
+node, as the VR menu already does; uikit generates its own geometry rather than painting onto the
+existing meshes' UVs, so the content panels become children of the hinge groups rather than
+textures on the flap faces.

@@ -5,65 +5,85 @@ import { EventManager } from '../../core/EventManager'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { Logger } from '../../utils/Logger'
 import {
-    GameEventTypes, InputEventTypes,
-    type GameSelectedEvent, type CancelPressedEvent,
-    type SceneCanvasClickEvent, type SceneCanvasWheelEvent
+    GameEventTypes, InputEventTypes, UIEventTypes,
+    type GameSelectedEvent, type CancelPressedEvent, type MenuOpenEvent, type MenuCloseEvent
 } from '../../types/InteractionEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
-import type { XRControllerRaySource } from '../../webxr/XRControllerManager'
-import { GameBoxFoldModel, PANEL_CANVAS_SIZE, OPEN_BOX_HALF_WIDTH, type GameBoxFoldHeaderImage } from './GameBoxFoldModel'
+import type { XRControllerSource } from '../../webxr/XRControllerManager'
+import { UikitPointerBridge } from '../uikit/UikitPointerBridge'
+import { GameBoxFoldModel } from './GameBoxFoldModel'
+import { OPEN_BOX_HALF_WIDTH } from './GameBoxFoldDimensions'
+import type { GameBoxFoldHeaderImage } from './GameBoxFoldContent'
 import { GameArtworkProvider, ARTWORK_DIMENSIONS } from '../game-box/instancing/GameArtworkProvider'
 import { formatRating } from '../categorization/RatingFormat'
 import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
-// Genres first (usually 1-3, Steam's own categorization), then community tags (SteamSpy) - capped
-// so the second flap's face stays legible rather than listing everything available.
+// Community tags (SteamSpy) can run long - capped so the second flap's face stays legible.
 const MAX_TAGS_SHOWN = 6
 
-// steam:// URIs launch through the OS protocol handler, same mechanism the old
-// BinderGameDetailPanel used via a plain <a href="steam://run/..."> - there's no Tauri shell
-// plugin in this project yet, so this is untested inside the desktop webview specifically; it's
-// not a regression either way since the old panel's own link was never verified there.
+function dedupe(items: readonly string[]): string[] {
+    const seenLowercase = new Set<string>()
+    return items.filter(item => {
+        const key = item.toLowerCase()
+        const isNew = !seenLowercase.has(key)
+        seenLowercase.add(key)
+        return isNew
+    })
+}
+
+// steam:// launches via the OS protocol handler (same mechanism the old BinderGameDetailPanel used
+// via a plain <a href>). Untested inside the desktop webview specifically (no Tauri shell plugin
+// yet) - not a regression either way, since the old link was never verified there either.
 const STEAM_LAUNCH_URL_PREFIX = 'steam://run/'
 
-// Parented local offsets so the box reads as "held" rather than intersecting the camera/hand.
-// Flatscreen is centered in view (not off to a corner); VR sits just in front of the grip so it
-// doesn't clip into the controller model. Visual tuning is an open question (see the plan doc).
+// Parented local offsets so the box reads as "held," not intersecting the camera/hand. Flatscreen
+// centers in view; VR sits just in front of the grip.
 //
-// Camera-anchor distance is NOT a fixed constant (see computeCameraAnchorDistance() below) - a
-// fixed -0.35, then -0.7, was each tuned against whatever window aspect ratio happened to be open
-// at the time, and both overflowed at other aspect ratios: fovY is fixed (SceneManager's
-// CAMERA_FOV) but fovX depends on aspect, so a narrower/taller window has a narrower horizontal
-// FOV and the same physical-width open box (see GameBoxFoldModel.OPEN_BOX_HALF_WIDTH) fills more
-// of it - direct request (2026-08-21), confirmed via projection math: at the -0.7 distance that
-// fixed the wide-desktop case, anything narrower than roughly a square window (aspect < ~1) would
-// already overflow again. Recomputed at summon time; see FALLBACK_CAMERA_DISTANCE for the one case
-// (a non-PerspectiveCamera) where the real fov/aspect aren't available to compute from.
+// Camera-anchor distance isn't a fixed constant (see computeCameraAnchorDistance()): fovY is fixed
+// but fovX depends on aspect, so a fixed distance overflows some window shapes. Recomputed at
+// summon time from the real FOV; FALLBACK_CAMERA_DISTANCE covers the one case (non-
+// PerspectiveCamera) where FOV/aspect aren't available.
 const FALLBACK_CAMERA_DISTANCE = 0.7
-// How much of the camera's current horizontal FOV the open box's full width is allowed to fill -
-// leaves margin on both sides rather than framing it edge-to-edge.
-const OPEN_BOX_SAFE_FOV_FRACTION = 0.7
-// Clamped so an extreme aspect ratio can't push the computed distance uncomfortably close (very
-// wide window) or absurdly far away, tiny-looking (very narrow window).
-const MIN_CAMERA_ANCHOR_DISTANCE = 0.5
-const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
-// Pushed further from the grip (was -0.12) per direct request - held right at the hand, the box
-// ended up right in front of the player's face too. More separation from the grip reads as
-// "holding it out to look at" instead.
-const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.22)
-// The model's cover front faces its own local -Z (see GameBoxFoldModel). Parented to a
-// camera/grip whose own forward is also local -Z, the cover would face away from the viewer -
-// rotate it to face back toward whatever it's parented to.
-const MODEL_FACING_ROTATION_Y = Math.PI
-// Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's own forward axis points roughly
-// "out and down" in a natural grip, so with only the Y-flip above the box's face ended up angled
-// down/back toward the palm - reading it meant over-extending the wrist, tilting the controller
-// forward to bring the face up into view. Pitching the box forward by 90 degrees is meant to
-// bring the face up to a natural viewing angle without that wrist tilt. First-pass, unconfirmed
-// in headset - flip the sign below and re-test live if it ends up facing the wrong way.
+// How much of the camera's horizontal FOV the open box's full width may fill - leaves margin
+// instead of framing edge-to-edge. Doesn't account for the open box being wider than it is tall
+// (three panels side by side), so some vertical margin is inherent regardless of this value.
+export const OPEN_BOX_SAFE_FOV_FRACTION = 0.85
+// Extra distance held in reserve on top of the FOV-fit calculation - a flat margin, not a change
+// to the fit itself.
+export const CAMERA_ANCHOR_DISTANCE_MARGIN = 0.05
+// VR's own reserve for the same camera-anchor path (single connected controller) - kept separate
+// from the flatscreen margin above since the two don't move together (flatscreen wants closer, VR
+// wants further). Not live-verified in headset yet.
+export const VR_CAMERA_ANCHOR_DISTANCE_MARGIN = 0.3
+// Clamped so an extreme aspect ratio can't push distance uncomfortably close or absurdly far.
+// MIN sits below OPEN_BOX_SAFE_FOV_FRACTION's own fit+margin distance at a standard 16:9 window,
+// so the fraction - not this floor - is what actually governs size at the common case.
+export const MIN_CAMERA_ANCHOR_DISTANCE = 0.4
+export const MAX_CAMERA_ANCHOR_DISTANCE = 1.4
+// Pushed out from the grip so the box reads as "held out to look at," not against the face.
+const GRIP_LOCAL_OFFSET = new THREE.Vector3(0, 0.05, -0.32)
+
+// Flatscreen-only tilt for dimensionality - held dead square to the camera, the box read flat/2D.
+// Pitch only, deliberately no yaw: a yawed edge's two ends sit at different distances from the
+// camera this close (real perspective convergence, not a rotation bug), which reads as the box's
+// top edge sloping. Pitch alone keeps both ends of every horizontal edge equidistant, so it can't
+// reintroduce that regardless of how close the box is held.
+//
+// Sign is positive, not the negative it looks like it should be: this rotation applies (via
+// rotation.order 'YXZ') BEFORE the MODEL_FACING_ROTATION_Y flip below, and that 180-degree flip
+// negates the pitch's local Z contribution along with X - so a negative value here actually tips
+// the top toward the camera once the flip is applied on top of it.
+export const FLATSCREEN_TILT_PITCH_DEGREES = 9
+// The model's front cover faces its own local -Z; parented to a camera/grip whose forward is also
+// local -Z, it would face away from the viewer without this flip.
+export const MODEL_FACING_ROTATION_Y = Math.PI
+// Grip-only, on top of MODEL_FACING_ROTATION_Y: a controller's forward points "out and down" in a
+// natural grip, so with only the Y-flip the box's face angled down toward the palm. Pitching it
+// forward brings the face to a natural viewing angle. Unconfirmed in headset - flip the sign and
+// re-test if it faces the wrong way.
 const GRIP_BOX_PITCH_DEGREES = -90
-// See attachToAnchor()'s doc comment - below this many connected controllers, camera-anchor
-// instead of grip-anchor, so the player keeps a free hand to point/interact with.
+// Below this many connected controllers, camera-anchor instead of grip-anchor so the player keeps
+// a free hand to point/interact with.
 const MIN_CONTROLLERS_FOR_GRIP_ANCHOR = 2
 
 /**
@@ -78,6 +98,10 @@ const MIN_CONTROLLERS_FOR_GRIP_ANCHOR = 2
  * model.update() each frame and calls playOpen()/playClose() at the right moments. Selecting a
  * game while one is already open always plays close-then-reopen (see pendingSelection) rather
  * than re-texturing the still-open box in place, so every selection gets visible feedback.
+ *
+ * Interaction on the box's faces is uikit's own (a UikitPointerBridge routes mouse and WebXR
+ * controller input at the model's uikit pages), attached only while a box is summoned. This class
+ * knows nothing about which controls exist on which face.
  */
 export class GameBoxFoldCoordinator {
     private static readonly logger = Logger.createLogFunctions(GameBoxFoldCoordinator.name)
@@ -85,11 +109,11 @@ export class GameBoxFoldCoordinator {
     private readonly eventManager: EventManager
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly model: GameBoxFoldModel
+    private readonly pointerBridge: UikitPointerBridge
     private readonly artworkProvider = GameArtworkProvider.getInstance()
-    // Plain pixel bundles, not GPU textures - GameBoxFoldModel rasterizes them into a scratch
+    // Plain pixel bundles, not GPU textures - the store panel rasterizes them into a scratch
     // canvas itself, so there's nothing here to .dispose().
     private readonly headerImageCache = new Map<string, GameBoxFoldHeaderImage>()
-    private readonly raycaster = new THREE.Raycaster()
 
     private currentAppid: string | null = null
     // Set when GameEventTypes.Selected arrives while a box is already summoned - playClose()
@@ -101,9 +125,16 @@ export class GameBoxFoldCoordinator {
         this.eventManager = EventManager.getInstance()
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
-        this.model = new GameBoxFoldModel()
+        this.model = new GameBoxFoldModel(this.launchCurrentGame)
+        // THREE's default Euler order ('XYZ') applies yaw before pitch, which visibly rolls the
+        // top edge out of level once both are nonzero (as the flatscreen tilt below sets up).
+        // 'YXZ' - pitch first, then yaw around the fixed vertical - measures exactly level.
+        this.model.group.rotation.order = 'YXZ'
         this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         this.model.group.visible = false
+        // Controller rays only ever need to hit this box, so the model's own group is the
+        // intersection root - not the whole scene.
+        this.pointerBridge = new UikitPointerBridge(this.model.group)
         this.model.onFullyClosed(() => {
             if (this.pendingSelection) {
                 const { appid, game } = this.pendingSelection
@@ -111,9 +142,11 @@ export class GameBoxFoldCoordinator {
                 this.summon(appid, game)
                 return
             }
+            this.pointerBridge.detach()
             this.model.group.visible = false
             this.model.group.removeFromParent()
             this.currentAppid = null
+            this.eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'game-box' })
         })
 
         this.eventManager.registerEventHandler<GameSelectedEvent>(
@@ -125,25 +158,15 @@ export class GameBoxFoldCoordinator {
             InputEventTypes.CancelPressed,
             this.handleCancelPressed
         )
-        this.eventManager.registerEventHandler<SceneCanvasClickEvent>(
-            InputEventTypes.SceneCanvasClick,
-            this.handleBoxClick
-        )
-        this.eventManager.registerEventHandler<SceneCanvasWheelEvent>(
-            InputEventTypes.SceneCanvasWheel,
-            this.handleBoxWheel
-        )
-
         this.renderLoopRegistry.register(this.constructor.name, this.update)
     }
 
     dispose(): void {
         this.eventManager.deregisterEventHandler(GameEventTypes.Selected, this.handleGameSelected)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
-        this.eventManager.deregisterEventHandler(InputEventTypes.SceneCanvasClick, this.handleBoxClick)
-        this.eventManager.deregisterEventHandler(InputEventTypes.SceneCanvasWheel, this.handleBoxWheel)
         this.renderLoopRegistry.unregister(this.constructor.name)
 
+        this.pointerBridge.detach()
         this.model.group.removeFromParent()
         this.model.dispose()
         this.headerImageCache.clear()
@@ -157,11 +180,13 @@ export class GameBoxFoldCoordinator {
             return
         }
 
-        // Nothing summoned yet: open directly. Something already summoned (even the same game
-        // re-selected): close first, then reopen with the new content once onFullyClosed fires -
-        // re-texturing an already-open box in place skipped the animation entirely, which read as
-        // selection just silently swapping the game with no feedback.
+        // Nothing summoned: open directly. Something already open (even the same game re-selected):
+        // close first, reopen once onFullyClosed fires - re-texturing in place skipped the
+        // animation, which read as the selection silently swapping with no feedback.
         if (this.currentAppid === null) {
+            // Not emitted in summon() - that also runs for a mid-close reopen (pendingSelection
+            // below), where the box was never really "closed," so a second Open/Close would be noise.
+            this.eventManager.emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'game-box' })
             this.summon(appid, game)
         } else {
             this.pendingSelection = { appid, game }
@@ -173,18 +198,19 @@ export class GameBoxFoldCoordinator {
         this.currentAppid = appid
         this.model.setContent({
             name: game.name,
-            // Distinct from "Steam reports 0/no reviews" (a real, meaningful value - see
-            // AppDetailsCache.ts's isDefined-based merge comment): userscore itself is
-            // undefined when we never got rating data for this game at all. Collapsing that
-            // into 0 (as this used to) made "no data" and "confirmed unrated" both render the
-            // same misleading "Unrated" text - direct request (2026-08-20), confirmed live that
-            // most boxes were actually hitting the no-data case. Omitting the field entirely
-            // here (GameBoxFoldContent.rating is optional) makes the debug panel skip the row.
+            // undefined (no rating data) is distinct from Steam's real "0/no reviews" value -
+            // collapsing both to 0 made "no data" and "confirmed unrated" render the same
+            // misleading "Unrated" text. Omitting the field (GameBoxFoldContent.rating is
+            // optional) makes the debug panel skip the row instead.
             rating: game.userscore !== undefined ? formatRating(game.userscore) : undefined,
             playtimeHours: game.playtime_forever ? Math.round(game.playtime_forever / 60) : undefined,
             recentPlaytimeHours: game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60) : undefined,
+            genres: dedupe(game.genres?.map(g => g.description) ?? []),
             tags: this.buildTags(game),
-            categories: game.categories?.map(c => c.description),
+            // Steam's own category list sometimes repeats an entry verbatim. Not currently shown
+            // on any face (see GameBoxDebugPanel's FEATURES-parking comment) but worth passing
+            // through clean.
+            categories: dedupe(game.categories?.map(c => c.description) ?? []),
             userCollections: game.user_collections?.map(c => c.name),
             description: game.short_description,
             metacritic: game.metacritic ? `Metacritic: ${game.metacritic.score}` : undefined,
@@ -197,25 +223,13 @@ export class GameBoxFoldCoordinator {
         this.model.playOpen()
     }
 
-    /** Genres (Steam's own) followed by top community tags (SteamSpy, same source/fallback
-     *  GroupResolver uses for tag-mode grouping) - the two "what kind of game is this" sections
-     *  BinderGameDetailPanel showed separately, combined here since the flap has room for one
-     *  legible list, not two. */
+    /** Community tags (SteamSpy, same source/fallback GroupResolver uses for tag-mode grouping) -
+     *  shown as its own section, separate from Steam's own genres. */
     private buildTags(game: SteamGameData): string[] {
-        const genres = game.genres?.map(g => g.description) ?? []
         const communityTags = game.steamspy_top_tags?.length
             ? game.steamspy_top_tags
             : getTopSteamSpyTags(game.steamspy_tags)
-
-        const seen = new Set<string>()
-        const combined: string[] = []
-        for (const tag of [...genres, ...communityTags]) {
-            const key = tag.toLowerCase()
-            if (seen.has(key)) continue
-            seen.add(key)
-            combined.push(tag)
-        }
-        return combined.slice(0, MAX_TAGS_SHOWN)
+        return dedupe(communityTags).slice(0, MAX_TAGS_SHOWN)
     }
 
     private readonly handleCancelPressed = (): void => {
@@ -230,95 +244,66 @@ export class GameBoxFoldCoordinator {
     private readonly update = (_now: number, deltaTime: number): void => {
         // AnimationMixer's own unit is seconds; RenderLoopRegistry callbacks receive milliseconds.
         this.model.update(deltaTime / 1000)
+        // Attaching here rather than in summon() is what lets this be unconditional: attach() is a
+        // no-op once attached and a no-op again while the renderer/scene/camera aren't published
+        // yet, so a summon that lands before they exist just picks up on a later frame - no
+        // readiness handshake needed.
+        if (this.currentAppid !== null) {
+            this.pointerBridge.attach()
+        }
+        this.pointerBridge.update()
     }
 
-    private readonly handleBoxClick = (event: CustomEvent<SceneCanvasClickEvent>): void => {
-        if (event.detail.button !== 0) {
+    /** Handed to the store panel's Play control at construction - the panel owns the button, this
+     *  owns which game is loaded. */
+    private readonly launchCurrentGame = (): void => {
+        if (this.currentAppid === null) {
             return
         }
-        const hit = this.raycastAgainstBox(event.detail.ndcX, event.detail.ndcY)
-        if (hit?.face === 'store' && this.model.isPointInPlayButton(hit.canvasX, hit.canvasY) && this.currentAppid) {
-            GameBoxFoldCoordinator.logger.debug(`Play clicked for appid ${this.currentAppid}`)
-            window.location.href = `${STEAM_LAUNCH_URL_PREFIX}${this.currentAppid}`
-        }
-    }
-
-    private readonly handleBoxWheel = (event: CustomEvent<SceneCanvasWheelEvent>): void => {
-        const hit = this.raycastAgainstBox(event.detail.ndcX, event.detail.ndcY)
-        // Gated to the cache-entry viewport specifically (not the whole debug face) - direct
-        // request (2026-08-20): the scrollbar was firing from anywhere on the right flap,
-        // including over the description/tags text above it, which read as broken/oversensitive
-        // scrolling rather than "you're over the JSON viewport."
-        if (hit?.face === 'debug' && this.model.isPointInCacheEntry(hit.canvasY)) {
-            this.model.scrollDebugPanel(event.detail.deltaY)
-        }
-    }
-
-    /**
-     * Raycasts only against this box's own three content meshes (not the whole scene - the box
-     * is a small, self-contained held prop, and SceneClickGameBoxRaycast's shelf-wide raycast is a
-     * different concern with a different hit contract). Returns which panel was hit and the
-     * canvas-space point within it (via intersection.uv - see GameBoxFoldModel for the
-     * UV<->canvas mapping derivation), or null if nothing summoned, the ray misses, or it lands on
-     * one of a mesh's five blank faces rather than its content face.
-     */
-    private raycastAgainstBox(ndcX: number, ndcY: number): { face: 'store' | 'identity' | 'debug'; canvasX: number; canvasY: number } | null {
-        if (this.currentAppid === null || !this.model.group.visible) {
-            return null
-        }
-        const camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
-        if (!camera) {
-            return null
-        }
-
-        const meshes = this.model.getInteractiveMeshes()
-        this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
-        const intersections = this.raycaster.intersectObjects([meshes.store, meshes.identity, meshes.debug], false)
-        const hit = intersections[0]
-        if (!hit || !hit.uv) {
-            return null
-        }
-
-        const mesh = hit.object as THREE.Mesh
-        if (!this.model.isContentFaceHit(mesh, hit.face?.materialIndex)) {
-            return null
-        }
-
-        const face = mesh === meshes.store ? 'store' : mesh === meshes.debug ? 'debug' : 'identity'
-        return { face, canvasX: hit.uv.x * PANEL_CANVAS_SIZE, canvasY: (1 - hit.uv.y) * PANEL_CANVAS_SIZE }
+        GameBoxFoldCoordinator.logger.debug(`Play clicked for appid ${this.currentAppid}`)
+        window.location.href = `${STEAM_LAUNCH_URL_PREFIX}${this.currentAppid}`
     }
 
     private attachToAnchor(): void {
         const dm = DataManager.getInstance()
-        const raySource = dm.get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        // Grip-anchoring only makes sense with a spare hand: with a single controller connected,
-        // that same controller is also whatever the player points/clicks with, so gluing the box
-        // to it too means it swings every time they aim elsewhere. Direct request (2026-08-20):
-        // with only one controller, camera-anchor instead - same behavior flatscreen already uses
-        // with zero controllers, so this also makes "how many controllers" the only thing that
-        // decides the anchor, not a separate VR-only special case.
-        const connectedControllerCount = raySource?.getControllerRaySpaces?.().length ?? 0
+        const controllerSource = dm.get<XRControllerSource>(DataKey.XRControllerSource) ?? null
+        // Grip-anchoring only makes sense with a spare hand - with one controller, it's also
+        // whatever the player points/clicks with, so gluing the box to it swings it on every aim.
+        // Camera-anchor instead with only one controller (same as flatscreen's zero-controller
+        // case), so "how many controllers" is the only thing deciding the anchor.
+        const connectedControllerCount = controllerSource?.getConnectedControllers?.().length ?? 0
         const grip = connectedControllerCount >= MIN_CONTROLLERS_FOR_GRIP_ANCHOR
-            ? raySource?.getPrimaryControllerGrip() ?? null
+            ? controllerSource?.getPrimaryControllerGrip() ?? null
             : null
 
         if (grip) {
             grip.add(this.model.group)
             this.model.group.position.copy(GRIP_LOCAL_OFFSET)
             this.model.group.rotation.x = THREE.MathUtils.degToRad(GRIP_BOX_PITCH_DEGREES)
+            this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
             return
         }
 
         const camera = dm.get<THREE.Camera>(DataKey.MainCamera) ?? null
         if (camera) {
             camera.add(this.model.group)
+            // Flatscreen (0 controllers) and VR-single-controller both camera-anchor via this same
+            // path, but want a different amount of reserve distance held back beyond the tightest
+            // FOV-fit - see VR_CAMERA_ANCHOR_DISTANCE_MARGIN's own comment for why they aren't one
+            // shared constant.
+            const distanceMargin = connectedControllerCount === 0
+                ? CAMERA_ANCHOR_DISTANCE_MARGIN
+                : VR_CAMERA_ANCHOR_DISTANCE_MARGIN
             const distance = camera instanceof THREE.PerspectiveCamera
-                ? this.computeCameraAnchorDistance(camera)
+                ? this.computeCameraAnchorDistance(camera, distanceMargin)
                 : FALLBACK_CAMERA_DISTANCE
             this.model.group.position.set(0, 0, -distance)
             // Reset in case a previous summon this session was grip-anchored (pitch is
             // grip-only) - the same model.group is reused across summons, not recreated.
-            this.model.group.rotation.x = 0
+            this.model.group.rotation.x = connectedControllerCount === 0
+                ? THREE.MathUtils.degToRad(FLATSCREEN_TILT_PITCH_DEGREES)
+                : 0
+            this.model.group.rotation.y = MODEL_FACING_ROTATION_Y
         }
     }
 
@@ -327,11 +312,14 @@ export class GameBoxFoldCoordinator {
      *  camera-anchor-distance doc comment for why this can't be a fixed constant. Recomputed each
      *  summon, not continuously - a live window resize while a box is already open won't re-fit
      *  until the next selection. */
-    private computeCameraAnchorDistance(camera: THREE.PerspectiveCamera): number {
+    private computeCameraAnchorDistance(camera: THREE.PerspectiveCamera, distanceMargin: number): number {
         const verticalFovRad = THREE.MathUtils.degToRad(camera.fov)
         const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad / 2) * camera.aspect)
         const distance = OPEN_BOX_HALF_WIDTH / (OPEN_BOX_SAFE_FOV_FRACTION * Math.tan(horizontalFovRad / 2))
-        return THREE.MathUtils.clamp(distance, MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE)
+        return THREE.MathUtils.clamp(
+            distance + distanceMargin,
+            MIN_CAMERA_ANCHOR_DISTANCE, MAX_CAMERA_ANCHOR_DISTANCE
+        )
     }
 
     private findGameByAppid(appid: string): SteamGameData | undefined {
@@ -341,16 +329,12 @@ export class GameBoxFoldCoordinator {
 
     /**
      * Goes through the same GameArtworkProvider pixel pipeline the shelf's instanced boxes use,
-     * rather than a plain THREE.TextureLoader/<img> load - a raw cross-origin <img> load is
-     * subject to the browser's normal CORS enforcement and fails for CDN artwork with no CORS
-     * headers (confirmed via console: library_600x900.jpg blocked by CORS, appid 219680), while
-     * GameArtworkProvider's pipeline already resolves this same artwork successfully for the
-     * shelf instance. Bonus: reuses whatever the shelf's own request already fetched/decoded/
-     * disk-cached for this appid instead of a second network round-trip. Header format (not
-     * library) - the store panel presents it as a disc, see GameBoxFoldModel.redrawStorePanel().
-     * Hands the model plain pixels rather than building a THREE texture here: GameBoxFoldModel
-     * draws it into a canvas (for the disc clip/composite), which sidesteps DataTexture's flipY
-     * quirk entirely (canvas ImageData is already top-down, matching the pixel source).
+     * rather than a plain THREE.TextureLoader/<img> load - a raw cross-origin <img> load fails for
+     * CDN artwork with no CORS headers, while GameArtworkProvider already resolves it for the
+     * shelf instance (and this reuses whatever it already fetched/cached). Header format, not
+     * library - the store panel presents it as a disc. Hands the model plain pixels rather than a
+     * THREE texture: GameBoxFoldModel draws them into a canvas itself, sidestepping DataTexture's
+     * flipY quirk (canvas ImageData is already top-down).
      */
     private async applyHeaderImage(game: SteamGameData): Promise<void> {
         const appid = String(game.appid)

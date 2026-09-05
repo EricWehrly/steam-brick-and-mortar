@@ -108,4 +108,19 @@ describe('InputManager pause()/resume()', () => {
         document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
         manager.dispose()
     })
+
+    it('isInputPaused() reflects pause()/resume() - the reason-agnostic question an '
+        + 'input-consuming class (e.g. SceneClickGameBoxRaycast) asks instead of reaching into UI '
+        + 'concepts like "menuType" itself. WHAT decides to call pause()/resume() (menu-open '
+        + 'counting lives in SystemUICoordinator, not here) is not this class\'s concern.', () => {
+        expect(manager.isInputPaused()).toBe(false)
+
+        manager.pause()
+        expect(manager.isInputPaused()).toBe(true)
+
+        manager.resume()
+        expect(manager.isInputPaused()).toBe(false)
+
+        manager.dispose()
+    })
 })
