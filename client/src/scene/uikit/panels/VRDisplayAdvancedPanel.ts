@@ -19,7 +19,7 @@ import { AppSettings } from '../../../core/AppSettings'
 import { DISPLAY_ADVANCED_SCHEMA, schemaSettingKeys, type NumericSettingKey } from '../../../ui/settings/SettingsSchema'
 import { buildSettingsSchemaTree } from '../SettingsSchemaUIKitRenderer'
 import type { UIKitSliderRow } from '../UIKitRowHelpers'
-import { UIKIT_COLORS } from '../UikitColorTokens'
+import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 
 // Grown from 260/20/14/18 - direct request (2026-08-20): "the 'advanced' is unnecessarily
 // squished, too tight, not readable enough." Tall enough now that the 6 controls mostly fit
@@ -50,7 +50,7 @@ export class VRDisplayAdvancedPanel {
         // Plain hyphen, not an em-dash: uikit's msdf glyph lookup had no glyph for "—" (confirmed
         // via repeated "Missing glyph info" console warnings), and the whole title failed to
         // render rather than just that one character.
-        root.add(new Text({ text: 'Display - Advanced', fontSize: TITLE_FONT_SIZE, color: UIKIT_COLORS.textPrimary }))
+        root.add(new Text({ text: 'Display - Advanced', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
 
         const scroll = new Container({
             flexDirection: 'column',
@@ -66,7 +66,7 @@ export class VRDisplayAdvancedPanel {
         root.add(scroll)
 
         const resetButton = new Button({ variant: 'secondary', onClick: this.reset.bind(this) })
-        resetButton.add(new Text({ text: 'Reset to Defaults', color: UIKIT_COLORS.textPrimary }))
+        resetButton.add(new Text({ text: 'Reset to Defaults', color: COLOR_TOKENS.textPrimary }))
         root.add(resetButton)
 
         return { container: root, rowsBySetting }

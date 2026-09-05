@@ -27,7 +27,7 @@ import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
 import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenuTabContent } from './VRMenuTabRegistry'
 import { toUikitSafeText } from './UikitTextSanitizer'
-import { UIKIT_COLORS } from './UikitColorTokens'
+import { COLOR_TOKENS } from '../../ui/ColorTokens'
 
 // Bumped from 0.0008 - direct request (2026-08-20): a flatscreen screenshot comparison against the
 // DOM menu showed the VR panel reading much smaller/denser despite occupying a similar screen
@@ -47,9 +47,9 @@ const SHELL_GAP = 12
 const TAB_ROW_PADDING = 12
 const TAB_BUTTON_GAP = 8
 const TAB_LABEL_FONT_SIZE = 13
-const TAB_INACTIVE_COLOR = UIKIT_COLORS.textSecondary
-const TAB_ACTIVE_COLOR = UIKIT_COLORS.textPrimary
-const TAB_ACTIVE_BACKGROUND = UIKIT_COLORS.surface3
+const TAB_INACTIVE_COLOR = COLOR_TOKENS.textSecondary
+const TAB_ACTIVE_COLOR = COLOR_TOKENS.textPrimary
+const TAB_ACTIVE_BACKGROUND = COLOR_TOKENS.surface3
 const TAB_INACTIVE_BACKGROUND = 'transparent'
 
 /** Exported so other VR uikit surfaces (e.g. VRControllerPointer's cursor/beam) can render above
@@ -94,7 +94,7 @@ export class VRSettingsMenuShell {
             pixelSize: SHELL_PIXEL_SIZE,
             depthTest: false,
             renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
-            backgroundColor: UIKIT_COLORS.surface1,
+            backgroundColor: COLOR_TOKENS.surface1,
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
             borderBottomLeftRadius: 12,
