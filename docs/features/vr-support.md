@@ -1,7 +1,7 @@
 # Feature: VR Support
 
 **Act**: 2 (Gate 2 — required for Act 2 completion)
-**Status**: In Progress — sub-scope 1 (VR Controllers) has a plan doc and implementation underway (see [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md)); sub-scope 2 (VR Headset) not started
+**Status**: In Progress — sub-scope 1 (VR Controllers) landed (see [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md)); sub-scope 2 (VR Headset) underway on `feature/vr-uikit-menu-migration` (see [`vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md)) — settings-menu tab shell, controller-ray pointer, and two ported tabs (`display-advanced`, `debug`) are live; five panels remain (2026-09-05: branch rebuilt onto `act2/default` post [PR #161](https://github.com/EricWehrly/steam-brick-and-mortar/pull/161)/[#162](https://github.com/EricWehrly/steam-brick-and-mortar/pull/162), `yarn tsc`/`yarn test` clean, 1771/1771)
 **Priority**: High
 
 ## Goal
@@ -27,8 +27,11 @@ This feature splits into two sub-scopes, deliberately sequenced:
    **now superseded**: DOM projection was spiked and abandoned (it never reaches an immersive
    session's render surface). The replacement direction is real `@pmndrs/uikit` scene geometry, and
    a VR settings panel with per-controller ray interaction is built on it today (see
-   `VRSettingsPanelCoordinator`/`VRControllerPointer`) - but only one of nine panels is ported, with
-   no tab shell, still behind `?forceVRSettingsPanel=1`. Migrating the rest is planned in
+   `VRSettingsPanelCoordinator`/`VRControllerPointer`) - a tab shell exists, activated by the same
+   `MenuOpen`/`MenuClose` events the DOM pause menu emits, with two of eight pause-menu panels
+   ported (`display-advanced`, `debug`) plus a `category-reference` tab piloting `world-lock`
+   anchoring (see that plan's "Full menu/panel inventory" and "world-lock trial" sections). Five
+   panels remain. Migrating them is planned in
    [`docs/plans/vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md).
    Sibling scope: in-VR button hints, planned but back-burnered -
    [`docs/plans/vr-button-hints-plan.md`](../plans/vr-button-hints-plan.md).
@@ -41,9 +44,10 @@ in hand for every iteration. Headset work depends on controller routing existing
 isn't a change to the dependency order, just an explicit statement of which half comes first.
 
 **Neither sub-scope starts implementation without a plan doc first.** Sub-scope 1 (VR Controllers)
-now has one: [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md) (written 2026-08-10,
-implementation in progress). Sub-scope 2 (VR Headset) still has no plan doc — this project's
-planning rules require a plan + sign-off before code starts there too.
+has one: [`docs/plans/vr-support-plan.md`](../plans/vr-support-plan.md) (written 2026-08-10,
+implementation landed). Sub-scope 2 (VR Headset) has one too:
+[`docs/plans/vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md) (written
+2026-08-19, implementation underway on `feature/vr-uikit-menu-migration`).
 
 ## Context
 
@@ -80,13 +84,21 @@ VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stabl
 - VR controller interaction and raycasting connects to the raycast drag suppression work already in the subagent threads.
 - See `docs/architecture/webxr-architecture.md` for the foundational design decisions.
 - **Next step is scoping, not code**: write `docs/plans/vr-support-plan.md` covering at least sub-scope 1 (VR Controllers) — the WebXR infrastructure audit above should feed directly into it. Get sign-off before writing any implementation code, per this project's planning rules.
-- **Before resuming sub-scope 2 (spatial UI/settings menu) work**: read `docs/tech-debt.md`'s
-  `vr-uikit-menu-sync-recheck` entry first. A sibling branch (`feature/vr-uikit-menu-migration`)
-  already has real uikit-based VR pointer/cursor work in progress there, diverging independently
-  from controller-aim correction and text-sanitizing code that also exists on
-  `feature/game-box-uikit-panels` - real drift, not just cosmetic difference, and neither branch's
-  pointer/cursor behavior has been re-verified in a real headset since.
-- **After sub-scope 2 lands**: [uikit Component System](uikit-component-system.md) is deliberately
-  queued to start next - a real content/layout/style separation for uikit-built panels, designed
-  against both this feature's settings panels and the game box's panels together rather than
-  either alone.
+- **`vr-uikit-menu-sync-recheck` reconciled (2026-09-05)**: `feature/vr-uikit-menu-migration` was
+  rebuilt onto `act2/default` after PR #161/#162 landed the game box's own uikit migration.
+  `ControllerAimCorrection.ts`'s shared pitch constant, the renamed `XRControllerSource`/
+  `XRControllerState` shape, and `UikitTextSanitizer.ts`'s HTML-entity-decoding superset all merged
+  forward correctly (see `docs/tech-debt.md`'s entry for the full before/after). Still open per that
+  entry's "Done when" #1: **none of this has been re-verified in a real headset yet** - screen/
+  reasoning-only so far.
+- **Four workstreams now advancing together (2026-09-05)**: the game box's uikit panels (stable,
+  merged - see [Game Detail Screen](game-detail-screen.md)), this settings-menu migration, a new
+  standalone-in-world-UI thread (below), and [uikit Component System](uikit-component-system.md),
+  which is no longer strictly gated on this sub-scope landing first - see that doc's own sequencing
+  note for the updated direction.
+- **New in-world UI thread**: the `category-reference` VR tab (see the migration plan's "world-lock
+  trial" section) already pilots a `world-lock`-anchored, scrollable uikit surface, distinct from
+  the settings menu's `camera-attached` panel - a live "fixed in world vs. attached to viewpoint"
+  comparison. Direction: get one such standalone in-world panel confirmed scrollable (already true
+  for `category-reference`) and eventually tabbable the same way the settings shell is, as a second
+  real data point for whatever the uikit Component System designs against.

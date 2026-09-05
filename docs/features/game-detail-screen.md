@@ -1,9 +1,11 @@
 # Feature: Game Detail Screen
 
 **Act**: 2 (Best Effort — design pass tied to VR implementation)
-**Status**: In Progress — implemented 2026-08-11 on `feature/game-box-fold-open` (`yarn tsc` clean,
-full suite 1618/1618), pending manual/real-headset verification (dev server wasn't running this
-session, per `client/CLAUDE.md` — not started proactively)
+**Status**: Stable — uikit-panel rewrite merged to `act2/default` 2026-09-05 via
+[PR #162](https://github.com/EricWehrly/steam-brick-and-mortar/pull/162)/[#161](https://github.com/EricWehrly/steam-brick-and-mortar/pull/161)
+(`yarn tsc` clean, full suite green); meant as the reference implementation for the VR
+settings-menu migration and the new in-world-UI thread (see [VR Support](vr-support.md)'s Notes).
+Still pending manual/real-headset verification.
 **Priority**: Medium
 
 ## Goal
@@ -125,5 +127,11 @@ for the full task breakdown. Summary:
 - Related feature: [uikit Component System](uikit-component-system.md) — the panels here are built
   fully imperatively (magic numbers scattered across `GameBoxFoldDimensions.ts`/
   `GameBoxPanelStyle.ts`/`GameBoxPanelParts.ts`, no real content/layout/style separation); tracked
-  as its own feature rather than fixed in place here, sequenced after the VR settings-menu uikit
-  migration so it's designed against two panel families, not one
+  as its own feature rather than fixed in place here, now building opportunistically alongside the
+  VR settings-menu migration rather than waiting for it to land first
+- **Test coverage gap (2026-09-05)**: `GameBoxFoldCoordinator.test.ts`, `GameBoxFoldModel.test.ts`,
+  `GameBoxPanelParts.test.ts`, `GameBoxDebugPanel.test.ts`, and `GameBoxStorePanel.test.ts` all
+  exist, but `GameBoxIdentityPanel.ts` has no direct test yet (only indirect coverage via
+  `GameBoxFoldCoordinator`'s own tests). Direct request: since this implementation is meant as the
+  stable reference other in-scene UI work compares against, close this gap before it drifts further
+  rather than after.

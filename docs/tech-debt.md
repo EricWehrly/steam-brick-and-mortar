@@ -353,9 +353,8 @@ action needed" if no such consumer materializes.
 - `client/CLAUDE.md` (the "Colors" guidance pointing at this module)
 
 ## id: vr-uikit-menu-sync-recheck
-**Priority**: Low now, but re-evaluate the moment work resumes on the VR settings-menu PR/branch
-**Effort**: Medium - a real headset session plus a deliberate reconciliation pass across a handful
-of files that now exist twice, independently, on two different branches
+**Priority**: Low - reconciliation done (2026-09-05); only the real-headset re-verification remains
+**Effort**: Small now - a real headset session; the file-level reconciliation itself is done
 **Context**: This branch (`feature/game-box-uikit-panels`) and the sibling
 `feature/vr-uikit-menu-migration` (settings-menu uikit work, see
 [`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) on that branch - it
@@ -387,14 +386,17 @@ differences:
   wasn't properly connecting... we should verify when we ultimately load that branch up, and just
   get it right there. We can assume our current branch is the correct, functioning implementation,
   for the moment.").
-**Done when**: once the VR settings-menu branch/PR is actually picked back up, (1) put on a real
-headset and confirm the beam/cursor genuinely line up with both the shelf-select raycast and
-whatever a uikit surface is showing, on THIS branch's implementation, before assuming it's correct;
-(2) reconcile `ControllerAimCorrection.ts` against the sibling branch's inline copy - one shared
-definition, not two independently-tuned ones; (3) diff `UikitTextSanitizer.ts` between branches and
-merge forward rather than let an automatic merge/rebase silently pick one side; (4) recheck whether
-the render-order concept this branch removed as premature is now the shape the settings-menu branch
-actually needs, and use that shape rather than reinventing a third one.
+**Done when**: (1) ~~reconcile `ControllerAimCorrection.ts` against the sibling branch's inline
+copy~~ **done 2026-09-05** - `feature/vr-uikit-menu-migration` merged `act2/default` forward and
+took this branch's shared `ControllerAimCorrection.ts`/renamed `XRControllerSource` types; (2) ~~diff
+`UikitTextSanitizer.ts` between branches and merge forward~~ **done 2026-09-05** - took this
+branch's entity-decoding superset; (3) ~~recheck whether the render-order concept this branch
+removed as premature is now the shape the settings-menu branch actually needs~~ **done 2026-09-05** -
+`VRSettingsMenuShell.ts`'s `ALWAYS_ON_TOP_RENDER_ORDER` (1000) and `VRControllerPointer.ts`'s own
+`ON_TOP_RENDER_ORDER` (1001) coexist correctly (pointer draws on top of panels, one value higher);
+(4) **still open** - put on a real headset and confirm the beam/cursor genuinely line up with both
+the shelf-select raycast and whatever a uikit surface is showing, on the merged implementation,
+before assuming it's correct. Only (4) is left.
 **Related files**:
 - `client/src/webxr/ControllerAimCorrection.ts`
 - `client/src/scene/uikit/VRControllerPointer.ts`

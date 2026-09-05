@@ -1,8 +1,10 @@
 # Feature: uikit Component System
 
-**Act**: 2 (Best Effort) — sequenced after [VR Support](vr-support.md) sub-scope 2's settings-menu
-migration lands, not before
-**Status**: Not started — deliberately deferred (see Sequencing below)
+**Act**: 2 (Best Effort) — advancing alongside [VR Support](vr-support.md) sub-scope 2's
+settings-menu migration and the new in-world-UI thread, not gated behind either
+**Status**: Not started as its own extraction pass — building opportunistically wherever the other
+three concurrent threads (game box panels, settings-menu migration, new in-world UI) hit the same
+duplication (see Sequencing below)
 **Priority**: Medium
 
 ## Goal
@@ -42,16 +44,23 @@ component layer on top of uikit's primitives: declarative composition instead of
 constants, and shared components (rows, scrollable sections, chip lists, dividers) that panels
 compose rather than each reimplementing.
 
-## Sequencing: after the VR settings-menu migration, not before
+## Sequencing: build ahead, opportunistically (revised 2026-09-05)
 
-[`feature/vr-uikit-menu-migration`](https://github.com/EricWehrly/steam-brick-and-mortar/tree/feature/vr-uikit-menu-migration)
-is already building its own uikit-based settings panels independently (see
-`docs/tech-debt.md`'s `vr-uikit-menu-sync-recheck` for the reconciliation already known to be
-needed there). Direct request: land that work first, *then* design this system - with two real,
-differently-shaped panel families (game box faces + settings menu) to generalize from, rather than
-building an abstraction against a single call site and guessing at what a second consumer will
-need. Building it now, against only the game box, risks the exact premature-abstraction trap this
-project's own conventions warn against.
+Original direction (2026-09-05, superseded same day): wait for the VR settings-menu migration to
+fully land before starting, so the design generalizes from two real panel families instead of
+guessing from one. Revised direction, once `feature/vr-uikit-menu-migration` was rebuilt onto
+`act2/default` and both branches' panel families were sitting side by side: rather than wait for
+either the settings-menu migration (five panels still unported) or the new in-world-UI thread to
+finish, build this "ahead" of where each concrete port needs it - extracting a shared piece the
+moment porting the next settings panel, or the next in-world UI tab, would otherwise duplicate
+something the game box's panels already do. **No hard gating rule on when this starts or how far it
+goes** - the point is finding the cheapest real implementation path as each new panel's actual shape
+shows up, not pre-designing a full component system speculatively. Concretely: fewer rewritten
+lines and less duplicated tree-shape beats a complete abstraction landed all at once. This still
+respects the original worry (don't generalize from a single call site) because by the time this
+work starts for real, three families already exist to look at - the game box, the settings-menu
+tabs already ported (`display-advanced`, `debug`), and the `category-reference` world-lock tab -
+just without waiting for any of them to be *finished* first.
 
 ## Acceptance Criteria (draft - refine once scoping starts)
 
@@ -69,17 +78,20 @@ project's own conventions warn against.
 
 ## Stories / Tasks
 
-Not yet broken down - scoping starts once the VR settings-menu migration (sequencing above) lands.
-Write `docs/plans/uikit-component-system-plan.md` at that point, informed by both panel families'
-actual shapes.
+No separate plan doc required to start - each extraction rides along with whatever settings-menu
+panel or in-world-UI tab is being ported when the duplication shows up, the same way
+`GameBoxPanelParts.ts`'s `buildScrollableColumn`/`roundedCorners` helpers were pulled out during the
+game box's own reconciliation pass. Write `docs/plans/uikit-component-system-plan.md` only if/when
+the extracted pieces grow enough to need a real design (a token system, a shared row-builder
+library) rather than a handful of small shared functions - not a prerequisite to starting.
 
 ## Notes / Open Questions
 
-- **Deferral reason**: only one real consumer (the game box) exists today; the settings-menu
-  migration will be the second, and designing against two shapes rather than one is the whole
-  point of waiting.
-- **Dependencies**: [VR Support](vr-support.md) sub-scope 2 (settings-menu uikit migration) landing
-  first.
+- **Why not deferred anymore**: the original wait-for-two-families reasoning is satisfied more
+  cheaply by building alongside the still-in-progress settings-menu migration and in-world-UI
+  thread than by waiting for either to finish - see Sequencing above.
+- **Dependencies**: none blocking start; informed by whichever of [VR Support](vr-support.md)
+  sub-scope 2's remaining panels or the new in-world-UI tab is being worked on at the time.
 - Related tech debt, likely folded into or built alongside this: `game-box-color-centralization`,
   `generic-color-token-consumers`, `vr-uikit-menu-sync-recheck` (all in `docs/tech-debt.md`).
 - Related: [Game Detail Screen](game-detail-screen.md) (the game box's own feature doc),

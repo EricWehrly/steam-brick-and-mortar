@@ -14,6 +14,22 @@ Make the app's settings menu genuinely usable in an immersive WebXR session, fro
 When this is done, `?forceVRSettingsPanel=1` is deleted, the VR panel shows real settings (not just
 the one Advanced tab), and the dead CSS3D projector is removed.
 
+## Branch rebuilt onto act2/default (2026-09-05)
+
+The game box's own uikit migration ([PR #162](https://github.com/EricWehrly/steam-brick-and-mortar/pull/162)/[#161](https://github.com/EricWehrly/steam-brick-and-mortar/pull/161)) landed on
+`act2/default` while this branch was still in flight. Merged forward (not rebased - 46 commits deep
+into a base that had since rewritten the entire `GameBoxFold*` canvas system made a linear rebase
+impractical; one merge instead of replaying conflicts 46 times). Reconciled along the way, per
+`docs/tech-debt.md`'s `vr-uikit-menu-sync-recheck` entry: `ControllerAimCorrection.ts`'s shared
+pitch constant, the `XRControllerSource`/`XRControllerState` rename, and `UikitTextSanitizer.ts`'s
+entity-decoding superset all took the game box branch's (more complete) versions;
+`VRSettingsPanelCoordinator.ts` (unique to this branch) was updated to the renamed types. `yarn tsc`
+clean, full suite green (1771/1771) post-merge. **Still not re-verified in a real headset** - see
+the sync-recheck entry's remaining "Done when" item.
+
+Direct request (2026-09-05): try to migrate the remaining panels in this same PR, one commit per
+panel/section - matches Story 5's plan below already.
+
 ## Where we actually are (updated 2026-08-20, all live-verified unless noted)
 
 Built and working:
