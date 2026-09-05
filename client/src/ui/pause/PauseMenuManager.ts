@@ -21,7 +21,7 @@ import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes, InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, MenuPanelChangedEvent, CancelPressedEvent, MenuOpenEvent, MenuCloseEvent } from '../../types/InteractionEvents'
 import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
@@ -69,6 +69,13 @@ export class PauseMenuManager {
     private scrollPositionByPanelId: Map<string, number> = new Map()
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
+    // When true, open()/close() still run their full state machine (activePanel tracking,
+    // MenuPanelChanged sync, input pause) but the DOM overlay itself never becomes visible - the
+    // VR uikit menu is the only thing the player actually sees. Direct request (2026-08-20): the
+    // DOM menu is being phased out, and forceVRSettingsPanel should let it be evaluated as the
+    // only UI on flatscreen too, not just alongside the DOM one. See SystemUICoordinator, which
+    // sets this from UrlUtils.isVRSettingsPanelForced().
+    private domVisualsSuppressed = false
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
     // Tracks any OTHER menuType ('game-box', ...) currently up - see handleOpenMenuPressed's own
@@ -118,11 +125,26 @@ export class PauseMenuManager {
         // it's open - a pure dismiss, not a toggle, so it never reopens a closed menu.
         this.eventManager.registerEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
 
+        // The VR uikit tab shell (VRSettingsMenuShell) emits the same event when its own tabs are
+        // clicked, so the two menus' active panel stays in sync without either calling the other
+        // directly - see docs/plans/vr-uikit-menu-migration-plan.md. showPanel() below emits this
+        // event too, guarded to skip a no-op re-show, which is what keeps this from looping.
+        this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+
         // Tracks other menuTypes ('game-box', ...) so handleOpenMenuPressed can tell an Escape/Start
         // that closed one of those apart from a genuine request to open THIS menu. Filtered off
         // 'pause' itself since this instance already tracks its own state via this.state.isOpen.
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleOtherMenuClose)
+    }
+
+    private readonly handleMenuPanelChanged = (event: CustomEvent<MenuPanelChangedEvent>): void => {
+        if (!this.panels.has(this.resolvePanelId(event.detail.panelId))) {
+            // Originated from a VR-only tab (e.g. the "More Settings" placeholder) that has no
+            // DOM counterpart - nothing for this menu to switch to.
+            return
+        }
+        this.showPanel(event.detail.panelId)
     }
 
     // Escape/Start is bound to BOTH OpenMenu and Cancel (see CancelPressedEvent.bundledWithOpenMenu's
@@ -174,6 +196,15 @@ export class PauseMenuManager {
 
     setSystemDependencies(dependencies: SystemDependencies): void {
         this.systemDependencies = dependencies
+    }
+
+    /** See domVisualsSuppressed's doc comment. Applied immediately if the menu happens to already
+     *  be open when called, not just on the next open(). */
+    setDomVisualsSuppressed(suppressed: boolean): void {
+        this.domVisualsSuppressed = suppressed
+        if (this.overlay && this.state.isOpen) {
+            this.overlay.style.display = suppressed ? 'none' : 'flex'
+        }
     }
 
     registerPanel(panel: PauseMenuPanel): void {
@@ -255,8 +286,9 @@ export class PauseMenuManager {
         this.state.isOpen = true
         this.state.previousFocus = document.activeElement as HTMLElement
 
-        // Show overlay
-        if (this.overlay) {
+        // Show overlay - unless the VR uikit menu is standing in as the only visible UI (see
+        // domVisualsSuppressed's doc comment).
+        if (this.overlay && !this.domVisualsSuppressed) {
             this.overlay.style.display = 'flex'
         }
 
@@ -304,6 +336,14 @@ export class PauseMenuManager {
     showPanel(panelId: string): void {
         const resolvedPanelId = this.resolvePanelId(panelId)
 
+        // Already showing this panel - skip the hide/show cycle entirely. This also doubles as
+        // the guard that keeps MenuPanelChanged (emitted below) from looping between this class
+        // and the VR uikit tab shell: each side only re-emits when the panel actually changes, so
+        // an echo of your own just-emitted event is a no-op here rather than bouncing back again.
+        if (resolvedPanelId === this.state.activePanel) {
+            return
+        }
+
         // Hide current panel
         if (this.state.activePanel) {
             this.captureActivePanelMemory()
@@ -321,6 +361,7 @@ export class PauseMenuManager {
             this.updateActiveTab(resolvedPanelId)
             this.updateContentLayout(resolvedPanelId)
             this.restoreScrollPosition(resolvedPanelId)
+            this.eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: resolvedPanelId })
         }
     }
 
@@ -572,6 +613,7 @@ export class PauseMenuManager {
         )
         this.eventManager.deregisterEventHandler(InputEventTypes.OpenMenuPressed, this.handleOpenMenuPressed)
         this.eventManager.deregisterEventHandler(InputEventTypes.CancelPressed, this.handleCancelPressed)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.handleOtherMenuOpen)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleOtherMenuClose)
 

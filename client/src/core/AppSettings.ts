@@ -75,6 +75,7 @@ export const Setting = {
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
     HideUIInVR: 'hideUIInVR',
+    LockMovementWhileMenuOpen: 'lockMovementWhileMenuOpen',
     // Debug
     VerboseLogging: 'verboseLogging',
     ShowDebugInfo: 'showDebugInfo',
@@ -181,6 +182,13 @@ export interface ApplicationSettings {
     showFPS: boolean
     showPerformanceStats: boolean
     hideUIInVR: boolean
+    /** Whether opening the pause/settings menu also suspends camera movement/rotation (see
+     *  SystemUICoordinator's handlePauseInput/handleResumeInput). Defaults off in dev builds and
+     *  on in production - direct request (2026-08-20): losing the ability to walk around while
+     *  iterating on the VR menu (e.g. to test world-locked content from different angles) made dev
+     *  work harder than it needed to be, but the original "don't let the player wander off while a
+     *  menu covers the screen" intent still holds for real play. */
+    lockMovementWhileMenuOpen: boolean
     
     // Debug Settings
     verboseLogging: boolean
@@ -584,6 +592,7 @@ export class AppSettings {
             showFPS: false,
             showPerformanceStats: false,
             hideUIInVR: true,
+            lockMovementWhileMenuOpen: !isDev, // off in dev for easier iteration, on in production
             
             // Debug Settings
             verboseLogging: false,

@@ -54,9 +54,16 @@ describe('PauseMenuManager OpenMenuPressed wiring', () => {
         expect(pauseMenuManager.isOpen()).toBe(false)
     })
 
-    it('closes on CancelPressed (gamepad B/Circle) when open', () => {
+    it('closes on a later, independent CancelPressed (gamepad B/Circle) when open', async () => {
         eventManager.emit(InputEventTypes.OpenMenuPressed, {})
         expect(pauseMenuManager.isOpen()).toBe(true)
+
+        // A real gamepad B/Circle press is a genuinely separate event, sometime after the menu
+        // was opened by something else - awaiting a microtask models that gap. Without it, this
+        // would be indistinguishable from Escape/Start's own same-keypress OpenMenu+Cancel
+        // double-fire (see PauseMenuManager's suppressNextCancelClose), which this test isn't
+        // simulating.
+        await Promise.resolve()
 
         eventManager.emit(InputEventTypes.CancelPressed, {})
         expect(pauseMenuManager.isOpen()).toBe(false)

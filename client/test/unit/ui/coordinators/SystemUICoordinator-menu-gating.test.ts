@@ -43,10 +43,12 @@ vi.mock('../../../../src/ui/LightingControlsPanel', () => ({
 
 function makeMockRenderer(
     requestPointerLock: ReturnType<typeof vi.fn<(options?: PointerLockOptions) => Promise<void>>>
-): { domElement: HTMLCanvasElement } {
+): { domElement: HTMLCanvasElement; setTransparentSort: () => void } {
     const domElement = document.createElement('canvas')
     domElement.requestPointerLock = requestPointerLock
-    return { domElement } as unknown as { domElement: HTMLCanvasElement }
+    // init() also wires VRSettingsPanelCoordinator, which calls this on the real renderer to get
+    // uikit's transparent panels sorted correctly.
+    return { domElement, setTransparentSort: vi.fn() } as unknown as { domElement: HTMLCanvasElement; setTransparentSort: () => void }
 }
 
 describe('SystemUICoordinator menu-open gating', () => {
