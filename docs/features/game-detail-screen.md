@@ -122,3 +122,8 @@ for the full task breakdown. Summary:
 - Related feature: [VR Support](vr-support.md) — this feature's VR half; see also
   [VR Spatial Settings Menu](../plans/vr-spatial-settings-menu-plan.md), parallel VR UX work from
   the same 2026-08-10 session
+- Related feature: [uikit Component System](uikit-component-system.md) — the panels here are built
+  fully imperatively (magic numbers scattered across `GameBoxFoldDimensions.ts`/
+  `GameBoxPanelStyle.ts`/`GameBoxPanelParts.ts`, no real content/layout/style separation); tracked
+  as its own feature rather than fixed in place here, sequenced after the VR settings-menu uikit
+  migration so it's designed against two panel families, not one
