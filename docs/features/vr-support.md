@@ -78,3 +78,7 @@ VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stabl
   from controller-aim correction and text-sanitizing code that also exists on
   `feature/game-box-uikit-panels` - real drift, not just cosmetic difference, and neither branch's
   pointer/cursor behavior has been re-verified in a real headset since.
+- **After sub-scope 2 lands**: [uikit Component System](uikit-component-system.md) is deliberately
+  queued to start next - a real content/layout/style separation for uikit-built panels, designed
+  against both this feature's settings panels and the game box's panels together rather than
+  either alone.
