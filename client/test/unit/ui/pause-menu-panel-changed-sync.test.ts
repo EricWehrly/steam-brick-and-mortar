@@ -24,7 +24,6 @@ describe('PauseMenuManager MenuPanelChanged sync', () => {
 
         pauseMenuManager = new PauseMenuManager(
             {},
-            {},
             { performanceMonitor: null as any, renderer: null as any },
             eventManager,
             appSettings,

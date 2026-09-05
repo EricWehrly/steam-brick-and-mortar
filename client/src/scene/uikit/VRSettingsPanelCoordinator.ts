@@ -65,7 +65,7 @@ import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
-import type { XRControllerRaySource, XRControllerRayInfo } from '../../webxr/XRControllerManager'
+import type { XRControllerSource, XRControllerState } from '../../webxr/XRControllerManager'
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
 import { VRControllerPointer } from './VRControllerPointer'
 
@@ -262,9 +262,9 @@ export class VRSettingsPanelCoordinator {
      * 'connected'/'disconnected' events. Correct regardless of controllers connecting or
      * disconnecting mid-session while the panel is open.
      */
-    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<XRControllerRayInfo> {
-        const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
-        const connected = raySource?.getControllerRaySpaces?.() ?? []
+    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<XRControllerState> {
+        const raySource = DataManager.getInstance().get<XRControllerSource>(DataKey.XRControllerSource) ?? null
+        const connected = raySource?.getConnectedControllers?.() ?? []
         const connectedIndices = new Set(connected.map(entry => entry.index))
 
         for (const [index, pointer] of this.controllerPointers) {
@@ -274,12 +274,12 @@ export class VRSettingsPanelCoordinator {
             }
         }
 
-        for (const { index, raySpace } of connected) {
+        for (const { index, targetRaySpace } of connected) {
             if (this.controllerPointers.has(index)) {
                 continue
             }
             this.controllerPointers.set(index, new VRControllerPointer({
-                raySpace,
+                raySpace: targetRaySpace,
                 getCamera: () => camera as THREE.PerspectiveCamera,
                 intersectRoot: this.menuShell.container,
                 scene
@@ -314,7 +314,7 @@ export class VRSettingsPanelCoordinator {
         }
 
         if (this.anchorMode === 'grip-attached') {
-            const raySource = DataManager.getInstance().get<XRControllerRaySource>(DataKey.XRControllerRaySource) ?? null
+            const raySource = DataManager.getInstance().get<XRControllerSource>(DataKey.XRControllerSource) ?? null
             const grip = raySource?.getPrimaryControllerGrip() ?? null
 
             if (grip) {

@@ -23,7 +23,7 @@ import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
 import { VR_MENU_TABS } from '../../../../src/scene/uikit/VRMenuTabRegistry'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
-import type { XRControllerRaySource, XRControllerRayInfo } from '../../../../src/webxr/XRControllerManager'
+import type { XRControllerSource, XRControllerState } from '../../../../src/webxr/XRControllerManager'
 
 /** Reaches into the coordinator's private render-loop callback - same private-internals-cast
  *  pattern this file already uses for RenderLoopRegistry's callbacks map below. */
@@ -166,11 +166,11 @@ describe('VRSettingsPanelCoordinator', () => {
 
     it('anchors to the primary controller grip in grip-attached mode when one is published', () => {
         const grip = new THREE.Group()
-        const raySource: XRControllerRaySource = {
+        const raySource: XRControllerSource = {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => grip
         }
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'grip-attached')
         coordinator.init(createFakeRenderer())
@@ -255,16 +255,16 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('creates a controller-ray pointer (beam) for each connected controller once update() runs', () => {
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'left', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 },
-            { index: 1, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
+        const raySpaces: XRControllerState[] = [
+            { index: 0, handedness: 'left', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 },
+            { index: 1, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
-        const raySource: XRControllerRaySource = {
+        const raySource: XRControllerSource = {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => null,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => raySpaces
         }
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
@@ -273,20 +273,20 @@ describe('VRSettingsPanelCoordinator', () => {
 
         runUpdate(coordinator)
 
-        expect(raySpaces[0].raySpace.children).toHaveLength(1)
-        expect(raySpaces[1].raySpace.children).toHaveLength(1)
+        expect(raySpaces[0].targetRaySpace.children).toHaveLength(1)
+        expect(raySpaces[1].targetRaySpace.children).toHaveLength(1)
     })
 
     it('tears down a controller pointer once that controller disconnects', () => {
-        let raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
+        let raySpaces: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
-        const raySource: XRControllerRaySource = {
+        const raySource: XRControllerSource = {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => null,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => raySpaces
         }
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
@@ -294,7 +294,7 @@ describe('VRSettingsPanelCoordinator', () => {
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
 
         runUpdate(coordinator)
-        const disconnectedRaySpace = raySpaces[0].raySpace
+        const disconnectedRaySpace = raySpaces[0].targetRaySpace
         expect(disconnectedRaySpace.children).toHaveLength(1)
 
         raySpaces = []
@@ -304,26 +304,26 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('disposes all controller pointers when the panel deactivates', () => {
-        const raySpaces: XRControllerRayInfo[] = [
-            { index: 0, handedness: 'right', raySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
+        const raySpaces: XRControllerState[] = [
+            { index: 0, handedness: 'right', targetRaySpace: new THREE.Group() as unknown as THREE.XRTargetRaySpace, triggerValue: 1 }
         ]
-        const raySource: XRControllerRaySource = {
+        const raySource: XRControllerSource = {
             getPrimaryControllerRay: () => null,
             getPrimaryControllerGrip: () => null,
-            getControllerRaySpaces: () => raySpaces
+            getConnectedControllers: () => raySpaces
         }
-        DataManager.getInstance().set(DataKey.XRControllerRaySource, raySource, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
         coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
         coordinator.init(createFakeRenderer())
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
         runUpdate(coordinator)
-        expect(raySpaces[0].raySpace.children).toHaveLength(1)
+        expect(raySpaces[0].targetRaySpace.children).toHaveLength(1)
 
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })
 
-        expect(raySpaces[0].raySpace.children).toHaveLength(0)
+        expect(raySpaces[0].targetRaySpace.children).toHaveLength(0)
     })
 
     it('dispose() hides the panel and deregisters listeners', () => {

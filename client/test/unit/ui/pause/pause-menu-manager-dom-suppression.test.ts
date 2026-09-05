@@ -23,7 +23,6 @@ describe('PauseMenuManager - DOM visual suppression', () => {
         EventManager.getInstance().removeAllListeners()
         manager = new PauseMenuManager(
             {},
-            {},
             undefined,
             EventManager.getInstance(),
             AppSettings.getInstance(),
