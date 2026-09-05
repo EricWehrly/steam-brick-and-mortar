@@ -10,6 +10,7 @@ import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
 import { VRDebugPanel } from './panels/VRDebugPanel'
+import { VRCacheManagementPanel } from './panels/VRCacheManagementPanel'
 
 export interface VRMenuTabContent {
     readonly container: Container
@@ -40,6 +41,15 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Debug',
         icon: '🔧',
         build: () => new VRDebugPanel()
+    },
+    {
+        // Real DOM PauseMenuPanel id ('cache-management', see CacheManagementPanel.ts). Pass 1
+        // only (layout, no live data/interactivity yet) - see VRCacheManagementPanel.ts's own
+        // top comment for the domain survey and what's deliberately left out.
+        panelId: 'cache-management',
+        title: 'Cache',
+        icon: '💾',
+        build: () => new VRCacheManagementPanel()
     },
     {
         // Doesn't correspond to a real DOM panel id - stands in for every DOM panel not yet
