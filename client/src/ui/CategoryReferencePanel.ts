@@ -16,19 +16,22 @@ import '../styles/category-reference-panel.css'
 
 // ─── Static category data ──────────────────────────────────────────────────
 
-interface CategoryEntry {
+// Exported so VRCategoryReferencePanel.ts (client/src/scene/uikit/panels/) can render the same
+// data instead of hand-duplicating it - this content is exactly the kind of "same intent in two
+// places" the VR uikit migration is trying to eliminate elsewhere (see SettingsSchema.ts).
+export interface CategoryEntry {
     label: string
     description: string
     status: 'live' | 'planned' | 'idea'
 }
 
-const STEAM_GENRE_CATEGORIES: CategoryEntry[] = KNOWN_GENRES.map(g => ({
+export const STEAM_GENRE_CATEGORIES: CategoryEntry[] = KNOWN_GENRES.map(g => ({
     label: g,
     description: `Steam genre — matched case-insensitively from genres[0].description`,
     status: 'live',
 }))
 
-const META_CATEGORIES: CategoryEntry[] = [
+export const META_CATEGORIES: CategoryEntry[] = [
     {
         label: 'New to Library',
         description: 'Games added in the last 30–90 days (date_added from Steam).',
@@ -51,7 +54,7 @@ const META_CATEGORIES: CategoryEntry[] = [
     },
 ]
 
-const SORT_DIMENSIONS: CategoryEntry[] = [
+export const SORT_DIMENSIONS: CategoryEntry[] = [
     {
         label: 'Alphabetical',
         description: 'A–Z by game name.',

@@ -194,6 +194,22 @@
   resolved "https://registry.yarnpkg.com/@pmndrs/pointer-events/-/pointer-events-6.6.30.tgz#b7b3fc4794a533836c670fb3160a98cccb85b4b0"
   integrity sha512-YD2jWdgEqqAWJNOOZ1WZMunUby8jwuQyOMk8zbeqC39R4nkZnGvu1Pa5EMGbV1zd2vZTxXDxYcAVxtQuhVwf3g==
 
+"@pmndrs/uikit-default@^1.0.75":
+  version "1.0.76"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-default/-/uikit-default-1.0.76.tgz#24693b6eb5e3d34eb88e9447aeb8f4435c5ee87e"
+  integrity sha512-pSd+qmxiSMNmVHAcL1E8nwEztDNe0dwtu7Bp8QWzIqi0Fyqf7LYk2LMF11TIURe21hU/Uj9+378dKgHvcLqI8Q==
+  dependencies:
+    "@pmndrs/uikit" "^1.0.76"
+    "@pmndrs/uikit-lucide" "^1.0.76"
+    zod "^4.4.3"
+
+"@pmndrs/uikit-lucide@^1.0.76":
+  version "1.0.76"
+  resolved "https://registry.yarnpkg.com/@pmndrs/uikit-lucide/-/uikit-lucide-1.0.76.tgz#bc8f166437f344b4a355d391ffb7ec1e77df2645"
+  integrity sha512-qCPcVFO1qNWFBHq4xQ3s+CtSyvs4QKe61Xkjf2Fk8koiyNY36flVe7Yqhz8zLsj4Sf+O5ziCmFlpMFpGZOusbA==
+  dependencies:
+    "@pmndrs/uikit" "^1.0.76"
+
 "@pmndrs/uikit-pub-sub@^1.0.76":
   version "1.0.76"
   resolved "https://registry.yarnpkg.com/@pmndrs/uikit-pub-sub/-/uikit-pub-sub-1.0.76.tgz#5de4f09182eb7c5ae4962ff517630dcfa4915656"
@@ -201,7 +217,7 @@
   dependencies:
     "@preact/signals-core" "^1.8.0"
 
-"@pmndrs/uikit@^1.0.75":
+"@pmndrs/uikit@^1.0.75", "@pmndrs/uikit@^1.0.76":
   version "1.0.76"
   resolved "https://registry.yarnpkg.com/@pmndrs/uikit/-/uikit-1.0.76.tgz#7e801b38727146eee10d1e7956376377606cd127"
   integrity sha512-qLE7kGaW5LGE4YdFzCQZaCiB6NvfL9JJ2NxaBSw8Z0lu/0uiUfA49vKHFxk/1qiGvTu+esrDCAydI+H2aN1kYg==
@@ -218,7 +234,7 @@
   resolved "https://registry.yarnpkg.com/@polka/url/-/url-1.0.0-next.29.tgz#5a40109a1ab5f84d6fd8fc928b19f367cbe7e7b1"
   integrity sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==
 
-"@preact/signals-core@^1.5.1", "@preact/signals-core@^1.8.0":
+"@preact/signals-core@^1.14.4", "@preact/signals-core@^1.5.1", "@preact/signals-core@^1.8.0":
   version "1.14.4"
   resolved "https://registry.yarnpkg.com/@preact/signals-core/-/signals-core-1.14.4.tgz#d3588cbda237fcb3c8a8e478f6cc370653609eb7"
   integrity sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==
