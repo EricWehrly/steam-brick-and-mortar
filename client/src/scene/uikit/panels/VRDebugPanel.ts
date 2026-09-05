@@ -30,6 +30,7 @@ import type { DebugStats } from '../../../ui/pause/panels/DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../../ui/PerformanceMonitor'
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
+import { formatBytes } from '../../../utils/FormatBytes'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
@@ -114,14 +115,6 @@ function memoryColor(percent: number): string {
     if (percent > 0.9) return WARNING_COLOR
     if (percent > 0.7) return CAUTION_COLOR
     return GOOD_COLOR
-}
-
-function formatBytes(bytes: number): string {
-    if (bytes <= 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
 const SECTIONS: ReadonlyArray<{ readonly heading: string; readonly rows: readonly StatRowSpec[] }> = [

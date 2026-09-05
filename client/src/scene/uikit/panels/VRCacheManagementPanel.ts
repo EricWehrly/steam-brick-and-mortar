@@ -2,11 +2,6 @@
  * VR port of CacheManagementPanel (client/src/ui/pause/panels/CacheManagementPanel.ts) - Story 5 of
  * docs/plans/vr-uikit-menu-migration-plan.md.
  *
- * PASS 1 (layout only, this commit): structure and static placeholder text for the rows below.
- * No live data, no click handlers beyond no-ops - see each row's own comment for what pass 2/3
- * still needs to do. Deliberately stopping here for review before wiring anything real, per
- * direct request: lay out what's kept/dropped first, discuss, then wire values and interactivity.
- *
  * Domain survey of the DOM original (direct request, before building anything) - not everything it
  * renders is real:
  *   - KEPT - genuinely live/functional in the DOM panel: image count + storage quota stats,
@@ -25,15 +20,22 @@
  *   - "Last Updated" is kept but noted as low-value: it's not a real cache timestamp, just
  *     `new Date()` stamped at whichever moment stats were last refreshed.
  *
- * Open design question for review, not resolved here: the DOM panel's Clear Cache uses
- * `window.confirm()`, which doesn't work inside an immersive WebXR session (blocks the main thread,
- * can't render over the XR canvas) - this tab only ever shows in VR (flatscreen still gets the DOM
- * menu), so it needs a different confirm affordance. Not built in this pass; see clear button below.
+ * Clear Cache confirm: the DOM panel uses `window.confirm()`, which doesn't work inside an
+ * immersive WebXR session (blocks the main thread, can't render over the XR canvas) - this tab
+ * only ever shows in VR (flatscreen still gets the DOM menu). Cheapest real alternative: a two-step
+ * arm/confirm on the button itself (see armClear() below) rather than building a modal/dialog
+ * system for this one confirmation.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
+import { PixelDataCache } from '../../../scene/game-box/instancing/PixelDataCache'
+import { SteamApiClient } from '../../../steam/SteamApiClient'
+import { EventManager, EventSource } from '../../../core/EventManager'
+import { SteamEventTypes } from '../../../types/InteractionEvents'
+import type { SteamCacheClearEvent, SteamImageCacheClearEvent, SteamLoadLibraryEvent } from '../../../types/InteractionEvents'
+import { formatBytes } from '../../../utils/FormatBytes'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
@@ -46,6 +48,14 @@ const CARD_BACKGROUND = COLOR_TOKENS.surface2
 const CARD_RADIUS = 10
 const USERS_LIST_HEIGHT = 140
 const LOADING_TEXT = 'loading...'
+const EMPTY_USERS_TEXT = 'No cached users found'
+const REFRESH_LABEL = 'Refresh'
+const CLEAR_LABEL = 'Clear Cache'
+const CLEAR_CONFIRM_LABEL = 'Confirm Clear?'
+// How long the Clear button stays armed before silently reverting - long enough to genuinely
+// look at and press a second time, short enough that walking away doesn't leave it primed.
+const CLEAR_ARM_TIMEOUT_MS = 4000
+const LOAD_LABEL = 'Load'
 
 export class VRCacheManagementPanel {
     readonly container: Container
@@ -54,6 +64,11 @@ export class VRCacheManagementPanel {
     private readonly storageQuotaValue: Text
     private readonly lastUpdateValue: Text
     private readonly usersListContainer: Container
+    private readonly eventManager = EventManager.getInstance()
+
+    private clearArmed = false
+    private clearArmTimeout: ReturnType<typeof setTimeout> | null = null
+    private clearButtonLabel!: Text
 
     constructor() {
         const built = this.build()
@@ -62,6 +77,9 @@ export class VRCacheManagementPanel {
         this.storageQuotaValue = built.storageQuotaValue
         this.lastUpdateValue = built.lastUpdateValue
         this.usersListContainer = built.usersListContainer
+
+        void this.refreshStats()
+        void this.refreshCachedUsers()
     }
 
     private build(): {
@@ -78,7 +96,7 @@ export class VRCacheManagementPanel {
         root.add(stats.card)
 
         root.add(this.buildSectionHeading('Load from Cached Users'))
-        const usersListContainer = this.buildUsersListPlaceholder()
+        const usersListContainer = this.buildUsersList()
         root.add(usersListContainer)
 
         root.add(this.buildActionsRow())
@@ -106,9 +124,6 @@ export class VRCacheManagementPanel {
             borderRadius: CARD_RADIUS
         })
 
-        // Pass 2 wires these three from PixelDataCache.getStorageEstimate() (count) and
-        // navigator.storage.estimate() (quota) - same sources the DOM panel already reads, no new
-        // data plumbing needed. "Last Updated" kept per the domain survey above, low-value as-is.
         const imageCountValue = this.buildStatRow(card, 'Images Cached', LOADING_TEXT)
         const storageQuotaValue = this.buildStatRow(card, 'Storage Quota', LOADING_TEXT)
         const lastUpdateValue = this.buildStatRow(card, 'Last Updated', 'Never')
@@ -125,36 +140,124 @@ export class VRCacheManagementPanel {
         return valueText
     }
 
-    /** Pass 1 shows the DOM panel's own empty-state copy ("No cached users found") - pass 2
-     *  replaces this with one row per SteamApiClient.getCachedUsers() entry, each with its own
-     *  inline Load button rather than porting the DOM's separate <select> + button as two pieces -
-     *  cheaper than building a new select-style row helper for this one panel's sake. */
-    private buildUsersListPlaceholder(): Container {
-        const list = new Container({
+    private buildUsersList(): Container {
+        return new Container({
             flexDirection: 'column',
             gap: ROW_GAP,
             width: '100%',
             height: USERS_LIST_HEIGHT,
             overflow: 'scroll'
         })
-        list.add(new Text({ text: 'No cached users found', fontSize: ROW_LABEL_FONT_SIZE, color: COLOR_TOKENS.textTertiary }))
-        return list
     }
 
     private buildActionsRow(): Container {
         const row = new Container({ flexDirection: 'row', gap: ROW_GAP, width: '100%' })
 
-        // Pass 2: onClick re-reads stats the same way the DOM panel's refreshCache() does.
-        const refreshButton = new Button({ variant: 'secondary', onClick: () => {} })
-        refreshButton.add(new Text({ text: 'Refresh', color: COLOR_TOKENS.textPrimary }))
+        const refreshButton = new Button({ variant: 'secondary', onClick: () => void this.refreshStats() })
+        refreshButton.add(new Text({ text: REFRESH_LABEL, color: COLOR_TOKENS.textPrimary }))
         row.add(refreshButton)
 
-        // Pass 2/3: needs a VR-appropriate confirm step before this actually clears anything -
-        // window.confirm() (what the DOM panel uses) doesn't work in an immersive session. Left as
-        // a plain, unconfirmed no-op for pass 1 - see this file's top comment.
-        const clearButton = new Button({ variant: 'destructive', onClick: () => {} })
-        clearButton.add(new Text({ text: 'Clear Cache', color: COLOR_TOKENS.textPrimary }))
+        const clearButton = new Button({ variant: 'destructive', onClick: () => this.handleClearClick() })
+        this.clearButtonLabel = new Text({ text: CLEAR_LABEL, color: COLOR_TOKENS.textPrimary })
+        clearButton.add(this.clearButtonLabel)
         row.add(clearButton)
+
+        return row
+    }
+
+    /** First press arms (relabels + starts the auto-revert timeout, same-shape debounce as
+     *  PauseMenuManager's own suppressNextCancelClose); a second press while armed - the only time
+     *  this actually clears anything - fires it for real. */
+    private handleClearClick(): void {
+        if (!this.clearArmed) {
+            this.armClear()
+            return
+        }
+        this.disarmClear()
+        this.clearCache()
+    }
+
+    private armClear(): void {
+        this.clearArmed = true
+        this.clearButtonLabel.setProperties({ text: CLEAR_CONFIRM_LABEL })
+        this.clearArmTimeout = setTimeout(() => this.disarmClear(), CLEAR_ARM_TIMEOUT_MS)
+    }
+
+    private disarmClear(): void {
+        this.clearArmed = false
+        this.clearButtonLabel.setProperties({ text: CLEAR_LABEL })
+        if (this.clearArmTimeout !== null) {
+            clearTimeout(this.clearArmTimeout)
+            this.clearArmTimeout = null
+        }
+    }
+
+    private clearCache(): void {
+        this.eventManager.emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, { scope: 'all', source: EventSource.UI })
+        this.eventManager.emit<SteamImageCacheClearEvent>(SteamEventTypes.ImageCacheClear, { source: EventSource.UI })
+        void this.refreshStats()
+    }
+
+    private async refreshStats(): Promise<void> {
+        const [pixelStats, storageEstimate] = await Promise.all([
+            PixelDataCache.getInstance().getStorageEstimate(),
+            this.getStorageEstimate()
+        ])
+
+        this.imageCountValue.setProperties({ text: String(pixelStats.count) })
+        this.storageQuotaValue.setProperties({ text: this.formatQuota(storageEstimate) })
+        this.lastUpdateValue.setProperties({ text: new Date().toLocaleString() })
+    }
+
+    /** Same navigator.storage.estimate() the DOM panel reads - not every environment implements
+     *  it (see DebugStatsProvider's identical guard), so this mirrors that fallback rather than
+     *  assuming it exists. */
+    private async getStorageEstimate(): Promise<{ used: number; quota: number } | null> {
+        if (!('storage' in navigator) || !('estimate' in navigator.storage)) {
+            return null
+        }
+        const estimate = await navigator.storage.estimate()
+        return { used: estimate.usage ?? 0, quota: estimate.quota ?? 0 }
+    }
+
+    private formatQuota(estimate: { used: number; quota: number } | null): string {
+        if (!estimate) {
+            return 'Not available'
+        }
+        return `${formatBytes(estimate.used)} / ${formatBytes(estimate.quota)}`
+    }
+
+    private async refreshCachedUsers(): Promise<void> {
+        const users = SteamApiClient.getInstance().getCachedUsers();
+        [...this.usersListContainer.children].forEach(child => child.removeFromParent())
+
+        if (users.length === 0) {
+            this.usersListContainer.add(new Text({ text: EMPTY_USERS_TEXT, fontSize: ROW_LABEL_FONT_SIZE, color: COLOR_TOKENS.textTertiary }))
+            return
+        }
+
+        for (const user of users) {
+            this.usersListContainer.add(this.buildUserRow(user))
+        }
+    }
+
+    private buildUserRow(user: { vanityUrl: string; displayName: string; gameCount: number }): Container {
+        const row = new Container({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' })
+        row.add(new Text({
+            text: `${user.displayName} (${user.gameCount} games)`,
+            fontSize: ROW_LABEL_FONT_SIZE,
+            color: COLOR_TOKENS.textPrimary
+        }))
+
+        const loadButton = new Button({
+            variant: 'secondary',
+            onClick: () => this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
+                userInput: user.vanityUrl,
+                source: EventSource.UI
+            })
+        })
+        loadButton.add(new Text({ text: LOAD_LABEL, color: COLOR_TOKENS.textPrimary }))
+        row.add(loadButton)
 
         return row
     }

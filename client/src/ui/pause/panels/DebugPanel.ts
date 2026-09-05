@@ -18,6 +18,7 @@ import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../PerformanceMonitor'
+import { formatBytes } from '../../../utils/FormatBytes'
 import { AppSettings } from '../../../core/AppSettings'
 
 export interface DebugStats {
@@ -108,17 +109,17 @@ export class DebugPanel extends PauseMenuPanel {
             performanceFps: this.stats.performance.fps.toFixed(1),
             performanceFrameTime: this.stats.performance.frameTime.toFixed(2) + 'ms',
             performanceMemoryClass: this.getPerformanceClass('memory'),
-            performanceMemoryUsed: this.formatBytes(this.stats.performance.memoryUsed),
-            performanceMemoryTotal: this.formatBytes(this.stats.performance.memoryTotal),
+            performanceMemoryUsed: formatBytes(this.stats.performance.memoryUsed),
+            performanceMemoryTotal: formatBytes(this.stats.performance.memoryTotal),
             performanceTriangles: this.stats.performance.triangles.toLocaleString(),
             performanceDrawCallsClass: this.getPerformanceClass('drawCalls'),
             performanceDrawCalls: this.stats.performance.drawCalls,
             
             // Cache (flattened and formatted)
             cacheImageCount: this.stats.cache.imageCount,
-            cacheImageSize: this.formatBytes(this.stats.cache.imageCacheSize),
+            cacheImageSize: formatBytes(this.stats.cache.imageCacheSize),
             cacheGameDataCount: this.stats.cache.gameDataCount,
-            cacheGameDataSize: this.formatBytes(this.stats.cache.gameDataSize),
+            cacheGameDataSize: formatBytes(this.stats.cache.gameDataSize),
             cacheQuotaClass: this.getPerformanceClass('quota'),
             cacheQuotaUsage: this.formatQuotaUsage(),
             
@@ -313,17 +314,9 @@ export class DebugPanel extends PauseMenuPanel {
         }
     }
 
-    private formatBytes(bytes: number): string {
-        if (bytes === 0) return '0 B'
-        const k = 1024
-        const sizes = ['B', 'KB', 'MB', 'GB']
-        const i = Math.floor(Math.log(bytes) / Math.log(k))
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-    }
-
     private formatQuotaUsage(): string {
-        const used = this.formatBytes(this.stats.cache.quotaUsed)
-        const total = this.formatBytes(this.stats.cache.quotaTotal)
+        const used = formatBytes(this.stats.cache.quotaUsed)
+        const total = formatBytes(this.stats.cache.quotaTotal)
         const percent = ((this.stats.cache.quotaUsed / this.stats.cache.quotaTotal) * 100).toFixed(1)
         return `${used} / ${total} (${percent}%)`
     }
@@ -410,8 +403,8 @@ export class DebugPanel extends PauseMenuPanel {
         const updateQuotaUsage = () => {
             const element = document.getElementById('stat-quota-used')
             if (element) {
-                const used = this.formatBytes(stats.quotaUsed)
-                const total = this.formatBytes(stats.quotaTotal)
+                const used = formatBytes(stats.quotaUsed)
+                const total = formatBytes(stats.quotaTotal)
                 const percent = ((stats.quotaUsed / stats.quotaTotal) * 100).toFixed(1)
                 element.textContent = `${used} / ${total} (${percent}%)`
             }

@@ -14,6 +14,7 @@ import { SteamEventTypes } from '../../../types/InteractionEvents'
 import type { SteamCacheClearEvent, SteamImageCacheClearEvent } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { formatBytes } from '../../../utils/FormatBytes'
 
 export interface CacheStats {
     imageCount: number
@@ -57,7 +58,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
         const templateData = {
             imageCount: this.cacheStats.imageCount || 'Loading...',
-            totalSize: this.cacheStats.totalSize ? this.formatBytes(this.cacheStats.totalSize) : 'Loading...',
+            totalSize: this.cacheStats.totalSize ? formatBytes(this.cacheStats.totalSize) : 'Loading...',
             lastUpdate: this.cacheStats.lastUpdate?.toLocaleString() || 'Never',
             cacheApiStatus: ('caches' in window) ? 'Available' : 'Not available',
             cacheApiUnavailable: !('caches' in window),
@@ -248,7 +249,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         }
 
         if (totalSizeEl) {
-            totalSizeEl.textContent = this.formatBytes(this.cacheStats.totalSize)
+            totalSizeEl.textContent = formatBytes(this.cacheStats.totalSize)
         }
 
         if (lastUpdateEl) {
@@ -424,14 +425,6 @@ export class CacheManagementPanel extends PauseMenuPanel {
         } catch {
             return {}
         }
-    }
-
-    private formatBytes(bytes: number): string {
-        if (bytes === 0) return '0 B'
-        const k = 1024
-        const sizes = ['B', 'KB', 'MB', 'GB']
-        const i = Math.floor(Math.log(bytes) / Math.log(k))
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
 
     private updateStorageQuotaDisplay(): void {
