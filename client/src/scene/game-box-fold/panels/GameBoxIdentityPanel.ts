@@ -6,11 +6,13 @@
 
 import { Container } from '@pmndrs/uikit'
 import { buildComingSoonRows } from './GameBoxPanelParts'
-import { PANEL_PADDING, PANEL_ROOT_PROPERTIES } from './GameBoxPanelStyle'
+import { PANEL_HEIGHT_PX, PANEL_PADDING, PANEL_ROOT_PROPERTIES } from './GameBoxPanelStyle'
 
-// Where the reserved rows start down the face - carried over from the canvas layout's 0.27 of
-// panel height, which read as "upper third" rather than crowding the top edge.
-const CONTENT_TOP_PADDING = 108
+// Where the reserved rows start down the face - reads as "upper third" rather than crowding the
+// top edge. Derived from panel height (not a bare pixel count) so it stays proportional if the
+// page size ever changes.
+const CONTENT_TOP_FRACTION = 0.27
+const CONTENT_TOP_PADDING = PANEL_HEIGHT_PX * CONTENT_TOP_FRACTION
 
 export class GameBoxIdentityPanel {
     readonly container: Container

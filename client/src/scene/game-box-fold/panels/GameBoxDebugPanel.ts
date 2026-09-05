@@ -8,24 +8,15 @@
  * had to hit-test a wheel event's position against a remembered Y to stop the description and chip
  * rows above from scrolling the JSON too.
  *
- * The sections column above the cache entry is its OWN bounded, scrollable area rather than a plain
- * flex child sized however it happens to come out - left unbounded, a verbose game's content could
- * exceed the fixed page height and visibly overlap the cache viewport below it rather than merely
- * clipping. A capped, scrollable area degrades to a scrollbar instead.
- *
- * Both scrollable Containers below (sectionsArea, the cache-entry viewport) declare
- * flexDirection:'column' explicitly - easy to leave off, since a single-child scroll area looks
- * right either way until you actually try to scroll it. uikit defaults an unset flexDirection to
- * 'row' and an unset alignItems to 'stretch': with 'row', height is the CROSS axis, so 'stretch'
- * forces the single child to exactly the container's fixed height regardless of its own real
- * content size, which makes maxScrollPosition compute to ~0 (there's nothing left to scroll to).
- * 'column' makes height the MAIN axis instead, where a child lays out at its own natural size by
- * default.
+ * The sections column above the cache entry is its OWN bounded, scrollable area (buildScrollableColumn)
+ * rather than a plain flex child sized however it happens to come out - left unbounded, a verbose
+ * game's content could exceed the fixed page height and visibly overlap the cache viewport below it
+ * rather than merely clipping. A capped, scrollable area degrades to a scrollbar instead.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
 import type { GameBoxFoldContent } from '../GameBoxFoldContent'
-import { buildChipSection, buildTextLine } from './GameBoxPanelParts'
+import { buildChipSection, buildScrollableColumn, buildTextLine } from './GameBoxPanelParts'
 import { toUikitSafeMultilineText } from '../../uikit/UikitTextSanitizer'
 import {
     BODY_LINE_HEIGHT, LABEL_FONT_SIZE, MONO_FONT_SIZE,
@@ -112,28 +103,14 @@ export class GameBoxDebugPanel {
             gap: SECTION_GAP
         })
 
-        const sectionsArea = new Container({
-            flexDirection: 'column',
-            width: '100%',
-            maxHeight: SECTIONS_MAX_HEIGHT,
-            overflow: 'scroll',
-            scrollbarColor: PANEL_COLORS.border,
-            scrollbarWidth: 3
-        })
+        const sectionsArea = buildScrollableColumn({ maxHeight: SECTIONS_MAX_HEIGHT })
         sectionsArea.add(this.sections)
         root.add(sectionsArea)
 
         root.add(new Container({ width: '100%', height: DIVIDER_HEIGHT, backgroundColor: PANEL_COLORS.border }))
         root.add(new Text({ text: 'CACHE ENTRY', fontSize: LABEL_FONT_SIZE, color: PANEL_COLORS.label }))
 
-        const viewport = new Container({
-            flexDirection: 'column',
-            width: '100%',
-            height: CACHE_VIEWPORT_HEIGHT,
-            overflow: 'scroll',
-            scrollbarColor: PANEL_COLORS.border,
-            scrollbarWidth: 3
-        })
+        const viewport = buildScrollableColumn({ height: CACHE_VIEWPORT_HEIGHT })
         viewport.add(this.cacheText)
         root.add(viewport)
 
