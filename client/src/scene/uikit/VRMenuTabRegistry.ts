@@ -11,6 +11,7 @@ import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
 import { VRDebugPanel } from './panels/VRDebugPanel'
 import { VRCacheManagementPanel } from './panels/VRCacheManagementPanel'
+import { VRCameraSettingsPanel } from './panels/VRCameraSettingsPanel'
 
 export interface VRMenuTabContent {
     readonly container: Container
@@ -43,13 +44,21 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         build: () => new VRDebugPanel()
     },
     {
-        // Real DOM PauseMenuPanel id ('cache-management', see CacheManagementPanel.ts). Pass 1
-        // only (layout, no live data/interactivity yet) - see VRCacheManagementPanel.ts's own
-        // top comment for the domain survey and what's deliberately left out.
+        // Real DOM PauseMenuPanel id ('cache-management', see CacheManagementPanel.ts). See
+        // VRCacheManagementPanel.ts's own top comment for the domain survey and what's
+        // deliberately left out (dead buttons/settings the DOM panel never really wired up).
         panelId: 'cache-management',
         title: 'Cache',
         icon: '💾',
         build: () => new VRCacheManagementPanel()
+    },
+    {
+        // Real DOM PauseMenuPanel id ('camera-settings', see CameraSettingsPanel.ts). See
+        // VRCameraSettingsPanel.ts's own top comment for the domain survey.
+        panelId: 'camera-settings',
+        title: 'Camera',
+        icon: '📷',
+        build: () => new VRCameraSettingsPanel()
     },
     {
         // Doesn't correspond to a real DOM panel id - stands in for every DOM panel not yet

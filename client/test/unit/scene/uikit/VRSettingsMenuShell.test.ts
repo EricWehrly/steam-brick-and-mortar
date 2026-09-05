@@ -79,7 +79,7 @@ describe('VRSettingsMenuShell', () => {
     it('ignores a MenuPanelChanged for a panel id with no matching VR tab', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
 
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'camera-settings' })
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'application' })
 
         expect(shell.activeTabPanelId).toBe(DEFAULT_VR_MENU_TAB_PANEL_ID)
     })
