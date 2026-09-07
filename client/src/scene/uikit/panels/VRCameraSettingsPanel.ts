@@ -5,21 +5,25 @@
  * Domain survey (direct request, before building anything):
  *   - KEPT: FOV/near/far sliders and the five camera presets (Normal/Wide/Ultra Wide/Cinematic/
  *     Telephoto), all genuinely functional in the DOM panel.
- *   - Not AppSettings-backed, unlike display-advanced: the DOM panel's sliders mutate the live
- *     THREE.PerspectiveCamera directly (`camera.fov = value; camera.updateProjectionMatrix()`) and
- *     never touch AppSettings - `this.appSettings` is stored in the DOM class but never actually
- *     read or written anywhere in it. So these values are session-only today (reset to whatever
- *     SceneManager constructs the camera with on next reload), not persisted like the display-
- *     advanced controls are. This VR port preserves that exact behavior rather than adding
- *     persistence as an unrequested scope change - if FOV/near/far should start persisting, that's
- *     a DOM-panel-first decision, not something to slip in via this port. Consequence: this panel
- *     can't use SettingsSchema.ts (its RangeSettingControl.setting is typed to an AppSettings key
- *     specifically) - built with UIKitRowHelpers.createSliderRow directly instead, which is already
- *     generic (plain value + onChange, no AppSettings dependency).
- *   - DROPPED - dead, not just hard to port: the multi-camera prev/next navigation and camera-count
- *     display. `loadCameras()` only ever pushes DataKey.MainCamera - there is no second camera
- *     anywhere in this codebase for it to switch to, despite the class doc comment's aspirational
- *     "Multiple camera management and switching."
+ *   - Not AppSettings-backed today, unlike display-advanced: the DOM panel's sliders mutate the
+ *     live THREE.PerspectiveCamera directly (`camera.fov = value; camera.updateProjectionMatrix()`)
+ *     and never touch AppSettings - `this.appSettings` is stored in the DOM class but never
+ *     actually read or written anywhere in it. Consequence for this port: can't use
+ *     SettingsSchema.ts (its RangeSettingControl.setting is typed to an AppSettings key
+ *     specifically) - built with UIKitRowHelpers.createSliderRow directly instead, which is
+ *     already generic (plain value + onChange, no AppSettings dependency).
+ *   - The multi-camera prev/next navigation and camera-count display are NOT dead code, corrected
+ *     same day after an initial misread here: direct request (2026-09-05) - "those sliders are
+ *     meant to adjust the camera, which adjusts the 'preset', which should get saved. We wanted to
+ *     support multiple presets, and (later) camera cycling. Hence the stand-in code." Real,
+ *     intentional scaffolding for a feature not built yet (see
+ *     [`camera-preset-persistence`](../../../../docs/tech-debt.md#id-camera-preset-persistence) -
+ *     `// TD: camera-preset-persistence`), not something to expose as player-visible VR controls
+ *     while it only has one camera to switch between and nothing to persist yet - direct
+ *     preference: "UI that WE can know how we want to extend (meaning comments) rather than
+ *     necessarily player-visible and confusing." So: FOV/near/far stay session-only for now (no
+ *     persisted "preset" model exists yet to save into), and no prev/next controls are built here -
+ *     both wait on that tech-debt entry, not on this port.
  *   - Simplified: the DOM panel highlights whichever preset button matches the camera's current
  *     values (detectCurrentPreset()). Presets here are click-to-apply only, not shown as toggled/
  *     active - cheaper than threading live-detection through every slider change for a purely

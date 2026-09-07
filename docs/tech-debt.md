@@ -893,5 +893,28 @@ for the decision to standardize on uikit. No `isPointIn*`-style hit-testing rema
 **Status**: ✅ Resolved 2026-08-19 — confirmed against real headset hardware: `xr-standard` button
 index 4 does open the menu. `InputProfile.ts`'s VR `OpenMenu` binding was correct as shipped.
 
+## id: camera-preset-persistence
+**Priority**: Low
+**Effort**: Medium - a real preset-storage model (named presets, which one is "active",
+persistence) plus a camera-cycling UI once more than one camera exists
+**Context**: `CameraSettingsPanel`'s FOV/near/far sliders mutate the live `THREE.PerspectiveCamera`
+directly and never persist (confirmed via code read, not assumption - `this.appSettings` is stored
+in the class but never actually read or written anywhere in it). The multi-camera prev/next
+navigation and camera-count display are real stand-in scaffolding for a planned feature, not dead
+code left by mistake: direct request (2026-09-05) - "those sliders are meant to adjust the camera,
+which adjusts the 'preset', which should get saved. We wanted to support multiple presets, and
+(later) camera cycling. Hence the stand-in code." The VR port
+(`VRCameraSettingsPanel.ts`) initially mischaracterized this as dead code to drop - corrected same
+day, with a preference for "UI that WE can know how we want to extend (meaning comments) rather
+than necessarily player-visible and confusing" - i.e. document the intent, don't ship a
+prev/next control that only ever has one camera to switch to.
+**Done when**: FOV/near/far edits persist as a named, editable preset (not just the five hardcoded
+`CAMERA_PRESETS`); multiple cameras can exist and be cycled between via the (currently stand-in)
+prev/next controls, which then become real, player-visible UI instead of documentation-only intent.
+**Related files**:
+- `client/src/ui/pause/panels/CameraSettingsPanel.ts` (`this.appSettings` unused; `loadCameras()`
+  only ever publishes one camera)
+- `client/src/scene/uikit/panels/VRCameraSettingsPanel.ts` (`// TD: camera-preset-persistence`)
+
 ## id: gamepad-button-actions-unconsumed
 **Status**: ✅ Resolved 2026-07-24 — see `docs/plans/input-action-routing-plan.md` (implemented, then revised twice the same day after design reviews — see the plan's "Revision history" for what changed and why each time). Keyboard `Interact`/`OpenMenu` now fire directly off the real `keydown` DOM event (via a new `InputStateTracker.onRawKeyDown` callback) — no polling, no frame-diffing, since keyboard already has a real press edge. Mouse deliberately has no equivalent path: a real mouse click already has its own independent dispatch (`SystemUICoordinator`), entirely separate from the binding system, so nothing was added to route it through here too. Gamepad has no native press event, so `DeviceDetector.pollGamepads()` (which already polls every frame) tracks per-button state and emits `InputEventTypes.GamepadButtonPressed` on a transition. Both keyboard and gamepad funnel through `InputActionResolver`'s new `handleRawKeyPress()`/`handleGamepadButtonPress()`, which look up bound actions via a new `BindingResolver.findButtonActionsBoundTo()` and resolve all the way to a *specific* event per action (`InputEventTypes.OpenMenuPressed`, `InputEventTypes.InteractPressed`) rather than a generic tagged envelope — `InputActionResolver` is the class whose job is deciding which action fired, so it does that fully rather than handing a partial answer downstream. No dispatcher class: `PauseMenuManager` listens for `OpenMenuPressed` directly and calls its own `toggle()` (replacing the old hardcoded `Escape`-only listener); `SystemUICoordinator` listens for `InteractPressed` (simulates a click at the reticle position by emitting the existing `SceneCanvasClick` with center-screen NDC) and owns the gamepad/VR reticle. Along the way, fixed two real bugs: (1) pausing didn't actually stop gamepad-driven camera movement — `InputManager` now has `pause()`/`resume()` that gate camera application only, while `updateFrame()` (gamepad polling) keeps running; (2) `DeviceDetector.pollGamepads()` only flagged a device-list change on gamepad *disconnect*, never *connect* via polling. `ToggleUI` and `ToggleFullscreen` were both removed entirely rather than built (see [Input System](features/input-system.md) Stretch section) — no consumer was ever designed for `ToggleUI`, and `ToggleFullscreen` was redundant scope (F11 already provides native browser fullscreen).
