@@ -65,7 +65,7 @@ describe('VRCacheManagementPanel', () => {
         const panel = new VRCacheManagementPanel()
         await flushMicrotasks()
 
-        const usersList = panel.container.children[3]
+        const usersList = panel.container.children[6]
         expect(usersList.children.some(child => child instanceof Text && (child as unknown as { inputProperties: { text: string } }).inputProperties.text === 'No cached users found')).toBe(true)
     })
 
@@ -77,7 +77,7 @@ describe('VRCacheManagementPanel', () => {
         const panel = new VRCacheManagementPanel()
         await flushMicrotasks()
 
-        const usersList = panel.container.children[3]
+        const usersList = panel.container.children[6]
         expect(usersList.children).toHaveLength(2)
     })
 
@@ -90,7 +90,7 @@ describe('VRCacheManagementPanel', () => {
         const panel = new VRCacheManagementPanel()
         await flushMicrotasks()
 
-        const usersList = panel.container.children[3]
+        const usersList = panel.container.children[6]
         const row = usersList.children[0]
         const loadButton = row.children[1] as unknown as { inputProperties: { onClick: () => void } }
         loadButton.inputProperties.onClick()

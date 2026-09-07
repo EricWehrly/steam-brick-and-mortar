@@ -20,6 +20,11 @@
  *   - "Last Updated" is kept but noted as low-value: it's not a real cache timestamp, just
  *     `new Date()` stamped at whichever moment stats were last refreshed.
  *
+ * Image cache vs. cached-user library data are two distinct domains sharing one DOM panel by
+ * legacy convenience, not by anything in common - direct request: give each its own heading and
+ * controls (a divider between them) rather than one shared Refresh/Clear Cache row at the bottom
+ * that reads as applying to both, when both buttons only ever touch the image cache.
+ *
  * Clear Cache confirm: the DOM panel uses `window.confirm()`, which doesn't work inside an
  * immersive WebXR session (blocks the main thread, can't render over the XR canvas) - this tab
  * only ever shows in VR (flatscreen still gets the DOM menu). Cheapest real alternative: a two-step
@@ -46,6 +51,7 @@ const ROW_LABEL_FONT_SIZE = 13
 const CARD_PADDING = 14
 const CARD_BACKGROUND = COLOR_TOKENS.surface2
 const CARD_RADIUS = 10
+const DIVIDER_HEIGHT = 1
 const USERS_LIST_HEIGHT = 140
 const LOADING_TEXT = 'loading...'
 const EMPTY_USERS_TEXT = 'No cached users found'
@@ -92,14 +98,20 @@ export class VRCacheManagementPanel {
         const root = new Container({ flexDirection: 'column', gap: SECTION_GAP, padding: PANEL_PADDING, width: '100%' })
         root.add(new Text({ text: 'Cache', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
 
+        // Two distinct data domains sharing one panel by DOM legacy convenience, not by anything
+        // in common - image cache (PixelDataCache) and per-user library cache (SteamApiClient) -
+        // direct request: give each its own heading/controls instead of one shared actions row
+        // that reads as applying to both.
+        root.add(this.buildSectionHeading('Image Cache'))
         const stats = this.buildStatsCard()
         root.add(stats.card)
+        root.add(this.buildImageCacheActionsRow())
+
+        root.add(this.buildDivider())
 
         root.add(this.buildSectionHeading('Load from Cached Users'))
         const usersListContainer = this.buildUsersList()
         root.add(usersListContainer)
-
-        root.add(this.buildActionsRow())
 
         return {
             container: root,
@@ -140,6 +152,10 @@ export class VRCacheManagementPanel {
         return valueText
     }
 
+    private buildDivider(): Container {
+        return new Container({ width: '100%', height: DIVIDER_HEIGHT, backgroundColor: COLOR_TOKENS.border })
+    }
+
     private buildUsersList(): Container {
         return new Container({
             flexDirection: 'column',
@@ -150,7 +166,7 @@ export class VRCacheManagementPanel {
         })
     }
 
-    private buildActionsRow(): Container {
+    private buildImageCacheActionsRow(): Container {
         const row = new Container({ flexDirection: 'row', gap: ROW_GAP, width: '100%' })
 
         const refreshButton = new Button({ variant: 'secondary', onClick: () => void this.refreshStats() })
