@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, QUALITY_LEVEL, RENDER_QUALITY_PRESETS, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, QUALITY_LEVEL, RENDER_QUALITY_PRESETS, resolvePixelRatioScale, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
 import { SSAO_QUALITY_LEVELS } from '../../../scene/RenderPipelineManager'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
@@ -477,7 +477,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         }
 
         const preset = RENDER_QUALITY_PRESETS[quality]
-        const pixelRatioScale = quality === QUALITY_LEVEL.ULTRA ? window.devicePixelRatio : preset.pixelRatioScale
+        const pixelRatioScale = resolvePixelRatioScale(quality)
 
         this.renderer.shadowMap.enabled = preset.shadowMapEnabled
         this.renderer.setPixelRatio(pixelRatioScale)

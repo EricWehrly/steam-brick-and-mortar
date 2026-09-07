@@ -247,9 +247,11 @@ export type RenderQualityPreset = Pick<ApplicationSettings,
  * quality regardless of cost, including the one setting (shadowQuality 4, PCFSoft→VSM) that
  * measured a real ~2x frame-time jump on its own.
  *
- * Ultra's pixelRatioScale below is a placeholder — GraphicsSettingsPanel.applyQualityPreset()
- * resolves it to window.devicePixelRatio at apply-time instead, so it scales to the user's actual
- * display rather than a fixed number.
+ * High and Ultra's pixelRatioScale below are placeholders — resolvePixelRatioScale() (below) floors
+ * them at window.devicePixelRatio at apply-time instead, so a fixed number tuned against a DPI:1
+ * display doesn't silently under-render (and visibly blur small text) on any HiDPI/scaled one. Low
+ * and Medium are exempt on purpose — trading resolution below native for framerate is the actual
+ * performance relief those two tiers exist to offer, not a bug to correct.
  */
 export const RENDER_QUALITY_PRESETS: Record<QualityLevel, RenderQualityPreset> = {
     low: {
@@ -288,6 +290,21 @@ export const RENDER_QUALITY_PRESETS: Record<QualityLevel, RenderQualityPreset> =
         msaaLevel: QUALITY_LEVEL.ULTRA,
         pixelRatioScale: 2, // resolved to window.devicePixelRatio at apply-time
     },
+}
+
+/** The pixelRatioScale a given quality tier should actually render at, on this display. See
+ *  RENDER_QUALITY_PRESETS' own doc comment: High/Ultra are quality-first tiers, so their preset
+ *  number is a floor, not a fixed target - never render below the real window.devicePixelRatio,
+ *  or small text/fine detail visibly blurs on any HiDPI/scaled display. Low/Medium return their
+ *  preset value unchanged; rendering below native is the performance relief those tiers exist to
+ *  offer. Used both for the default settings (below) and GraphicsSettingsPanel.applyQualityPreset()
+ *  - one shared computation, so the two can't drift apart the way they previously did. */
+export function resolvePixelRatioScale(quality: QualityLevel): number {
+    const preset = RENDER_QUALITY_PRESETS[quality]
+    if (quality === QUALITY_LEVEL.LOW || quality === QUALITY_LEVEL.MEDIUM) {
+        return preset.pixelRatioScale
+    }
+    return Math.max(preset.pixelRatioScale, window.devicePixelRatio)
 }
 
 /**
@@ -553,7 +570,7 @@ export class AppSettings {
             msaaLevel: 'low', // 'low' maps to 0 samples (off) - matches pre-existing behavior
             toneMappingExposure: 0.25,
         environmentIntensity: 0.3,
-            pixelRatioScale: 1,
+            pixelRatioScale: resolvePixelRatioScale(QUALITY_LEVEL.HIGH), // matches qualityLevel above
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
             artworkFresnelLift: 0.15,
