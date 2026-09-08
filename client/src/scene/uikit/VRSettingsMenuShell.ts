@@ -35,7 +35,7 @@ import { COLOR_TOKENS } from '../../ui/ColorTokens'
 // the single lever for "the whole panel is too small," not a per-row font tweak. Exported so every
 // standalone uikit root (VRCategoryReferencePanel today) shares one real value instead of each
 // re-declaring its own copy of the same magic number.
-export const SHELL_PIXEL_SIZE = 0.0011
+export const SHELL_PIXEL_SIZE = 0.0015
 const PANEL_WIDTH = 820
 // Fixed rather than autosized to whichever tab happens to be shortest - per direct request ("the
 // settings menu can be taller ... start with the tallest page, and work towards the most
