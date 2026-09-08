@@ -1,7 +1,13 @@
 # Feature: UI Standardization
 
 **Act**: 2 (Intermission)
-**Status**: In Progress (Phase A complete, Phase B starting)
+**Status**: Paused (2026-08-20) — Phase A complete, Phase B partially landed. The CSS-token/
+component-class work (`tokens.css`, `UIComponent` hierarchy) is not abandoned and is actively reused
+by [VR uikit Menu Migration](../plans/vr-uikit-menu-migration-plan.md)'s `SettingsSchemaDomRenderer`;
+what's paused is hand-migrating each remaining DOM panel through this feature's own Phase C rollout,
+in favor of panels getting normalized DOM styling *and* a VR tab together via that plan's
+dual-renderer schema instead of as two separate passes. See `ui-normalization-plan.md`'s status note
+for the full reasoning.
 **Priority**: High
 
 ## Goal

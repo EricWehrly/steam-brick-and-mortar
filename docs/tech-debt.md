@@ -353,9 +353,8 @@ action needed" if no such consumer materializes.
 - `client/CLAUDE.md` (the "Colors" guidance pointing at this module)
 
 ## id: vr-uikit-menu-sync-recheck
-**Priority**: Low now, but re-evaluate the moment work resumes on the VR settings-menu PR/branch
-**Effort**: Medium - a real headset session plus a deliberate reconciliation pass across a handful
-of files that now exist twice, independently, on two different branches
+**Priority**: Low - reconciliation done (2026-09-05); only the real-headset re-verification remains
+**Effort**: Small now - a real headset session; the file-level reconciliation itself is done
 **Context**: This branch (`feature/game-box-uikit-panels`) and the sibling
 `feature/vr-uikit-menu-migration` (settings-menu uikit work, see
 [`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) on that branch - it
@@ -387,14 +386,17 @@ differences:
   wasn't properly connecting... we should verify when we ultimately load that branch up, and just
   get it right there. We can assume our current branch is the correct, functioning implementation,
   for the moment.").
-**Done when**: once the VR settings-menu branch/PR is actually picked back up, (1) put on a real
-headset and confirm the beam/cursor genuinely line up with both the shelf-select raycast and
-whatever a uikit surface is showing, on THIS branch's implementation, before assuming it's correct;
-(2) reconcile `ControllerAimCorrection.ts` against the sibling branch's inline copy - one shared
-definition, not two independently-tuned ones; (3) diff `UikitTextSanitizer.ts` between branches and
-merge forward rather than let an automatic merge/rebase silently pick one side; (4) recheck whether
-the render-order concept this branch removed as premature is now the shape the settings-menu branch
-actually needs, and use that shape rather than reinventing a third one.
+**Done when**: (1) ~~reconcile `ControllerAimCorrection.ts` against the sibling branch's inline
+copy~~ **done 2026-09-05** - `feature/vr-uikit-menu-migration` merged `act2/default` forward and
+took this branch's shared `ControllerAimCorrection.ts`/renamed `XRControllerSource` types; (2) ~~diff
+`UikitTextSanitizer.ts` between branches and merge forward~~ **done 2026-09-05** - took this
+branch's entity-decoding superset; (3) ~~recheck whether the render-order concept this branch
+removed as premature is now the shape the settings-menu branch actually needs~~ **done 2026-09-05** -
+`VRSettingsMenuShell.ts`'s `ALWAYS_ON_TOP_RENDER_ORDER` (1000) and `VRControllerPointer.ts`'s own
+`ON_TOP_RENDER_ORDER` (1001) coexist correctly (pointer draws on top of panels, one value higher);
+(4) **still open** - put on a real headset and confirm the beam/cursor genuinely line up with both
+the shelf-select raycast and whatever a uikit surface is showing, on the merged implementation,
+before assuming it's correct. Only (4) is left.
 **Related files**:
 - `client/src/webxr/ControllerAimCorrection.ts`
 - `client/src/scene/uikit/VRControllerPointer.ts`
@@ -886,6 +888,10 @@ for the decision to standardize on uikit. No `isPointIn*`-style hit-testing rema
 
 ## id: approximated-placement-tripwire
 **Status**: ✅ Resolved (date not tracked — confirmed via code audit 2026-07-22) — approximation assumptions documented inline (`GameBoxUtils.ts:9-13`, explicitly framed as a deliberate tripwire for model-sync regressions) and covered by `client/test/unit/scene/placement-tripwire.test.ts`.
+
+## id: xr-menu-button-mapping-unverified
+**Status**: ✅ Resolved 2026-08-19 — confirmed against real headset hardware: `xr-standard` button
+index 4 does open the menu. `InputProfile.ts`'s VR `OpenMenu` binding was correct as shipped.
 
 ## id: gamepad-button-actions-unconsumed
 **Status**: ✅ Resolved 2026-07-24 — see `docs/plans/input-action-routing-plan.md` (implemented, then revised twice the same day after design reviews — see the plan's "Revision history" for what changed and why each time). Keyboard `Interact`/`OpenMenu` now fire directly off the real `keydown` DOM event (via a new `InputStateTracker.onRawKeyDown` callback) — no polling, no frame-diffing, since keyboard already has a real press edge. Mouse deliberately has no equivalent path: a real mouse click already has its own independent dispatch (`SystemUICoordinator`), entirely separate from the binding system, so nothing was added to route it through here too. Gamepad has no native press event, so `DeviceDetector.pollGamepads()` (which already polls every frame) tracks per-button state and emits `InputEventTypes.GamepadButtonPressed` on a transition. Both keyboard and gamepad funnel through `InputActionResolver`'s new `handleRawKeyPress()`/`handleGamepadButtonPress()`, which look up bound actions via a new `BindingResolver.findButtonActionsBoundTo()` and resolve all the way to a *specific* event per action (`InputEventTypes.OpenMenuPressed`, `InputEventTypes.InteractPressed`) rather than a generic tagged envelope — `InputActionResolver` is the class whose job is deciding which action fired, so it does that fully rather than handing a partial answer downstream. No dispatcher class: `PauseMenuManager` listens for `OpenMenuPressed` directly and calls its own `toggle()` (replacing the old hardcoded `Escape`-only listener); `SystemUICoordinator` listens for `InteractPressed` (simulates a click at the reticle position by emitting the existing `SceneCanvasClick` with center-screen NDC) and owns the gamepad/VR reticle. Along the way, fixed two real bugs: (1) pausing didn't actually stop gamepad-driven camera movement — `InputManager` now has `pause()`/`resume()` that gate camera application only, while `updateFrame()` (gamepad polling) keeps running; (2) `DeviceDetector.pollGamepads()` only flagged a device-list change on gamepad *disconnect*, never *connect* via polling. `ToggleUI` and `ToggleFullscreen` were both removed entirely rather than built (see [Input System](features/input-system.md) Stretch section) — no consumer was ever designed for `ToggleUI`, and `ToggleFullscreen` was redundant scope (F11 already provides native browser fullscreen).

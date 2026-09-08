@@ -1,42 +1,10 @@
 <!-- DisplayAdvancedPanel Template - Artwork material and shadow contact tuning -->
+<!-- Section content is schema-driven - see DISPLAY_ADVANCED_SCHEMA in
+     client/src/ui/settings/SettingsSchema.ts and SettingsSchemaDomRenderer.ts. -->
 <div class="display-advanced-panel">
   <div class="settings-sections">
 
-    <!-- Artwork Material Tuning -->
-    <section class="setting-section">
-      <div class="setting-group">
-        <label class="setting-label">🎨 Game Box Artwork Material</label>
-
-        {{artworkRoughnessControl}}
-        {{artworkMetalnessControl}}
-      </div>
-    </section>
-
-    <!-- Fresnel Edge Lift -->
-    <section class="setting-section">
-      <div class="setting-group">
-        <label class="setting-label">✨ Fresnel Edge Lift</label>
-        <p class="setting-description">
-          Brightens box silhouettes at oblique camera angles so artwork reads at the sides of shelves.
-        </p>
-
-        {{artworkFresnelLiftControl}}
-        {{artworkFresnelPowerControl}}
-      </div>
-    </section>
-
-    <!-- Shadow Contact Grounding -->
-    <section class="setting-section">
-      <div class="setting-group">
-        <label class="setting-label">🌓 Shadow Contact Grounding</label>
-        <p class="setting-description">
-          Controls how tightly shadows hug surfaces at shelf-box intersections.
-        </p>
-
-        {{shadowContactBiasControl}}
-        {{shadowContactNormalBiasControl}}
-      </div>
-    </section>
+    {{sections}}
 
     <!-- Reset -->
     <section class="setting-section">

@@ -1,6 +1,15 @@
 # UI Normalization — Active Roadmap
 **Milestone**: 6.6  
-**Status**: 🔄 In Progress (Phase A Complete, Phase B underway — B0/B1/B3 implemented)  
+**Status**: ⏸ Paused (2026-08-20) — Phase A Complete, Phase B partially landed (B0/B1/B3). Superseded
+as the active thread by [`vr-uikit-menu-migration-plan.md`](vr-uikit-menu-migration-plan.md)'s
+dual-renderer `SettingsSchema` approach: rather than hand-unifying each DOM panel's CSS/markup
+(Phase B/C below) and separately hand-porting each to VR, panels now targeted for VR migration get
+consistency *by construction* — one schema, two renderers (DOM + uikit). Nothing here is discarded:
+`tokens.css` and the `UIComponent`/`RangeControl`/`SelectControl` hierarchy are exactly what
+`SettingsSchemaDomRenderer` renders through. Phase B/C's remaining *un-migrated* panels (the ones
+this plan hadn't reached yet) are on hold until it's clear whether they'll go through the VR
+migration's schema path instead of a standalone CSS-class pass. Revisit this plan's status once the
+VR migration's Tier 1 panel list is further along.  
 **Approach**: Incremental updates. One small component or panel at a time to ensure nothing breaks.
 
 ---
