@@ -159,15 +159,16 @@ export class SystemUICoordinator {
         //
         // ?forceVRSettingsPanel=1 lifts the headset requirement, making the VR uikit menu the ONLY
         // visible UI on flatscreen too - direct request (2026-08-20), so the VR menu can be
-        // evaluated toward becoming the one final UI while the DOM menu is phased out. It opens the
-        // real pause menu at startup (so the panel - which only ever activates via a real MenuOpen -
-        // shows immediately without a manual Settings/OpenMenu press) and suppresses the DOM
-        // overlay's own visuals; the DOM menu's state machine (activePanel, MenuPanelChanged sync)
-        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it. Going
-        // through the same open() every real press uses means the panel's active state can never
-        // disagree with PauseMenuManager's - a previous version pre-activated the VR panel
-        // independently and the two desynced (confirmed live 2026-08-20: first real press looked
-        // like a no-op).
+        // evaluated toward becoming the one final UI while the DOM menu is phased out. It suppresses
+        // the DOM overlay's own visuals (its state machine - activePanel, MenuPanelChanged sync -
+        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it), but does
+        // NOT open the menu itself - direct request (2026-09-05): auto-opening on every load was
+        // unwanted friction while iterating. A real Settings click / OpenMenu press is still
+        // required, same as always; only which surface that press shows changes.
+        //
+        // Temporary: this whole flag is meant to go away once the VR settings-menu migration is
+        // complete (see docs/plans/vr-uikit-menu-migration-plan.md's Story 6) - it exists purely to
+        // let the VR panel be evaluated on flatscreen before every DOM panel is ported.
         //
         // Also stands up the standalone Category Reference world-lock trial (see
         // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
@@ -175,7 +176,6 @@ export class SystemUICoordinator {
         if (UrlUtils.isVRSettingsPanelForced()) {
             this.vrSettingsPanelCoordinator.setShowOnFlatscreen(true)
             this.pauseMenuManager.setDomVisualsSuppressed(true)
-            this.pauseMenuManager.open()
 
             this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
             this.vrCategoryReferenceCoordinator.init(renderer)

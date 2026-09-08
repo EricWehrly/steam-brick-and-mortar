@@ -39,13 +39,13 @@
  * setShowOnFlatscreen() lifts the VR requirement - that's ?forceVRSettingsPanel=1's job, and the
  * only way to look at this panel without a headset. This class has no knowledge of that flag or of
  * PauseMenuManager: it's told, the same way PauseMenuManager.setDomVisualsSuppressed() is told.
- * Activation still requires a real MenuOpen either way. A previous version pre-activated
- * independently at init() when forced, which desynced this panel's active state from
- * PauseMenuManager's real isOpen (confirmed live 2026-08-20: the VR panel would already be showing
- * at load, so the first real Settings/OpenMenu press - which PauseMenuManager saw as "opening" a
- * menu it thought was closed - looked like a no-op, and the *second* press was the one that
- * actually closed anything). SystemUICoordinator instead calls the real pauseMenuManager.open()
- * once at startup when forced, so both surfaces open through the exact same path.
+ * Activation still requires a real MenuOpen either way - the flag does NOT auto-open the menu at
+ * startup (direct request, 2026-09-05: that was unwanted friction while iterating). An earlier
+ * version both pre-activated this panel independently at init() AND auto-opened the real pause
+ * menu at startup; the former desynced this panel's active state from PauseMenuManager's real
+ * isOpen (confirmed live 2026-08-20: the VR panel would already be showing at load, so the first
+ * real Settings/OpenMenu press looked like a no-op) - fixed by only ever activating through a real
+ * MenuOpen, same path a manual press uses.
  *
  * Anchor strategy (settled 2026-08-19 via live headset testing, see
  * docs/plans/vr-uikit-menu-migration-plan.md) is switchable via VRPanelAnchorMode:
