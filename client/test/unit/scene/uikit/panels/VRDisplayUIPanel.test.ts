@@ -1,6 +1,6 @@
 /**
- * VRDisplayUIPanel - very slim start (just the pixel-ratio-scale control), same pure data-binding
- * test style as VRDisplayAdvancedPanel.test.ts.
+ * VRDisplayUIPanel - very slim start (pixel-ratio-scale + UI font-scale controls), same pure
+ * data-binding test style as VRDisplayAdvancedPanel.test.ts.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -32,5 +32,26 @@ describe('VRDisplayUIPanel', () => {
         appSettings.setSetting(Setting.PixelRatioScale, 1.5)
 
         expect(appSettings.getSetting('pixelRatioScale')).toBe(1.5)
+    })
+
+    it('shows the current uiFontScale as the font-scale row\'s initial value', () => {
+        const appSettings = AppSettings.getInstance()
+        appSettings.setSetting(Setting.UiFontScale, 1.3)
+
+        const panel = new VRDisplayUIPanel(appSettings)
+
+        const sliderRow = panel.container.children[2]
+        const valueText = sliderRow.children[0].children[1] as unknown as { inputProperties: { text: string } }
+        expect(valueText.inputProperties.text).toBe('1.30×')
+    })
+
+    it('writes font-scale slider changes straight through AppSettings.setSetting', () => {
+        const appSettings = AppSettings.getInstance()
+        appSettings.setSetting(Setting.UiFontScale, 1)
+        new VRDisplayUIPanel(appSettings)
+
+        appSettings.setSetting(Setting.UiFontScale, 1.4)
+
+        expect(appSettings.getSetting('uiFontScale')).toBe(1.4)
     })
 })
