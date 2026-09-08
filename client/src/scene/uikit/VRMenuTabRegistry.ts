@@ -10,7 +10,6 @@ import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRDisplayUIPanel } from './panels/VRDisplayUIPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
-import { VRDebugPanel } from './panels/VRDebugPanel'
 import { VRCacheManagementPanel } from './panels/VRCacheManagementPanel'
 import { VRCameraSettingsPanel } from './panels/VRCameraSettingsPanel'
 
@@ -45,14 +44,6 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Display / UI',
         icon: '🖥️',
         build: appSettings => new VRDisplayUIPanel(appSettings)
-    },
-    {
-        // Real DOM PauseMenuPanel id ('debug', see DebugPanel.ts) - unlike the placeholder/
-        // category-reference tabs above, this one really does sync via MenuPanelChanged.
-        panelId: 'debug',
-        title: 'Debug',
-        icon: '🔧',
-        build: () => new VRDebugPanel()
     },
     {
         // Real DOM PauseMenuPanel id ('cache-management', see CacheManagementPanel.ts). See

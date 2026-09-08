@@ -12,14 +12,11 @@ import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
-import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { GameLibraryListPanel } from '../GameLibraryListPanel'
 import { LayoutControlPanel } from '../LayoutControlPanel'
 import { ScenePropsPanel } from '../ScenePropsPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
-import { DataManager } from '../../core/data/DataManager'
-import { DataDomain, DataKey } from '../../core/data/DataTypes'
 import {
     UIEventTypes,
     InputEventTypes,
@@ -55,7 +52,6 @@ export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
-    private categoryReferencePanel?: CategoryReferencePanel
     private gameLibraryListPanel?: GameLibraryListPanel
     private layoutControlPanel?: LayoutControlPanel
     private scenePropsPanel?: ScenePropsPanel
@@ -99,10 +95,6 @@ export class SystemUICoordinator {
             updateInterval: 100,
             precision: 1
         })
-        // Published for VRDebugPanel's lookup - the DOM DebugPanel gets this via direct
-        // constructor injection (see PauseMenuManager.registerDefaultPanels) instead, since it's
-        // only the VR side that has no such injection point back to here.
-        DataManager.getInstance().set(DataKey.PerformanceMonitor, this.performanceMonitor, { domain: DataDomain.Scene })
 
         this.pauseMenuManager = new PauseMenuManager(
             {},
@@ -169,17 +161,17 @@ export class SystemUICoordinator {
         // Temporary: this whole flag is meant to go away once the VR settings-menu migration is
         // complete (see docs/plans/vr-uikit-menu-migration-plan.md's Story 6) - it exists purely to
         // let the VR panel be evaluated on flatscreen before every DOM panel is ported.
-        //
-        // Also stands up the standalone Category Reference world-lock trial (see
-        // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
-        // evaluating this VR menu system in flatscreen together, not two separate dev toggles.
         if (UrlUtils.isVRSettingsPanelForced()) {
             this.vrSettingsPanelCoordinator.setShowOnFlatscreen(true)
             this.pauseMenuManager.setDomVisualsSuppressed(true)
-
-            this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
-            this.vrCategoryReferenceCoordinator.init(renderer)
         }
+
+        // The category-reference tool (dev/design quick-reference for game categories/sort
+        // dimensions) has exactly one implementation - direct request (2026-09-05), not gated
+        // behind the flatscreen-eval flag above like it used to be. Toggled by 'G', same as its
+        // DOM predecessor.
+        this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
+        this.vrCategoryReferenceCoordinator.init()
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -195,9 +187,6 @@ export class SystemUICoordinator {
 
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
-
-        // Category reference panel (dev/debug tool)
-        this.initializeCategoryReferencePanel()
 
         // Spreadsheet-style metadata panel (dev/debug tool)
         this.initializeGameLibraryListPanel()
@@ -244,13 +233,6 @@ export class SystemUICoordinator {
             this.lightingControlsPanel = new LightingControlsPanel(this.eventManager, this.appSettings)
             // Show the integrated panel by default since the button is now part of it
             this.lightingControlsPanel.show()
-        }
-    }
-
-    private initializeCategoryReferencePanel(): void {
-        if (!this.categoryReferencePanel) {
-            this.categoryReferencePanel = new CategoryReferencePanel()
-            this.categoryReferencePanel.init()
         }
     }
 
@@ -519,7 +501,6 @@ export class SystemUICoordinator {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
-        this.categoryReferencePanel?.dispose()
         this.gameLibraryListPanel?.dispose()
         this.layoutControlPanel?.dispose()
 

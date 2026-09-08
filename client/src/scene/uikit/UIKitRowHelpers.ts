@@ -19,8 +19,9 @@ const ROW_GAP = 8
 const ROW_TEXT_COLOR = COLOR_TOKENS.textPrimary
 
 // Compact rows/headings (stat cards, section labels) - a smaller scale than the settings-slider
-// rows above, shared by VRDebugPanel/VRCacheManagementPanel/VRCameraSettingsPanel, which each
-// had their own identical copy of this shape before extraction.
+// rows above, shared by VRCacheManagementPanel/VRCameraSettingsPanel (and VRDebugPanel, before it
+// was dropped - see that commit's own message), which each had their own identical copy of this
+// shape.
 const COMPACT_ROW_FONT_SIZE = 13
 const SECTION_HEADING_COLOR = COLOR_TOKENS.accent
 
