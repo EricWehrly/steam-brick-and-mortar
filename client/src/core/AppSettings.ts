@@ -49,6 +49,7 @@ export const Setting = {
     ToneMappingExposure: 'toneMappingExposure',
     EnvironmentIntensity: 'environmentIntensity',
     PixelRatioScale: 'pixelRatioScale',
+    UiFontScale: 'uiFontScale',
     ArtworkRoughness: 'artworkRoughness',
     ArtworkMetalness: 'artworkMetalness',
     ArtworkFresnelLift: 'artworkFresnelLift',
@@ -153,6 +154,10 @@ export interface ApplicationSettings {
     toneMappingExposure: number
     environmentIntensity: number
     pixelRatioScale: number
+    /** Multiplies the VR settings menu's base pixelSize (VRSettingsMenuShell's
+     *  resolveShellPixelSize()) - text/rows/gaps all scale off this one factor together, same
+     *  reasoning as SHELL_PIXEL_SIZE's own doc comment. No DOM counterpart; VR-only. */
+    uiFontScale: number
     artworkRoughness: number
     artworkMetalness: number
     artworkFresnelLift: number
@@ -579,6 +584,7 @@ export class AppSettings {
             toneMappingExposure: 0.25,
         environmentIntensity: 0.3,
             pixelRatioScale: resolvePixelRatioScale(QUALITY_LEVEL.HIGH), // matches qualityLevel above
+            uiFontScale: 1,
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
             artworkFresnelLift: 0.15,
@@ -673,7 +679,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
+        const numberFields = ['pixelRatioScale', 'uiFontScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false
