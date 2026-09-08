@@ -8,6 +8,7 @@
 import type { Container } from '@pmndrs/uikit'
 import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
+import { VRDisplayUIPanel } from './panels/VRDisplayUIPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
 import { VRDebugPanel } from './panels/VRDebugPanel'
 import { VRCacheManagementPanel } from './panels/VRCacheManagementPanel'
@@ -27,6 +28,7 @@ export interface VRMenuTab {
 }
 
 const MORE_SETTINGS_PANEL_ID = 'vr-more-settings'
+const DISPLAY_UI_PANEL_ID = 'vr-display-ui'
 
 export const VR_MENU_TABS: readonly VRMenuTab[] = [
     {
@@ -34,6 +36,15 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Display · Advanced',
         icon: '🔬',
         build: appSettings => new VRDisplayAdvancedPanel(appSettings)
+    },
+    {
+        // No real DOM PauseMenuPanel id - a "Display / UI" tab doesn't exist there yet. Very slim
+        // start (direct request, 2026-09-05): just the pixel-ratio-scale control, since text/scene
+        // sharpness needs to be tunable from inside VR, where the DOM Graphics panel isn't reachable.
+        panelId: DISPLAY_UI_PANEL_ID,
+        title: 'Display / UI',
+        icon: '🖥️',
+        build: appSettings => new VRDisplayUIPanel(appSettings)
     },
     {
         // Real DOM PauseMenuPanel id ('debug', see DebugPanel.ts) - unlike the placeholder/
