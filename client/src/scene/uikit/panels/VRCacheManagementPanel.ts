@@ -41,12 +41,14 @@ import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
 import type { SteamCacheClearEvent, SteamImageCacheClearEvent, SteamLoadLibraryEvent } from '../../../types/InteractionEvents'
 import { formatBytes } from '../../../utils/FormatBytes'
+import { createSectionHeading, createLabeledRow } from '../UIKitRowHelpers'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
 const SECTION_GAP = 16
 const ROW_GAP = 6
-const HEADING_FONT_SIZE = 13
+// Matches createLabeledRow/createSectionHeading's own compact scale - kept as a local constant
+// for the two rows here (empty-state text, user-row label) that don't go through those helpers.
 const ROW_LABEL_FONT_SIZE = 13
 const CARD_PADDING = 14
 const CARD_BACKGROUND = COLOR_TOKENS.surface2
@@ -102,14 +104,14 @@ export class VRCacheManagementPanel {
         // in common - image cache (PixelDataCache) and per-user library cache (SteamApiClient) -
         // direct request: give each its own heading/controls instead of one shared actions row
         // that reads as applying to both.
-        root.add(this.buildSectionHeading('Image Cache'))
+        root.add(createSectionHeading('Image Cache'))
         const stats = this.buildStatsCard()
         root.add(stats.card)
         root.add(this.buildImageCacheActionsRow())
 
         root.add(this.buildDivider())
 
-        root.add(this.buildSectionHeading('Load from Cached Users'))
+        root.add(createSectionHeading('Load from Cached Users'))
         const usersListContainer = this.buildUsersList()
         root.add(usersListContainer)
 
@@ -120,10 +122,6 @@ export class VRCacheManagementPanel {
             lastUpdateValue: stats.lastUpdateValue,
             usersListContainer
         }
-    }
-
-    private buildSectionHeading(text: string): Text {
-        return new Text({ text: text.toUpperCase(), fontSize: HEADING_FONT_SIZE, color: COLOR_TOKENS.accent })
     }
 
     private buildStatsCard(): { card: Container; imageCountValue: Text; storageQuotaValue: Text; lastUpdateValue: Text } {
@@ -144,11 +142,8 @@ export class VRCacheManagementPanel {
     }
 
     private buildStatRow(card: Container, label: string, initialValue: string): Text {
-        const row = new Container({ flexDirection: 'row', justifyContent: 'space-between', width: '100%' })
-        row.add(new Text({ text: label, fontSize: ROW_LABEL_FONT_SIZE, color: COLOR_TOKENS.textSecondary }))
-        const valueText = new Text({ text: initialValue, fontSize: ROW_LABEL_FONT_SIZE, color: COLOR_TOKENS.textPrimary })
-        row.add(valueText)
-        card.add(row)
+        const { container, valueText } = createLabeledRow(label, initialValue)
+        card.add(container)
         return valueText
     }
 

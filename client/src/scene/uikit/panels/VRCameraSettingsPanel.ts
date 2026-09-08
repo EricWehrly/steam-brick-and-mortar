@@ -36,14 +36,13 @@ import type * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
-import { createSliderRow, type UIKitSliderRow } from '../UIKitRowHelpers'
+import { createSliderRow, createSectionHeading, type UIKitSliderRow } from '../UIKitRowHelpers'
 import { CAMERA_PRESETS, type CameraPreset } from '../../../ui/pause/panels/CameraSettingsPanel'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
 const SECTION_GAP = 16
 const ROW_GAP = 8
-const HEADING_FONT_SIZE = 13
 const FOV_MIN = 30
 const FOV_MAX = 120
 const FOV_STEP = 1
@@ -71,7 +70,7 @@ export class VRCameraSettingsPanel {
         const root = new Container({ flexDirection: 'column', gap: SECTION_GAP, padding: PANEL_PADDING, width: '100%' })
         root.add(new Text({ text: 'Camera', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
 
-        root.add(this.buildSectionHeading('Presets'))
+        root.add(createSectionHeading('Presets'))
         root.add(this.buildPresetsRow())
 
         this.fovRow = createSliderRow({
@@ -99,10 +98,6 @@ export class VRCameraSettingsPanel {
         root.add(this.farRow.container)
 
         this.container = root
-    }
-
-    private buildSectionHeading(text: string): Text {
-        return new Text({ text: text.toUpperCase(), fontSize: HEADING_FONT_SIZE, color: COLOR_TOKENS.accent })
     }
 
     private buildPresetsRow(): Container {

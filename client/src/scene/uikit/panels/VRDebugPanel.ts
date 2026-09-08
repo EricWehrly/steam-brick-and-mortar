@@ -31,12 +31,11 @@ import type { PerformanceMonitorUI } from '../../../ui/PerformanceMonitor'
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 import { formatBytes } from '../../../utils/FormatBytes'
+import { createSectionHeading, createLabeledRow } from '../UIKitRowHelpers'
 
 const PANEL_PADDING = 20
 const TITLE_FONT_SIZE = 18
 const ROW_GAP = 6
-const ROW_LABEL_FONT_SIZE = 13
-const ROW_LABEL_COLOR = COLOR_TOKENS.textSecondary
 const ROW_VALUE_COLOR = COLOR_TOKENS.textPrimary
 const SCROLL_HEIGHT = 460
 const LOADING_TEXT = 'loading...'
@@ -55,8 +54,6 @@ const CARD_WIDTH = 350
 const CARD_PADDING = 14
 const CARD_BACKGROUND = COLOR_TOKENS.surface2
 const CARD_RADIUS = 10
-const CARD_HEADING_FONT_SIZE = 13
-const CARD_HEADING_COLOR = COLOR_TOKENS.accent
 
 interface StatRowSpec {
     readonly key: keyof typeof ROW_FORMATTERS
@@ -197,7 +194,7 @@ export class VRDebugPanel {
             backgroundColor: CARD_BACKGROUND,
             borderRadius: CARD_RADIUS
         })
-        card.add(new Text({ text: heading.toUpperCase(), fontSize: CARD_HEADING_FONT_SIZE, color: CARD_HEADING_COLOR }))
+        card.add(createSectionHeading(heading))
         for (const row of rows) {
             card.add(this.buildRow(row))
         }
@@ -205,12 +202,9 @@ export class VRDebugPanel {
     }
 
     private buildRow(row: StatRowSpec): Container {
-        const line = new Container({ flexDirection: 'row', justifyContent: 'space-between', width: '100%' })
-        line.add(new Text({ text: row.label, fontSize: ROW_LABEL_FONT_SIZE, color: ROW_LABEL_COLOR }))
-        const valueText = new Text({ text: LOADING_TEXT, fontSize: ROW_LABEL_FONT_SIZE, color: ROW_VALUE_COLOR })
+        const { container, valueText } = createLabeledRow(row.label, LOADING_TEXT)
         this.valueTexts.set(row.key, valueText)
-        line.add(valueText)
-        return line
+        return container
     }
 
     private async refresh(): Promise<void> {

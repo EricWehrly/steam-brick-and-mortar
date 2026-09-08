@@ -18,6 +18,12 @@ const ROW_GAP = 8
 // --color-text-primary via COLOR_TOKENS, not an ad-hoc hex value - see ui/ColorTokens.ts.
 const ROW_TEXT_COLOR = COLOR_TOKENS.textPrimary
 
+// Compact rows/headings (stat cards, section labels) - a smaller scale than the settings-slider
+// rows above, shared by VRDebugPanel/VRCacheManagementPanel/VRCameraSettingsPanel, which each
+// had their own identical copy of this shape before extraction.
+const COMPACT_ROW_FONT_SIZE = 13
+const SECTION_HEADING_COLOR = COLOR_TOKENS.accent
+
 export interface UIKitSliderRowOptions {
     readonly label: string
     readonly min: number
@@ -75,4 +81,21 @@ export function createSliderRow(options: UIKitSliderRowOptions): UIKitSliderRow 
             valueText.setProperties({ text: formatDisplay(next) })
         }
     }
+}
+
+/** Uppercase section/card-group label - e.g. a stat card's own heading, or a panel's own section
+ *  divider label ("IMAGE CACHE", "LOAD FROM CACHED USERS"). */
+export function createSectionHeading(text: string): Text {
+    return new Text({ text: text.toUpperCase(), fontSize: COMPACT_ROW_FONT_SIZE, color: SECTION_HEADING_COLOR })
+}
+
+/** A label-left, value-right row at the compact (stat-card) scale - not the settings-slider scale
+ *  createSliderRow above uses. Caller decides what to do with the returned value Text (store it in
+ *  a lookup keyed some other way, or just hold the reference directly to update later). */
+export function createLabeledRow(label: string, initialValue: string): { container: Container; valueText: Text } {
+    const container = new Container({ flexDirection: 'row', justifyContent: 'space-between', width: '100%' })
+    container.add(new Text({ text: label, fontSize: COMPACT_ROW_FONT_SIZE, color: COLOR_TOKENS.textSecondary }))
+    const valueText = new Text({ text: initialValue, fontSize: COMPACT_ROW_FONT_SIZE, color: COLOR_TOKENS.textPrimary })
+    container.add(valueText)
+    return { container, valueText }
 }
