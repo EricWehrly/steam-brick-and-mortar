@@ -9,7 +9,6 @@ import type { Container } from '@pmndrs/uikit'
 import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
-import { VRDebugPanel } from './panels/VRDebugPanel'
 
 export interface VRMenuTabContent {
     readonly container: Container
@@ -32,14 +31,6 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Display · Advanced',
         icon: '🔬',
         build: appSettings => new VRDisplayAdvancedPanel(appSettings)
-    },
-    {
-        // Real DOM PauseMenuPanel id ('debug', see DebugPanel.ts) - unlike the placeholder/
-        // category-reference tabs above, this one really does sync via MenuPanelChanged.
-        panelId: 'debug',
-        title: 'Debug',
-        icon: '🔧',
-        build: () => new VRDebugPanel()
     },
     {
         // Doesn't correspond to a real DOM panel id - stands in for every DOM panel not yet
