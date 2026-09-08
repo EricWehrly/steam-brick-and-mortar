@@ -59,13 +59,15 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
     LightingControlsPanel: class { show() {}; hide() {}; toggle() {}; dispose() {} }
 }))
 
-function makeMockRenderer(): { domElement: HTMLCanvasElement } {
+function makeMockRenderer(): { domElement: HTMLCanvasElement; setTransparentSort: () => void } {
     const domElement = document.createElement('canvas')
     // handleMenuClose now requests pointer lock directly (moved here from a PauseMenuManager
     // callback) - jsdom's canvas has no real implementation, so this needs a stub the same way
     // system-ui-coordinator-pointer-lock.test.ts already does.
     domElement.requestPointerLock = vi.fn().mockResolvedValue(undefined)
-    return { domElement } as unknown as { domElement: HTMLCanvasElement }
+    // init() also wires VRSettingsPanelCoordinator, which calls this on the real renderer to get
+    // uikit's transparent panels sorted correctly.
+    return { domElement, setTransparentSort: vi.fn() } as unknown as { domElement: HTMLCanvasElement; setTransparentSort: () => void }
 }
 
 function emitInteractPressed(): void {
@@ -98,6 +100,17 @@ describe('SystemUICoordinator InteractPressed wiring', () => {
         expect(eventManagerMock.emit).toHaveBeenCalledWith(
             InputEventTypes.SceneCanvasClick,
             expect.objectContaining({ ndcX: 0, ndcY: 0 } satisfies Partial<SceneCanvasClickEvent>)
+        )
+    })
+
+    it('does not emit SceneCanvasClick when InteractPressed fires while a menu is open', () => {
+        isPauseMenuOpen = true
+
+        emitInteractPressed()
+
+        expect(eventManagerMock.emit).not.toHaveBeenCalledWith(
+            InputEventTypes.SceneCanvasClick,
+            expect.anything()
         )
     })
 

@@ -79,7 +79,8 @@ describe('SystemUICoordinator Lighting Integration', () => {
         
         // Mock renderer
         renderer = {
-            info: { render: { triangles: 0, calls: 0 } }
+            info: { render: { triangles: 0, calls: 0 } },
+            setTransparentSort: vi.fn()
         } as any
         
         // Setup mock dependencies
