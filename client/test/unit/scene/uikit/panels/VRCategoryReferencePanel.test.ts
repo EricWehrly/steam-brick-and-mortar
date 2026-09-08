@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { VRCategoryReferencePanel } from '../../../../../src/scene/uikit/panels/VRCategoryReferencePanel'
-import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS } from '../../../../../src/ui/CategoryReferencePanel'
+import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS } from '../../../../../src/scene/categorization/CategoryReferenceData'
 
 describe('VRCategoryReferencePanel', () => {
     it('constructs a real uikit component tree without throwing', () => {

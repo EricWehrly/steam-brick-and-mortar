@@ -1,7 +1,8 @@
 /**
- * VRCategoryReferenceCoordinator - world-lock placement + lifecycle. Mirrors
- * VRSettingsPanelCoordinator.test.ts's fake-renderer/stub-forwardEvents pattern (jsdom's canvas
- * doesn't implement the Pointer Events capture APIs the real forwardHtmlEvents needs).
+ * VRCategoryReferenceCoordinator - toggle lifecycle + world-lock placement. UikitPointerBridge's
+ * own attach() no-ops without a published DataKey.Renderer (see its own doc comment), so these
+ * tests never trigger the real forwardHtmlEvents - no jsdom Pointer Events stubbing needed, unlike
+ * VRSettingsPanelCoordinator.test.ts's fake-renderer pattern.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -13,14 +14,6 @@ import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
 
 const CALLBACK_KEY = 'VRCategoryReferenceCoordinator'
-
-function createFakeRenderer(): THREE.WebGLRenderer {
-    return { domElement: document.createElement('canvas') } as unknown as THREE.WebGLRenderer
-}
-
-function createStubForwardEvents(): () => { destroy: () => void; update: () => void } {
-    return () => ({ destroy: () => {}, update: () => {} })
-}
 
 function runUpdate(coordinator: VRCategoryReferenceCoordinator): void {
     (coordinator as unknown as { update: (now: number, deltaTime: number) => void }).update(0, 16)
@@ -46,18 +39,22 @@ describe('VRCategoryReferenceCoordinator', () => {
         RenderLoopRegistry.getInstance().unregister(CALLBACK_KEY)
     })
 
-    it('does nothing until init() and a frame have run', () => {
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
+    it('starts closed - the panel is not placed in the scene until toggled open', () => {
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        runUpdate(coordinator)
+
         expect(scene.children.some(child => child instanceof Container)).toBe(false)
     })
 
-    it('places the panel a fixed distance in front of the camera on the first update', () => {
+    it('places the panel a fixed distance in front of the camera on first open', () => {
         camera.position.set(1, 1.6, 2)
         camera.rotation.set(0, Math.PI / 2, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        coordinator.toggle()
         runUpdate(coordinator)
 
         const panelContainer = scene.children.find(child => child instanceof Container)!
@@ -69,8 +66,9 @@ describe('VRCategoryReferenceCoordinator', () => {
         camera.position.set(0, 0, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        coordinator.toggle()
         runUpdate(coordinator)
 
         const panelContainer = scene.children.find(child => child instanceof Container)!
@@ -83,9 +81,21 @@ describe('VRCategoryReferenceCoordinator', () => {
         expect(panelContainer.position.equals(positionAfterFirstPlacement)).toBe(true)
     })
 
+    it('toggling closed hides the panel without removing it from the scene', () => {
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        coordinator.toggle()
+        runUpdate(coordinator)
+
+        coordinator.toggle()
+
+        const panelContainer = (coordinator as unknown as { panel: { container: { visible: boolean } } }).panel.container
+        expect(panelContainer.visible).toBe(false)
+    })
+
     it('registers and unregisters a render-loop callback across init()/dispose()', () => {
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
 
         expect(RenderLoopRegistry.getInstance().getCount()).toBeGreaterThan(0)
 
@@ -98,8 +108,9 @@ describe('VRCategoryReferenceCoordinator', () => {
     })
 
     it('dispose() removes the panel from the scene', () => {
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        coordinator.toggle()
         runUpdate(coordinator)
         expect(scene.children.some(child => child instanceof Container)).toBe(true)
 
@@ -112,8 +123,9 @@ describe('VRCategoryReferenceCoordinator', () => {
     it('does nothing (and does not throw) if no main camera is published yet', () => {
         DataManager.resetInstance()
 
-        coordinator = new VRCategoryReferenceCoordinator(createStubForwardEvents())
-        coordinator.init(createFakeRenderer())
+        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator.init()
+        coordinator.toggle()
 
         expect(() => runUpdate(coordinator!)).not.toThrow()
     })

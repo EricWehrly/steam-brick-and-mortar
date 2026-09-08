@@ -1,8 +1,8 @@
 /**
- * VR port of CategoryReferencePanel (client/src/ui/CategoryReferencePanel.ts). Renders the same
- * STEAM_GENRE_CATEGORIES/META_CATEGORIES/SORT_DIMENSIONS data the DOM panel exports, rather than
- * re-hardcoding it - same "one source, two renderers" reasoning as SettingsSchema, just without a
- * shared schema type since this content is read-only reference data, not editable settings.
+ * The category-reference tool's one implementation (direct request, 2026-09-05 - no separate DOM
+ * version anymore, see CategoryReferenceData.ts's own doc comment). Renders
+ * STEAM_GENRE_CATEGORIES/META_CATEGORIES/SORT_DIMENSIONS, kept as plain data rather than
+ * hand-duplicated per renderer.
  *
  * Owns its own root styling (background/border-radius/depthTest/renderOrder/pixelSize) rather than
  * inheriting it from a shared shell - it's not a tab inside VRSettingsMenuShell. Originally tried
@@ -13,10 +13,11 @@
  */
 
 import { Container, Text } from '@pmndrs/uikit'
-import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../../ui/CategoryReferencePanel'
+import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../categorization/CategoryReferenceData'
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
-import { ALWAYS_ON_TOP_RENDER_ORDER, SHELL_PIXEL_SIZE } from '../VRSettingsMenuShell'
+import { AppSettings } from '../../../core/AppSettings'
+import { ALWAYS_ON_TOP_RENDER_ORDER, resolveShellPixelSize } from '../VRSettingsMenuShell'
 
 const PANEL_WIDTH = 480
 const PANEL_PADDING = 20
@@ -40,7 +41,7 @@ const SCROLL_HEIGHT = 460
 export class VRCategoryReferencePanel {
     readonly container: Container
 
-    constructor() {
+    constructor(private readonly appSettings: AppSettings = AppSettings.getInstance()) {
         this.container = this.build()
     }
 
@@ -50,7 +51,7 @@ export class VRCategoryReferencePanel {
             gap: ROW_GAP,
             padding: PANEL_PADDING,
             width: PANEL_WIDTH,
-            pixelSize: SHELL_PIXEL_SIZE,
+            pixelSize: resolveShellPixelSize(this.appSettings),
             depthTest: false,
             renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
             backgroundColor: COLOR_TOKENS.surface1,
