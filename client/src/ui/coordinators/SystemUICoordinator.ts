@@ -12,7 +12,6 @@ import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
-import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { GameLibraryListPanel } from '../GameLibraryListPanel'
 import { LayoutControlPanel } from '../LayoutControlPanel'
 import { ScenePropsPanel } from '../ScenePropsPanel'
@@ -53,7 +52,6 @@ export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
-    private categoryReferencePanel?: CategoryReferencePanel
     private gameLibraryListPanel?: GameLibraryListPanel
     private layoutControlPanel?: LayoutControlPanel
     private scenePropsPanel?: ScenePropsPanel
@@ -153,27 +151,26 @@ export class SystemUICoordinator {
         //
         // ?forceVRSettingsPanel=1 lifts the headset requirement, making the VR uikit menu the ONLY
         // visible UI on flatscreen too - direct request (2026-08-20), so the VR menu can be
-        // evaluated toward becoming the one final UI while the DOM menu is phased out. It opens the
-        // real pause menu at startup (so the panel - which only ever activates via a real MenuOpen -
-        // shows immediately without a manual Settings/OpenMenu press) and suppresses the DOM
-        // overlay's own visuals; the DOM menu's state machine (activePanel, MenuPanelChanged sync)
-        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it. Going
-        // through the same open() every real press uses means the panel's active state can never
-        // disagree with PauseMenuManager's - a previous version pre-activated the VR panel
-        // independently and the two desynced (confirmed live 2026-08-20: first real press looked
-        // like a no-op).
+        // evaluated toward becoming the one final UI while the DOM menu is phased out. It suppresses
+        // the DOM overlay's own visuals (its state machine - activePanel, MenuPanelChanged sync -
+        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it), but does
+        // NOT open the menu itself - direct request (2026-09-05): auto-opening on every load was
+        // unwanted friction while iterating. A real Settings click / OpenMenu press is still
+        // required, same as always; only which surface that press shows changes.
         //
-        // Also stands up the standalone Category Reference world-lock trial (see
-        // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
-        // evaluating this VR menu system in flatscreen together, not two separate dev toggles.
+        // Temporary: this whole flag is meant to go away once the VR settings-menu migration is
+        // complete (see docs/plans/vr-uikit-menu-migration-plan.md's Story 6) - it exists purely to
+        // let the VR panel be evaluated on flatscreen before every DOM panel is ported.
         if (UrlUtils.isVRSettingsPanelForced()) {
             this.vrSettingsPanelCoordinator.setShowOnFlatscreen(true)
             this.pauseMenuManager.setDomVisualsSuppressed(true)
-            this.pauseMenuManager.open()
-
-            this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
-            this.vrCategoryReferenceCoordinator.init(renderer)
         }
+
+        // The category-reference tool (dev/design quick-reference for game categories/sort
+        // dimensions) has exactly one implementation - direct request (2026-09-05), not gated
+        // behind the flatscreen-eval flag above like it used to be.
+        this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
+        this.vrCategoryReferenceCoordinator.init()
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -189,9 +186,6 @@ export class SystemUICoordinator {
 
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
-
-        // Category reference panel (dev/debug tool)
-        this.initializeCategoryReferencePanel()
 
         // Spreadsheet-style metadata panel (dev/debug tool)
         this.initializeGameLibraryListPanel()
@@ -238,13 +232,6 @@ export class SystemUICoordinator {
             this.lightingControlsPanel = new LightingControlsPanel(this.eventManager, this.appSettings)
             // Show the integrated panel by default since the button is now part of it
             this.lightingControlsPanel.show()
-        }
-    }
-
-    private initializeCategoryReferencePanel(): void {
-        if (!this.categoryReferencePanel) {
-            this.categoryReferencePanel = new CategoryReferencePanel()
-            this.categoryReferencePanel.init()
         }
     }
 
@@ -513,7 +500,6 @@ export class SystemUICoordinator {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
-        this.categoryReferencePanel?.dispose()
         this.gameLibraryListPanel?.dispose()
         this.layoutControlPanel?.dispose()
 
