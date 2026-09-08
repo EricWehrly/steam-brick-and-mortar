@@ -8,6 +8,14 @@
 
 The full store experience works in a VR headset via WebXR — navigation, browsing, and UI interaction all functional in headset. This is the "impressor" that defines Act 2 done.
 
+**Settings-menu end state (direct request, 2026-09-05)**: this feature's spatial-UI work is meant
+to coalesce onto one single, fairly-universal UI implementation - not a DOM menu and a uikit menu
+maintained side by side forever. See
+[`vr-uikit-menu-migration-plan.md`](../plans/vr-uikit-menu-migration-plan.md)'s Goal section for
+what that means concretely (every DOM panel eventually retired once its uikit counterpart is
+functionally equivalent) and [uikit Component System](uikit-component-system.md) for the shared
+structure that makes getting there cheaper.
+
 ## Sequencing: Controllers before headset (decided 2026-07-23)
 
 This feature splits into two sub-scopes, deliberately sequenced:

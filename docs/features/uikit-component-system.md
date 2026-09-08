@@ -13,6 +13,11 @@ A real separation of **content** (what data a panel shows), **layout** (how it's
 composed), and **style** (colors, spacing, type scale) for `@pmndrs/uikit`-built in-scene panels -
 replacing today's fully-imperative "build the whole Container tree by hand, per panel" approach.
 
+This directly serves [VR Support](vr-support.md)'s stated end state: coalescing onto one single,
+fairly-universal UI implementation rather than permanently maintaining a DOM version and a uikit
+version of every panel. The fewer hand-tooled, one-off trees each panel is, the cheaper it is for
+uikit to actually become that one implementation instead of just a second one living alongside DOM.
+
 ## Context
 
 This isn't a new complaint - it predates the uikit migration itself. Two review threads on

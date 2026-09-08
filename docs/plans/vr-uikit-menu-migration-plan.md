@@ -14,6 +14,17 @@ Make the app's settings menu genuinely usable in an immersive WebXR session, fro
 When this is done, `?forceVRSettingsPanel=1` is deleted, the VR panel shows real settings (not just
 the one Advanced tab), and the dead CSS3D projector is removed.
 
+**End state (direct request, 2026-09-05): coalesce onto one single, fairly-universal UI
+implementation** — not "DOM forever for some panels, uikit forever for others." Every DOM pause-menu
+panel eventually has a real uikit counterpart (settings-shaped ones via `SettingsSchema`'s dual
+renderer; action/data-shaped ones — Debug, Cache, Camera, and whatever's left — hand-built against
+uikit's primitives, same as this session's panels), and the DOM implementation is retired once its
+uikit equivalent is functionally equivalent, the same "old thing stays gated until proven, then
+deleted" rule this project already applies elsewhere (see `USE_FOLD_OPEN_GAME_BOX_INTERACTION` in
+[Game Detail Screen](../features/game-detail-screen.md)). `?forceVRSettingsPanel=1` is the
+temporary bridge for evaluating that convergence before every panel is ported - see Story 6 and the
+"Non-goals" section below for what's explicitly not decided yet (exact retirement sequencing).
+
 ## Branch rebuilt onto act2/default (2026-09-05)
 
 The game box's own uikit migration ([PR #162](https://github.com/EricWehrly/steam-brick-and-mortar/pull/162)/[#161](https://github.com/EricWehrly/steam-brick-and-mortar/pull/161)) landed on
