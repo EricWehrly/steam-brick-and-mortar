@@ -2,9 +2,9 @@
 
 **Act**: 2 (Best Effort) — advancing alongside [VR Support](vr-support.md) sub-scope 2's
 settings-menu migration and the new in-world-UI thread, not gated behind either
-**Status**: Not started as its own extraction pass — building opportunistically wherever the other
-three concurrent threads (game box panels, settings-menu migration, new in-world UI) hit the same
-duplication (see Sequencing below)
+**Status**: In progress — the settings-menu half is built (schema-as-panel, a real stylesheet on
+uikit's own `StyleSheet`/`classList`, one generic renderer); the game-box panels have not adopted it
+yet. See [the plan](../plans/uikit-component-system-plan.md) for the shape and what's left.
 **Priority**: Medium
 
 ## Goal
@@ -78,12 +78,15 @@ just without waiting for any of them to be *finished* first.
 
 ## Stories / Tasks
 
-No separate plan doc required to start - each extraction rides along with whatever settings-menu
-panel or in-world-UI tab is being ported when the duplication shows up, the same way
-`GameBoxPanelParts.ts`'s `buildScrollableColumn`/`roundedCorners` helpers were pulled out during the
-game box's own reconciliation pass. Write `docs/plans/uikit-component-system-plan.md` only if/when
-the extracted pieces grow enough to need a real design (a token system, a shared row-builder
-library) rather than a handful of small shared functions - not a prerequisite to starting.
+Each extraction rides along with whatever settings-menu panel or in-world-UI tab is being ported
+when the duplication shows up, the same way `GameBoxPanelParts.ts`'s `buildScrollableColumn`/
+`roundedCorners` helpers were pulled out during the game box's own reconciliation pass.
+
+That threshold has since been crossed: review feedback on PR #168 ("figuring out how to edit these
+menus through these files is not at all intuitive") drove a real token system and a declarative
+panel model for the settings menu, so **[docs/plans/uikit-component-system-plan.md](../plans/uikit-component-system-plan.md)**
+now records the design and the remaining work - chiefly migrating the game-box panels onto it, which
+is what the acceptance criteria above still need.
 
 ## Notes / Open Questions
 
