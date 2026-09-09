@@ -1,20 +1,20 @@
 /**
- * VRCategoryReferencePanel - pure structural tests. Real @pmndrs/uikit Container/Text instances
+ * CategoryReferencePanel - pure structural tests. Real @pmndrs/uikit Container/Text instances
  * construct fine under jsdom (see VRDisplayAdvancedPanel.test.ts's doc comment) - content is
  * static reference data, no async fetch, no AppSettings binding to exercise.
  */
 
 import { describe, it, expect } from 'vitest'
-import { VRCategoryReferencePanel } from '../../../../../src/scene/uikit/panels/VRCategoryReferencePanel'
+import { CategoryReferencePanel } from '../../../../../src/scene/uikit/panels/CategoryReferencePanel'
 import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS } from '../../../../../src/scene/categorization/CategoryReferenceData'
 
-describe('VRCategoryReferencePanel', () => {
+describe('CategoryReferencePanel', () => {
     it('constructs a real uikit component tree without throwing', () => {
-        expect(() => new VRCategoryReferencePanel()).not.toThrow()
+        expect(() => new CategoryReferencePanel()).not.toThrow()
     })
 
     it('builds all three category sections into the scroll container, one row per entry', () => {
-        const panel = new VRCategoryReferencePanel()
+        const panel = new CategoryReferencePanel()
 
         // container children: title Text, scroll Container.
         expect(panel.container.children).toHaveLength(2)

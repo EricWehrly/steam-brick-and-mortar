@@ -35,7 +35,7 @@ import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
-import { VRCategoryReferenceCoordinator } from '../../scene/uikit/VRCategoryReferenceCoordinator'
+import { CategoryReferenceCoordinator } from '../../scene/uikit/CategoryReferenceCoordinator'
 import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
 
@@ -62,7 +62,7 @@ export class SystemUICoordinator {
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
-    private vrCategoryReferenceCoordinator?: VRCategoryReferenceCoordinator
+    private categoryReferenceCoordinator?: CategoryReferenceCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
@@ -169,8 +169,8 @@ export class SystemUICoordinator {
         // The category-reference tool (dev/design quick-reference for game categories/sort
         // dimensions) has exactly one implementation - direct request (2026-09-05), not gated
         // behind the flatscreen-eval flag above like it used to be.
-        this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
-        this.vrCategoryReferenceCoordinator.init()
+        this.categoryReferenceCoordinator = new CategoryReferenceCoordinator()
+        this.categoryReferenceCoordinator.init()
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -494,7 +494,7 @@ export class SystemUICoordinator {
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
         this.vrSettingsPanelCoordinator?.dispose()
-        this.vrCategoryReferenceCoordinator?.dispose()
+        this.categoryReferenceCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
         this.pauseMenuManager?.dispose()

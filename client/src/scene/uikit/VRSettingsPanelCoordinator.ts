@@ -91,7 +91,7 @@ export type VRPanelAnchorMode = 'camera-attached' | 'world-lock' | 'grip-attache
 // 'camera-attached' - the 2026-08-19 A/B winner - is what this whole settings menu keeps using.
 // The world-lock trial (2026-08-20) was a misunderstanding: it was meant to try the *Category
 // Reference* content as a standalone world-positioned panel, not to change how the main settings
-// menu anchors - see VRCategoryReferenceCoordinator.ts, which owns that trial instead and doesn't
+// menu anchors - see CategoryReferenceCoordinator.ts, which owns that trial instead and doesn't
 // touch this constant.
 const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'camera-attached'
 

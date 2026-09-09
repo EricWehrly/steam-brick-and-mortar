@@ -38,7 +38,7 @@ const BASE_SHELL_PIXEL_SIZE = 0.0015
 
 /** The base above, scaled by the user's own uiFontScale setting (Display/UI tab, direct request
  *  2026-09-05: "let's add UI font scaling please. We need it now."). Exported so every standalone
- *  uikit root (VRCategoryReferencePanel today) shares one real computation instead of each
+ *  uikit root (CategoryReferencePanel today) shares one real computation instead of each
  *  re-declaring its own copy of the same magic number. */
 export function resolveShellPixelSize(appSettings: AppSettings): number {
     return BASE_SHELL_PIXEL_SIZE * appSettings.getSetting('uiFontScale')
