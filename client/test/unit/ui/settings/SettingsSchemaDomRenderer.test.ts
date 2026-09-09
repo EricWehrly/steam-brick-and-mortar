@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { AppSettings, Setting } from '../../../../src/core/AppSettings'
-import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/SettingsSchema'
+import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayAdvancedSchema'
 import { renderSettingsSchemaSections, schemaSliderConfigs } from '../../../../src/ui/settings/SettingsSchemaDomRenderer'
 
 describe('renderSettingsSchemaSections', () => {

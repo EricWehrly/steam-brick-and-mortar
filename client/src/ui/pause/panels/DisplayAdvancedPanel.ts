@@ -17,7 +17,8 @@ import displayAdvancedPanelTemplate from '../../../templates/pause-menu/display-
 import '../../../styles/pause-menu/settings-components.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { DISPLAY_ADVANCED_SCHEMA, schemaSettingKeys } from '../../settings/SettingsSchema'
+import { schemaSettingKeys } from '../../settings/SettingsSchema'
+import { DISPLAY_ADVANCED_SCHEMA } from '../../settings/schemas/DisplayAdvancedSchema'
 import { renderSettingsSchemaSections, schemaSliderConfigs } from '../../settings/SettingsSchemaDomRenderer'
 
 export class DisplayAdvancedPanel extends PauseMenuPanel {

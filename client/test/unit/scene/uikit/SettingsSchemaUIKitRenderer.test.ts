@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Container } from '@pmndrs/uikit'
 import { AppSettings, Setting } from '../../../../src/core/AppSettings'
-import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/SettingsSchema'
+import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayAdvancedSchema'
 import { buildSettingsSchemaTree } from '../../../../src/scene/uikit/SettingsSchemaUIKitRenderer'
 
 describe('buildSettingsSchemaTree', () => {
