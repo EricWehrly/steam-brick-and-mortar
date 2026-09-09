@@ -2,8 +2,10 @@
  * The category-reference tool now has exactly one implementation - direct request (2026-09-05):
  * "we don't need a 'VR' variant. We're just gonna have the one." Replaces the DOM
  * CategoryReferencePanel entirely (toggle button + 'G' hotkey + HTML table), rather than keeping
- * both around. Places a single VRCategoryReferencePanel as a standalone, world-positioned object -
+ * both around. Places a single CategoryReferencePanel as a standalone, world-positioned object -
  * not a settings-menu tab, no MenuOpen/MenuClose lifecycle - world-locking once at first open.
+ * Named without a "VR" prefix on purpose (review feedback, 2026-09-09) - this is a universal,
+ * VR-compatible UI, not a VR-specific one, and this class has no DOM sibling to disambiguate from.
  *
  * toggle() is public but nothing calls it yet - the DOM predecessor's 'G' keyboard hotkey was
  * deliberately dropped rather than ported (direct request, 2026-09-08): "We'll get to manipulating
@@ -29,14 +31,14 @@ import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { UikitPointerBridge } from './UikitPointerBridge'
-import { VRCategoryReferencePanel } from './panels/VRCategoryReferencePanel'
+import { CategoryReferencePanel } from './panels/CategoryReferencePanel'
 
 // Matches VRSettingsPanelCoordinator's WORLD_LOCK_DISTANCE - not imported, that constant is
 // module-private, and this panel's own size differs anyway so there's no real value tying them.
 const WORLD_LOCK_DISTANCE = 1.2
 
-export class VRCategoryReferenceCoordinator {
-    private readonly panel = new VRCategoryReferencePanel()
+export class CategoryReferenceCoordinator {
+    private readonly panel = new CategoryReferencePanel()
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly pointerBridge: UikitPointerBridge
 

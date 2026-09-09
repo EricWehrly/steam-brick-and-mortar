@@ -1,5 +1,5 @@
 /**
- * VRCategoryReferenceCoordinator - toggle lifecycle + world-lock placement. UikitPointerBridge's
+ * CategoryReferenceCoordinator - toggle lifecycle + world-lock placement. UikitPointerBridge's
  * own attach() no-ops without a published DataKey.Renderer (see its own doc comment), so these
  * tests never trigger the real forwardHtmlEvents - no jsdom Pointer Events stubbing needed, unlike
  * VRSettingsPanelCoordinator.test.ts's fake-renderer pattern.
@@ -8,21 +8,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { Container } from '@pmndrs/uikit'
-import { VRCategoryReferenceCoordinator } from '../../../../src/scene/uikit/VRCategoryReferenceCoordinator'
+import { CategoryReferenceCoordinator } from '../../../../src/scene/uikit/CategoryReferenceCoordinator'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
 
-const CALLBACK_KEY = 'VRCategoryReferenceCoordinator'
+const CALLBACK_KEY = 'CategoryReferenceCoordinator'
 
-function runUpdate(coordinator: VRCategoryReferenceCoordinator): void {
+function runUpdate(coordinator: CategoryReferenceCoordinator): void {
     (coordinator as unknown as { update: (now: number, deltaTime: number) => void }).update(0, 16)
 }
 
-describe('VRCategoryReferenceCoordinator', () => {
+describe('CategoryReferenceCoordinator', () => {
     let camera: THREE.PerspectiveCamera
     let scene: THREE.Scene
-    let coordinator: VRCategoryReferenceCoordinator | undefined
+    let coordinator: CategoryReferenceCoordinator | undefined
 
     beforeEach(() => {
         DataManager.resetInstance()
@@ -40,7 +40,7 @@ describe('VRCategoryReferenceCoordinator', () => {
     })
 
     it('starts closed - the panel is not placed in the scene until toggled open', () => {
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         runUpdate(coordinator)
 
@@ -52,7 +52,7 @@ describe('VRCategoryReferenceCoordinator', () => {
         camera.rotation.set(0, Math.PI / 2, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         coordinator.toggle()
         runUpdate(coordinator)
@@ -66,7 +66,7 @@ describe('VRCategoryReferenceCoordinator', () => {
         camera.position.set(0, 0, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         coordinator.toggle()
         runUpdate(coordinator)
@@ -82,7 +82,7 @@ describe('VRCategoryReferenceCoordinator', () => {
     })
 
     it('toggling closed hides the panel without removing it from the scene', () => {
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         coordinator.toggle()
         runUpdate(coordinator)
@@ -94,7 +94,7 @@ describe('VRCategoryReferenceCoordinator', () => {
     })
 
     it('registers and unregisters a render-loop callback across init()/dispose()', () => {
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
 
         expect(RenderLoopRegistry.getInstance().getCount()).toBeGreaterThan(0)
@@ -108,7 +108,7 @@ describe('VRCategoryReferenceCoordinator', () => {
     })
 
     it('dispose() removes the panel from the scene', () => {
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         coordinator.toggle()
         runUpdate(coordinator)
@@ -123,7 +123,7 @@ describe('VRCategoryReferenceCoordinator', () => {
     it('does nothing (and does not throw) if no main camera is published yet', () => {
         DataManager.resetInstance()
 
-        coordinator = new VRCategoryReferenceCoordinator()
+        coordinator = new CategoryReferenceCoordinator()
         coordinator.init()
         coordinator.toggle()
 

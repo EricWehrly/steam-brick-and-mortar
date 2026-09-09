@@ -1,5 +1,5 @@
 /**
- * Static reference data for the category-reference tool (VRCategoryReferencePanel) - dev/design
+ * Static reference data for the category-reference tool (CategoryReferencePanel) - dev/design
  * quick-reference for game categories/sort dimensions:
  *   - Steam API genres (what the store actually serves)
  *   - Planned meta-categories (library-state based)

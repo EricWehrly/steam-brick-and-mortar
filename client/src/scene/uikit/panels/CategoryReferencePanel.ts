@@ -9,7 +9,7 @@
  * as a tab there, piloting `world-lock` anchoring on the whole settings menu; that was a
  * misunderstanding (direct correction, 2026-08-20) - the trial was meant to place *this* panel as
  * its own standalone world-positioned object, leaving the settings menu on `camera-attached` as
- * before. See VRCategoryReferenceCoordinator.ts, which owns that placement.
+ * before. See CategoryReferenceCoordinator.ts, which owns that placement.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
@@ -38,7 +38,7 @@ const STATUS_COLOR: Record<CategoryEntry['status'], string> = {
 }
 const SCROLL_HEIGHT = 460
 
-export class VRCategoryReferencePanel {
+export class CategoryReferencePanel {
     readonly container: Container
 
     constructor(private readonly appSettings: AppSettings = AppSettings.getInstance()) {

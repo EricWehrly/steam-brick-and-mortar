@@ -61,7 +61,7 @@ export class UrlUtils {
      * at startup when this is set, so the uikit settings panel (which only ever activates via a
      * real MenuOpen - see VRSettingsPanelCoordinator) shows immediately without a manual
      * Settings/OpenMenu press, and also stands up the standalone Category Reference world-lock
-     * trial (VRCategoryReferenceCoordinator).
+     * trial (CategoryReferenceCoordinator).
      */
     static isVRSettingsPanelForced(): boolean {
         return UrlUtils.getSearchParams().get('forceVRSettingsPanel') === '1'
