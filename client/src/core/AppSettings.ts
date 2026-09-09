@@ -49,6 +49,7 @@ export const Setting = {
     ToneMappingExposure: 'toneMappingExposure',
     EnvironmentIntensity: 'environmentIntensity',
     PixelRatioScale: 'pixelRatioScale',
+    UiFontScale: 'uiFontScale',
     ArtworkRoughness: 'artworkRoughness',
     ArtworkMetalness: 'artworkMetalness',
     ArtworkFresnelLift: 'artworkFresnelLift',
@@ -75,6 +76,7 @@ export const Setting = {
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
     HideUIInVR: 'hideUIInVR',
+    LockMovementWhileMenuOpen: 'lockMovementWhileMenuOpen',
     // Debug
     VerboseLogging: 'verboseLogging',
     ShowDebugInfo: 'showDebugInfo',
@@ -152,6 +154,10 @@ export interface ApplicationSettings {
     toneMappingExposure: number
     environmentIntensity: number
     pixelRatioScale: number
+    /** Multiplies the VR settings menu's base pixelSize (VRSettingsMenuShell's
+     *  resolveShellPixelSize()) - text/rows/gaps all scale off this one factor together, same
+     *  reasoning as SHELL_PIXEL_SIZE's own doc comment. No DOM counterpart; VR-only. */
+    uiFontScale: number
     artworkRoughness: number
     artworkMetalness: number
     artworkFresnelLift: number
@@ -181,6 +187,13 @@ export interface ApplicationSettings {
     showFPS: boolean
     showPerformanceStats: boolean
     hideUIInVR: boolean
+    /** Whether opening the pause/settings menu also suspends camera movement/rotation (see
+     *  SystemUICoordinator's handlePauseInput/handleResumeInput). Defaults off in dev builds and
+     *  on in production - direct request (2026-08-20): losing the ability to walk around while
+     *  iterating on the VR menu (e.g. to test world-locked content from different angles) made dev
+     *  work harder than it needed to be, but the original "don't let the player wander off while a
+     *  menu covers the screen" intent still holds for real play. */
+    lockMovementWhileMenuOpen: boolean
     
     // Debug Settings
     verboseLogging: boolean
@@ -571,6 +584,7 @@ export class AppSettings {
             toneMappingExposure: 0.25,
         environmentIntensity: 0.3,
             pixelRatioScale: resolvePixelRatioScale(QUALITY_LEVEL.HIGH), // matches qualityLevel above
+            uiFontScale: 1,
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
             artworkFresnelLift: 0.15,
@@ -601,6 +615,7 @@ export class AppSettings {
             showFPS: false,
             showPerformanceStats: false,
             hideUIInVR: true,
+            lockMovementWhileMenuOpen: !isDev, // off in dev for easier iteration, on in production
             
             // Debug Settings
             verboseLogging: false,
@@ -664,7 +679,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
+        const numberFields = ['pixelRatioScale', 'uiFontScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false

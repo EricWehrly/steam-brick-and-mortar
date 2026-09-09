@@ -24,6 +24,7 @@ import {
     WebXREventTypes,
     AppSettingsEventTypes,
     type SceneCanvasClickEvent,
+    type SceneCanvasWheelEvent,
     type MenuOpenEvent,
     type MenuCloseEvent,
     type InputPauseEvent,
@@ -34,6 +35,9 @@ import type { SettingChangedEvent } from '../../core/AppSettings'
 import { InputDeviceKind } from '../../input/InputProfile'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
+import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
+import { VRCategoryReferenceCoordinator } from '../../scene/uikit/VRCategoryReferenceCoordinator'
+import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
 
 const RETICLE_ELEMENT_ID = 'gamepad-reticle'
@@ -59,6 +63,8 @@ export class SystemUICoordinator {
     private renderer?: THREE.WebGLRenderer
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
+    private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
+    private vrCategoryReferenceCoordinator?: VRCategoryReferenceCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
     private isXRSessionActive = false
@@ -99,6 +105,8 @@ export class SystemUICoordinator {
             this.appSettings,
             this.performanceMonitor
         )
+
+        this.vrSettingsPanelCoordinator = new VRSettingsPanelCoordinator(this.eventManager, this.appSettings)
     }
 
     public async init(
@@ -114,6 +122,10 @@ export class SystemUICoordinator {
             this.rendererDomElement.addEventListener('mousemove', this.handleRendererMouseMove)
             this.rendererDomElement.addEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.addEventListener('contextmenu', this.handleRendererContextMenu)
+            // passive: true - nothing here calls preventDefault(), so the browser doesn't need to
+            // wait on this handler before it can start scrolling (moot for this canvas anyway,
+            // but the standard default-on posture for a wheel listener that never blocks).
+            this.rendererDomElement.addEventListener('wheel', this.handleRendererWheel, { passive: true })
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
@@ -130,6 +142,38 @@ export class SystemUICoordinator {
 
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels()
+
+        this.vrSettingsPanelCoordinator.init(renderer)
+
+        // Which settings surface you get is decided by whether you're in a headset, not by a flag:
+        // in an immersive session the VR uikit panel shows, on flatscreen the DOM pause menu does
+        // (direct request, 2026-09-02). Both open off the same MenuOpen, so nothing about opening
+        // the menu changes - see VRSettingsPanelCoordinator's own doc comment for how it reconciles
+        // "menu open" with "session presenting".
+        //
+        // ?forceVRSettingsPanel=1 lifts the headset requirement, making the VR uikit menu the ONLY
+        // visible UI on flatscreen too - direct request (2026-08-20), so the VR menu can be
+        // evaluated toward becoming the one final UI while the DOM menu is phased out. It suppresses
+        // the DOM overlay's own visuals (its state machine - activePanel, MenuPanelChanged sync -
+        // keeps running underneath, since VRSettingsMenuShell's tab sync depends on it), but does
+        // NOT open the menu itself - direct request (2026-09-05): auto-opening on every load was
+        // unwanted friction while iterating. A real Settings click / OpenMenu press is still
+        // required, same as always; only which surface that press shows changes.
+        //
+        // Also stands up the standalone Category Reference world-lock trial (see
+        // VRCategoryReferenceCoordinator.ts) - grouped under the same flag since both are part of
+        // evaluating this VR menu system in flatscreen together, not two separate dev toggles.
+        //
+        // Temporary: this whole flag is meant to go away once the VR settings-menu migration is
+        // complete (see docs/plans/vr-uikit-menu-migration-plan.md's Story 6) - it exists purely to
+        // let the VR panel be evaluated on flatscreen before every DOM panel is ported.
+        if (UrlUtils.isVRSettingsPanelForced()) {
+            this.vrSettingsPanelCoordinator.setShowOnFlatscreen(true)
+            this.pauseMenuManager.setDomVisualsSuppressed(true)
+
+            this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
+            this.vrCategoryReferenceCoordinator.init(renderer)
+        }
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -288,6 +332,17 @@ export class SystemUICoordinator {
     }
 
     private readonly handleInteractPressed = (): void => {
+        // While a menu is open (DOM pause menu and/or the VR uikit settings panel - both open
+        // together, see VRSettingsPanelCoordinator's doc comment), the menu is what's actually in
+        // front of the player; a trigger/Enter/gamepad-A press shouldn't reach through it to
+        // select whatever game box happens to be further along the same ray. This was previously
+        // an accepted known limitation - fixed here at the single chokepoint every non-mouse
+        // Interact press already funnels through, rather than teaching the raycast itself about
+        // occlusion.
+        if (this.pauseMenuManager.isOpen()) {
+            return
+        }
+
         // Simulates a click at the reticle position (screen center) - a real mouse click never
         // reaches here at all (see the registration comment above).
         this.eventManager.emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
@@ -408,6 +463,26 @@ export class SystemUICoordinator {
         event.preventDefault()
     }
 
+    private readonly handleRendererWheel = (event: WheelEvent): void => {
+        if (!this.rendererDomElement) {
+            return
+        }
+
+        const rect = this.rendererDomElement.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) {
+            return
+        }
+
+        const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        const ndcY = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+        this.eventManager.emit<SceneCanvasWheelEvent>(InputEventTypes.SceneCanvasWheel, {
+            ndcX,
+            ndcY,
+            deltaY: event.deltaY
+        })
+    }
+
     private createReticleElement(): void {
         const element = document.createElement('div')
         element.id = RETICLE_ELEMENT_ID
@@ -425,11 +500,14 @@ export class SystemUICoordinator {
             this.rendererDomElement.removeEventListener('mousemove', this.handleRendererMouseMove)
             this.rendererDomElement.removeEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.removeEventListener('contextmenu', this.handleRendererContextMenu)
+            this.rendererDomElement.removeEventListener('wheel', this.handleRendererWheel)
             this.rendererDomElement = undefined
         }
 
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
+        this.vrSettingsPanelCoordinator?.dispose()
+        this.vrCategoryReferenceCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
         this.pauseMenuManager?.dispose()

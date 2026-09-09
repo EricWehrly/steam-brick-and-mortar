@@ -75,7 +75,7 @@ function makeMockRenderer(
 ): { domElement: HTMLCanvasElement } {
     const domElement = document.createElement('canvas')
     domElement.requestPointerLock = requestPointerLock
-    return { domElement } as unknown as { domElement: HTMLCanvasElement }
+    return { domElement, setTransparentSort: vi.fn() } as unknown as { domElement: HTMLCanvasElement }
 }
 
 describe('SystemUICoordinator pointer lock wiring', () => {

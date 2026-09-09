@@ -52,4 +52,17 @@ export class UrlUtils {
     static isDebugLoggingEnabled(): boolean {
         return UrlUtils.getSearchParams().get('debug') === 'true'
     }
+
+    /**
+     * Whether ?forceVRSettingsPanel=1 is present — switches to the VR uikit menu system as the
+     * only visible UI, including on flatscreen (the DOM pause menu is being phased out; this flag
+     * is how it gets evaluated as the sole UI ahead of that, not just previewed alongside it - see
+     * PauseMenuManager.setDomVisualsSuppressed()). Does NOT auto-open the menu itself (direct
+     * request, 2026-09-05) - a real Settings click / OpenMenu press is still required, same as
+     * always. Also stands up the standalone Category Reference world-lock trial
+     * (VRCategoryReferenceCoordinator).
+     */
+    static isVRSettingsPanelForced(): boolean {
+        return UrlUtils.getSearchParams().get('forceVRSettingsPanel') === '1'
+    }
 }

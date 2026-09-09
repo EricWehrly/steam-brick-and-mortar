@@ -127,7 +127,11 @@ export class DeviceDetector {
      * gamepad (e.g. hand tracking with no physical controller).
      */
     getXRGamepads(): ReadonlyArray<XRGamepadState> {
-        if (!this.xrSession) {
+        // inputSources is an external WebXR API boundary - observed on this Tauri/WebView2 target
+        // to transiently report as undefined (throwing "not iterable") while xrSession itself is
+        // still non-null, e.g. during session teardown churn. Treat as no controllers rather than
+        // crashing this frame's poll.
+        if (!this.xrSession?.inputSources) {
             return []
         }
 
@@ -325,7 +329,8 @@ export class DeviceDetector {
             }
         }
 
-        if (!this.xrSession) {
+        // See getXRGamepads()'s doc comment - same external-API-boundary guard.
+        if (!this.xrSession?.inputSources) {
             return
         }
 
