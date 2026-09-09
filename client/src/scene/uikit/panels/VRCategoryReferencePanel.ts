@@ -1,19 +1,23 @@
 /**
- * The category-reference tool's one implementation (direct request, 2026-09-05 - no separate DOM
- * version anymore, see CategoryReferenceData.ts's own doc comment). Renders
- * STEAM_GENRE_CATEGORIES/META_CATEGORIES/SORT_DIMENSIONS, kept as plain data rather than
- * hand-duplicated per renderer.
+ * VR port of CategoryReferencePanel (client/src/ui/CategoryReferencePanel.ts). Renders the same
+ * STEAM_GENRE_CATEGORIES/META_CATEGORIES/SORT_DIMENSIONS data the DOM panel exports, rather than
+ * re-hardcoding it - same "one source, two renderers" reasoning as SettingsSchema, just without a
+ * shared schema type since this content is read-only reference data, not editable settings.
  *
  * Owns its own root styling (background/border-radius/depthTest/renderOrder/pixelSize) rather than
  * inheriting it from a shared shell - it's not a tab inside VRSettingsMenuShell. Originally tried
  * as a tab there, piloting `world-lock` anchoring on the whole settings menu; that was a
  * misunderstanding (direct correction, 2026-08-20) - the trial was meant to place *this* panel as
  * its own standalone world-positioned object, leaving the settings menu on `camera-attached` as
- * before. See CategoryReferenceCoordinator.ts, which owns that placement.
+ * before. See VRCategoryReferenceCoordinator.ts, which owns that placement.
+ *
+ * pixelSize is computed via resolveShellPixelSize(appSettings) (VRSettingsMenuShell.ts) rather
+ * than a bare constant, so this panel respects the Display/UI tab's UI Font Scale slider like
+ * every other standalone uikit root.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
-import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../categorization/CategoryReferenceData'
+import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type CategoryEntry } from '../../../ui/CategoryReferencePanel'
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 import { AppSettings } from '../../../core/AppSettings'
@@ -38,7 +42,7 @@ const STATUS_COLOR: Record<CategoryEntry['status'], string> = {
 }
 const SCROLL_HEIGHT = 460
 
-export class CategoryReferencePanel {
+export class VRCategoryReferencePanel {
     readonly container: Container
 
     constructor(private readonly appSettings: AppSettings = AppSettings.getInstance()) {
