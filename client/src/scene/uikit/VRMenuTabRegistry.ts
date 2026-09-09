@@ -1,47 +1,25 @@
 /**
- * The VR settings menu's tab list - what VRSettingsMenuShell renders as its tab column. Ported
- * one entry at a time as DOM pause-menu panels migrate onto SettingsSchema (Story 5 of
- * docs/plans/vr-uikit-menu-migration-plan.md). A DOM panel without a real entry here isn't listed
- * twice with a dead stub - it just isn't a VR tab yet, same as before this registry existed.
+ * Which panels the VR settings menu shows as tabs, and in what order. Just an ordered list of
+ * schemas: a tab's id, title and icon come from the schema itself, so they can't drift from the
+ * DOM panel of the same id the way a separately-declared tab list did (this registry used to say
+ * 'Display · Advanced' while the schema said 'Advanced', and nothing read the schema's copy).
+ *
+ * Ported one entry at a time as DOM pause-menu panels migrate onto SettingsSchema (Story 5 of
+ * docs/plans/vr-uikit-menu-migration-plan.md). A DOM panel without an entry here isn't listed
+ * twice with a dead stub - it just isn't a VR tab yet.
  */
 
-import type { Container } from '@pmndrs/uikit'
-import type { AppSettings } from '../../core/AppSettings'
-import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
-import { VRDisplayUIPanel } from './panels/VRDisplayUIPanel'
+import type { SettingsPanelSchema } from '../../ui/settings/SettingsSchema'
+import { DISPLAY_ADVANCED_SCHEMA } from '../../ui/settings/schemas/DisplayAdvancedSchema'
+import { DISPLAY_UI_SCHEMA } from '../../ui/settings/schemas/DisplayUISchema'
 
-export interface VRMenuTabContent {
-    readonly container: Container
-}
-
-export interface VRMenuTab {
-    /** Matches the DOM PauseMenuPanel.id this tab mirrors, so UIEventTypes.MenuPanelChanged can
-     *  sync the two menus by a shared id rather than each side inventing its own. */
-    readonly panelId: string
-    readonly title: string
-    readonly icon: string
-    build(appSettings: AppSettings): VRMenuTabContent
-}
-
-const DISPLAY_UI_PANEL_ID = 'vr-display-ui'
-
-export const VR_MENU_TABS: readonly VRMenuTab[] = [
-    {
-        panelId: 'display-advanced',
-        title: 'Display · Advanced',
-        icon: '🔬',
-        build: appSettings => new VRDisplayAdvancedPanel(appSettings)
-    },
-    {
-        // No real DOM PauseMenuPanel id - a "Display / UI" tab doesn't exist there yet. Very slim
-        // start (direct request, 2026-09-05): just pixel-ratio-scale and UI font-scale, since
-        // text/scene sharpness needs to be tunable from inside VR, where the DOM Graphics panel
-        // isn't reachable.
-        panelId: DISPLAY_UI_PANEL_ID,
-        title: 'Display / UI',
-        icon: '🖥️',
-        build: appSettings => new VRDisplayUIPanel(appSettings)
-    }
+export const VR_MENU_SCHEMAS: readonly SettingsPanelSchema[] = [
+    DISPLAY_ADVANCED_SCHEMA,
+    DISPLAY_UI_SCHEMA
 ]
 
-export const DEFAULT_VR_MENU_TAB_PANEL_ID = VR_MENU_TABS[0].panelId
+export const DEFAULT_VR_MENU_TAB_PANEL_ID = VR_MENU_SCHEMAS[0].id
+
+export function findVRMenuSchema(panelId: string): SettingsPanelSchema | undefined {
+    return VR_MENU_SCHEMAS.find(schema => schema.id === panelId)
+}

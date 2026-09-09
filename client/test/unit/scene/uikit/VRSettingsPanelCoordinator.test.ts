@@ -21,7 +21,7 @@ import { AppSettings } from '../../../../src/core/AppSettings'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
-import { VR_MENU_TABS } from '../../../../src/scene/uikit/VRMenuTabRegistry'
+import { VR_MENU_SCHEMAS } from '../../../../src/scene/uikit/VRMenuTabRegistry'
 import { RenderLoopRegistry } from '../../../../src/scene/RenderLoopRegistry'
 import type { XRControllerSource, XRControllerState } from '../../../../src/webxr/XRControllerManager'
 
@@ -188,8 +188,8 @@ describe('VRSettingsPanelCoordinator', () => {
         enterVR()
 
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
-        const otherTab = VR_MENU_TABS[1]
-        EventManager.getInstance().emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.panelId })
+        const otherTab = VR_MENU_SCHEMAS[1]
+        EventManager.getInstance().emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.id })
         const shellContainerAtFirstOpen = camera.children[0]
 
         EventManager.getInstance().emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'pause' })

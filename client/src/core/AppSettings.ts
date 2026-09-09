@@ -154,9 +154,9 @@ export interface ApplicationSettings {
     toneMappingExposure: number
     environmentIntensity: number
     pixelRatioScale: number
-    /** Multiplies the VR settings menu's base pixelSize (VRSettingsMenuShell's
-     *  resolveShellPixelSize()) - text/rows/gaps all scale off this one factor together, same
-     *  reasoning as SHELL_PIXEL_SIZE's own doc comment. No DOM counterpart; VR-only. */
+    /** Multiplies the VR menu's base pixelSize (scene/uikit/VRMenuPixelSize.ts) - text, rows and
+     *  gaps all scale off this one inherited factor together, and applies to an already-open menu.
+     *  No DOM counterpart; VR-only. */
     uiFontScale: number
     artworkRoughness: number
     artworkMetalness: number
