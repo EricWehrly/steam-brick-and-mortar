@@ -72,7 +72,7 @@ describe('PauseMenuManager MenuPanelChanged sync', () => {
     it('ignores an externally-emitted MenuPanelChanged for a panel id it does not have', () => {
         pauseMenuManager.open('cache-management')
 
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'vr-more-settings' })
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'vr-only-panel-with-no-dom-counterpart' })
 
         expect(pauseMenuManager.getState().activePanel).toBe('cache-management')
     })
