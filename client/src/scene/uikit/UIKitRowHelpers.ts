@@ -2,24 +2,19 @@
  * Thin analog to UIComponent.ts's RangeControl - builds a @pmndrs/uikit component *tree*
  * (label + live value + Slider) instead of an HTML string, so uikit panels can lean on the same
  * row shape the DOM pause-menu panels already use.
+ *
+ * Carries no sizes or colors of its own: every node names a style out of VRMenuStyleSheet.ts.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Slider } from '@pmndrs/uikit-default'
 import { signal } from '@preact/signals-core'
-import { COLOR_TOKENS } from '../../ui/ColorTokens'
-
-// Bumped from 14/4 - direct request (2026-08-20): rows read as "unnecessarily squished, too
-// tight, not readable enough."
-const ROW_LABEL_FONT_SIZE = 16
-const ROW_GAP = 8
-// uikit's Text has no default color (renders black) - this panel's rows sit on a dark
-// surface, so an unset color is invisible, not just low-contrast. Sourced from tokens.css'
-// --color-text-primary via COLOR_TOKENS, not an ad-hoc hex value - see ui/ColorTokens.ts.
-const ROW_TEXT_COLOR = COLOR_TOKENS.textPrimary
+import { MENU_CLASS } from './VRMenuStyleSheet'
+import { toUikitSafeText } from './UikitTextSanitizer'
 
 export interface UIKitSliderRowOptions {
     readonly label: string
+    readonly description?: string
     readonly min: number
     readonly max: number
     readonly step: number
@@ -36,16 +31,20 @@ export interface UIKitSliderRow {
 }
 
 export function createSliderRow(options: UIKitSliderRowOptions): UIKitSliderRow {
-    const { label, min, max, step, value, onChange } = options
+    const { label, description, min, max, step, value, onChange } = options
     const formatDisplay = options.formatDisplay ?? ((v: number) => String(v))
 
-    const row = new Container({ flexDirection: 'column', gap: ROW_GAP, width: '100%' })
+    const row = new Container(undefined, [MENU_CLASS.settingRow])
 
-    const labelRow = new Container({ flexDirection: 'row', justifyContent: 'space-between', width: '100%' })
-    labelRow.add(new Text({ text: label, fontSize: ROW_LABEL_FONT_SIZE, color: ROW_TEXT_COLOR }))
-    const valueText = new Text({ text: formatDisplay(value), fontSize: ROW_LABEL_FONT_SIZE, color: ROW_TEXT_COLOR })
-    labelRow.add(valueText)
-    row.add(labelRow)
+    const header = new Container(undefined, [MENU_CLASS.settingRowHeader])
+    header.add(new Text({ text: toUikitSafeText(label) }, [MENU_CLASS.settingLabel]))
+    const valueText = new Text({ text: formatDisplay(value) }, [MENU_CLASS.settingValue])
+    header.add(valueText)
+    row.add(header)
+
+    if (description) {
+        row.add(new Text({ text: toUikitSafeText(description) }, [MENU_CLASS.sectionDescription]))
+    }
 
     // A plain number here would put Slider in "controlled" mode where onValueChange still fires
     // correctly but the displayed thumb reads this same never-changing prop, so it visually

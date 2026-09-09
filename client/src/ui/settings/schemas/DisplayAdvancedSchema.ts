@@ -10,10 +10,12 @@ export const DISPLAY_ADVANCED_SCHEMA: SettingsPanelSchema = {
     id: 'display-advanced',
     title: 'Advanced',
     icon: '🔬',
+    group: 'Display',
+    resettable: true,
     sections: [
         {
             heading: '🎨 Game Box Artwork Material',
-            controls: [
+            content: [
                 {
                     kind: 'range',
                     setting: 'artworkRoughness',
@@ -43,7 +45,7 @@ export const DISPLAY_ADVANCED_SCHEMA: SettingsPanelSchema = {
         {
             heading: '✨ Fresnel Edge Lift',
             description: 'Brightens box silhouettes at oblique camera angles so artwork reads at the sides of shelves.',
-            controls: [
+            content: [
                 {
                     kind: 'range',
                     setting: 'artworkFresnelLift',
@@ -73,7 +75,7 @@ export const DISPLAY_ADVANCED_SCHEMA: SettingsPanelSchema = {
         {
             heading: '🌓 Shadow Contact Grounding',
             description: 'Controls how tightly shadows hug surfaces at shelf-box intersections.',
-            controls: [
+            content: [
                 {
                     kind: 'range',
                     setting: 'shadowContactBias',

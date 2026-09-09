@@ -23,45 +23,14 @@
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
 import { EventManager } from '../../core/EventManager'
-import { AppSettings } from '../../core/AppSettings'
-import { UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
-import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID, type VRMenuTab, type VRMenuTabContent } from './VRMenuTabRegistry'
+import { AppSettings, type SettingChangedEvent } from '../../core/AppSettings'
+import { AppSettingsEventTypes, UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
+import { VR_MENU_SCHEMAS, DEFAULT_VR_MENU_TAB_PANEL_ID, findVRMenuSchema } from './VRMenuTabRegistry'
+import { schemaTabTitle, type SettingsPanelSchema } from '../../ui/settings/SettingsSchema'
+import { buildSettingsPanel, type SettingsSchemaPanel } from './SettingsSchemaUIKitRenderer'
 import { toUikitSafeText } from './UikitTextSanitizer'
-import { COLOR_TOKENS } from '../../ui/ColorTokens'
-
-// Bumped from 0.0008, then 0.0011 to 0.0015 (direct request, 2026-09-05: "this UI is still blurry
-// ... needs hopefully the base font size cranked" - confirmed live in-browser that a bigger base
-// pixelSize is genuinely what fixes it, not a post-processing or msdf-atlas issue). Every uikit-px
-// (text, gaps, padding, controls) scales off this one factor, so it's the single lever for "the
-// whole panel reads too small/soft," not a per-row font tweak.
-const BASE_SHELL_PIXEL_SIZE = 0.0015
-
-/** The base above, scaled by the user's own uiFontScale setting (Display/UI tab, direct request
- *  2026-09-05: "let's add UI font scaling please. We need it now."). Exported so every standalone
- *  uikit root (VRCategoryReferencePanel today) shares one real computation instead of each
- *  re-declaring its own copy of the same magic number. */
-export function resolveShellPixelSize(appSettings: AppSettings): number {
-    return BASE_SHELL_PIXEL_SIZE * appSettings.getSetting('uiFontScale')
-}
-const PANEL_WIDTH = 820
-// Fixed rather than autosized to whichever tab happens to be shortest - per direct request ("the
-// settings menu can be taller ... start with the tallest page, and work towards the most
-// complicated"), every tab gets this much room up front, with contentArea's overflow:'scroll'
-// below absorbing anything taller still. This is the content area's own scroll budget, separate
-// from the tab row's height above it.
-const CONTENT_HEIGHT = 640
-const SHELL_GAP = 12
-const TAB_ROW_PADDING = 12
-const TAB_BUTTON_GAP = 8
-const TAB_LABEL_FONT_SIZE = 13
-const TAB_INACTIVE_COLOR = COLOR_TOKENS.textSecondary
-const TAB_ACTIVE_COLOR = COLOR_TOKENS.textPrimary
-const TAB_ACTIVE_BACKGROUND = COLOR_TOKENS.surface3
-const TAB_INACTIVE_BACKGROUND = 'transparent'
-
-/** Exported so other VR uikit surfaces (e.g. VRControllerPointer's cursor/beam) can render above
- *  this menu's own geometry without guessing a number that happens to be higher. */
-export const ALWAYS_ON_TOP_RENDER_ORDER = 1000
+import { MENU_CLASS } from './VRMenuStyleSheet'
+import { resolveMenuPixelSize } from './VRMenuPixelSize'
 
 interface TabButtonHandle {
     readonly button: Button
@@ -75,7 +44,7 @@ export class VRSettingsMenuShell {
     private readonly contentArea: Container
     private readonly tabButtons = new Map<string, TabButtonHandle>()
     private activePanelId: string
-    private activeContent: VRMenuTabContent | null = null
+    private activeContent: SettingsSchemaPanel | null = null
 
     constructor(
         private readonly eventManager: EventManager,
@@ -89,55 +58,40 @@ export class VRSettingsMenuShell {
         this.contentArea = built.contentArea
 
         this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+        this.eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, this.handleSettingChanged)
 
         this.showTab(this.activePanelId, { emit: false })
     }
 
     private build(): { container: Container; tabRow: Container; contentArea: Container } {
-        const container = new Container({
-            flexDirection: 'column',
-            gap: SHELL_GAP,
-            width: PANEL_WIDTH,
-            pixelSize: resolveShellPixelSize(this.appSettings),
-            depthTest: false,
-            renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
-            backgroundColor: COLOR_TOKENS.surface1,
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12,
-            borderBottomLeftRadius: 12,
-            borderBottomRightRadius: 12
-        })
+        // pixelSize is the one style value that isn't static (it tracks the user's font-scale
+        // setting), so it's set here rather than in the stylesheet. It's an inherited property, so
+        // this single assignment scales the whole menu - see handleSettingChanged().
+        const container = new Container(
+            { pixelSize: resolveMenuPixelSize(this.appSettings) },
+            [MENU_CLASS.menuRoot]
+        )
 
-        const tabRow = new Container({
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: TAB_BUTTON_GAP,
-            width: '100%',
-            padding: TAB_ROW_PADDING
-        })
-        for (const tab of VR_MENU_TABS) {
-            const handle = this.buildTabButton(tab)
-            this.tabButtons.set(tab.panelId, handle)
+        const tabRow = new Container(undefined, [MENU_CLASS.menuTabRow])
+        for (const schema of VR_MENU_SCHEMAS) {
+            const handle = this.buildTabButton(schema)
+            this.tabButtons.set(schema.id, handle)
             tabRow.add(handle.button)
         }
         container.add(tabRow)
 
-        // overflow:'scroll' - CONTENT_HEIGHT is a fixed budget, not a guarantee every tab fits
-        // within it; a future tall tab (see the "tallest page" direction above) scrolls instead
-        // of overflowing the panel's rounded frame.
-        const contentArea = new Container({ flexDirection: 'column', width: '100%', height: CONTENT_HEIGHT, overflow: 'scroll' })
+        const contentArea = new Container(undefined, [MENU_CLASS.menuContentArea])
         container.add(contentArea)
 
         return { container, tabRow, contentArea }
     }
 
-    private buildTabButton(tab: VRMenuTab): TabButtonHandle {
-        const label = new Text({ text: toUikitSafeText(`${tab.icon} ${tab.title}`), fontSize: TAB_LABEL_FONT_SIZE, color: TAB_INACTIVE_COLOR })
-        const button = new Button({
-            variant: 'ghost',
-            backgroundColor: TAB_INACTIVE_BACKGROUND,
-            onClick: () => this.selectTab(tab.panelId)
-        })
+    private buildTabButton(schema: SettingsPanelSchema): TabButtonHandle {
+        const label = new Text(
+            { text: toUikitSafeText(`${schema.icon} ${schemaTabTitle(schema)}`) },
+            [MENU_CLASS.menuTabLabel]
+        )
+        const button = new Button({ variant: 'ghost', onClick: () => this.selectTab(schema.id) }, [MENU_CLASS.menuTabButton])
         button.add(label)
         return { button, label }
     }
@@ -158,8 +112,8 @@ export class VRSettingsMenuShell {
     }
 
     private showTab(panelId: string, options: { readonly emit: boolean }): void {
-        const tab = VR_MENU_TABS.find(entry => entry.panelId === panelId)
-        if (!tab) {
+        const schema = findVRMenuSchema(panelId)
+        if (!schema) {
             // The DOM menu switched to a panel VR doesn't have a tab for yet (Story 5 territory)
             // - leave whatever VR tab is currently shown rather than clearing the content area.
             return
@@ -173,7 +127,7 @@ export class VRSettingsMenuShell {
         this.setTabButtonActive(panelId, true)
 
         this.activeContent?.container.removeFromParent()
-        this.activeContent = tab.build(this.appSettings)
+        this.activeContent = buildSettingsPanel(schema, this.appSettings)
         this.contentArea.add(this.activeContent.container)
 
         if (options.emit) {
@@ -186,11 +140,30 @@ export class VRSettingsMenuShell {
         if (!handle) {
             return
         }
-        handle.button.setProperties({ backgroundColor: active ? TAB_ACTIVE_BACKGROUND : TAB_INACTIVE_BACKGROUND })
-        handle.label.setProperties({ color: active ? TAB_ACTIVE_COLOR : TAB_INACTIVE_COLOR })
+        handle.button.classList.replace(
+            active ? MENU_CLASS.menuTabButton : MENU_CLASS.menuTabButtonActive,
+            active ? MENU_CLASS.menuTabButtonActive : MENU_CLASS.menuTabButton
+        )
+        handle.label.classList.replace(
+            active ? MENU_CLASS.menuTabLabel : MENU_CLASS.menuTabLabelActive,
+            active ? MENU_CLASS.menuTabLabelActive : MENU_CLASS.menuTabLabel
+        )
+    }
+
+    /** UI Font Scale applies to the open menu, not just the next one (review feedback, 2026-09-09:
+     *  "we need to be able to do this live"). pixelSize is inherited and uikit's properties are
+     *  reactive signals, so reassigning it on the root alone rescales every descendant - no rebuild,
+     *  no reopen. This only holds while no descendant sets its own pixelSize; a child that does
+     *  outranks the inherited value and would stop scaling. */
+    private readonly handleSettingChanged = (event: CustomEvent<SettingChangedEvent>): void => {
+        if (event.detail.settingName !== 'uiFontScale') {
+            return
+        }
+        this.container.setProperties({ pixelSize: resolveMenuPixelSize(this.appSettings) })
     }
 
     dispose(): void {
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
+        this.eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, this.handleSettingChanged)
     }
 }

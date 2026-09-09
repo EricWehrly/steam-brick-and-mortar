@@ -9,7 +9,7 @@ import { AppSettings } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
 import { UIEventTypes, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
 import { VRSettingsMenuShell } from '../../../../src/scene/uikit/VRSettingsMenuShell'
-import { VR_MENU_TABS, DEFAULT_VR_MENU_TAB_PANEL_ID } from '../../../../src/scene/uikit/VRMenuTabRegistry'
+import { VR_MENU_SCHEMAS, DEFAULT_VR_MENU_TAB_PANEL_ID } from '../../../../src/scene/uikit/VRMenuTabRegistry'
 
 describe('VRSettingsMenuShell', () => {
     let eventManager: EventManager
@@ -26,7 +26,7 @@ describe('VRSettingsMenuShell', () => {
 
         expect(shell.container.children).toHaveLength(2)
         const [tabColumn, contentArea] = shell.container.children
-        expect(tabColumn.children).toHaveLength(VR_MENU_TABS.length)
+        expect(tabColumn.children).toHaveLength(VR_MENU_SCHEMAS.length)
         expect(contentArea.children).toHaveLength(1)
     })
 
@@ -37,15 +37,15 @@ describe('VRSettingsMenuShell', () => {
 
     it('selectTab() swaps the content area to the chosen tab and emits MenuPanelChanged', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
-        const otherTab = VR_MENU_TABS[1]
+        const otherTab = VR_MENU_SCHEMAS[1]
 
         let received: MenuPanelChangedEvent | null = null
         eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, e => { received = e.detail })
 
-        shell.selectTab(otherTab.panelId)
+        shell.selectTab(otherTab.id)
 
-        expect(shell.activeTabPanelId).toBe(otherTab.panelId)
-        expect(received).toEqual(expect.objectContaining({ panelId: otherTab.panelId }))
+        expect(shell.activeTabPanelId).toBe(otherTab.id)
+        expect(received).toEqual(expect.objectContaining({ panelId: otherTab.id }))
 
         const [, contentArea] = shell.container.children
         expect(contentArea.children).toHaveLength(1)
@@ -64,14 +64,14 @@ describe('VRSettingsMenuShell', () => {
 
     it('follows an externally-emitted MenuPanelChanged (e.g. from the DOM menu) without re-emitting', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
-        const otherTab = VR_MENU_TABS[1]
+        const otherTab = VR_MENU_SCHEMAS[1]
 
         let emitCount = 0
         eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, () => { emitCount++ })
 
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.panelId })
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.id })
 
-        expect(shell.activeTabPanelId).toBe(otherTab.panelId)
+        expect(shell.activeTabPanelId).toBe(otherTab.id)
         // The shell's own handler doesn't re-emit - only the test's own emit() above counts.
         expect(emitCount).toBe(1)
     })
@@ -88,8 +88,8 @@ describe('VRSettingsMenuShell', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
         shell.dispose()
 
-        const otherTab = VR_MENU_TABS[1]
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.panelId })
+        const otherTab = VR_MENU_SCHEMAS[1]
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: otherTab.id })
 
         expect(shell.activeTabPanelId).toBe(DEFAULT_VR_MENU_TAB_PANEL_ID)
     })

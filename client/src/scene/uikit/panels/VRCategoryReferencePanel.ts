@@ -21,26 +21,19 @@ import { STEAM_GENRE_CATEGORIES, META_CATEGORIES, SORT_DIMENSIONS, type Category
 import { toUikitSafeText } from '../UikitTextSanitizer'
 import { COLOR_TOKENS } from '../../../ui/ColorTokens'
 import { AppSettings } from '../../../core/AppSettings'
-import { ALWAYS_ON_TOP_RENDER_ORDER, resolveShellPixelSize } from '../VRSettingsMenuShell'
+import { MENU_CLASS } from '../VRMenuStyleSheet'
+import { resolveMenuPixelSize } from '../VRMenuPixelSize'
 
 const PANEL_WIDTH = 480
-const PANEL_PADDING = 20
-const SECTION_GAP = 18
-const ROW_GAP = 4
-const TITLE_FONT_SIZE = 18
-const SECTION_HEADING_FONT_SIZE = 13
-const SECTION_HEADING_COLOR = COLOR_TOKENS.accent
-const ROW_LABEL_FONT_SIZE = 13
-const ROW_LABEL_COLOR = COLOR_TOKENS.textPrimary
-// Mirrors category-reference-panel.css's .cat-row--<status> intent (live/planned/idea), sourced
-// from tokens.css's status colors - "idea" isn't really an error, so it maps to the muted
-// tertiary-text tone rather than being forced into the error color.
-const STATUS_COLOR: Record<CategoryEntry['status'], string> = {
-    live: COLOR_TOKENS.success,
-    planned: COLOR_TOKENS.warning,
-    idea: COLOR_TOKENS.textTertiary
-}
 const SCROLL_HEIGHT = 460
+
+/** Which stylesheet entry paints a row's status - the colors themselves live in
+ *  VRMenuStyleSheet.ts, same as .cat-row--<status> lives in category-reference-panel.css. */
+const STATUS_CLASS: Record<CategoryEntry['status'], string> = {
+    live: MENU_CLASS.categoryStatusLive,
+    planned: MENU_CLASS.categoryStatusPlanned,
+    idea: MENU_CLASS.categoryStatusIdea
+}
 
 export class VRCategoryReferencePanel {
     readonly container: Container
@@ -50,29 +43,13 @@ export class VRCategoryReferencePanel {
     }
 
     private build(): Container {
-        const root = new Container({
-            flexDirection: 'column',
-            gap: ROW_GAP,
-            padding: PANEL_PADDING,
-            width: PANEL_WIDTH,
-            pixelSize: resolveShellPixelSize(this.appSettings),
-            depthTest: false,
-            renderOrder: ALWAYS_ON_TOP_RENDER_ORDER,
-            backgroundColor: COLOR_TOKENS.surface1,
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12,
-            borderBottomLeftRadius: 12,
-            borderBottomRightRadius: 12
-        })
-        root.add(new Text({ text: 'Category Reference', fontSize: TITLE_FONT_SIZE, color: COLOR_TOKENS.textPrimary }))
+        const root = new Container(
+            { width: PANEL_WIDTH, pixelSize: resolveMenuPixelSize(this.appSettings) },
+            [MENU_CLASS.standalonePanelRoot]
+        )
+        root.add(new Text({ text: 'Category Reference' }, [MENU_CLASS.panelTitle]))
 
-        const scroll = new Container({
-            flexDirection: 'column',
-            gap: SECTION_GAP,
-            width: '100%',
-            height: SCROLL_HEIGHT,
-            overflow: 'scroll'
-        })
+        const scroll = new Container({ height: SCROLL_HEIGHT, overflow: 'scroll' }, [MENU_CLASS.section])
         scroll.add(this.buildSection('Steam Genres', STEAM_GENRE_CATEGORIES))
         scroll.add(this.buildSection('Meta / Library-State Categories', META_CATEGORIES))
         scroll.add(this.buildSection('Sort Dimensions', SORT_DIMENSIONS))
@@ -82,12 +59,11 @@ export class VRCategoryReferencePanel {
     }
 
     private buildSection(heading: string, entries: readonly CategoryEntry[]): Container {
-        const section = new Container({ flexDirection: 'column', gap: ROW_GAP, width: '100%' })
-        section.add(new Text({
-            text: toUikitSafeText(`${heading.toUpperCase()} (${entries.length})`),
-            fontSize: SECTION_HEADING_FONT_SIZE,
-            color: SECTION_HEADING_COLOR
-        }))
+        const section = new Container(undefined, [MENU_CLASS.categorySection])
+        section.add(new Text(
+            { text: toUikitSafeText(`${heading.toUpperCase()} (${entries.length})`) },
+            [MENU_CLASS.categoryHeading]
+        ))
         for (const entry of entries) {
             section.add(this.buildRow(entry))
         }
@@ -95,9 +71,9 @@ export class VRCategoryReferencePanel {
     }
 
     private buildRow(entry: CategoryEntry): Container {
-        const row = new Container({ flexDirection: 'row', justifyContent: 'space-between', width: '100%' })
-        row.add(new Text({ text: toUikitSafeText(entry.label), fontSize: ROW_LABEL_FONT_SIZE, color: ROW_LABEL_COLOR }))
-        row.add(new Text({ text: entry.status, fontSize: ROW_LABEL_FONT_SIZE, color: STATUS_COLOR[entry.status] }))
+        const row = new Container(undefined, [MENU_CLASS.categoryRow])
+        row.add(new Text({ text: toUikitSafeText(entry.label) }, [MENU_CLASS.categoryLabel]))
+        row.add(new Text({ text: entry.status }, [STATUS_CLASS[entry.status]]))
         return row
     }
 }

@@ -8,14 +8,14 @@ const SAMPLE_SCHEMA: SettingsPanelSchema = {
     sections: [
         {
             heading: 'Section A',
-            controls: [
+            content: [
                 { kind: 'range', setting: 'artworkRoughness', id: 'a', label: 'A', min: 0, max: 1, step: 0.1 },
                 { kind: 'range', setting: 'artworkMetalness', id: 'b', label: 'B', min: 0, max: 1, step: 0.1 }
             ]
         },
         {
             heading: 'Section B',
-            controls: [
+            content: [
                 { kind: 'range', setting: 'uiFontScale', id: 'c', label: 'C', min: 0, max: 1, step: 0.1 }
             ]
         }

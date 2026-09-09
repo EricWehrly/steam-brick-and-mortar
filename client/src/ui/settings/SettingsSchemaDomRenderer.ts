@@ -10,40 +10,47 @@
 import { RangeControl } from '../components/UIComponent'
 import type { SliderConfig } from '../../utils/UIComponentUtils'
 import type { AppSettings } from '../../core/AppSettings'
-import type { SettingControl, SettingsPanelSchema, SettingsSection } from './SettingsSchema'
+import { isSettingControl, type SectionContent, type SettingsPanelSchema, type SettingsSection } from './SettingsSchema'
 
 export function renderSettingsSchemaSections(schema: SettingsPanelSchema, appSettings: AppSettings): string {
     return schema.sections.map(section => renderSection(section, appSettings)).join('')
 }
 
 function renderSection(section: SettingsSection, appSettings: AppSettings): string {
+    const heading = section.heading
+        ? `<label class="setting-label">${section.heading}</label>`
+        : ''
     const description = section.description
         ? `<p class="setting-description">${section.description}</p>`
         : ''
-    const controls = section.controls.map(control => renderControl(control, appSettings)).join('')
+    const content = section.content.map(entry => renderContent(entry, appSettings)).join('')
 
     return `<section class="setting-section">
         <div class="setting-group">
-            <label class="setting-label">${section.heading}</label>
+            ${heading}
             ${description}
-            ${controls}
+            ${content}
         </div>
     </section>`
 }
 
-function renderControl(control: SettingControl, appSettings: AppSettings): string {
-    switch (control.kind) {
+function renderContent(content: SectionContent, appSettings: AppSettings): string {
+    if (!isSettingControl(content)) {
+        return `<p class="setting-description">${content.text}</p>`
+    }
+
+    switch (content.kind) {
         case 'range':
             return new RangeControl({
-                id: control.id,
-                label: control.label,
-                description: control.description,
-                min: control.min,
-                max: control.max,
-                step: control.step,
-                value: appSettings.getSetting(control.setting),
-                formatDisplay: control.formatDisplay,
-                trackLabels: control.trackLabels
+                id: content.id,
+                label: content.label,
+                description: content.description,
+                min: content.min,
+                max: content.max,
+                step: content.step,
+                value: appSettings.getSetting(content.setting),
+                formatDisplay: content.formatDisplay,
+                trackLabels: content.trackLabels
             }).render()
     }
 }
@@ -54,7 +61,7 @@ function renderControl(control: SettingControl, appSettings: AppSettings): strin
 export function schemaSliderConfigs(schema: SettingsPanelSchema, appSettings: AppSettings): SliderConfig[] {
     const configs: SliderConfig[] = []
     for (const section of schema.sections) {
-        for (const control of section.controls) {
+        for (const control of section.content) {
             if (control.kind === 'range') {
                 configs.push({
                     sliderId: control.id,
