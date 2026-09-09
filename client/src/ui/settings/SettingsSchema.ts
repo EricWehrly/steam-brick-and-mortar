@@ -8,6 +8,10 @@
  * resetSettingsToDefaults() already own that (see AppSettings.ts's getDefaultSettings()), so a
  * schema-driven reset just passes schemaSettingKeys(schema) through to it rather than carrying a
  * third copy of every default value.
+ *
+ * Holds only the generic types and helpers - a specific tab's schema data (e.g.
+ * DISPLAY_ADVANCED_SCHEMA) lives in its own file under ./schemas/, not here (review feedback,
+ * 2026-09-09: "I don't think the schema for a specific tab belongs in here").
  */
 
 import type { ApplicationSettings } from '../../core/AppSettings'
@@ -57,101 +61,4 @@ export interface SettingsPanelSchema {
  *  AppSettings.resetSettingsToDefaults() wants for a schema-driven reset. */
 export function schemaSettingKeys(schema: SettingsPanelSchema): ReadonlyArray<keyof ApplicationSettings> {
     return schema.sections.flatMap(section => section.controls.map(control => control.setting))
-}
-
-export const DISPLAY_ADVANCED_SCHEMA: SettingsPanelSchema = {
-    id: 'display-advanced',
-    title: 'Advanced',
-    icon: '🔬',
-    sections: [
-        {
-            heading: '🎨 Game Box Artwork Material',
-            controls: [
-                {
-                    kind: 'range',
-                    setting: 'artworkRoughness',
-                    id: 'artwork-roughness',
-                    label: 'Roughness',
-                    description: 'Controls how matte vs. glossy the surface reads.',
-                    min: 0.2,
-                    max: 0.6,
-                    step: 0.01,
-                    formatDisplay: v => v.toFixed(2),
-                    trackLabels: ['0.2 (glossy)', '0.6 (matte)']
-                },
-                {
-                    kind: 'range',
-                    setting: 'artworkMetalness',
-                    id: 'artwork-metalness',
-                    label: 'Metalness',
-                    description: 'Adds specular character. Changes apply immediately.',
-                    min: 0.0,
-                    max: 0.2,
-                    step: 0.01,
-                    formatDisplay: v => v.toFixed(2),
-                    trackLabels: ['0.0 (none)', '0.2 (max)']
-                }
-            ]
-        },
-        {
-            heading: '✨ Fresnel Edge Lift',
-            description: 'Brightens box silhouettes at oblique camera angles so artwork reads at the sides of shelves.',
-            controls: [
-                {
-                    kind: 'range',
-                    setting: 'artworkFresnelLift',
-                    id: 'artwork-fresnel-lift',
-                    label: 'Lift',
-                    description: 'Controls brightness boost intensity.',
-                    min: 0.0,
-                    max: 0.3,
-                    step: 0.01,
-                    formatDisplay: v => v.toFixed(2),
-                    trackLabels: ['0.0 (off)', '0.3 (max)']
-                },
-                {
-                    kind: 'range',
-                    setting: 'artworkFresnelPower',
-                    id: 'artwork-fresnel-power',
-                    label: 'Power',
-                    description: 'Controls falloff sharpness.',
-                    min: 2.0,
-                    max: 8.0,
-                    step: 0.1,
-                    formatDisplay: v => v.toFixed(1),
-                    trackLabels: ['2.0 (wide)', '8.0 (sharp)']
-                }
-            ]
-        },
-        {
-            heading: '🌓 Shadow Contact Grounding',
-            description: 'Controls how tightly shadows hug surfaces at shelf-box intersections.',
-            controls: [
-                {
-                    kind: 'range',
-                    setting: 'shadowContactBias',
-                    id: 'shadow-contact-bias',
-                    label: 'Bias',
-                    description: 'More negative pulls shadow contact closer.',
-                    min: -0.005,
-                    max: -0.0001,
-                    step: 0.0001,
-                    formatDisplay: v => v.toFixed(4),
-                    trackLabels: ['−0.005 (tighter)', '−0.0001 (looser)']
-                },
-                {
-                    kind: 'range',
-                    setting: 'shadowContactNormalBias',
-                    id: 'shadow-contact-normal-bias',
-                    label: 'Normal Bias',
-                    description: 'Lower tightens the contact zone. Changes apply immediately.',
-                    min: 0.0,
-                    max: 0.03,
-                    step: 0.001,
-                    formatDisplay: v => v.toFixed(3),
-                    trackLabels: ['0.0 (tight)', '0.03 (loose)']
-                }
-            ]
-        }
-    ]
 }
