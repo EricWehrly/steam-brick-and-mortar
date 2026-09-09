@@ -140,8 +140,10 @@ export class PauseMenuManager {
 
     private readonly handleMenuPanelChanged = (event: CustomEvent<MenuPanelChangedEvent>): void => {
         if (!this.panels.has(this.resolvePanelId(event.detail.panelId))) {
-            // Originated from a VR-only tab (e.g. the "More Settings" placeholder) that has no
-            // DOM counterpart - nothing for this menu to switch to.
+            // Originated from a VR tab with no DOM counterpart (e.g. "Display / UI") - nothing for
+            // this menu to switch to. VR-only tabs are meant to stay rare - see
+            // VRMenuTabRegistry.ts's own doc comment - not a general escape hatch for skipping DOM
+            // parity.
             return
         }
         this.showPanel(event.detail.panelId)

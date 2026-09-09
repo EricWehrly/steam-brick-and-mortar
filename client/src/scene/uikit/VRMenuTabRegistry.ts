@@ -9,7 +9,6 @@ import type { Container } from '@pmndrs/uikit'
 import type { AppSettings } from '../../core/AppSettings'
 import { VRDisplayAdvancedPanel } from './panels/VRDisplayAdvancedPanel'
 import { VRDisplayUIPanel } from './panels/VRDisplayUIPanel'
-import { VRPlaceholderPanel } from './panels/VRPlaceholderPanel'
 
 export interface VRMenuTabContent {
     readonly container: Container
@@ -24,7 +23,6 @@ export interface VRMenuTab {
     build(appSettings: AppSettings): VRMenuTabContent
 }
 
-const MORE_SETTINGS_PANEL_ID = 'vr-more-settings'
 const DISPLAY_UI_PANEL_ID = 'vr-display-ui'
 
 export const VR_MENU_TABS: readonly VRMenuTab[] = [
@@ -43,18 +41,6 @@ export const VR_MENU_TABS: readonly VRMenuTab[] = [
         title: 'Display / UI',
         icon: '🖥️',
         build: appSettings => new VRDisplayUIPanel(appSettings)
-    },
-    {
-        // Doesn't correspond to a real DOM panel id - stands in for every DOM panel not yet
-        // ported to VR, so the shell has more than one tab to prove switching actually works
-        // (Story 4's acceptance criterion) without overclaiming coverage Story 5 hasn't built yet.
-        panelId: MORE_SETTINGS_PANEL_ID,
-        title: 'More Settings',
-        icon: '🚧',
-        build: () => new VRPlaceholderPanel({
-            title: 'More Settings',
-            message: 'The rest of the settings menu is still flatscreen-only - use the pause menu for now.'
-        })
     }
 ]
 
