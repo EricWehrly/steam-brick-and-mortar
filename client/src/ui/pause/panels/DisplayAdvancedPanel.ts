@@ -6,14 +6,15 @@
  * - Fresnel edge lift (intensity and falloff)
  * - Shadow contact grounding (bias / normalBias)
  *
- * Rendered from DISPLAY_ADVANCED_SCHEMA (SettingsSchema.ts) rather than hand-built markup, so this
- * panel's controls stay in one place shared with the VR uikit port (VRDisplayAdvancedPanel) -
- * see docs/plans/vr-uikit-menu-migration-plan.md.
+ * Rendered from DISPLAY_ADVANCED_SCHEMA (schemas/DisplayAdvancedSchema.ts) rather than hand-built
+ * markup, so this panel's controls stay in one place shared with the VR uikit port
+ * (VRDisplayAdvancedPanel) - see docs/plans/vr-uikit-menu-migration-plan.md. No standalone .html
+ * template - renderSettingsSchemaSections() already produces the only content that varies per
+ * panel, so the couple of static wrapper/reset-button lines don't earn a template file of their
+ * own (review feedback, 2026-09-09).
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
-import { renderTemplate } from '../../../utils/TemplateEngine'
-import displayAdvancedPanelTemplate from '../../../templates/pause-menu/display-advanced-panel.html?raw'
 import '../../../styles/pause-menu/settings-components.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
@@ -34,9 +35,20 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
     }
 
     render(): string {
-        return renderTemplate(displayAdvancedPanelTemplate, {
-            sections: renderSettingsSchemaSections(DISPLAY_ADVANCED_SCHEMA, this.appSettings)
-        })
+        return `<div class="display-advanced-panel">
+            <div class="settings-sections">
+                ${renderSettingsSchemaSections(DISPLAY_ADVANCED_SCHEMA, this.appSettings)}
+                <section class="setting-section">
+                    <div class="setting-group">
+                        <div class="setting-control">
+                            <button id="reset-display-advanced" class="pause-btn secondary">
+                                Reset to Defaults
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>`
     }
 
     attachEvents(): void {
