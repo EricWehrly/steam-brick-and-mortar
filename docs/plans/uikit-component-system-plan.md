@@ -32,7 +32,7 @@ Three homes, one concern each. Editing a menu means opening exactly one of them.
 | Concern | Lives in | Analogue |
 |---|---|---|
 | **Form / content** — identity, copy, controls | `client/src/ui/settings/schemas/<Name>Schema.ts` | the HTML template |
-| **Style** — type scale, spacing, color | `client/src/scene/uikit/VRMenuStyleSheet.ts` | the CSS file |
+| **Style** — type scale, spacing, color | `client/src/styles/vr-menu.css` | the CSS file (literally) |
 | **Function** — composition, wiring, lifecycle | `SettingsSchemaUIKitRenderer.ts`, `VRSettingsMenuShell.ts` | the TS file |
 
 ### Form: a schema *is* the panel
@@ -44,9 +44,33 @@ the DOM and VR versions of a panel cannot drift.
 
 Adding a tab = writing a schema file and listing it in `VRMenuTabRegistry`. Nothing else.
 
-### Style: uikit's own StyleSheet, not a bespoke token object
+### Style: plain CSS, digested into uikit's own StyleSheet
 
-`@pmndrs/uikit` ships a CSS-like cascade the project wasn't using:
+Appearance is written as an actual `.css` file (`client/src/styles/vr-menu.css`) and digested at
+load into uikit's registry by a small strict parser (`scene/uikit/UikitCssParser.ts`). It is
+imported as raw text (`?raw`), never injected into the page - uikit isn't a DOM, so the stylesheet
+means nothing to the browser. `scene/uikit/VRMenuStyleSheet.ts` is just the seam: load, register,
+and export `MENU_CLASS`.
+
+The parser accepts a deliberate subset, and anything outside it **throws** rather than being
+silently dropped, since a lost declaration is an invisible styling bug:
+
+- single class selectors, optionally comma-grouped (`.a, .b { ... }`); no combinators, pseudo-classes,
+  ids, nesting or at-rules
+- `:root { --name: value }` constants read back with `var(--name)`; names the file doesn't declare
+  fall through to `tokens.css`'s `--color-*` palette (via `resolveColorTokenVar` in `ColorTokens.ts`),
+  so the stylesheet references the same color tokens the DOM UI does, by their real names
+- kebab-case properties mapped to uikit's camelCase ones (including uikit-only `depth-test` and
+  `render-order`); `12px` and `12` both mean the number 12 (uikit-px are unitless, scaled by
+  `pixelSize`); `border-radius` expands to uikit's four corner properties
+
+Two guards keep the CSS and the TypeScript that names its classes honest: a test asserts every
+class in `MENU_CLASS` has a rule and vice versa, and the module throws at load if the CSS arrives
+empty. The second exists because **Vitest blanks every `.css` file to an empty string by default,
+`?raw` included**; `test/vitest.shared.ts` opts this one file back in, and each vitest config lists
+it. Forgetting that in a new config would otherwise leave the menu silently unstyled under test.
+
+The uikit machinery this rides on:
 
 - **`StyleSheet`** — a mutable `Record<string, InProperties>` of named styles. Components take class
   names as their **second constructor argument** (`new Container(props, [MENU_CLASS.panelRoot])`),
@@ -59,7 +83,9 @@ Adding a tab = writing a schema file and listing it in `VRMenuTabRegistry`. Noth
   it now.
 
 `MENU_CLASS` exports the names rather than using bare strings, so a typo is a compile error and
-importing a name is what guarantees the registration module has run.
+importing a name is what guarantees the registration module has run. Classes may be combined
+(`[MENU_CLASS.standalonePanelRoot, MENU_CLASS.categoryPanel]`); `classList.replace` swaps state
+classes, as the tab buttons do for active/inactive.
 
 ### Function
 
@@ -93,6 +119,10 @@ the user's font-scale setting and therefore can't live in a static stylesheet �
 4. **Rows don't observe external setting changes.** A row's displayed value resyncs on `reset()` and
    on its own drag, not when something else writes the same setting. Fine today; revisit if two
    surfaces are ever open at once.
-5. **DOM tab groups still declared separately.** `schema.group` records which group a panel belongs
+5. **Pseudo-class state in the stylesheet.** Selectors are single classes only, so hover/active/focus
+   styling can't be written as `.x:hover { ... }` yet; uikit does support state variants natively
+   (`hover: { ... }` conditionals, with `'*'` cascading), so mapping `:hover` and friends onto those
+   is the natural extension once a panel needs one. Until then the parser rejects it loudly.
+6. **DOM tab groups still declared separately.** `schema.group` records which group a panel belongs
    to, but `PauseMenuManager.registerDefaultPanels()` still calls `registerTabGroup` by hand. Wiring
    the DOM side to read groups off schemas would finish removing the duplication.
