@@ -43,6 +43,46 @@ export interface RangeSettingControl {
     readonly trackLabels?: readonly string[]
 }
 
+export interface RangeOptions {
+    readonly label: string
+    readonly description?: string
+    readonly min: number
+    readonly max: number
+    readonly step: number
+    /** Labels distributed evenly under the track (e.g. min/max, or named steps). */
+    readonly trackLabels?: readonly string[]
+    /** Appended to the displayed value ('x' for a multiplier). */
+    readonly unit?: string
+    /** Only for the rare control whose DOM id shouldn't follow its setting key. */
+    readonly id?: string
+}
+
+/** Builds a range control, deriving what every control would otherwise repeat: `kind`, an `id`
+ *  that is the kebab-case of the setting key (`artworkRoughness` -> `artwork-roughness`), and a
+ *  display format that shows as many decimals as the step has (step 0.05 -> '1.25', 0.0001 ->
+ *  '-0.0010'). Label, description and track labels are real copy and stay explicit. */
+export function range(setting: NumericSettingKey, options: RangeOptions): RangeSettingControl {
+    const { id, unit = '', ...rest } = options
+    const decimals = decimalPlaces(options.step)
+    return {
+        kind: 'range',
+        setting,
+        id: id ?? kebabCase(setting),
+        formatDisplay: value => `${value.toFixed(decimals)}${unit}`,
+        ...rest
+    }
+}
+
+function kebabCase(camelCase: string): string {
+    return camelCase.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
+}
+
+function decimalPlaces(step: number): number {
+    const [mantissa, exponent] = String(step).split('e-')
+    const fractionDigits = mantissa.split('.')[1]?.length ?? 0
+    return fractionDigits + (exponent ? Number(exponent) : 0)
+}
+
 /** Standalone copy in the flow of a section - an explanation or caveat that belongs between
  *  controls rather than attached to any one of them. Not bound to a setting. */
 export interface NoteContent {
