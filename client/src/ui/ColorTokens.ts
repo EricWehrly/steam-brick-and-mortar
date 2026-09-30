@@ -80,3 +80,15 @@ function readCssColorTokens(): Record<ColorTokenKey, string> {
 }
 
 export const COLOR_TOKENS: Readonly<Record<ColorTokenKey, string>> = readCssColorTokens()
+
+const TOKEN_KEY_BY_CSS_VAR = new Map(
+    (Object.keys(CSS_VAR_NAMES) as ColorTokenKey[]).map(key => [CSS_VAR_NAMES[key], key])
+)
+
+/** Resolves a tokens.css custom property name ('--color-surface-1') to its color value, for
+ *  non-DOM stylesheets that reference tokens by their real CSS names. Undefined for anything that
+ *  isn't a color token. */
+export function resolveColorTokenVar(cssVarName: string): string | undefined {
+    const key = TOKEN_KEY_BY_CSS_VAR.get(cssVarName)
+    return key ? COLOR_TOKENS[key] : undefined
+}

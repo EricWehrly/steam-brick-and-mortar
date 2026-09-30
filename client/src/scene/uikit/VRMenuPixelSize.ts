@@ -1,6 +1,6 @@
 /**
  * The one uikit-px -> world-meters conversion for VR menu surfaces, and the user's scale multiplier
- * on top of it. Separate from VRMenuStyleSheet.ts because this is the only "style" value that isn't
+ * on top of it. Separate from styles/vr-menu.css because this is the only "style" value that isn't
  * static: it reads a live setting, so it can't be baked into a StyleSheet entry.
  *
  * pixelSize is an inherited uikit property, so setting it on a root cascades to every descendant -

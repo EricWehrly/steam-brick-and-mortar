@@ -7,7 +7,7 @@
  * A schema is the panel: on the VR side there is no per-panel class to go read, and editing a tab
  * means editing its schema file (review feedback, 2026-09-09: "figuring out how to edit these menus
  * through these files is not at all intuitive"). Layout/appearance is the renderer's and
- * VRMenuStyleSheet.ts's business; nothing here carries a size, a color, or a Container.
+ * styles/vr-menu.css's business; nothing here carries a size, a color, or a Container.
  *
  * Defaults are deliberately NOT part of this schema: AppSettings.getDefaultSetting()/
  * resetSettingsToDefaults() already own that (see AppSettings.ts's getDefaultSettings()), so a
