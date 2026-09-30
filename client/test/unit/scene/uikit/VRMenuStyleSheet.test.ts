@@ -1,13 +1,16 @@
 /**
  * Guards the seam between styles/vr-menu.css and the TypeScript that names its classes. A class in
  * one but not the other is an invisible bug: uikit only console-warns on an unknown class name, and
- * a stylesheet rule nothing references is dead weight that looks like it's doing something.
+ * a stylesheet rule nothing references is dead weight that looks like it's doing something. Drift
+ * is checked in three directions: CSS -> MENU_CLASS, MENU_CLASS -> CSS, and MENU_CLASS -> actual use.
  */
 
 import { describe, it, expect } from 'vitest'
 import { StyleSheet } from '@pmndrs/uikit'
 import { MENU_CLASS, VR_MENU_STYLES } from '../../../../src/scene/uikit/VRMenuStyleSheet'
 import { COLOR_TOKENS } from '../../../../src/ui/ColorTokens'
+
+const sourceFiles = import.meta.glob('../../../../src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 describe('VR menu stylesheet', () => {
     const declaredClasses = Object.values(MENU_CLASS)
@@ -23,6 +26,18 @@ describe('VR menu stylesheet', () => {
         const unreferenced = styledClasses.filter(name => !declaredClasses.includes(name as never))
 
         expect(unreferenced).toEqual([])
+    })
+
+    it('has no class that nothing references - a rule and a MENU_CLASS entry that no component uses', () => {
+        const consumers = Object.entries(sourceFiles)
+            .filter(([path]) => !path.endsWith('/scene/uikit/VRMenuStyleSheet.ts'))
+            .map(([, source]) => source)
+
+        const unused = Object.keys(MENU_CLASS).filter(
+            key => !consumers.some(source => new RegExp(`MENU_CLASS\\.${key}\\b`).test(source))
+        )
+
+        expect(unused).toEqual([])
     })
 
     it('has no duplicate class names in MENU_CLASS', () => {
