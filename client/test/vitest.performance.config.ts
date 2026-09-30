@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitest/config'
+import { RAW_STYLESHEET_CSS } from './vitest.shared'
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    css: RAW_STYLESHEET_CSS,
     setupFiles: ['./test/setup.ts'],
     include: ['test/performance/**/*.test.ts'],
     exclude: ['test/unit/**', 'test/integration/**', 'test/live/**', 'test/visual/**'],

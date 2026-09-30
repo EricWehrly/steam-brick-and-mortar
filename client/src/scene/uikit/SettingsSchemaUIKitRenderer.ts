@@ -5,7 +5,7 @@
  * applied to a different schema (review feedback, 2026-09-09), so a panel's definition lives in
  * exactly one readable file instead of being split between a data file and a builder class.
  *
- * Layout composition lives here; sizes and colors live in VRMenuStyleSheet.ts; what the panel says
+ * Layout composition lives here; sizes and colors live in styles/vr-menu.css; what the panel says
  * and which settings it binds live in the schema. Nothing in this file names a pixel or a hex.
  */
 
