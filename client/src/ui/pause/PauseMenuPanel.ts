@@ -21,6 +21,7 @@ export interface PauseMenuPanelConfig {
  * of LOD configs and ceiling geometry. See GpuGameBoxRenderer.buildLodConfigsFromSettings()
  */
 
+// TD: dom-menu-panel-retirement
 export abstract class PauseMenuPanel {
     protected container: HTMLElement | null = null
     protected config: PauseMenuPanelConfig

@@ -6,6 +6,7 @@
  *
  * Deliberately not anchored with `$`: the module id being matched still carries its `?raw` suffix.
  */
+// TD: vitest-config-shared-base
 export const RAW_STYLESHEET_CSS = {
   include: [/src[\\/]styles[\\/]vr-menu\.css/]
 }

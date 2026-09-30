@@ -84,6 +84,7 @@ export const SORT_DIMENSIONS: CategoryEntry[] = [
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
 
+// TD: dom-menu-panel-retirement
 export class CategoryReferencePanel {
     private container: HTMLElement | null = null
     private toggleButton: HTMLElement | null = null
