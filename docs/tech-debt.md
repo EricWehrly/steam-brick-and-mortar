@@ -244,11 +244,55 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 **Plan reference**:
 - `docs/plans/lighting-shadow-refactor-plan.md`
 
+## id: dom-menu-panel-retirement
+**Priority**: Medium - the stated end state of the VR settings-menu migration, but sequenced behind the ports rather than ahead of them
+**Effort**: Incremental - each panel's deletion rides with its own port; the tail (manager, flag, renderers, templates) is a final cleanup pass
+**Context**: The migration's goal is **one universal UI** - a single uikit implementation that works on flatscreen and in VR - not a VR-only menu living beside the DOM one. That makes every DOM pause-menu panel temporary. Until now the removal was only implied ("the DOM menu being phased out" in `docs/plans/vr-uikit-menu-migration-plan.md`); nothing owned actually deleting it, so nothing would notice if ports landed and the DOM versions quietly stayed. Review feedback on PR #168: "let's just try to replace the old dom stuff before we add any new stuff" - a port is a *replacement*, not an addition, and is not finished until its DOM counterpart is gone.
+
+What retires, and when:
+- **Per panel, in the port that achieves parity**: the `PauseMenuPanel` subclass registered in `PauseMenuManager.registerDefaultPanels()`, its `src/templates/pause-menu/*.html`, and its `src/styles/pause-menu/*.css`. `DisplayAdvancedPanel` is already schema-driven and is the pilot; it stays until the VR tab covers flatscreen in practice.
+- **DOM `CategoryReferencePanel`** (`src/ui/CategoryReferencePanel.ts`, `src/styles/category-reference-panel.css`) - its removal, and the single uikit implementation replacing it, is built and parked on branch `feature/vr-category-reference-unification`, waiting to be rebased onto `act2/default` and opened as its own PR after #168 lands.
+- **The tail, once the last panel is ported**: `?forceVRSettingsPanel=1` and `UrlUtils.isVRSettingsPanelForced()` (Story 6), `PauseMenuManager`'s DOM rendering and `setDomVisualsSuppressed`, the `MenuPanelChanged` two-way sync, `SettingsSchemaDomRenderer`, and `TemplateEngine` if nothing else still uses it.
+
+**Done when**:
+- No `PauseMenuPanel` subclass, pause-menu template or pause-menu stylesheet remains
+- The Story 6 flag is gone and the uikit menu is the only menu on both flatscreen and headset
+- `SettingsSchemaDomRenderer` and its tests are deleted (the schema then has a single renderer)
+
+**Related**: [`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) Story 7; `vr-menu-css-token-duplication` (the category-reference colors in `vr-menu.css` mirror the DOM stylesheet this entry deletes).
+
+## id: vitest-config-shared-base
+**Priority**: Low - works today; it's duplication, not a defect
+**Effort**: ~1 hour
+**Context**: `client/test/` has five standalone vitest configs (`vitest.config.ts`, `.all`, `.integration`, `.live`, `.performance`). None extends another, so anything they should agree on has to be pasted into each - which is how `test/vitest.shared.ts` came to exist (opting `vr-menu.css` out of Vitest's default blanking of `.css` files, including `?raw` imports, had to be added to all five). They do share a real core (`globals`, `jsdom`, `setupFiles`, `watch: false`); they differ on reporters, include/exclude, timeouts and pool. Review feedback on PR #169: "do these not all inherit from `vitest.config.ts`?" - they should.
+
+**Decision**: do this **after #168 merges**, as its own small change. It rewrites every config, so doing it mid-stack would conflict with the work in flight.
+
+**Done when**:
+- One base config holds the shared core (including the CSS opt-in); each other config only states how it differs, via `mergeConfig`
+- `test/vitest.shared.ts` is removed
+- `yarn test`, `test:integration`, `test:all` and `test:performance` each run the same set of tests as before (compare per-file counts, not just totals)
+
+**Related gap worth fixing alongside**: the summary reporter reports a test file that fails to *load* (e.g. a throwing import) as 0 passed / 0 failed, so `yarn test` can print `FAILURES: 0` while whole suites silently don't run. It surfaced only because the pass count dropped from 1766 to 1716. A file that can't load should count as a failure.
+
 ---
 
 ## Later / Backlog
 
 > No active trigger — explicitly deferred, conditional on something else landing first, or indefinite. Revisit when the stated condition is met, not on a schedule.
+
+## id: vr-menu-css-token-duplication
+**Priority**: Low - deliberately deferred; trigger-based
+**Effort**: ~2-3 hours, mostly deciding what should be shared
+**Context**: `client/src/styles/vr-menu.css` declares its own `--vr-space-*`, `--vr-font-*` and corner-radius scale, but `src/ui/tokens.css` already has `--space-*`, `--radius-*` and `--font-size-*`. They overlap only partly: space xs/sm/md (4/8/12) and radius-lg (12) are identical; space lg/xl (18/28 vs 16/24) and the font sizes (12/13/16/17/20 vs 10/12/14/16/20) differ. The two are arguably different unit systems - uikit-px are unitless and scaled to world-meters by `pixelSize`, CSS px are screen pixels - so some divergence is legitimate, but nothing in the file says so, and the identical values are real duplication. The parser also only resolves *color* tokens from `tokens.css` (`resolveColorTokenVar`) and rejects `@import`, whereas the DOM stylesheets compose through `@import` chains in `main.css`.
+
+**Decision (for now)**: track it, don't fix. The first time someone trips over editing the VR scale - or finds themselves changing the same value in both places - consider addressing it then, rather than on a schedule.
+
+**Done when** (either outcome closes it):
+- The VR scale is explicitly documented as intentionally separate, with the reason, **or**
+- Values that genuinely coincide reference `tokens.css` (widen the resolver beyond colors), and only VR-specific values keep a `--vr-*` name
+
+**Related**: `dom-menu-panel-retirement` - the category-reference colors in `vr-menu.css` mirror `category-reference-panel.css`, which that entry deletes.
 
 ## id: lambda-outbound-api-circuit-breaker
 **Priority**: Low

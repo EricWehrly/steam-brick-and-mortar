@@ -404,6 +404,25 @@ rewritten to the schema → VR panel appears in the shell → tests → in-heads
   stated decision with a comment, not the current accepted-simplification note.
 - Update `docs/features/vr-support.md` sub-scope 2 status.
 
+### Story 7 — Retire the DOM panels
+
+The end state is **one universal UI** that works on flatscreen and in VR, not a uikit menu living
+beside the DOM one - so every DOM pause-menu panel is temporary, and a port isn't finished until its
+DOM counterpart is deleted (review feedback on PR #168: "let's just try to replace the old dom stuff
+before we add any new stuff"). Until this story was written the removal was only implied, which is
+how ports could land and the DOM versions quietly stay.
+
+- **Per panel, inside the port that reaches parity**: delete the `PauseMenuPanel` subclass, its
+  `src/templates/pause-menu/*.html` and its `src/styles/pause-menu/*.css`.
+- **DOM `CategoryReferencePanel`** and its stylesheet go with the uikit unification parked on
+  `feature/vr-category-reference-unification`.
+- **The tail, after the last port and Story 6**: `PauseMenuManager`'s DOM rendering and
+  `setDomVisualsSuppressed`, the `MenuPanelChanged` two-way sync, `SettingsSchemaDomRenderer`, and
+  `TemplateEngine` if nothing else uses it.
+
+Tracked as `dom-menu-panel-retirement` in [`tech-debt.md`](../tech-debt.md), which carries the full
+done-when list.
+
 ## Non-goals (explicitly out of scope; revisit later)
 
 - ~~`CacheManagementPanel`, `DebugPanel`, `ControlsPanel` in VR. Documented as DOM-only for now.~~
