@@ -3,7 +3,7 @@
  * (label + live value + Slider) instead of an HTML string, so uikit panels can lean on the same
  * row shape the DOM pause-menu panels already use.
  *
- * Carries no sizes or colors of its own: every node names a style out of VRMenuStyleSheet.ts.
+ * Carries no sizes or colors of its own: every node names a class out of styles/vr-menu.css.
  */
 
 import { Container, Text } from '@pmndrs/uikit'

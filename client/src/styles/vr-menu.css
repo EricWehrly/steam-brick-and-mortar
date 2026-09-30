@@ -1,0 +1,213 @@
+/*
+ * The VR menu's appearance. Plain CSS, but NOT loaded into the page: uikit isn't a DOM, so
+ * scene/uikit/VRMenuStyleSheet.ts imports this as raw text and digests it into uikit's own style
+ * registry (see UikitCssParser.ts for exactly which subset of CSS is understood - single class
+ * selectors and :root variables; anything else throws).
+ *
+ * Numbers are uikit-px, not screen pixels: unitless in uikit, scaled to world-meters by the menu
+ * root's pixelSize (VRMenuPixelSize.ts). `depth-test` and `render-order` are uikit properties with
+ * no CSS equivalent. Colors are tokens.css's --color-* custom properties, the same palette the DOM
+ * UI uses.
+ *
+ * Every class here must be listed in MENU_CLASS (VRMenuStyleSheet.ts) and vice versa - a test
+ * enforces it.
+ */
+
+:root {
+    /* Type scale */
+    --vr-font-title: 20px;
+    --vr-font-heading: 17px;
+    --vr-font-body: 16px;
+    --vr-font-label: 13px;
+    --vr-font-hint: 12px;
+
+    /* Spacing scale - grown from the original 10/15/12 values, which read as unnecessarily
+       squished and too tight. */
+    --vr-space-xs: 4px;
+    --vr-space-sm: 8px;
+    --vr-space-md: 12px;
+    --vr-space-lg: 18px;
+    --vr-space-xl: 28px;
+
+    --vr-corner-radius: 12px;
+
+    /* Fixed rather than autosized to whichever tab happens to be shortest. The content area
+       scrolls, so this is a budget, not a cap; panels never self-scroll inside it. */
+    --vr-menu-width: 820px;
+    --vr-menu-content-height: 640px;
+
+    /* Above the menu's own geometry, so other VR surfaces (the controller pointer's cursor and
+       beam) can draw over it. */
+    --vr-render-order-top: 1000;
+}
+
+/* Drawn over scene geometry rather than depth-sorted into it - a menu the world can occlude is
+   worse than useless in a headset. Both properties inherit, so descendants don't repeat them.
+   Shared by anything that is its own root: the tabbed menu and standalone world-placed panels. */
+.vr-menu-root,
+.vr-standalone-panel-root {
+    depth-test: false;
+    render-order: var(--vr-render-order-top);
+    background-color: var(--color-surface-1);
+    border-radius: var(--vr-corner-radius);
+}
+
+/* ---- Tabbed menu shell ---- */
+
+.vr-menu-root {
+    flex-direction: column;
+    gap: var(--vr-space-md);
+    width: var(--vr-menu-width);
+}
+
+.vr-menu-tab-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--vr-space-sm);
+    width: 100%;
+    padding: var(--vr-space-md);
+}
+
+.vr-menu-tab-button {
+    background-color: transparent;
+}
+
+.vr-menu-tab-button-active {
+    background-color: var(--color-surface-3);
+}
+
+.vr-menu-tab-label {
+    font-size: var(--vr-font-label);
+    color: var(--color-text-secondary);
+}
+
+.vr-menu-tab-label-active {
+    font-size: var(--vr-font-label);
+    color: var(--color-text-primary);
+}
+
+.vr-menu-content-area {
+    flex-direction: column;
+    width: 100%;
+    height: var(--vr-menu-content-height);
+    overflow: scroll;
+}
+
+/* ---- Settings panels ---- */
+
+.vr-menu-panel-root {
+    flex-direction: column;
+    gap: var(--vr-space-lg);
+    padding: var(--vr-space-xl);
+    width: 100%;
+}
+
+.vr-menu-panel-title {
+    font-size: var(--vr-font-title);
+    color: var(--color-text-primary);
+}
+
+.vr-menu-panel-note {
+    font-size: var(--vr-font-hint);
+    color: var(--color-text-tertiary);
+}
+
+.vr-menu-section {
+    flex-direction: column;
+    gap: var(--vr-space-lg);
+    width: 100%;
+}
+
+.vr-menu-section-heading {
+    font-size: var(--vr-font-heading);
+    color: var(--color-text-primary);
+}
+
+.vr-menu-section-description {
+    font-size: var(--vr-font-label);
+    color: var(--color-text-tertiary);
+}
+
+.vr-menu-setting-row {
+    flex-direction: column;
+    gap: var(--vr-space-sm);
+    width: 100%;
+}
+
+.vr-menu-setting-row-header {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.vr-menu-setting-label,
+.vr-menu-setting-value {
+    font-size: var(--vr-font-body);
+    color: var(--color-text-primary);
+}
+
+/* ---- Standalone world-placed panels ---- */
+
+/* A panel that is its own root rather than a tab inside the menu shell; the frame and
+   always-on-top rules it shares with the shell are grouped above. */
+.vr-standalone-panel-root {
+    flex-direction: column;
+    gap: var(--vr-space-xs);
+    padding: var(--vr-space-lg);
+}
+
+/* Category reference: a denser reference-table look than a settings panel - tighter rows,
+   accent headings, and a status color per row. Mirrors category-reference-panel.css, which does
+   the same job for the DOM implementation of the same content. */
+.vr-category-panel {
+    width: 480px;
+}
+
+.vr-category-scroll {
+    flex-direction: column;
+    gap: var(--vr-space-lg);
+    width: 100%;
+    height: 460px;
+    overflow: scroll;
+}
+
+.vr-category-section {
+    flex-direction: column;
+    gap: var(--vr-space-xs);
+    width: 100%;
+}
+
+.vr-category-heading {
+    font-size: var(--vr-font-label);
+    color: var(--color-accent);
+}
+
+.vr-category-row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.vr-category-label,
+.vr-category-status-live,
+.vr-category-status-planned,
+.vr-category-status-idea {
+    font-size: var(--vr-font-label);
+}
+
+.vr-category-label {
+    color: var(--color-text-primary);
+}
+
+.vr-category-status-live {
+    color: var(--color-success);
+}
+
+.vr-category-status-planned {
+    color: var(--color-warning);
+}
+
+/* "idea" isn't an error, so it reads as muted rather than being forced into the error color. */
+.vr-category-status-idea {
+    color: var(--color-text-tertiary);
+}
