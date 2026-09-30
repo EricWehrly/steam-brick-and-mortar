@@ -13,6 +13,8 @@
  * enforces it.
  */
 
+/* TD: vr-menu-css-token-duplication - this scale partly duplicates tokens.css's --space-*,
+   --radius-* and --font-size-*; see docs/tech-debt.md for what overlaps and why it's deferred. */
 :root {
     /* Type scale */
     --vr-font-title: 20px;
