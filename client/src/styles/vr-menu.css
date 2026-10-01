@@ -148,6 +148,56 @@
     color: var(--color-text-primary);
 }
 
+.vr-menu-toggle-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--vr-space-lg);
+    width: 100%;
+}
+
+/* The label and its optional description, stacked; shrinks so a long description wraps instead of
+   pushing the switch out of the row. */
+.vr-menu-toggle-text {
+    flex-direction: column;
+    gap: var(--vr-space-xs);
+    flex-shrink: 1;
+}
+
+.vr-menu-action {
+    align-self: flex-start;
+}
+
+/* ---- Confirmation dialog ---- */
+
+/* The overlay, backdrop and button behaviour are uikit-default's own; this is just the card. */
+.vr-menu-dialog {
+    width: 460px;
+    gap: var(--vr-space-lg);
+    padding: var(--vr-space-xl);
+    background-color: var(--color-surface-2);
+}
+
+.vr-menu-dialog-title {
+    font-size: var(--vr-font-heading);
+    color: var(--color-text-primary);
+}
+
+.vr-menu-dialog-message {
+    font-size: var(--vr-font-body);
+    color: var(--color-text-secondary);
+}
+
+.vr-menu-dialog-footer {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: var(--vr-space-sm);
+}
+
+.vr-menu-dialog-button-label {
+    font-size: var(--vr-font-body);
+}
+
 /* ---- Standalone world-placed panels ---- */
 
 /* A panel that is its own root rather than a tab inside the menu shell; the frame and

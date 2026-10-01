@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { range, schemaSettingKeys, schemaTabTitle, type SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
+import { action, range, schemaSettingKeys, schemaTabTitle, toggle, type SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
+import { SETTINGS_ACTION } from '../../../../src/ui/settings/SettingsActions'
 
 const BASIC = { label: 'L', min: 0, max: 1, step: 0.1 }
 
@@ -33,6 +34,28 @@ describe('schemaSettingKeys', () => {
         expect(schemaSettingKeys({ id: 'empty', title: 'Empty', icon: '❓', sections: [] })).toEqual([])
     })
 
+    it('includes a toggle\'s setting alongside a range\'s, so a schema-driven reset restores both', () => {
+        const mixed: SettingsPanelSchema = {
+            id: 'mixed',
+            title: 'Mixed',
+            icon: '🎛️',
+            sections: [{ content: [toggle('autoSave', { label: 'Auto-save' }), range('uiFontScale', BASIC)] }]
+        }
+
+        expect(schemaSettingKeys(mixed)).toEqual(['autoSave', 'uiFontScale'])
+    })
+
+    it('skips actions, which are not bound to a setting', () => {
+        const withAction: SettingsPanelSchema = {
+            id: 'actions',
+            title: 'Actions',
+            icon: '⚡',
+            sections: [{ content: [action(SETTINGS_ACTION.Export, { label: 'Export' }), range('uiFontScale', BASIC)] }]
+        }
+
+        expect(schemaSettingKeys(withAction)).toEqual(['uiFontScale'])
+    })
+
     it('skips notes, which are not bound to a setting', () => {
         const withNote: SettingsPanelSchema = {
             id: 'noted',
@@ -52,6 +75,47 @@ describe('schemaTabTitle', () => {
 
     it('is just the title when the panel has no group', () => {
         expect(schemaTabTitle({ id: 'x', title: 'Debug', icon: '🐞', sections: [] })).toBe('Debug')
+    })
+})
+
+describe('toggle', () => {
+    it('fills in the kind and carries the setting and copy through unchanged', () => {
+        expect(toggle('autoSave', { label: 'Auto-save', description: 'Saves as you go.' })).toEqual({
+            kind: 'toggle',
+            setting: 'autoSave',
+            id: 'auto-save',
+            label: 'Auto-save',
+            description: 'Saves as you go.'
+        })
+    })
+
+    it('derives the id as the kebab-case of the setting key, unless overridden', () => {
+        expect(toggle('showPerformanceStats', { label: 'Stats' }).id).toBe('show-performance-stats')
+        expect(toggle('autoSave', { label: 'Auto-save', id: 'custom-id' }).id).toBe('custom-id')
+    })
+})
+
+describe('action', () => {
+    it('fills in the kind and uses the action id as the control id', () => {
+        expect(action(SETTINGS_ACTION.Export, { label: 'Export Settings' })).toEqual({
+            kind: 'action',
+            action: SETTINGS_ACTION.Export,
+            id: SETTINGS_ACTION.Export,
+            label: 'Export Settings'
+        })
+    })
+
+    it('carries a confirmation and the flatscreen-only flag through', () => {
+        const confirm = { title: 'Sure?', message: 'Really.', confirmLabel: 'Yes' }
+
+        expect(action(SETTINGS_ACTION.ResetAll, { label: 'Reset', confirm, flatscreenOnly: true })).toMatchObject({
+            confirm,
+            flatscreenOnly: true
+        })
+    })
+
+    it('lets a panel that offers the same action twice give each its own id', () => {
+        expect(action(SETTINGS_ACTION.Export, { label: 'Export', id: 'export-again' }).id).toBe('export-again')
     })
 })
 

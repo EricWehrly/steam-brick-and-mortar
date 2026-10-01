@@ -22,13 +22,15 @@
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
+import { signal } from '@preact/signals-core'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, type SettingChangedEvent } from '../../core/AppSettings'
-import { AppSettingsEventTypes, UIEventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
+import { AppSettingsEventTypes, UIEventTypes, WebXREventTypes, type MenuPanelChangedEvent } from '../../types/InteractionEvents'
 import { VR_MENU_SCHEMAS, DEFAULT_VR_MENU_TAB_PANEL_ID, findVRMenuSchema } from './VRMenuTabRegistry'
 import { schemaTabTitle, type SettingsPanelSchema } from '../../ui/settings/SettingsSchema'
-import { buildSettingsPanel, type SettingsSchemaPanel } from './SettingsSchemaUIKitRenderer'
+import { buildSettingsPanel, type SettingsPanelContext, type SettingsSchemaPanel } from './SettingsSchemaUIKitRenderer'
 import { toUikitSafeText } from './UikitTextSanitizer'
+import { VRMenuConfirmDialog } from './VRMenuConfirmDialog'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { resolveMenuPixelSize } from './VRMenuPixelSize'
 
@@ -43,6 +45,11 @@ export class VRSettingsMenuShell {
     private readonly tabRow: Container
     private readonly contentArea: Container
     private readonly tabButtons = new Map<string, TabButtonHandle>()
+    private readonly confirmDialog = new VRMenuConfirmDialog()
+    /** True while an immersive session is presenting - a signal, so a panel's flatscreen-only
+     *  actions hide the moment a session starts even with the menu already open. */
+    private readonly immersiveSession = signal(false)
+    private readonly panelContext: SettingsPanelContext
     private activePanelId: string
     private activeContent: SettingsSchemaPanel | null = null
 
@@ -51,6 +58,11 @@ export class VRSettingsMenuShell {
         private readonly appSettings: AppSettings
     ) {
         this.activePanelId = DEFAULT_VR_MENU_TAB_PANEL_ID
+        this.panelContext = {
+            eventManager: this.eventManager,
+            requestConfirmation: request => this.confirmDialog.show(request),
+            immersiveSession: this.immersiveSession
+        }
 
         const built = this.build()
         this.container = built.container
@@ -59,6 +71,8 @@ export class VRSettingsMenuShell {
 
         this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
         this.eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, this.handleSettingChanged)
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
+        this.eventManager.registerEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
 
         this.showTab(this.activePanelId, { emit: false })
     }
@@ -82,6 +96,9 @@ export class VRSettingsMenuShell {
 
         const contentArea = new Container(undefined, [MENU_CLASS.menuContentArea])
         container.add(contentArea)
+
+        // On the root, last, so the overlay covers the tabs and the scrolling content alike.
+        container.add(this.confirmDialog.container)
 
         return { container, tabRow, contentArea }
     }
@@ -126,8 +143,11 @@ export class VRSettingsMenuShell {
         this.activePanelId = panelId
         this.setTabButtonActive(panelId, true)
 
+        // A confirmation belongs to the panel that asked for it; don't leave it hanging over another.
+        this.confirmDialog.cancel()
+
         this.activeContent?.container.removeFromParent()
-        this.activeContent = buildSettingsPanel(schema, this.appSettings)
+        this.activeContent = buildSettingsPanel(schema, this.appSettings, this.panelContext)
         this.contentArea.add(this.activeContent.container)
 
         if (options.emit) {
@@ -162,8 +182,18 @@ export class VRSettingsMenuShell {
         this.container.setProperties({ pixelSize: resolveMenuPixelSize(this.appSettings) })
     }
 
+    private readonly handleXRSessionStart = (): void => {
+        this.immersiveSession.value = true
+    }
+
+    private readonly handleXRSessionEnd = (): void => {
+        this.immersiveSession.value = false
+    }
+
     dispose(): void {
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
         this.eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, this.handleSettingChanged)
+        this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
+        this.eventManager.deregisterEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
     }
 }

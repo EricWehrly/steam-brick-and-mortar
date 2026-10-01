@@ -20,6 +20,7 @@
  */
 
 import type { ApplicationSettings } from '../../core/AppSettings'
+import type { SettingsActionId } from './SettingsActions'
 
 /** Keys of ApplicationSettings whose value is a number - the only settings a range control can
  *  bind to. Distributes over the union so a RangeSettingControl's `setting` field type-checks
@@ -90,12 +91,78 @@ export interface NoteContent {
     readonly text: string
 }
 
-// Extend with 'toggle' | 'select' variants when a panel actually needs them (Story 5) - see
+/** Keys of ApplicationSettings whose value is a boolean - what a toggle can bind to. */
+export type BooleanSettingKey = {
+    [K in keyof ApplicationSettings]: ApplicationSettings[K] extends boolean ? K : never
+}[keyof ApplicationSettings]
+
+export interface ToggleSettingControl {
+    readonly kind: 'toggle'
+    readonly setting: BooleanSettingKey
+    /** DOM element id / uikit row key - must be unique within the panel. */
+    readonly id: string
+    readonly label: string
+    readonly description?: string
+}
+
+export interface ToggleOptions {
+    readonly label: string
+    readonly description?: string
+    /** Only for the rare control whose DOM id shouldn't follow its setting key. */
+    readonly id?: string
+}
+
+/** Builds a toggle, deriving `kind` and an `id` that is the kebab-case of the setting key. */
+export function toggle(setting: BooleanSettingKey, options: ToggleOptions): ToggleSettingControl {
+    const { id, ...rest } = options
+    return { kind: 'toggle', setting, id: id ?? kebabCase(setting), ...rest }
+}
+
+/** Asks the user to confirm before an action is carried out. Shown as a modal over the menu on
+ *  surfaces that can't use a blocking window.confirm() - which is every immersive session. */
+export interface ActionConfirmation {
+    readonly title: string
+    readonly message: string
+    readonly confirmLabel: string
+}
+
+/** A button that asks the app to do something other than set a setting. Pressing it raises
+ *  UIEventTypes.SettingsActionRequested carrying `action`; nothing about how it's carried out lives
+ *  in the schema or the renderer. Not bound to a setting. */
+export interface ActionContent {
+    readonly kind: 'action'
+    readonly action: SettingsActionId
+    /** DOM element id / uikit row key - must be unique within the panel. */
+    readonly id: string
+    readonly label: string
+    readonly confirm?: ActionConfirmation
+    /** Hidden while an immersive session is presenting - for actions that depend on browser UI
+     *  (a file picker, a download) that can't be reached from inside a headset. */
+    readonly flatscreenOnly?: boolean
+}
+
+export interface ActionOptions {
+    readonly label: string
+    readonly confirm?: ActionConfirmation
+    readonly flatscreenOnly?: boolean
+    /** Only for a panel that offers the same action twice. */
+    readonly id?: string
+}
+
+/** Builds an action, deriving `kind` and an `id` that is the action's own id. */
+export function action(actionId: SettingsActionId, options: ActionOptions): ActionContent {
+    const { id, ...rest } = options
+    return { kind: 'action', action: actionId, id: id ?? actionId, ...rest }
+}
+
+// Extend with a 'select' variant when a panel actually needs one (Story 5) - see
 // docs/plans/vr-uikit-menu-migration-plan.md.
-export type SettingControl = RangeSettingControl
+/** A control bound to a setting - what schemaSettingKeys() collects and a schema-driven reset
+ *  restores. */
+export type SettingControl = RangeSettingControl | ToggleSettingControl
 
 /** Anything a section can contain, in render order. */
-export type SectionContent = SettingControl | NoteContent
+export type SectionContent = SettingControl | ActionContent | NoteContent
 
 export interface SettingsSection {
     /** Omitted for a section that's just a run of controls with no heading of its own - a panel
@@ -122,7 +189,7 @@ export interface SettingsPanelSchema {
 }
 
 export function isSettingControl(content: SectionContent): content is SettingControl {
-    return content.kind !== 'note'
+    return content.kind === 'range' || content.kind === 'toggle'
 }
 
 /** How a flat surface (the VR tab row) names this panel: 'Display · Advanced' rather than a bare

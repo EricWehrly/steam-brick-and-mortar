@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { AppSettings } from '../../../../src/core/AppSettings'
 import { VR_MENU_SCHEMAS, DEFAULT_VR_MENU_TAB_PANEL_ID, findVRMenuSchema } from '../../../../src/scene/uikit/VRMenuTabRegistry'
 import { buildSettingsPanel } from '../../../../src/scene/uikit/SettingsSchemaUIKitRenderer'
+import { createTestPanelContext } from '../../../utils/settings-panel-context'
 
 describe('VR_MENU_SCHEMAS', () => {
     it('has at least two entries so the shell has something to switch between', () => {
@@ -22,10 +23,14 @@ describe('VR_MENU_SCHEMAS', () => {
         expect(findVRMenuSchema('not-a-real-panel')).toBeUndefined()
     })
 
+    it('lists the Application panel under the same id as its DOM counterpart, so the menus can sync on it', () => {
+        expect(findVRMenuSchema('application')).toBeDefined()
+    })
+
     it('every registered schema builds real content without throwing', () => {
         const appSettings = AppSettings.getInstance()
         for (const schema of VR_MENU_SCHEMAS) {
-            expect(() => buildSettingsPanel(schema, appSettings)).not.toThrow()
+            expect(() => buildSettingsPanel(schema, appSettings, createTestPanelContext().context)).not.toThrow()
         }
     })
 })

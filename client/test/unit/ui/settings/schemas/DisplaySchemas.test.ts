@@ -5,12 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { isSettingControl } from '../../../../../src/ui/settings/SettingsSchema'
+import type { RangeSettingControl, SettingsPanelSchema } from '../../../../../src/ui/settings/SettingsSchema'
 import { DISPLAY_ADVANCED_SCHEMA } from '../../../../../src/ui/settings/schemas/DisplayAdvancedSchema'
 import { DISPLAY_UI_SCHEMA } from '../../../../../src/ui/settings/schemas/DisplayUISchema'
 
-function controlsOf(schema: typeof DISPLAY_UI_SCHEMA) {
-    return schema.sections.flatMap(section => section.content).filter(isSettingControl)
+function controlsOf(schema: SettingsPanelSchema): RangeSettingControl[] {
+    return schema.sections
+        .flatMap(section => section.content)
+        .filter((content): content is RangeSettingControl => content.kind === 'range')
 }
 
 describe('shipped Display schemas', () => {

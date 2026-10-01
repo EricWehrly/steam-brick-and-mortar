@@ -7,10 +7,54 @@
  */
 
 import { Container, Text } from '@pmndrs/uikit'
-import { Slider } from '@pmndrs/uikit-default'
+import { Slider, Switch } from '@pmndrs/uikit-default'
 import { signal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { toUikitSafeText } from './UikitTextSanitizer'
+
+export interface UIKitToggleRowOptions {
+    readonly label: string
+    readonly description?: string
+    readonly checked: boolean
+    readonly onChange: (checked: boolean) => void
+}
+
+export interface UIKitToggleRow {
+    readonly container: Container
+    /** Resyncs the switch to an externally-set value (e.g. a reset-to-defaults action). */
+    setValue(checked: boolean): void
+}
+
+export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow {
+    const { label, description, checked, onChange } = options
+
+    const row = new Container(undefined, [MENU_CLASS.toggleRow])
+
+    const text = new Container(undefined, [MENU_CLASS.toggleText])
+    text.add(new Text({ text: toUikitSafeText(label) }, [MENU_CLASS.settingLabel]))
+    if (description) {
+        text.add(new Text({ text: toUikitSafeText(description) }, [MENU_CLASS.sectionDescription]))
+    }
+    row.add(text)
+
+    // A signal, not a plain boolean, for the same reason as the slider below: a plain value puts
+    // the switch in controlled mode with a prop that never changes, so it would visibly snap back.
+    const checkedSignal = signal(checked)
+    row.add(new Switch({
+        checked: checkedSignal,
+        onCheckedChange: (next: boolean) => {
+            checkedSignal.value = next
+            onChange(next)
+        }
+    }))
+
+    return {
+        container: row,
+        setValue: (next: boolean) => {
+            checkedSignal.value = next
+        }
+    }
+}
 
 export interface UIKitSliderRowOptions {
     readonly label: string
