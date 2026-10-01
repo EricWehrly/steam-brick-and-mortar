@@ -67,8 +67,9 @@ silently dropped, since a lost declaration is an invisible styling bug:
 Two guards keep the CSS and the TypeScript that names its classes honest: a test asserts every
 class in `MENU_CLASS` has a rule and vice versa, and the module throws at load if the CSS arrives
 empty. The second exists because **Vitest blanks every `.css` file to an empty string by default,
-`?raw` included**; `test/vitest.shared.ts` opts this one file back in, and each vitest config lists
-it. Forgetting that in a new config would otherwise leave the menu silently unstyled under test.
+`?raw` included**; `test/vitest.base.ts` opts this one file back in, and every vitest config merges
+that base. A new config that doesn't merge it would otherwise leave the menu silently unstyled under
+test - which is what the throw at load is there to catch.
 
 The uikit machinery this rides on:
 
