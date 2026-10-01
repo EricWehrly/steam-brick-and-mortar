@@ -261,20 +261,6 @@ What retires, and when:
 
 **Related**: [`vr-uikit-menu-migration-plan.md`](plans/vr-uikit-menu-migration-plan.md) Story 7; `vr-menu-css-token-duplication` (the category-reference colors in `vr-menu.css` mirror the DOM stylesheet this entry deletes).
 
-## id: vitest-config-shared-base
-**Priority**: Low - works today; it's duplication, not a defect
-**Effort**: ~1 hour
-**Context**: `client/test/` has five standalone vitest configs (`vitest.config.ts`, `.all`, `.integration`, `.live`, `.performance`). None extends another, so anything they should agree on has to be pasted into each - which is how `test/vitest.shared.ts` came to exist (opting `vr-menu.css` out of Vitest's default blanking of `.css` files, including `?raw` imports, had to be added to all five). They do share a real core (`globals`, `jsdom`, `setupFiles`, `watch: false`); they differ on reporters, include/exclude, timeouts and pool. Review feedback on PR #169: "do these not all inherit from `vitest.config.ts`?" - they should.
-
-**Decision**: do this **after #168 merges**, as its own small change. It rewrites every config, so doing it mid-stack would conflict with the work in flight.
-
-**Done when**:
-- One base config holds the shared core (including the CSS opt-in); each other config only states how it differs, via `mergeConfig`
-- `test/vitest.shared.ts` is removed
-- `yarn test`, `test:integration`, `test:all` and `test:performance` each run the same set of tests as before (compare per-file counts, not just totals)
-
-**Related gap worth fixing alongside**: the summary reporter reports a test file that fails to *load* (e.g. a throwing import) as 0 passed / 0 failed, so `yarn test` can print `FAILURES: 0` while whole suites silently don't run. It surfaced only because the pass count dropped from 1766 to 1716. A file that can't load should count as a failure.
-
 ---
 
 ## Later / Backlog
@@ -939,3 +925,6 @@ index 4 does open the menu. `InputProfile.ts`'s VR `OpenMenu` binding was correc
 
 ## id: gamepad-button-actions-unconsumed
 **Status**: ✅ Resolved 2026-07-24 — see `docs/plans/input-action-routing-plan.md` (implemented, then revised twice the same day after design reviews — see the plan's "Revision history" for what changed and why each time). Keyboard `Interact`/`OpenMenu` now fire directly off the real `keydown` DOM event (via a new `InputStateTracker.onRawKeyDown` callback) — no polling, no frame-diffing, since keyboard already has a real press edge. Mouse deliberately has no equivalent path: a real mouse click already has its own independent dispatch (`SystemUICoordinator`), entirely separate from the binding system, so nothing was added to route it through here too. Gamepad has no native press event, so `DeviceDetector.pollGamepads()` (which already polls every frame) tracks per-button state and emits `InputEventTypes.GamepadButtonPressed` on a transition. Both keyboard and gamepad funnel through `InputActionResolver`'s new `handleRawKeyPress()`/`handleGamepadButtonPress()`, which look up bound actions via a new `BindingResolver.findButtonActionsBoundTo()` and resolve all the way to a *specific* event per action (`InputEventTypes.OpenMenuPressed`, `InputEventTypes.InteractPressed`) rather than a generic tagged envelope — `InputActionResolver` is the class whose job is deciding which action fired, so it does that fully rather than handing a partial answer downstream. No dispatcher class: `PauseMenuManager` listens for `OpenMenuPressed` directly and calls its own `toggle()` (replacing the old hardcoded `Escape`-only listener); `SystemUICoordinator` listens for `InteractPressed` (simulates a click at the reticle position by emitting the existing `SceneCanvasClick` with center-screen NDC) and owns the gamepad/VR reticle. Along the way, fixed two real bugs: (1) pausing didn't actually stop gamepad-driven camera movement — `InputManager` now has `pause()`/`resume()` that gate camera application only, while `updateFrame()` (gamepad polling) keeps running; (2) `DeviceDetector.pollGamepads()` only flagged a device-list change on gamepad *disconnect*, never *connect* via polling. `ToggleUI` and `ToggleFullscreen` were both removed entirely rather than built (see [Input System](features/input-system.md) Stretch section) — no consumer was ever designed for `ToggleUI`, and `ToggleFullscreen` was redundant scope (F11 already provides native browser fullscreen).
+
+## id: vitest-config-shared-base
+**Status**: ✅ Resolved 2026-10-01 — the five vitest configs now `mergeConfig` a shared `test/vitest.base.ts` (globals, jsdom, setup files, the `vr-menu.css` opt-in out of Vitest's default `.css` blanking, default timeout) and state only how they differ; `test/vitest.shared.ts` is gone. Not a literal "inherit from `vitest.config.ts`": `mergeConfig` concatenates arrays, so that would have handed the integration config an exclude list naming its own tests. Verified by snapshotting every config's resolved settings before and after - four identical, `performance` differing only by gaining `watch: false`. Also fixed the summary reporter counting a test file that fails to load (or an unhandled error) as nothing: it now counts as a failure, with a unit test for the reporter and an end-to-end check.
