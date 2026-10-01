@@ -18,12 +18,15 @@ function formatError(error: string): string {
     return displayLines.map(l => `    ${l.trim()}`).join('\n')
 }
 
+const LOAD_FAILURE_LABEL = '(file failed to load)'
+const UNHANDLED_ERROR_LABEL = '(unhandled error)'
+
 const SEP = '═'.repeat(60)
 const DIV = '─'.repeat(60)
 
 export function createSummaryReporter(outputFile = 'test-results/test-results.json') {
     return {
-        onTestRunEnd(testModules: any[]): void {
+        onTestRunEnd(testModules: any[], unhandledErrors: any[] = []): void {
             let passed = 0, failed = 0, skipped = 0
             const failures: FailedTest[] = []
             const timeouts: FailedTest[] = []
@@ -33,6 +36,15 @@ export function createSummaryReporter(outputFile = 'test-results/test-results.js
             for (const module of testModules) {
                 const filePath = relative(process.cwd(), module.moduleId ?? '').replace(/\\/g, '/')
                 const stats: FileStats = { path: filePath, passed: 0, failed: 0, skipped: 0 }
+
+                // A file that can't be loaded (a throwing import, a syntax error) has no tests to
+                // report on, so counting only tests made it invisible: the run printed
+                // FAILURES: 0 while whole suites silently never ran.
+                for (const error of module.errors?.() ?? []) {
+                    failed++
+                    stats.failed++
+                    failures.push({ file: filePath, test: LOAD_FAILURE_LABEL, error: error?.message ?? 'Unknown error' })
+                }
 
                 for (const test of module.children.allTests()) {
                     const result = (test as any).result()
@@ -57,6 +69,13 @@ export function createSummaryReporter(outputFile = 'test-results/test-results.js
                 }
 
                 files.push(stats)
+            }
+
+            // Errors thrown outside any test (an async callback, a stray rejection) fail the run
+            // in vitest itself; they belong in the count too.
+            for (const error of unhandledErrors) {
+                failed++
+                failures.push({ file: UNHANDLED_ERROR_LABEL, test: error?.name ?? 'Error', error: error?.message ?? 'Unknown error' })
             }
 
             const report: ReportData = {
