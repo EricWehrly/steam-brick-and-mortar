@@ -378,18 +378,27 @@ One commit per panel. Order revised 2026-08-20 (see "Tab order & scope pivot" ab
 now lead, piloting the inline "to be implemented" placeholder pattern on low-stakes panels before
 the settings-shaped ones:
 
-1. `DebugPanel` ✅ done 2026-08-20 — mostly read-only stats; first test of the pattern on a
-   non-settings-shaped panel.
+1. `DebugPanel` — **dropped 2026-09-08**: a first VR port was built, then removed, because it needed
+   a live `PerformanceMonitorUI` published through `DataManager`, and the project owner ruled out
+   `DataManager` owning UI objects. No VR debug panel is planned for now; the DOM one stays.
 2. `CacheManagementPanel` — pilots inline per-section "to be implemented" placeholders specifically.
-3. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves)
-4. `ApplicationPanel` (toggles + buttons — exercises `createToggleRow`)
+   (A hand-built port exists on `feature/vr-uikit-menu-migration-v2`; it predates the schema +
+   stylesheet model, so it's reference for behavior, not code to merge.)
+3. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves) — same
+   situation as Cache.
+4. `ApplicationPanel` ✅ ported 2026-10-01 — introduced the `toggle` and `action` schema controls, a
+   modal confirmation dialog (`window.confirm()` is blocked in an immersive session), and
+   flatscreen-only actions. Its DOM counterpart stays until the flip (Story 7). Export/import are
+   hidden in VR; tracked as `vr-settings-file-io`.
 5. `GameSettingsPanel` (toggles + selects + inputs — exercises `createSelectRow`; text input in VR
    is an open problem, see Non-goals)
 6. `GraphicsSettingsPanel` (largest; expect real escape-hatch pressure — presets, reload badges)
 7. `ControlsPanel` (rebind-capture UI — least schema-shaped, likely heaviest placeholder use)
 
-Each: schema entry (or placeholder-annotated equivalent for 1/2/7) → both renderers → DOM panel
-rewritten to the schema → VR panel appears in the shell → tests → in-headset check.
+Each: schema entry (or placeholder-annotated equivalent for 2/7) → uikit renderer → VR panel
+appears in the shell → tests → in-headset check. The DOM panel is **not** rewritten onto the schema
+or deleted as part of the port (`DisplayAdvancedPanel`, the pilot, being the exception): it keeps
+working until the flip and is deleted with the rest - see Story 7.
 
 ### Story 6 — Remove the toggle, define the DOM menu's VR behavior
 
@@ -407,15 +416,21 @@ rewritten to the schema → VR panel appears in the shell → tests → in-heads
 ### Story 7 — Retire the DOM panels
 
 The end state is **one universal UI** that works on flatscreen and in VR, not a uikit menu living
-beside the DOM one - so every DOM pause-menu panel is temporary, and a port isn't finished until its
-DOM counterpart is deleted (review feedback on PR #168: "let's just try to replace the old dom stuff
-before we add any new stuff"). Until this story was written the removal was only implied, which is
-how ports could land and the DOM versions quietly stay.
+beside the DOM one - so every DOM pause-menu panel is temporary (review feedback on PR #168: "let's
+just try to replace the old dom stuff before we add any new stuff"). Until this story was written
+the removal was only implied, which is how ports could land and the DOM versions quietly stay.
 
-- **Per panel, inside the port that reaches parity**: delete the `PauseMenuPanel` subclass, its
-  `src/templates/pause-menu/*.html` and its `src/styles/pause-menu/*.css`.
-- **DOM `CategoryReferencePanel`** and its stylesheet go with the uikit unification parked on
-  `feature/vr-category-reference-unification`.
+**Timing (decided 2026-10-01): the DOM panels are deleted together at the Story 6 flip, not one per
+port.** The uikit menu is only the default flatscreen menu once the force flag is gone, so deleting a
+DOM panel the moment its VR port lands would drop that panel from the default flatscreen menu in the
+meantime. (An earlier draft of this story said "per panel, in the port"; that contradicted Story 6.)
+
+- **At the flip, all together**: every `PauseMenuPanel` subclass, its `src/templates/pause-menu/*.html`
+  and its `src/styles/pause-menu/*.css`.
+- **DOM `CategoryReferencePanel`** and its stylesheet: the uikit replacement was merged (`18e7b615`,
+  `42afb416`) and then reverted (`75eeaea9`) to shrink a review. Landing it again is
+  `git revert 75eeaea9` plus fixes - not a rebase, and **it needs a trigger first**, since the
+  unified panel's `toggle()` has no callers and the 'G' hotkey and DOM button are what it deletes.
 - **The tail, after the last port and Story 6**: `PauseMenuManager`'s DOM rendering and
   `setDomVisualsSuppressed`, the `MenuPanelChanged` two-way sync, `SettingsSchemaDomRenderer`, and
   `TemplateEngine` if nothing else uses it.
