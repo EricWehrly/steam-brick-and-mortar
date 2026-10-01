@@ -1,14 +1,9 @@
-import { defineConfig } from 'vitest/config'
-import { RAW_STYLESHEET_CSS } from './vitest.shared'
+import { defineConfig, mergeConfig } from 'vitest/config'
+import { baseConfig } from './vitest.base'
 import { createSummaryReporter } from './reporters/summary-reporter'
 
-export default defineConfig({
+export default mergeConfig(baseConfig, defineConfig({
   test: {
-    globals: true,
-    environment: 'jsdom',
-    css: RAW_STYLESHEET_CSS,
-    setupFiles: ['./test/setup.ts'],
-    watch: false,
     pool: 'threads',
     maxWorkers: '80%',
     reporters: [createSummaryReporter('./test-results/integration-results.json')],
@@ -22,4 +17,4 @@ export default defineConfig({
       '**/dist/**'
     ]
   },
-})
+}))

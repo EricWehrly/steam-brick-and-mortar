@@ -53,10 +53,10 @@ export const MENU_CLASS = {
 } as const
 
 // Vitest blanks .css files to '' unless a config's test.css.include matches them (see
-// test/vitest.shared.ts). An empty stylesheet parses fine and just leaves the menu unstyled, so fail
+// test/vitest.base.ts). An empty stylesheet parses fine and just leaves the menu unstyled, so fail
 // here instead of letting that pass silently.
 if (vrMenuCss.trim().length === 0) {
-    throw new Error('vr-menu.css loaded empty - is the test config missing RAW_STYLESHEET_CSS (test/vitest.shared.ts)?')
+    throw new Error('vr-menu.css loaded empty - does this vitest config merge test/vitest.base.ts (its css.include)?')
 }
 
 export const VR_MENU_STYLES = parseUikitCss(vrMenuCss, resolveColorTokenVar)
