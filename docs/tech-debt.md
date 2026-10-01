@@ -246,12 +246,14 @@ approach extend cleanly to meshes, or do meshes need a different policy shape th
 
 ## id: dom-menu-panel-retirement
 **Priority**: Medium - the stated end state of the VR settings-menu migration, but sequenced behind the ports rather than ahead of them
-**Effort**: Incremental - each panel's deletion rides with its own port; the tail (manager, flag, renderers, templates) is a final cleanup pass
-**Context**: The migration's goal is **one universal UI** - a single uikit implementation that works on flatscreen and in VR - not a VR-only menu living beside the DOM one. That makes every DOM pause-menu panel temporary. Until now the removal was only implied ("the DOM menu being phased out" in `docs/plans/vr-uikit-menu-migration-plan.md`); nothing owned actually deleting it, so nothing would notice if ports landed and the DOM versions quietly stayed. Review feedback on PR #168: "let's just try to replace the old dom stuff before we add any new stuff" - a port is a *replacement*, not an addition, and is not finished until its DOM counterpart is gone.
+**Effort**: Incremental ports, then one deletion pass at the flip - the DOM panels are deleted together, not one per port
+**Context**: The migration's goal is **one universal UI** - a single uikit implementation that works on flatscreen and in VR - not a VR-only menu living beside the DOM one. That makes every DOM pause-menu panel temporary. Until now the removal was only implied ("the DOM menu being phased out" in `docs/plans/vr-uikit-menu-migration-plan.md`); nothing owned actually deleting it, so nothing would notice if ports landed and the DOM versions quietly stayed. Review feedback on PR #168: "let's just try to replace the old dom stuff before we add any new stuff" - a port replaces a panel; it doesn't add a second one.
+
+**Decision (2026-10-01): delete the DOM panels together at the Story 6 flip, not one per port.** The uikit menu only becomes the default flatscreen menu once the `?forceVRSettingsPanel=1` flag is removed, so deleting a DOM panel as soon as its VR port lands would drop that panel from the default flatscreen pause menu in the meantime (it would stay reachable only behind the flag and in VR). Ports therefore land alongside their DOM counterparts, and each ported panel is recorded in Story 5's status. An earlier version of this entry said "per panel, in the port"; that was inconsistent with Story 6's sequencing.
 
 What retires, and when:
-- **Per panel, in the port that achieves parity**: the `PauseMenuPanel` subclass registered in `PauseMenuManager.registerDefaultPanels()`, its `src/templates/pause-menu/*.html`, and its `src/styles/pause-menu/*.css`. `DisplayAdvancedPanel` is already schema-driven and is the pilot; it stays until the VR tab covers flatscreen in practice.
-- **DOM `CategoryReferencePanel`** (`src/ui/CategoryReferencePanel.ts`, `src/styles/category-reference-panel.css`) - its removal, and the single uikit implementation replacing it, is built and parked on branch `feature/vr-category-reference-unification`, waiting to be rebased onto `act2/default` and opened as its own PR after #168 lands.
+- **At the flip, all together**: every `PauseMenuPanel` subclass registered in `PauseMenuManager.registerDefaultPanels()`, with its `src/templates/pause-menu/*.html` and `src/styles/pause-menu/*.css`. Ported so far: `DisplayAdvancedPanel` (pilot), `ApplicationPanel`. Until then a ported DOM panel stays and may share helpers with its VR twin (the DOM `ApplicationPanel` and the VR Application tab share `SettingsFileTransfer.ts`).
+- **DOM `CategoryReferencePanel`** (`src/ui/CategoryReferencePanel.ts`, `src/styles/category-reference-panel.css`) - the single uikit replacement was built, **merged as `18e7b615` + `42afb416`, and then reverted by `75eeaea9`** to shrink #168's review. It is not parked on a branch awaiting a rebase (`feature/vr-category-reference-unification` holds no unique content - every commit on it is already upstream); landing it again means `git revert 75eeaea9` plus fixes, chiefly adapting `VRCategoryReferencePanel.ts` to the `vr-menu.css` stylesheet that landed afterwards. **Blocker: it would ship unreachable** - the unified coordinator's `toggle()` has no callers and the DOM panel's 'G' hotkey and toggle button are what it deletes, so it needs a trigger (a typed UI event, a menu button, or a dev flag) before it can land.
 - **The tail, once the last panel is ported**: `?forceVRSettingsPanel=1` and `UrlUtils.isVRSettingsPanelForced()` (Story 6), `PauseMenuManager`'s DOM rendering and `setDomVisualsSuppressed`, the `MenuPanelChanged` two-way sync, `SettingsSchemaDomRenderer`, and `TemplateEngine` if nothing else still uses it.
 
 **Done when**:
@@ -293,6 +295,20 @@ What retires, and when:
 - Values that genuinely coincide reference `tokens.css` (widen the resolver beyond colors), and only VR-specific values keep a `--vr-*` name
 
 **Related**: `dom-menu-panel-retirement` - the category-reference colors in `vr-menu.css` mirror `category-reference-panel.css`, which that entry deletes.
+
+## id: vr-settings-file-io
+**Priority**: Low - flatscreen is unaffected; this is a gap in the VR menu's feature parity
+**Effort**: Unknown until a VR-appropriate approach is chosen
+**Context**: The Application panel's **Export Settings** and **Import Settings** are `flatscreenOnly` in `schemas/ApplicationSchema.ts` and hide while an immersive session is presenting (decision 2026-10-01: "flatscreen only; hide in VR; note for later"). Export builds a download link and import opens a native `<input type="file">` picker (`ui/settings/SettingsFileTransfer.ts`); a file picker generally can't be opened from inside an immersive session, and whether a programmatic download works there has **not been verified in a headset**. So the VR tab has a visibly shorter action list than flatscreen.
+
+**Decision (for now)**: track it, don't fix. Settings stay portable on flatscreen, and a headset user can export/import from the desktop before or after a session.
+
+**Done when** (any outcome that settles it):
+- A VR-appropriate way to move settings in and out is built (e.g. paste/copy of the JSON in an in-world text field, or a share/clipboard path), **or**
+- Export is confirmed to work in a headset and only import remains flatscreen-only, with the schema's `flatscreenOnly` narrowed to match, **or**
+- It is decided VR users don't need it, and the flag and this entry are kept as the record of why
+
+**Related**: `dom-menu-panel-retirement` (the DOM panel this replaces still owns the only working import path until the flip).
 
 ## id: lambda-outbound-api-circuit-breaker
 **Priority**: Low

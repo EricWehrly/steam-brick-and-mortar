@@ -29,6 +29,7 @@ export const APPLICATION_SCHEMA: SettingsPanelSchema = {
                         confirmLabel: 'Reset'
                     }
                 }),
+                // TD: vr-settings-file-io
                 action(SETTINGS_ACTION.Export, { label: 'Export Settings', flatscreenOnly: true }),
                 action(SETTINGS_ACTION.Import, { label: 'Import Settings', flatscreenOnly: true })
             ]

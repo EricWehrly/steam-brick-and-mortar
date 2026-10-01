@@ -113,9 +113,15 @@ the user's font-scale setting and therefore can't live in a static stylesheet â€
 2. **`setTheme()` from `@pmndrs/uikit-default`.** Its `Button`/`Slider` variants read a theme of
    signals, so pointing that theme at `COLOR_TOKENS` would make the pre-styled controls match the
    app palette live. Skipped here because it is global â€” it would restyle the game box's controls
-   too, which belongs with item 1.
-3. **Control kinds beyond `range`.** `toggle`/`select` land as the remaining DOM panels port
-   (migration plan's Story 5); each is a renderer case plus a schema variant, in both renderers.
+   too, which belongs with item 1. The confirmation dialog (`VRMenuConfirmDialog`, built on
+   uikit-default's `AlertDialog`) is now a visible case of this: its buttons and surface come from
+   that theme, so they only approximately match the app palette until `setTheme()` is pointed at it.
+3. **Control kinds beyond `range`, `toggle` and `action`.** `toggle` and `action` landed with the
+   Application panel (a switch bound to a boolean setting; a button that raises
+   `SettingsActionRequested`, with optional confirmation and a flatscreen-only flag). `select` is
+   still to come with Game Settings (migration plan's Story 5). Each kind is a schema variant plus a
+   uikit renderer case; the DOM renderer deliberately rejects the new kinds, since the DOM panels
+   that would use them are deleted at the menu flip rather than rewritten onto the schema.
 4. **Rows don't observe external setting changes.** A row's displayed value resyncs on `reset()` and
    on its own drag, not when something else writes the same setting. Fine today; revisit if two
    surfaces are ever open at once.
