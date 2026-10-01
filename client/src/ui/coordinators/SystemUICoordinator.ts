@@ -37,6 +37,7 @@ import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
 import { VRCategoryReferenceCoordinator } from '../../scene/uikit/VRCategoryReferenceCoordinator'
+import { SettingsActionHandler } from '../settings/SettingsActionHandler'
 import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
 
@@ -64,6 +65,7 @@ export class SystemUICoordinator {
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
+    private settingsActionHandler: SettingsActionHandler
     private vrCategoryReferenceCoordinator?: VRCategoryReferenceCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
@@ -107,6 +109,7 @@ export class SystemUICoordinator {
         )
 
         this.vrSettingsPanelCoordinator = new VRSettingsPanelCoordinator(this.eventManager, this.appSettings)
+        this.settingsActionHandler = new SettingsActionHandler(this.eventManager, this.appSettings)
     }
 
     public async init(
@@ -144,6 +147,7 @@ export class SystemUICoordinator {
         this.pauseMenuManager.registerDefaultPanels()
 
         this.vrSettingsPanelCoordinator.init(renderer)
+        this.settingsActionHandler.init()
 
         // Which settings surface you get is decided by whether you're in a headset, not by a flag:
         // in an immersive session the VR uikit panel shows, on flatscreen the DOM pause menu does
@@ -507,6 +511,7 @@ export class SystemUICoordinator {
         this.sceneClickGameBoxRaycast?.dispose()
         this.sceneClickGameBoxRaycast = undefined
         this.vrSettingsPanelCoordinator?.dispose()
+        this.settingsActionHandler?.dispose()
         this.vrCategoryReferenceCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null
