@@ -10,7 +10,7 @@
 import { RangeControl } from '../components/UIComponent'
 import type { SliderConfig } from '../../utils/UIComponentUtils'
 import type { AppSettings } from '../../core/AppSettings'
-import { isSettingControl, type SectionContent, type SettingsPanelSchema, type SettingsSection } from './SettingsSchema'
+import type { SectionContent, SettingsPanelSchema, SettingsSection } from './SettingsSchema'
 
 export function renderSettingsSchemaSections(schema: SettingsPanelSchema, appSettings: AppSettings): string {
     return schema.sections.map(section => renderSection(section, appSettings)).join('')
@@ -35,11 +35,9 @@ function renderSection(section: SettingsSection, appSettings: AppSettings): stri
 }
 
 function renderContent(content: SectionContent, appSettings: AppSettings): string {
-    if (!isSettingControl(content)) {
-        return `<p class="setting-description">${content.text}</p>`
-    }
-
     switch (content.kind) {
+        case 'note':
+            return `<p class="setting-description">${content.text}</p>`
         case 'range':
             return new RangeControl({
                 id: content.id,
@@ -52,6 +50,12 @@ function renderContent(content: SectionContent, appSettings: AppSettings): strin
                 formatDisplay: content.formatDisplay,
                 trackLabels: content.trackLabels
             }).render()
+        case 'toggle':
+        case 'action':
+            // The DOM menu's panels that use these (ApplicationPanel) are still hand-written and
+            // are deleted at the menu flip, so rendering them here would be code built to be thrown
+            // away. Failing loudly beats rendering nothing.
+            throw new Error(`The DOM schema renderer does not render "${content.kind}" controls ("${content.id}")`)
     }
 }
 

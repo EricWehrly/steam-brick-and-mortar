@@ -6,14 +6,17 @@
  *
  * Ported one entry at a time as DOM pause-menu panels migrate onto SettingsSchema (Story 5 of
  * docs/plans/vr-uikit-menu-migration-plan.md). A DOM panel without an entry here isn't listed
- * twice with a dead stub - it just isn't a VR tab yet.
+ * twice with a dead stub - it just isn't a VR tab yet. Ordered like the DOM menu's own tabs
+ * (Application ahead of the Display group), and the first entry is the tab shown by default.
  */
 
 import type { SettingsPanelSchema } from '../../ui/settings/SettingsSchema'
+import { APPLICATION_SCHEMA } from '../../ui/settings/schemas/ApplicationSchema'
 import { DISPLAY_ADVANCED_SCHEMA } from '../../ui/settings/schemas/DisplayAdvancedSchema'
 import { DISPLAY_UI_SCHEMA } from '../../ui/settings/schemas/DisplayUISchema'
 
 export const VR_MENU_SCHEMAS: readonly SettingsPanelSchema[] = [
+    APPLICATION_SCHEMA,
     DISPLAY_ADVANCED_SCHEMA,
     DISPLAY_UI_SCHEMA
 ]

@@ -38,6 +38,15 @@ export const MENU_CLASS = {
     settingRowHeader: 'vr-menu-setting-row-header',
     settingLabel: 'vr-menu-setting-label',
     settingValue: 'vr-menu-setting-value',
+    toggleRow: 'vr-menu-toggle-row',
+    toggleText: 'vr-menu-toggle-text',
+    action: 'vr-menu-action',
+
+    dialog: 'vr-menu-dialog',
+    dialogTitle: 'vr-menu-dialog-title',
+    dialogMessage: 'vr-menu-dialog-message',
+    dialogFooter: 'vr-menu-dialog-footer',
+    dialogButtonLabel: 'vr-menu-dialog-button-label',
 
     standalonePanelRoot: 'vr-standalone-panel-root',
 
