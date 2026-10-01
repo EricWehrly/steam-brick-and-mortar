@@ -1,15 +1,10 @@
-import { defineConfig } from 'vitest/config'
-import { RAW_STYLESHEET_CSS } from './vitest.shared'
+import { defineConfig, mergeConfig } from 'vitest/config'
+import { baseConfig } from './vitest.base'
 
-export default defineConfig({
+export default mergeConfig(baseConfig, defineConfig({
   test: {
-    globals: true,
-    environment: 'jsdom',
-    css: RAW_STYLESHEET_CSS,
-    setupFiles: ['./test/setup.ts'],
     include: ['test/performance/**/*.test.ts'],
     exclude: ['test/unit/**', 'test/integration/**', 'test/live/**', 'test/visual/**'],
-    testTimeout: 30000,
     hookTimeout: 30000,
     // Run performance tests serially to avoid resource conflicts
     pool: 'threads',
@@ -19,4 +14,4 @@ export default defineConfig({
     reporters: ['verbose', 'json'],
     outputFile: 'test-results/performance-results.json'
   }
-})
+}))
