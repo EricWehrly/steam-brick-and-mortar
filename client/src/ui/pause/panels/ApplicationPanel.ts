@@ -23,12 +23,11 @@ import applicationPanelTemplate from '../../../templates/pause-menu/application-
 import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { Logger } from '../../../utils/Logger'
+import { exportSettingsToFile, importSettingsFromFile } from '../../settings/SettingsFileTransfer'
 import type { EventManager } from '../../../core/EventManager'
 
+// TD: dom-menu-panel-retirement
 export class ApplicationPanel extends PauseMenuPanel {
-    private static readonly logger = Logger.createLogFunctions(ApplicationPanel.name)
-
     public readonly id = 'application'
     public readonly title = 'Application'
     public readonly icon = '⚙️'
@@ -88,52 +87,15 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     private exportSettings(): void {
-        const dataStr = this.appSettings.exportSettings()
-        const dataBlob = new Blob([dataStr], { type: 'application/json' })
-        const url = URL.createObjectURL(dataBlob)
-        
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `steam-brick-mortar-settings-${Date.now()}.json`
-        link.click()
-        
-        URL.revokeObjectURL(url)
+        exportSettingsToFile(this.appSettings)
     }
 
     // TODO: Replace alerts with a non-blocking panel-level status affordance.
     private importSettings(): void {
-        const input = document.createElement('input')
-        input.type = 'file'
-        input.accept = '.json'
-        
-        input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0]
-            if (!file) return
-            
-            const reader = new FileReader()
-            reader.onload = (event) => {
-                try {
-                    const importedSettings = JSON.parse(event.target?.result as string)
-
-                    if (this.appSettings.importSettings(importedSettings, EventSource.UI)) {
-                        this.refreshSettingsDisplay()
-
-                        const currentSettings = this.appSettings.getAllSettings()
-                        this.onSettingsChanged?.(currentSettings)
-
-                        ApplicationPanel.logger.info('Settings imported successfully')
-                    } else {
-                        ApplicationPanel.logger.warn('Invalid settings file format during import')
-                    }
-                } catch (error) {
-                    ApplicationPanel.logger.error('Failed to import settings. Please check the file format.', error)
-                }
-            }
-            
-            reader.readAsText(file)
-        }
-        
-        input.click()
+        importSettingsFromFile(this.appSettings, () => {
+            this.refreshSettingsDisplay()
+            this.onSettingsChanged?.(this.appSettings.getAllSettings())
+        })
     }
 
     private refreshSettingsDisplay(): void {

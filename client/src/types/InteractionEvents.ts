@@ -22,6 +22,7 @@ import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
 import type { LayoutMode } from './LayoutTypes'
 import type { ImportedGame, ImportChannel } from '../steam-integration/Library'
+import type { SettingsActionId } from '../ui/settings/SettingsActions'
 
 // =============================================================================
 // STEAM EVENTS
@@ -245,6 +246,16 @@ export interface MenuCloseEvent extends BaseInteractionEvent {
  */
 export interface MenuPanelChangedEvent extends BaseInteractionEvent {
     readonly panelId: string
+}
+
+/**
+ * A settings panel's action button was pressed (and confirmed, if its schema asks for that). Says
+ * what the user wants - reset everything, export, import - and nothing about how: the panel that
+ * raised it doesn't know what carries it out, and SettingsActionHandler decides how each action id
+ * is handled.
+ */
+export interface SettingsActionRequestedEvent extends BaseInteractionEvent {
+    readonly actionId: SettingsActionId
 }
 
 export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
@@ -477,6 +488,7 @@ export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
     MenuPanelChanged: 'ui:menu-panel-changed',
+    SettingsActionRequested: 'ui:settings-action-requested',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
     ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',
