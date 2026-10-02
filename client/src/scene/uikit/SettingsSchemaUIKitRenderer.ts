@@ -15,7 +15,7 @@
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
 import { computed, type ReadonlySignal } from '@preact/signals-core'
-import type { AppSettings } from '../../core/AppSettings'
+import type { AppSettings, ApplicationSettings } from '../../core/AppSettings'
 import type { EventManager } from '../../core/EventManager'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
@@ -24,7 +24,7 @@ import {
     type SettingsPanelSchema,
     type SettingsSection
 } from '../../ui/settings/SettingsSchema'
-import { createSliderRow, createToggleRow } from './UIKitRowHelpers'
+import { createSelectRow, createSliderRow, createToggleRow } from './UIKitRowHelpers'
 import { toUikitSafeText } from './UikitTextSanitizer'
 import type { ConfirmationRequest } from './VRMenuConfirmDialog'
 import { MENU_CLASS } from './VRMenuStyleSheet'
@@ -119,6 +119,18 @@ function buildSection(
                     description: content.description,
                     checked: appSettings.getSetting(content.setting),
                     onChange: checked => appSettings.setSetting(content.setting, checked)
+                })
+                resyncs.push(() => row.setValue(appSettings.getSetting(content.setting)))
+                container.add(row.container)
+                break
+            }
+            case 'select': {
+                const row = createSelectRow({
+                    label: content.label,
+                    description: content.description,
+                    options: content.options,
+                    value: appSettings.getSetting(content.setting),
+                    onChange: value => appSettings.setSetting(content.setting, value as ApplicationSettings[typeof content.setting])
                 })
                 resyncs.push(() => row.setValue(appSettings.getSetting(content.setting)))
                 container.add(row.container)

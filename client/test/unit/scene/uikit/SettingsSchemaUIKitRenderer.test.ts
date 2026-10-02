@@ -7,14 +7,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Container } from '@pmndrs/uikit'
-import { AppSettings, Setting } from '../../../../src/core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, Setting } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../../../src/types/InteractionEvents'
 import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayAdvancedSchema'
 import { DISPLAY_UI_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayUISchema'
 import { APPLICATION_SCHEMA } from '../../../../src/ui/settings/schemas/ApplicationSchema'
 import { SETTINGS_ACTION } from '../../../../src/ui/settings/SettingsActions'
-import type { SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
+import { select, type SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
 import { buildSettingsPanel } from '../../../../src/scene/uikit/SettingsSchemaUIKitRenderer'
 import { createTestPanelContext, resolvedProps } from '../../../utils/settings-panel-context'
 
@@ -89,6 +89,51 @@ describe('buildSettingsPanel', () => {
             buildSettingsPanel(resettable, appSettings, context).reset()
 
             expect(appSettings.getSetting('autoSave')).toBe(appSettings.getDefaultSetting('autoSave'))
+        })
+    })
+
+    describe('selects', () => {
+        const SELECT_SCHEMA: SettingsPanelSchema = {
+            id: 'selecting',
+            title: 'Selecting',
+            icon: 'S',
+            resettable: true,
+            sections: [{
+                content: [select('lightingQuality', {
+                    label: 'Lighting quality',
+                    options: [
+                        { value: LIGHTING_QUALITY.SIMPLE, label: 'Simple' },
+                        { value: LIGHTING_QUALITY.ADVANCED, label: 'Advanced' }
+                    ]
+                })]
+            }]
+        }
+
+        function optionButtons(panel: ReturnType<typeof buildSettingsPanel>) {
+            const row = panel.container.children[SECTION].children[0]
+            return row.children[row.children.length - 1].children
+        }
+
+        it('writes the chosen option to the bound setting', () => {
+            const { context } = createTestPanelContext()
+            const appSettings = AppSettings.getInstance()
+            appSettings.setSetting('lightingQuality', LIGHTING_QUALITY.SIMPLE)
+            const buttons = optionButtons(buildSettingsPanel(SELECT_SCHEMA, appSettings, context))
+
+            ;(resolvedProps(buttons[1]).onClick as () => void)()
+
+            expect(appSettings.getSetting('lightingQuality')).toBe(LIGHTING_QUALITY.ADVANCED)
+            appSettings.resetSettingsToDefaults(['lightingQuality'])
+        })
+
+        it('reset() restores the bound setting', () => {
+            const { context } = createTestPanelContext()
+            const appSettings = AppSettings.getInstance()
+            appSettings.setSetting('lightingQuality', LIGHTING_QUALITY.ADVANCED)
+
+            buildSettingsPanel(SELECT_SCHEMA, appSettings, context).reset()
+
+            expect(appSettings.getSetting('lightingQuality')).toBe(appSettings.getDefaultSetting('lightingQuality'))
         })
     })
 

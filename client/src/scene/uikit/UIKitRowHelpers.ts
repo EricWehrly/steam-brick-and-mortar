@@ -12,6 +12,17 @@ import { signal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { toUikitSafeText } from './UikitTextSanitizer'
 
+/** uikit's ClassList is an array: add() appends even a class it already holds and remove() drops
+ *  only one copy, so an unguarded swap leaves a stale class behind after a few state changes. */
+function swapClass(target: { classList: { contains(name: string): boolean; add(name: string): void; remove(name: string): void } }, on: string, off: string): void {
+    while (target.classList.contains(off)) {
+        target.classList.remove(off)
+    }
+    if (!target.classList.contains(on)) {
+        target.classList.add(on)
+    }
+}
+
 export interface UIKitToggleRowOptions {
     readonly label: string
     readonly description?: string
@@ -54,8 +65,7 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
         const [on, off] = checkedSignal.value
             ? [MENU_CLASS.switchOn, MENU_CLASS.switchOff]
             : [MENU_CLASS.switchOff, MENU_CLASS.switchOn]
-        toggleSwitch.classList.remove(off)
-        toggleSwitch.classList.add(on)
+        swapClass(toggleSwitch, on, off)
     }, toggleSwitch.abortSignal)
     row.add(toggleSwitch)
 
@@ -63,6 +73,72 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
         container: row,
         setValue: (next: boolean) => {
             checkedSignal.value = next
+        }
+    }
+}
+
+export interface UIKitSelectRowOptions {
+    readonly label: string
+    readonly description?: string
+    readonly options: readonly { readonly value: string; readonly label: string }[]
+    readonly value: string
+    readonly onChange: (value: string) => void
+}
+
+export interface UIKitSelectRow {
+    readonly container: Container
+    /** Resyncs the highlighted option to an externally-set value (e.g. a reset-to-defaults action). */
+    setValue(value: string): void
+}
+
+/** A choice among a few named values, as a row of buttons with the current one highlighted - a
+ *  dropdown would need a popup layer that a headset pointer has no good way to drive. */
+export function createSelectRow(options: UIKitSelectRowOptions): UIKitSelectRow {
+    const { label, description, value, onChange } = options
+
+    const row = new Container(undefined, [MENU_CLASS.settingRow])
+    row.add(new Text({ text: toUikitSafeText(label) }, [MENU_CLASS.settingLabel]))
+    if (description) {
+        row.add(new Text({ text: toUikitSafeText(description) }, [MENU_CLASS.sectionDescription]))
+    }
+
+    const selectedSignal = signal(value)
+    const choices = new Container(undefined, [MENU_CLASS.optionRow])
+    for (const option of options.options) {
+        // A plain Container, not a Button: Button's own hover colour outranks any class and stays
+        // stuck on the clicked button, which would hide the selected highlight.
+        const button = new Container(
+            {
+                onClick: () => {
+                    if (selectedSignal.peek() === option.value) {
+                        return
+                    }
+                    selectedSignal.value = option.value
+                    onChange(option.value)
+                }
+            },
+            [MENU_CLASS.option]
+        )
+        button.add(new Text({ text: toUikitSafeText(option.label) }, [MENU_CLASS.settingLabel]))
+        abortableEffect(() => {
+            if (selectedSignal.value === option.value) {
+                if (!button.classList.contains(MENU_CLASS.optionSelected)) {
+                    button.classList.add(MENU_CLASS.optionSelected)
+                }
+            } else {
+                while (button.classList.contains(MENU_CLASS.optionSelected)) {
+                    button.classList.remove(MENU_CLASS.optionSelected)
+                }
+            }
+        }, button.abortSignal)
+        choices.add(button)
+    }
+    row.add(choices)
+
+    return {
+        container: row,
+        setValue: (next: string) => {
+            selectedSignal.value = next
         }
     }
 }

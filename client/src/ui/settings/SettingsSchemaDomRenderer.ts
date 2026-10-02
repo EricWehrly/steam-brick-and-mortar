@@ -51,6 +51,7 @@ function renderContent(content: SectionContent, appSettings: AppSettings): strin
                 trackLabels: content.trackLabels
             }).render()
         case 'toggle':
+        case 'select':
         case 'action':
             // The DOM menu's panels that use these (ApplicationPanel) are still hand-written and
             // are deleted at the menu flip, so rendering them here would be code built to be thrown

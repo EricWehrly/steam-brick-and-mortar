@@ -43,6 +43,9 @@ export const MENU_CLASS = {
     switchOn: 'vr-menu-switch-on',
     switchOff: 'vr-menu-switch-off',
     switchThumb: 'vr-menu-switch-thumb',
+    optionRow: 'vr-menu-option-row',
+    option: 'vr-menu-option',
+    optionSelected: 'vr-menu-option-selected',
     action: 'vr-menu-action',
 
     dialog: 'vr-menu-dialog',

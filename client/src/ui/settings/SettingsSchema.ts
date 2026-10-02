@@ -54,6 +54,9 @@ export interface RangeOptions {
     readonly trackLabels?: readonly string[]
     /** Appended to the displayed value ('x' for a multiplier). */
     readonly unit?: string
+    /** Overrides the derived decimals-plus-unit format, for a value that reads better as a word
+     *  (a 0-4 shadow level shown as 'Off'...'Ultra') or a percentage. */
+    readonly formatDisplay?: (value: number) => string
     /** Only for the rare control whose DOM id shouldn't follow its setting key. */
     readonly id?: string
 }
@@ -155,11 +158,50 @@ export function action(actionId: SettingsActionId, options: ActionOptions): Acti
     return { kind: 'action', action: actionId, id: id ?? actionId, ...rest }
 }
 
-// Extend with a 'select' variant when a panel actually needs one (Story 5) - see
-// docs/plans/vr-uikit-menu-migration-plan.md.
+/** Keys of ApplicationSettings whose value is a string - what a select can bind to. */
+export type StringSettingKey = {
+    [K in keyof ApplicationSettings]: ApplicationSettings[K] extends string ? K : never
+}[keyof ApplicationSettings]
+
+export interface SelectOption<Value extends string = string> {
+    readonly value: Value
+    readonly label: string
+}
+
+/** A choice among a few named values. `options` is typed per setting by select() below, then
+ *  erased to plain strings here so one control type covers every string setting. */
+export interface SelectSettingControl {
+    readonly kind: 'select'
+    readonly setting: StringSettingKey
+    /** DOM element id / uikit row key - must be unique within the panel. */
+    readonly id: string
+    readonly label: string
+    readonly description?: string
+    readonly options: readonly SelectOption[]
+}
+
+export interface SelectOptions<Value extends string> {
+    readonly label: string
+    readonly description?: string
+    readonly options: readonly SelectOption<Value>[]
+    /** Only for the rare control whose DOM id shouldn't follow its setting key. */
+    readonly id?: string
+}
+
+/** Builds a select, deriving `kind` and an `id` that is the kebab-case of the setting key. Generic
+ *  over the key so each option's value is checked against that setting's own value type - a typo'd
+ *  or foreign value is a compile error rather than a setting silently set to something invalid. */
+export function select<Key extends StringSettingKey>(
+    setting: Key,
+    options: SelectOptions<ApplicationSettings[Key] & string>
+): SelectSettingControl {
+    const { id, ...rest } = options
+    return { kind: 'select', setting, id: id ?? kebabCase(setting), ...rest }
+}
+
 /** A control bound to a setting - what schemaSettingKeys() collects and a schema-driven reset
  *  restores. */
-export type SettingControl = RangeSettingControl | ToggleSettingControl
+export type SettingControl = RangeSettingControl | ToggleSettingControl | SelectSettingControl
 
 /** Anything a section can contain, in render order. */
 export type SectionContent = SettingControl | ActionContent | NoteContent
@@ -189,7 +231,7 @@ export interface SettingsPanelSchema {
 }
 
 export function isSettingControl(content: SectionContent): content is SettingControl {
-    return content.kind === 'range' || content.kind === 'toggle'
+    return content.kind === 'range' || content.kind === 'toggle' || content.kind === 'select'
 }
 
 /** How a flat surface (the VR tab row) names this panel: 'Display · Advanced' rather than a bare
