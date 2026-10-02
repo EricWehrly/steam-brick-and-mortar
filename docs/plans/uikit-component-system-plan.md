@@ -116,12 +116,23 @@ the user's font-scale setting and therefore can't live in a static stylesheet â€
    too, which belongs with item 1. The confirmation dialog (`VRMenuConfirmDialog`, built on
    uikit-default's `AlertDialog`) is now a visible case of this: its buttons and surface come from
    that theme, so they only approximately match the app palette until `setTheme()` is pointed at it.
-3. **Control kinds beyond `range`, `toggle` and `action`.** `toggle` and `action` landed with the
-   Application panel (a switch bound to a boolean setting; a button that raises
-   `SettingsActionRequested`, with optional confirmation and a flatscreen-only flag). `select` is
-   still to come with Game Settings (migration plan's Story 5). Each kind is a schema variant plus a
-   uikit renderer case; the DOM renderer deliberately rejects the new kinds, since the DOM panels
-   that would use them are deleted at the menu flip rather than rewritten onto the schema.
+3. **Control kinds beyond `range`, `toggle`, `action` and `select`.** `toggle` and `action` landed
+   with the Application panel (a switch bound to a boolean setting; a button that raises
+   `SettingsActionRequested`, with optional confirmation and a flatscreen-only flag). `select`
+   landed with the Graphics panel: a row of options bound to a string setting, with the current one
+   highlighted. Each kind is a schema variant plus a uikit renderer case; the DOM renderer
+   deliberately rejects the new kinds, since the DOM panels that would use them are deleted at the
+   menu flip rather than rewritten onto the schema. Still unrepresented: text input, and the
+   Camera/Controls/Cache/Debug panels that need it or other new kinds.
+
+   uikit traps found along the way, both of which bit the toggle and select rows:
+   - **`ClassList` does not dedupe.** `add()` appends a class it already holds and `remove()` drops
+     one copy, so a naive swap leaves stale classes after a few state changes and the wrong colour
+     wins. Guard adds with `contains()` and loop removes.
+   - **A component's own hover colour outranks class layers.** uikit-default's `Button` sets a
+     hover `backgroundColor` that stays applied to the clicked button and hides a class-driven
+     highlight. State shown by classes needs a plain `Container` (as the select options are), until
+     pseudo-class mapping (item 5) exists.
 4. **Rows don't observe external setting changes.** A row's displayed value resyncs on `reset()` and
    on its own drag, not when something else writes the same setting. Fine today; revisit if two
    surfaces are ever open at once.

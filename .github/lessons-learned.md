@@ -252,3 +252,18 @@ Async "round-trip time" (like worker messages or IndexedDB reads) doesn't block 
 1. Instrument all sync operations with `performance.now()` timing
 2. If main thread time is low but frames drop, look at GPU or batching
 3. Use browser DevTools Performance tab to see actual frame breakdown
+
+## uikit Pointer Events: Scope Each Forwarder to Its Own Root
+
+**Date**: 2026-10-01  
+**Context**: A VR menu toggle flipped twice per click once a second uikit root (the standalone panel) existed  
+**Scope**: Any scene with more than one uikit root and `@pmndrs/pointer-events`' `forwardHtmlEvents`
+
+### Issue
+A forwarder given the whole scene dispatches every DOM pointer event to all uikit nodes, so each additional root's forwarder re-delivered the same click to every root. Handlers ran once per forwarder.
+
+### Solution
+Give each forwarder only its own root as the scene to hit-test, so one DOM event reaches each node exactly once.
+
+### Harness note
+In the built-in browser harness a click only registers if the pointer hovered the target first (`hover`, then `left_click`), and a tab click sometimes needs a short wait after the hover.
