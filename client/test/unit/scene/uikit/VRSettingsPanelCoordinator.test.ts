@@ -12,7 +12,7 @@
  * case). So these tests check visibility, not child-array membership, once a panel has attached.
  */
 
-import { beforeEach, afterEach, describe, expect, it } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { Container } from '@pmndrs/uikit'
 import { VRSettingsPanelCoordinator } from '../../../../src/scene/uikit/VRSettingsPanelCoordinator'
@@ -103,6 +103,18 @@ describe('VRSettingsPanelCoordinator', () => {
         expect(camera.children).toHaveLength(1)
         expect(camera.children[0]).toBeInstanceOf(Container)
         expect(camera.children[0].visible).toBe(true)
+    })
+
+    it('forwards canvas events to the menu tree only, never the whole scene', () => {
+        const forwardEvents = vi.fn((_el: HTMLElement, _getCamera: unknown, _root: THREE.Object3D) => ({ destroy: () => {}, update: () => {} }))
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), forwardEvents)
+        coordinator.init(createFakeRenderer())
+        enterVR()
+        EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+
+        expect(forwardEvents).toHaveBeenCalledTimes(1)
+        expect(forwardEvents.mock.calls[0][2]).toBe(camera.children[0])
+        expect(forwardEvents.mock.calls[0][2]).not.toBe(scene)
     })
 
     it('anchors to a fixed point in front of the camera, independent of the camera afterward, in world-lock mode', () => {

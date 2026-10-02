@@ -227,7 +227,10 @@ export class VRSettingsPanelCoordinator {
 
         this.attachToAnchor(this.menuShell.container, camera, scene)
 
-        this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
+        // Scoped to the menu's own tree, not the scene: every forwarder on the canvas delivers each
+        // click to whatever root it was given, so two scene-wide forwarders deliver it twice and a
+        // toggle flips back immediately.
+        this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, this.menuShell.container)
 
         this.active = true
     }

@@ -60,7 +60,8 @@ export class UikitPointerBridge {
         renderer.localClippingEnabled = true
         renderer.setTransparentSort(reversePainterSortStable)
 
-        this.forwardedEvents = this.forwardEvents(renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
+        // Scoped to this bridge's own root, not the scene - see VRSettingsPanelCoordinator.activate().
+        this.forwardedEvents = this.forwardEvents(renderer.domElement, () => camera as THREE.PerspectiveCamera, this.intersectRoot)
         this.attached = true
     }
 
