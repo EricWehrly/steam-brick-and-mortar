@@ -4,7 +4,7 @@
  * doesn't implement the Pointer Events capture APIs the real forwardHtmlEvents needs).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { Container } from '@pmndrs/uikit'
 import { VRCategoryReferenceCoordinator } from '../../../../src/scene/uikit/VRCategoryReferenceCoordinator'
@@ -63,6 +63,17 @@ describe('VRCategoryReferenceCoordinator', () => {
         const panelContainer = scene.children.find(child => child instanceof Container)!
         expect(panelContainer).toBeDefined()
         expect(panelContainer.position.distanceTo(new THREE.Vector3(1, 1.6, 2))).toBeCloseTo(1.2, 5)
+    })
+
+    it('forwards canvas events to its own panel only, never the whole scene', () => {
+        const forwardEvents = vi.fn((_el: HTMLElement, _getCamera: unknown, _root: THREE.Object3D) => ({ destroy: () => {}, update: () => {} }))
+        coordinator = new VRCategoryReferenceCoordinator(forwardEvents)
+        coordinator.init(createFakeRenderer())
+        runUpdate(coordinator)
+
+        const panelContainer = scene.children.find(child => child instanceof Container)
+        expect(forwardEvents).toHaveBeenCalledTimes(1)
+        expect(forwardEvents.mock.calls[0][2]).toBe(panelContainer)
     })
 
     it('does not re-place the panel on subsequent updates even if the camera moves', () => {

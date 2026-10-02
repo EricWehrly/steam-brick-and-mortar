@@ -66,7 +66,8 @@ export class VRCategoryReferenceCoordinator {
         if (!this.placed) {
             this.placeInWorld(this.panel.container, camera, scene)
             this.placed = true
-            this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, scene)
+            // Scoped to this panel's own tree, not the scene - see VRSettingsPanelCoordinator.activate().
+            this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, this.panel.container)
         }
 
         this.forwardedEvents?.update()
