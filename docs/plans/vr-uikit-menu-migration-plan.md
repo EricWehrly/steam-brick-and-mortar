@@ -390,9 +390,15 @@ the settings-shaped ones:
    modal confirmation dialog (`window.confirm()` is blocked in an immersive session), and
    flatscreen-only actions. Its DOM counterpart stays until the flip (Story 7). Export/import are
    hidden in VR; tracked as `vr-settings-file-io`.
-5. `GameSettingsPanel` (toggles + selects + inputs — exercises `createSelectRow`; text input in VR
-   is an open problem, see Non-goals)
-6. `GraphicsSettingsPanel` (largest; expect real escape-hatch pressure — presets, reload badges)
+5. `GameSettingsPanel` ✅ AppSettings-bound toggles ported 2026-10-01 (`GameSettingsSchema`). Not
+   ported, still DOM-only: the local-SteamSettings controls (not AppSettings-bound; text input in VR
+   is an open problem, see Non-goals) and the `show-shelf-indices` event toggle.
+6. `GraphicsSettingsPanel` ✅ AppSettings-bound controls ported 2026-10-01 (`GraphicsSettingsSchema`;
+   introduced the `select` control, a row of buttons). Not ported, still DOM-only: the quality
+   preset (applies a bundle of settings), the ceiling toggle (also raises a scene event) and
+   fullscreen; `pixelRatioScale` is on the Display UI tab already. The VR ceiling-height slider
+   allows up to 7m because the default is 6.4; the DOM slider tops out at 5 and so cannot display
+   its own default (latent DOM bug, left alone since the DOM panel is deleted at the flip).
 7. `ControlsPanel` (rebind-capture UI — least schema-shaped, likely heaviest placeholder use)
 
 Each: schema entry (or placeholder-annotated equivalent for 2/7) → uikit renderer → VR panel
