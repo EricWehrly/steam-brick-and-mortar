@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Group } from 'three'
+import type { Container } from '@pmndrs/uikit'
 import { Switch } from '@pmndrs/uikit-default'
-import { createToggleRow } from '../../../../src/scene/uikit/UIKitRowHelpers'
+import { createSelectRow, createToggleRow } from '../../../../src/scene/uikit/UIKitRowHelpers'
 import { MENU_CLASS } from '../../../../src/scene/uikit/VRMenuStyleSheet'
 
 // uikit only resolves a node's properties once it is attached to a parent.
@@ -56,5 +57,82 @@ describe('createToggleRow switch', () => {
     it('styles the thumb', () => {
         const { toggleSwitch } = buildToggle(true)
         expect(toggleSwitch.handle.classList.contains(MENU_CLASS.switchThumb)).toBe(true)
+    })
+})
+
+const SELECT_OPTIONS = [
+    { value: 'low', label: 'Low' },
+    { value: 'high', label: 'High' },
+    { value: 'ultra', label: 'Ultra' }
+]
+
+function buildSelect(value: string) {
+    const onChange = vi.fn()
+    const row = createSelectRow({ label: 'Quality', options: SELECT_OPTIONS, value, onChange })
+    new Group().add(row.container)
+    const choices = row.container.children[row.container.children.length - 1] as Container
+    expect(choices.classList.contains(MENU_CLASS.optionRow)).toBe(true)
+    const buttons = choices.children as Container[]
+    const click = (index: number) => (buttons[index].properties.peek().onClick as () => void)()
+    const selectedIndexes = () => buttons
+        .map((button, index) => (button.classList.contains(MENU_CLASS.optionSelected) ? index : -1))
+        .filter(index => index >= 0)
+    return { row, buttons, click, selectedIndexes, onChange }
+}
+
+describe('createSelectRow', () => {
+    it('builds one button per option', () => {
+        expect(buildSelect('low').buttons).toHaveLength(SELECT_OPTIONS.length)
+    })
+
+    it('marks only the option it was given as selected', () => {
+        expect(buildSelect('high').selectedIndexes()).toEqual([1])
+    })
+
+    it('selects and reports the clicked option', () => {
+        const { click, selectedIndexes, onChange } = buildSelect('low')
+
+        click(2)
+
+        expect(selectedIndexes()).toEqual([2])
+        expect(onChange).toHaveBeenCalledTimes(1)
+        expect(onChange).toHaveBeenCalledWith('ultra')
+    })
+
+    it('does not report a click on the option that is already selected', () => {
+        const { click, onChange } = buildSelect('high')
+
+        click(1)
+
+        expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('follows setValue without reporting a change', () => {
+        const { row, selectedIndexes, onChange } = buildSelect('low')
+
+        row.setValue('ultra')
+
+        expect(selectedIndexes()).toEqual([2])
+        expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('leaves nothing selected when the value matches no option', () => {
+        expect(buildSelect('bogus').selectedIndexes()).toEqual([])
+    })
+
+    it('keeps the base class on every button and the selected class on only the chosen one, however many times the selection moves', () => {
+        const { buttons, click, row } = buildSelect('low')
+
+        click(1)
+        click(2)
+        click(0)
+        row.setValue('high')
+        click(2)
+
+        buttons.forEach((button, index) => {
+            const isSelected = index === 2
+            expect(button.classList.contains(MENU_CLASS.optionSelected), `button ${index} selected class`).toBe(isSelected)
+            expect(button.classList.contains(MENU_CLASS.option), `button ${index} base class`).toBe(true)
+        })
     })
 })

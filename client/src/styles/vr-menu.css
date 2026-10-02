@@ -97,8 +97,11 @@
 
 /* ---- Settings panels ---- */
 
+/* flex-shrink: 0 - the content area is a fixed height and scrolls, so a panel taller than it must
+   keep its own height instead of squeezing its sections into overlapping each other. */
 .vr-menu-panel-root {
     flex-direction: column;
+    flex-shrink: 0;
     gap: var(--vr-space-lg);
     padding: var(--vr-space-xl);
     width: 100%;
@@ -177,6 +180,30 @@
 
 .vr-menu-switch-thumb {
     background-color: var(--color-text-primary);
+}
+
+.vr-menu-option-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--vr-space-sm);
+    width: 100%;
+}
+
+/* Plain containers rather than uikit-default Buttons, whose hover colour outranks these classes.
+   createSelectRow adds -selected on top of the base class, so layout stays on every option. */
+.vr-menu-option {
+    background-color: var(--color-surface-3);
+    flex-direction: row;
+    align-items: center;
+    padding-left: var(--vr-space-md);
+    padding-right: var(--vr-space-md);
+    padding-top: var(--vr-space-sm);
+    padding-bottom: var(--vr-space-sm);
+    border-radius: var(--vr-space-sm);
+}
+
+.vr-menu-option-selected {
+    background-color: var(--color-accent);
 }
 
 .vr-menu-action {
