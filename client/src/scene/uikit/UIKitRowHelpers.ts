@@ -6,7 +6,7 @@
  * Carries no sizes or colors of its own: every node names a class out of styles/vr-menu.css.
  */
 
-import { Container, Text } from '@pmndrs/uikit'
+import { abortableEffect, Container, Text } from '@pmndrs/uikit'
 import { Slider, Switch } from '@pmndrs/uikit-default'
 import { signal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
@@ -40,13 +40,24 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
     // A signal, not a plain boolean, for the same reason as the slider below: a plain value puts
     // the switch in controlled mode with a prop that never changes, so it would visibly snap back.
     const checkedSignal = signal(checked)
-    row.add(new Switch({
+    const toggleSwitch = new Switch({
         checked: checkedSignal,
         onCheckedChange: (next: boolean) => {
             checkedSignal.value = next
             onChange(next)
         }
-    }))
+    })
+    toggleSwitch.handle.classList.add(MENU_CLASS.switchThumb)
+    // Driven off our own signal, not the switch's currentSignal: reading uikit properties before the
+    // node is attached to a parent caches undefined for them.
+    abortableEffect(() => {
+        const [on, off] = checkedSignal.value
+            ? [MENU_CLASS.switchOn, MENU_CLASS.switchOff]
+            : [MENU_CLASS.switchOff, MENU_CLASS.switchOn]
+        toggleSwitch.classList.remove(off)
+        toggleSwitch.classList.add(on)
+    }, toggleSwitch.abortSignal)
+    row.add(toggleSwitch)
 
     return {
         container: row,

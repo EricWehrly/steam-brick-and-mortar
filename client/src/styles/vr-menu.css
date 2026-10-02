@@ -164,6 +164,21 @@
     flex-shrink: 1;
 }
 
+/* uikit-default's Switch takes its track and thumb colors from its own dark theme, which leaves the
+   OFF track invisible on the menu's near-black surface. These replace them; the on/off pair is
+   swapped by createToggleRow as the switch changes state. */
+.vr-menu-switch-on {
+    background-color: var(--color-accent);
+}
+
+.vr-menu-switch-off {
+    background-color: var(--color-border-bright);
+}
+
+.vr-menu-switch-thumb {
+    background-color: var(--color-text-primary);
+}
+
 .vr-menu-action {
     align-self: flex-start;
 }

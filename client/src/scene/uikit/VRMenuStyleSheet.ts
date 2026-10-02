@@ -40,6 +40,9 @@ export const MENU_CLASS = {
     settingValue: 'vr-menu-setting-value',
     toggleRow: 'vr-menu-toggle-row',
     toggleText: 'vr-menu-toggle-text',
+    switchOn: 'vr-menu-switch-on',
+    switchOff: 'vr-menu-switch-off',
+    switchThumb: 'vr-menu-switch-thumb',
     action: 'vr-menu-action',
 
     dialog: 'vr-menu-dialog',
