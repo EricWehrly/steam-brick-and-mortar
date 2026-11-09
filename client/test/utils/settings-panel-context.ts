@@ -4,7 +4,6 @@
  */
 
 import { signal } from '@preact/signals-core'
-import { EventManager } from '../../src/core/EventManager'
 import type { SettingsPanelContext } from '../../src/scene/uikit/SettingsSchemaUIKitRenderer'
 import type { ConfirmationRequest } from '../../src/scene/uikit/VRMenuConfirmDialog'
 
@@ -17,13 +16,11 @@ export function resolvedProps(node: object): Record<string, unknown> {
 export function createTestPanelContext() {
     const confirmations: ConfirmationRequest[] = []
     const immersiveSession = signal(false)
-    const eventManager = EventManager.getInstance()
 
     const context: SettingsPanelContext = {
-        eventManager,
         requestConfirmation: request => { confirmations.push(request) },
         immersiveSession
     }
 
-    return { context, confirmations, immersiveSession, eventManager }
+    return { context, confirmations, immersiveSession }
 }

@@ -15,9 +15,12 @@ import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
+import { APP_STORAGE_PREFIX } from '../../../core/StoragePrefix'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import { StorePropsEventTypes, SteamEventTypes } from '../../../types/InteractionEvents'
 import type { SteamCacheClearEvent } from '../../../types/InteractionEvents'
+
+const GAME_SETTINGS_NAME = `${APP_STORAGE_PREFIX}-game-settings`
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -307,7 +310,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
         
         const a = document.createElement('a')
         a.href = url
-        a.download = 'steam-brick-mortar-game-settings.json'
+        a.download = `${GAME_SETTINGS_NAME}.json`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -318,7 +321,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     private loadSettings(): void {
         try {
-            const saved = localStorage.getItem('steam-brick-mortar-game-settings')
+            const saved = localStorage.getItem(GAME_SETTINGS_NAME)
             if (saved) {
                 this.settings = { ...this.settings, ...JSON.parse(saved) }
             }
@@ -329,7 +332,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     private saveSettings(): void {
         try {
-            localStorage.setItem('steam-brick-mortar-game-settings', JSON.stringify(this.settings))
+            localStorage.setItem(GAME_SETTINGS_NAME,JSON.stringify(this.settings))
         } catch (error) {
             console.warn('Failed to save game settings:', error)
         }

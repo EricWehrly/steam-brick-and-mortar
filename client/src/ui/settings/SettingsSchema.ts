@@ -230,8 +230,10 @@ export interface SettingsPanelSchema {
     readonly sections: readonly SettingsSection[]
 }
 
+/** A control is whatever is bound to a setting - exactly the content that carries a `setting` key,
+ *  so a new control kind is picked up without editing a list here. Actions and notes don't. */
 export function isSettingControl(content: SectionContent): content is SettingControl {
-    return content.kind === 'range' || content.kind === 'toggle' || content.kind === 'select'
+    return 'setting' in content
 }
 
 /** How a flat surface (the VR tab row) names this panel: 'Display · Advanced' rather than a bare

@@ -8,6 +8,7 @@
 
 import type { AppSettings } from '../../core/AppSettings'
 import { EventSource } from '../../core/EventManager'
+import { APP_STORAGE_PREFIX } from '../../core/StoragePrefix'
 import { Logger } from '../../utils/Logger'
 
 const logger = Logger.createLogFunctions('SettingsFileTransfer')
@@ -18,7 +19,7 @@ export function exportSettingsToFile(appSettings: AppSettings): void {
 
     const link = document.createElement('a')
     link.href = url
-    link.download = `steam-brick-mortar-settings-${Date.now()}.json`
+    link.download = `${APP_STORAGE_PREFIX}-settings-${Date.now()}.json`
     link.click()
 
     URL.revokeObjectURL(url)
