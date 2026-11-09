@@ -62,30 +62,18 @@
     width: var(--vr-menu-width);
 }
 
+/* Applied to uikit-default's TabsList, whose fixed height must give way to wrapping. Active and
+   inactive tab colors are the library's own, from the app theme (VRMenuTheme.ts). */
 .vr-menu-tab-row {
-    flex-direction: row;
     flex-wrap: wrap;
+    height: auto;
     gap: var(--vr-space-sm);
     width: 100%;
     padding: var(--vr-space-md);
 }
 
-.vr-menu-tab-button {
-    background-color: transparent;
-}
-
-.vr-menu-tab-button-active {
-    background-color: var(--color-surface-3);
-}
-
 .vr-menu-tab-label {
     font-size: var(--vr-font-label);
-    color: var(--color-text-secondary);
-}
-
-.vr-menu-tab-label-active {
-    font-size: var(--vr-font-label);
-    color: var(--color-text-primary);
 }
 
 .vr-menu-content-area {
@@ -167,43 +155,22 @@
     flex-shrink: 1;
 }
 
-/* uikit-default's Switch takes its track and thumb colors from its own dark theme, which leaves the
-   OFF track invisible on the menu's near-black surface. These replace them; the on/off pair is
-   swapped by createToggleRow as the switch changes state. */
-.vr-menu-switch-on {
-    background-color: var(--color-accent);
-}
-
-.vr-menu-switch-off {
-    background-color: var(--color-border-bright);
-}
-
+/* The Switch's track colors come from the app theme (VRMenuTheme.ts); the library's thumb uses the
+   theme background, which is the darker surface the active tab needs, so the thumb is set here. */
 .vr-menu-switch-thumb {
     background-color: var(--color-text-primary);
 }
 
 .vr-menu-option-row {
-    flex-direction: row;
     flex-wrap: wrap;
     gap: var(--vr-space-sm);
     width: 100%;
 }
 
-/* Plain containers rather than uikit-default Buttons, whose hover colour outranks these classes.
-   createSelectRow adds -selected on top of the base class, so layout stays on every option. */
+/* Checked / hover / outline colors are the ToggleGroupItem's own, from the app theme. */
 .vr-menu-option {
-    background-color: var(--color-surface-3);
     flex-direction: row;
     align-items: center;
-    padding-left: var(--vr-space-md);
-    padding-right: var(--vr-space-md);
-    padding-top: var(--vr-space-sm);
-    padding-bottom: var(--vr-space-sm);
-    border-radius: var(--vr-space-sm);
-}
-
-.vr-menu-option-selected {
-    background-color: var(--color-accent);
 }
 
 .vr-menu-action {

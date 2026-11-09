@@ -6,22 +6,11 @@
  * Carries no sizes or colors of its own: every node names a class out of styles/vr-menu.css.
  */
 
-import { abortableEffect, Container, Text } from '@pmndrs/uikit'
-import { Slider, Switch } from '@pmndrs/uikit-default'
-import { signal } from '@preact/signals-core'
+import { Container, Text } from '@pmndrs/uikit'
+import { Slider, Switch, ToggleGroup, ToggleGroupItem } from '@pmndrs/uikit-default'
+import { computed, signal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { toUikitSafeText } from './UikitTextSanitizer'
-
-/** uikit's ClassList is an array: add() appends even a class it already holds and remove() drops
- *  only one copy, so an unguarded swap leaves a stale class behind after a few state changes. */
-function swapClass(target: { classList: { contains(name: string): boolean; add(name: string): void; remove(name: string): void } }, on: string, off: string): void {
-    while (target.classList.contains(off)) {
-        target.classList.remove(off)
-    }
-    if (!target.classList.contains(on)) {
-        target.classList.add(on)
-    }
-}
 
 export interface UIKitToggleRowOptions {
     readonly label: string
@@ -59,14 +48,6 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
         }
     })
     toggleSwitch.handle.classList.add(MENU_CLASS.switchThumb)
-    // Driven off our own signal, not the switch's currentSignal: reading uikit properties before the
-    // node is attached to a parent caches undefined for them.
-    abortableEffect(() => {
-        const [on, off] = checkedSignal.value
-            ? [MENU_CLASS.switchOn, MENU_CLASS.switchOff]
-            : [MENU_CLASS.switchOff, MENU_CLASS.switchOn]
-        swapClass(toggleSwitch, on, off)
-    }, toggleSwitch.abortSignal)
     row.add(toggleSwitch)
 
     return {
@@ -103,14 +84,15 @@ export function createSelectRow(options: UIKitSelectRowOptions): UIKitSelectRow 
     }
 
     const selectedSignal = signal(value)
-    const choices = new Container(undefined, [MENU_CLASS.optionRow])
+    const choices = new ToggleGroup({ variant: 'outline' }, [MENU_CLASS.optionRow])
     for (const option of options.options) {
-        // A plain Container, not a Button: Button's own hover colour outranks any class and stays
-        // stuck on the clicked button, which would hide the selected highlight.
-        const button = new Container(
+        // Controlled by our own signal: clicking the selected item again reports "unchecked", which
+        // is ignored rather than leaving the group with nothing chosen.
+        const item = new ToggleGroupItem(
             {
-                onClick: () => {
-                    if (selectedSignal.peek() === option.value) {
+                checked: computed(() => selectedSignal.value === option.value),
+                onCheckedChange: (next: boolean) => {
+                    if (!next || selectedSignal.peek() === option.value) {
                         return
                     }
                     selectedSignal.value = option.value
@@ -119,19 +101,8 @@ export function createSelectRow(options: UIKitSelectRowOptions): UIKitSelectRow 
             },
             [MENU_CLASS.option]
         )
-        button.add(new Text({ text: toUikitSafeText(option.label) }, [MENU_CLASS.settingLabel]))
-        abortableEffect(() => {
-            if (selectedSignal.value === option.value) {
-                if (!button.classList.contains(MENU_CLASS.optionSelected)) {
-                    button.classList.add(MENU_CLASS.optionSelected)
-                }
-            } else {
-                while (button.classList.contains(MENU_CLASS.optionSelected)) {
-                    button.classList.remove(MENU_CLASS.optionSelected)
-                }
-            }
-        }, button.abortSignal)
-        choices.add(button)
+        item.add(new Text({ text: toUikitSafeText(option.label) }, [MENU_CLASS.settingLabel]))
+        choices.add(item)
     }
     row.add(choices)
 

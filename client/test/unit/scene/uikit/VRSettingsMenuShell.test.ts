@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { AlertDialog } from '@pmndrs/uikit-default'
+import { Group } from 'three'
+import { AlertDialog, Tabs, type TabsTrigger } from '@pmndrs/uikit-default'
 import { AppSettings } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
 import { UIEventTypes, WebXREventTypes, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
@@ -23,14 +24,41 @@ describe('VRSettingsMenuShell', () => {
         appSettings = AppSettings.getInstance()
     })
 
-    it('builds a tab column with one button per registered tab, a content area, and the confirmation dialog', () => {
+    it('builds a tab list with one trigger per registered tab, a content area, and the confirmation dialog', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
 
         expect(shell.container.children).toHaveLength(3)
-        const [tabColumn, contentArea, dialog] = shell.container.children
+        const [tabs, contentArea, dialog] = shell.container.children
         expect(dialog).toBeInstanceOf(AlertDialog)
-        expect(tabColumn.children).toHaveLength(VR_MENU_SCHEMAS.length)
+        expect(tabs).toBeInstanceOf(Tabs)
+        expect(tabs.children[0].children).toHaveLength(VR_MENU_SCHEMAS.length)
         expect(contentArea.children).toHaveLength(1)
+    })
+
+    it('marks only the active tab trigger as active, following selectTab and the DOM menu alike', () => {
+        const shell = new VRSettingsMenuShell(eventManager, appSettings)
+        new Group().add(shell.container)
+        const [tabs] = shell.container.children as [Tabs, ...unknown[]]
+        const activeIds = () => tabs.children[0].children
+            .filter(trigger => (trigger as TabsTrigger).properties.peek().value === tabs.currentSignal.value)
+            .map(trigger => (trigger as TabsTrigger).properties.peek().value)
+        const [first, second, third] = VR_MENU_SCHEMAS
+
+        expect(activeIds()).toEqual([first.id])
+        shell.selectTab(second.id)
+        expect(activeIds()).toEqual([second.id])
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: third.id })
+        expect(activeIds()).toEqual([third.id])
+    })
+
+    it('a trigger click selects its tab', () => {
+        const shell = new VRSettingsMenuShell(eventManager, appSettings)
+        const [tabs] = shell.container.children
+        const trigger = tabs.children[0].children[1]
+
+        ;(resolvedProps(trigger).onClick as () => void)()
+
+        expect(shell.activeTabPanelId).toBe(VR_MENU_SCHEMAS[1].id)
     })
 
     it('starts on the default tab', () => {
