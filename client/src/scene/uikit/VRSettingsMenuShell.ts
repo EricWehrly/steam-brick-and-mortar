@@ -59,7 +59,6 @@ export class VRSettingsMenuShell {
     ) {
         this.activePanelId = DEFAULT_VR_MENU_TAB_PANEL_ID
         this.panelContext = {
-            eventManager: this.eventManager,
             requestConfirmation: request => this.confirmDialog.show(request),
             immersiveSession: this.immersiveSession
         }

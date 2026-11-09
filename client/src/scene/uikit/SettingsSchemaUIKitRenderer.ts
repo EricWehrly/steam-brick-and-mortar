@@ -16,7 +16,7 @@ import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
 import { computed, type ReadonlySignal } from '@preact/signals-core'
 import type { AppSettings, ApplicationSettings } from '../../core/AppSettings'
-import type { EventManager } from '../../core/EventManager'
+import { EventManager } from '../../core/EventManager'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
     schemaSettingKeys,
@@ -33,7 +33,6 @@ const RESET_LABEL = 'Reset to Defaults'
 
 /** What a panel needs from the surface it's shown on, passed in rather than reached for. */
 export interface SettingsPanelContext {
-    readonly eventManager: EventManager
     /** Shows a modal and runs `onConfirm` if the user accepts. */
     readonly requestConfirmation: (request: ConfirmationRequest) => void
     /** True while an immersive session is presenting; flatscreen-only actions hide. */
@@ -147,7 +146,7 @@ function buildSection(
 
 function buildAction(content: ActionContent, context: SettingsPanelContext): Button {
     const raise = (): void => {
-        context.eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId: content.action })
+        EventManager.getInstance().emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId: content.action })
     }
     const press = (): void => {
         if (content.confirm) {
