@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Group } from 'three'
 import type { Container } from '@pmndrs/uikit'
-import { Switch } from '@pmndrs/uikit-default'
+import { Switch, type ToggleGroupItem } from '@pmndrs/uikit-default'
 import { createSelectRow, createToggleRow } from '../../../../src/scene/uikit/UIKitRowHelpers'
 import { MENU_CLASS } from '../../../../src/scene/uikit/VRMenuStyleSheet'
 
@@ -42,18 +42,6 @@ describe('createToggleRow switch', () => {
         expect(onChange).not.toHaveBeenCalled()
     })
 
-    it('shows exactly the on or off track class for the current state', () => {
-        const { row, toggleSwitch, click } = buildToggle(false)
-        const trackClasses = () => [MENU_CLASS.switchOn, MENU_CLASS.switchOff]
-            .filter(name => toggleSwitch.classList.contains(name))
-
-        expect(trackClasses()).toEqual([MENU_CLASS.switchOff])
-        click()
-        expect(trackClasses()).toEqual([MENU_CLASS.switchOn])
-        row.setValue(false)
-        expect(trackClasses()).toEqual([MENU_CLASS.switchOff])
-    })
-
     it('styles the thumb', () => {
         const { toggleSwitch } = buildToggle(true)
         expect(toggleSwitch.handle.classList.contains(MENU_CLASS.switchThumb)).toBe(true)
@@ -72,10 +60,10 @@ function buildSelect(value: string) {
     new Group().add(row.container)
     const choices = row.container.children[row.container.children.length - 1] as Container
     expect(choices.classList.contains(MENU_CLASS.optionRow)).toBe(true)
-    const buttons = choices.children as Container[]
+    const buttons = choices.children as ToggleGroupItem[]
     const click = (index: number) => (buttons[index].properties.peek().onClick as () => void)()
     const selectedIndexes = () => buttons
-        .map((button, index) => (button.classList.contains(MENU_CLASS.optionSelected) ? index : -1))
+        .map((button, index) => (button.currentSignal.value ? index : -1))
         .filter(index => index >= 0)
     return { row, buttons, click, selectedIndexes, onChange }
 }
@@ -120,8 +108,8 @@ describe('createSelectRow', () => {
         expect(buildSelect('bogus').selectedIndexes()).toEqual([])
     })
 
-    it('keeps the base class on every button and the selected class on only the chosen one, however many times the selection moves', () => {
-        const { buttons, click, row } = buildSelect('low')
+    it('keeps exactly one option selected however many times the selection moves', () => {
+        const { click, row, selectedIndexes } = buildSelect('low')
 
         click(1)
         click(2)
@@ -129,10 +117,6 @@ describe('createSelectRow', () => {
         row.setValue('high')
         click(2)
 
-        buttons.forEach((button, index) => {
-            const isSelected = index === 2
-            expect(button.classList.contains(MENU_CLASS.optionSelected), `button ${index} selected class`).toBe(isSelected)
-            expect(button.classList.contains(MENU_CLASS.option), `button ${index} base class`).toBe(true)
-        })
+        expect(selectedIndexes()).toEqual([2])
     })
 })

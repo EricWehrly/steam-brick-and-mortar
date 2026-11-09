@@ -52,7 +52,6 @@ describe('VR menu stylesheet', () => {
 
     it('resolves color tokens by their tokens.css names, not literals', () => {
         expect(VR_MENU_STYLES[MENU_CLASS.menuRoot].backgroundColor).toBe(COLOR_TOKENS.surface1)
-        expect(VR_MENU_STYLES[MENU_CLASS.menuTabButtonActive].backgroundColor).toBe(COLOR_TOKENS.surface3)
         expect(VR_MENU_STYLES[MENU_CLASS.categoryStatusPlanned].color).toBe(COLOR_TOKENS.warning)
     })
 

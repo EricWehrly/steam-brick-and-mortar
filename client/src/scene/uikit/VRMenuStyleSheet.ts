@@ -16,14 +16,12 @@ import { StyleSheet } from '@pmndrs/uikit'
 import vrMenuCss from '../../styles/vr-menu.css?raw'
 import { resolveColorTokenVar } from '../../ui/ColorTokens'
 import { parseUikitCss } from './UikitCssParser'
+import './VRMenuTheme'
 
 export const MENU_CLASS = {
     menuRoot: 'vr-menu-root',
     menuTabRow: 'vr-menu-tab-row',
-    menuTabButton: 'vr-menu-tab-button',
-    menuTabButtonActive: 'vr-menu-tab-button-active',
     menuTabLabel: 'vr-menu-tab-label',
-    menuTabLabelActive: 'vr-menu-tab-label-active',
     menuContentArea: 'vr-menu-content-area',
 
     panelRoot: 'vr-menu-panel-root',
@@ -40,12 +38,9 @@ export const MENU_CLASS = {
     settingValue: 'vr-menu-setting-value',
     toggleRow: 'vr-menu-toggle-row',
     toggleText: 'vr-menu-toggle-text',
-    switchOn: 'vr-menu-switch-on',
-    switchOff: 'vr-menu-switch-off',
     switchThumb: 'vr-menu-switch-thumb',
     optionRow: 'vr-menu-option-row',
     option: 'vr-menu-option',
-    optionSelected: 'vr-menu-option-selected',
     action: 'vr-menu-action',
 
     dialog: 'vr-menu-dialog',

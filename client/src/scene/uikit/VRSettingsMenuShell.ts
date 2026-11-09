@@ -21,7 +21,7 @@
  */
 
 import { Container, Text } from '@pmndrs/uikit'
-import { Button } from '@pmndrs/uikit-default'
+import { Tabs, TabsList, TabsTrigger } from '@pmndrs/uikit-default'
 import { signal } from '@preact/signals-core'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, type SettingChangedEvent } from '../../core/AppSettings'
@@ -34,30 +34,24 @@ import { VRMenuConfirmDialog } from './VRMenuConfirmDialog'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { resolveMenuPixelSize } from './VRMenuPixelSize'
 
-interface TabButtonHandle {
-    readonly button: Button
-    readonly label: Text
-}
-
 export class VRSettingsMenuShell {
     readonly container: Container
 
-    private readonly tabRow: Container
     private readonly contentArea: Container
-    private readonly tabButtons = new Map<string, TabButtonHandle>()
+    /** The active tab id. A signal so uikit's Tabs, in controlled mode, restyles the triggers itself
+     *  whether the change came from a click or from the DOM menu. */
+    private readonly activePanelIdSignal = signal(DEFAULT_VR_MENU_TAB_PANEL_ID)
     private readonly confirmDialog = new VRMenuConfirmDialog()
     /** True while an immersive session is presenting - a signal, so a panel's flatscreen-only
      *  actions hide the moment a session starts even with the menu already open. */
     private readonly immersiveSession = signal(false)
     private readonly panelContext: SettingsPanelContext
-    private activePanelId: string
     private activeContent: SettingsSchemaPanel | null = null
 
     constructor(
         private readonly eventManager: EventManager,
         private readonly appSettings: AppSettings
     ) {
-        this.activePanelId = DEFAULT_VR_MENU_TAB_PANEL_ID
         this.panelContext = {
             requestConfirmation: request => this.confirmDialog.show(request),
             immersiveSession: this.immersiveSession
@@ -65,7 +59,6 @@ export class VRSettingsMenuShell {
 
         const built = this.build()
         this.container = built.container
-        this.tabRow = built.tabRow
         this.contentArea = built.contentArea
 
         this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
@@ -73,10 +66,10 @@ export class VRSettingsMenuShell {
         this.eventManager.registerEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
         this.eventManager.registerEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
 
-        this.showTab(this.activePanelId, { emit: false })
+        this.showTab(this.activeTabPanelId, { emit: false })
     }
 
-    private build(): { container: Container; tabRow: Container; contentArea: Container } {
+    private build(): { container: Container; contentArea: Container } {
         // pixelSize is the one style value that isn't static (it tracks the user's font-scale
         // setting), so it's set here rather than in the stylesheet. It's an inherited property, so
         // this single assignment scales the whole menu - see handleSettingChanged().
@@ -85,13 +78,15 @@ export class VRSettingsMenuShell {
             [MENU_CLASS.menuRoot]
         )
 
-        const tabRow = new Container(undefined, [MENU_CLASS.menuTabRow])
+        // Tabs only owns "which trigger is active"; the content below is swapped by showTab, not by
+        // TabsContent, because panels are built lazily from schemas.
+        const tabs = new Tabs({ value: this.activePanelIdSignal, onValueChange: (panelId: string) => this.selectTab(panelId) })
+        const tabList = new TabsList(undefined, [MENU_CLASS.menuTabRow])
         for (const schema of VR_MENU_SCHEMAS) {
-            const handle = this.buildTabButton(schema)
-            this.tabButtons.set(schema.id, handle)
-            tabRow.add(handle.button)
+            tabList.add(this.buildTabTrigger(schema))
         }
-        container.add(tabRow)
+        tabs.add(tabList)
+        container.add(tabs)
 
         const contentArea = new Container(undefined, [MENU_CLASS.menuContentArea])
         container.add(contentArea)
@@ -99,17 +94,16 @@ export class VRSettingsMenuShell {
         // On the root, last, so the overlay covers the tabs and the scrolling content alike.
         container.add(this.confirmDialog.container)
 
-        return { container, tabRow, contentArea }
+        return { container, contentArea }
     }
 
-    private buildTabButton(schema: SettingsPanelSchema): TabButtonHandle {
-        const label = new Text(
+    private buildTabTrigger(schema: SettingsPanelSchema): TabsTrigger {
+        const trigger = new TabsTrigger({ value: schema.id })
+        trigger.add(new Text(
             { text: toUikitSafeText(`${schema.icon} ${schemaTabTitle(schema)}`) },
             [MENU_CLASS.menuTabLabel]
-        )
-        const button = new Button({ variant: 'ghost', onClick: () => this.selectTab(schema.id) }, [MENU_CLASS.menuTabButton])
-        button.add(label)
-        return { button, label }
+        ))
+        return trigger
     }
 
     /** User-initiated tab selection (a tab button's onClick) - always emits, so the DOM menu
@@ -120,7 +114,7 @@ export class VRSettingsMenuShell {
     }
 
     get activeTabPanelId(): string {
-        return this.activePanelId
+        return this.activePanelIdSignal.peek()
     }
 
     private readonly handleMenuPanelChanged = (event: CustomEvent<MenuPanelChangedEvent>): void => {
@@ -134,13 +128,11 @@ export class VRSettingsMenuShell {
             // - leave whatever VR tab is currently shown rather than clearing the content area.
             return
         }
-        if (panelId === this.activePanelId && this.activeContent) {
+        if (panelId === this.activeTabPanelId && this.activeContent) {
             return
         }
 
-        this.setTabButtonActive(this.activePanelId, false)
-        this.activePanelId = panelId
-        this.setTabButtonActive(panelId, true)
+        this.activePanelIdSignal.value = panelId
 
         // A confirmation belongs to the panel that asked for it; don't leave it hanging over another.
         this.confirmDialog.cancel()
@@ -152,21 +144,6 @@ export class VRSettingsMenuShell {
         if (options.emit) {
             this.eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId })
         }
-    }
-
-    private setTabButtonActive(panelId: string, active: boolean): void {
-        const handle = this.tabButtons.get(panelId)
-        if (!handle) {
-            return
-        }
-        handle.button.classList.replace(
-            active ? MENU_CLASS.menuTabButton : MENU_CLASS.menuTabButtonActive,
-            active ? MENU_CLASS.menuTabButtonActive : MENU_CLASS.menuTabButton
-        )
-        handle.label.classList.replace(
-            active ? MENU_CLASS.menuTabLabel : MENU_CLASS.menuTabLabelActive,
-            active ? MENU_CLASS.menuTabLabelActive : MENU_CLASS.menuTabLabel
-        )
     }
 
     /** UI Font Scale applies to the open menu, not just the next one (review feedback, 2026-09-09:
