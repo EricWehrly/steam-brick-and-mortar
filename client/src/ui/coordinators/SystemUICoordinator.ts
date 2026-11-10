@@ -146,7 +146,7 @@ export class SystemUICoordinator {
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels()
 
-        this.vrSettingsPanelCoordinator.init(renderer)
+        this.vrSettingsPanelCoordinator.init()
         this.settingsActionHandler.init()
 
         // Which settings surface you get is decided by whether you're in a headset, not by a flag:

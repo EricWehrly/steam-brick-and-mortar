@@ -9,13 +9,10 @@
  * - the tab column + content-swap area - constructed once here rather than per-activation, so its
  * UIEventTypes.MenuPanelChanged subscription is never missed (see the shell's own doc comment for
  * why). Only the shell's container is attached/detached from the anchor per open/close; this
- * coordinator's job is purely anchoring + pointer lifecycle, not panel content. Interaction is
- * wired two ways: @pmndrs/pointer-events' forwardHtmlEvents
- * drives hover/click/scroll from real DOM mouse/wheel events on the renderer canvas (flatscreen
- * testing, mouse acts as a cursor); syncControllerPointers()/VRControllerPointer drive the same
- * pointer-events pipeline from real WebXR controllers - one ray-pointer per connected controller,
- * self-healing every frame the same way XRControllerManager self-heals its own controller-model
- * pruning. Trigger down/up for these is native WebXR 'selectstart'/'selectend', independent of the
+ * coordinator's job is purely anchoring + pointer lifecycle, not panel content. Interaction (mouse
+ * on the canvas for flatscreen testing, one ray pointer per WebXR controller) is a
+ * UikitPointerBridge scoped to the shell's container. Trigger down/up for the controllers is native
+ * WebXR 'selectstart'/'selectend', independent of the
  * app's own gamepad-button input abstraction - see VRControllerPointer's doc comment. A VR trigger
  * pull also still fires the app's own gamepad-button-driven InteractPressed in parallel, but
  * SystemUICoordinator.handleInteractPressed no-ops while any menu is open, so it can't reach
@@ -56,18 +53,15 @@
  */
 
 import * as THREE from 'three'
-import { reversePainterSortStable } from '@pmndrs/uikit'
-import { forwardHtmlEvents } from '@pmndrs/pointer-events'
-import type { ForwardEventsOptions } from '@pmndrs/pointer-events'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
-import type { XRControllerSource, XRControllerState } from '../../webxr/XRControllerManager'
+import type { XRControllerSource } from '../../webxr/XRControllerManager'
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
-import { VRControllerPointer } from './VRControllerPointer'
+import { UikitPointerBridge, type ForwardEventsFn } from './UikitPointerBridge'
 
 // Same "held in front of the viewer" convention GameBoxFoldCoordinator uses, but further out
 // (was -0.6, matching parity with the game box) - the panel itself grew (see
@@ -95,29 +89,15 @@ export type VRPanelAnchorMode = 'camera-attached' | 'world-lock' | 'grip-attache
 // touch this constant.
 const DEFAULT_ANCHOR_MODE: VRPanelAnchorMode = 'camera-attached'
 
-/** Matches forwardHtmlEvents' own signature - injectable so tests can avoid it entirely: jsdom's
- *  canvas doesn't implement Pointer Events capture APIs (setPointerCapture/...), which
- *  forwardHtmlEvents depends on, so a real call throws under jsdom regardless of how faithfully
- *  the renderer/canvas stand-in is built. */
-type ForwardEventsFn = (
-    fromElement: HTMLElement,
-    getCamera: () => THREE.PerspectiveCamera | THREE.OrthographicCamera,
-    scene: THREE.Object3D,
-    options?: ForwardEventsOptions
-) => { destroy: () => void; update: () => void }
-
 export class VRSettingsPanelCoordinator {
     private readonly eventManager: EventManager
     private readonly appSettings: AppSettings
     private readonly renderLoopRegistry: RenderLoopRegistry
-    private readonly forwardEvents: ForwardEventsFn
     private readonly anchorMode: VRPanelAnchorMode
 
     private readonly menuShell: VRSettingsMenuShell
+    private readonly pointerBridge: UikitPointerBridge
 
-    private renderer: THREE.WebGLRenderer | null = null
-    private forwardedEvents: { update: () => void; destroy: () => void } | null = null
-    private readonly controllerPointers = new Map<number, VRControllerPointer>()
     private active = false
 
     // The two facts syncVisibility() reconciles - tracked rather than acted on directly, so either
@@ -132,15 +112,15 @@ export class VRSettingsPanelCoordinator {
     constructor(
         eventManager: EventManager,
         appSettings: AppSettings,
-        forwardEvents: ForwardEventsFn = forwardHtmlEvents,
+        forwardEvents?: ForwardEventsFn,
         anchorMode: VRPanelAnchorMode = DEFAULT_ANCHOR_MODE
     ) {
         this.eventManager = eventManager
         this.appSettings = appSettings
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
-        this.forwardEvents = forwardEvents
         this.anchorMode = anchorMode
         this.menuShell = new VRSettingsMenuShell(eventManager, appSettings)
+        this.pointerBridge = new UikitPointerBridge(this.menuShell.container, forwardEvents)
 
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
@@ -155,14 +135,7 @@ export class VRSettingsPanelCoordinator {
         this.syncVisibility()
     }
 
-    init(renderer: THREE.WebGLRenderer): void {
-        this.renderer = renderer
-
-        // Both required by uikit for correct panel transparency/ordering - see the vanilla usage
-        // example in @pmndrs/uikit's own README. Global renderer flags, safe to set unconditionally.
-        renderer.localClippingEnabled = true
-        renderer.setTransparentSort(reversePainterSortStable)
-
+    init(): void {
         this.renderLoopRegistry.register(this.constructor.name, this.update)
     }
 
@@ -220,17 +193,13 @@ export class VRSettingsPanelCoordinator {
 
         const scene = this.getScene()
         const camera = this.getCamera()
-        if (!scene || !camera || !this.renderer) {
-            console.warn('VRSettingsPanelCoordinator: scene/camera/renderer not ready yet, skipping activation')
+        if (!scene || !camera) {
+            console.warn('VRSettingsPanelCoordinator: scene/camera not ready yet, skipping activation')
             return
         }
 
         this.attachToAnchor(this.menuShell.container, camera, scene)
-
-        // Scoped to the menu's own tree, not the scene: every forwarder on the canvas delivers each
-        // click to whatever root it was given, so two scene-wide forwarders deliver it twice and a
-        // toggle flips back immediately.
-        this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, this.menuShell.container)
+        this.pointerBridge.attach()
 
         this.active = true
     }
@@ -240,13 +209,7 @@ export class VRSettingsPanelCoordinator {
             return
         }
 
-        this.forwardedEvents?.destroy()
-        this.forwardedEvents = null
-
-        for (const pointer of this.controllerPointers.values()) {
-            pointer.dispose()
-        }
-        this.controllerPointers.clear()
+        this.pointerBridge.detach()
 
         // Hide rather than remove from the scene graph - re-parenting a uikit root on every
         // open/close (Object3D.add() unconditionally calls removeFromParent() first, even when
@@ -256,40 +219,6 @@ export class VRSettingsPanelCoordinator {
         this.menuShell.container.visible = false
 
         this.active = false
-    }
-
-    /**
-     * Self-healing, mirroring XRControllerManager.update()'s own per-frame controller-model
-     * pruning: recomputes the connected-controller list every frame and reconciles
-     * this.controllerPointers to match, rather than trying to time creation/disposal around
-     * 'connected'/'disconnected' events. Correct regardless of controllers connecting or
-     * disconnecting mid-session while the panel is open.
-     */
-    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<XRControllerState> {
-        const raySource = DataManager.getInstance().get<XRControllerSource>(DataKey.XRControllerSource) ?? null
-        const connected = raySource?.getConnectedControllers?.() ?? []
-        const connectedIndices = new Set(connected.map(entry => entry.index))
-
-        for (const [index, pointer] of this.controllerPointers) {
-            if (!connectedIndices.has(index)) {
-                pointer.dispose()
-                this.controllerPointers.delete(index)
-            }
-        }
-
-        for (const { index, targetRaySpace } of connected) {
-            if (this.controllerPointers.has(index)) {
-                continue
-            }
-            this.controllerPointers.set(index, new VRControllerPointer({
-                raySpace: targetRaySpace,
-                getCamera: () => camera as THREE.PerspectiveCamera,
-                intersectRoot: this.menuShell.container,
-                scene
-            }))
-        }
-
-        return connected
     }
 
     /** Adds container to target only if it isn't already that target's child - Object3D.add()
@@ -368,20 +297,13 @@ export class VRSettingsPanelCoordinator {
             return
         }
 
-        this.forwardedEvents?.update()
+        // Retries until the renderer exists; a no-op once attached.
+        this.pointerBridge.attach()
+        this.pointerBridge.update()
         // Component.update()'s own contract: "must only be called for the root component" - the
         // shell's own top-level Container is that root. deltaTime is already milliseconds
         // (RenderLoopRegistry's unit), matching what uikit's own update(delta) example passes.
         this.menuShell.container.update(deltaTime)
-
-        const scene = this.getScene()
-        const camera = this.getCamera()
-        if (scene && camera) {
-            const connected = this.syncControllerPointers(scene, camera)
-            for (const { index } of connected) {
-                this.controllerPointers.get(index)?.update()
-            }
-        }
     }
 
     dispose(): void {
@@ -394,7 +316,5 @@ export class VRSettingsPanelCoordinator {
         this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)
         this.eventManager.deregisterEventHandler(WebXREventTypes.SessionEnd, this.handleXRSessionEnd)
         this.menuShell.dispose()
-
-        this.renderer = null
     }
 }
