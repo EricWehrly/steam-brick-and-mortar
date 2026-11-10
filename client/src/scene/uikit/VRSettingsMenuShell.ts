@@ -41,7 +41,7 @@ export class VRSettingsMenuShell {
     /** The active tab id. A signal so uikit's Tabs, in controlled mode, restyles the triggers itself
      *  whether the change came from a click or from the DOM menu. */
     private readonly activePanelIdSignal = signal(DEFAULT_VR_MENU_TAB_PANEL_ID)
-    private readonly confirmDialog = new VRMenuConfirmDialog()
+    private readonly confirmDialog: VRMenuConfirmDialog
     /** True while an immersive session is presenting - a signal, so a panel's flatscreen-only
      *  actions hide the moment a session starts even with the menu already open. */
     private readonly immersiveSession = signal(false)
@@ -52,10 +52,8 @@ export class VRSettingsMenuShell {
         private readonly eventManager: EventManager,
         private readonly appSettings: AppSettings
     ) {
-        this.panelContext = {
-            requestConfirmation: request => this.confirmDialog.show(request),
-            immersiveSession: this.immersiveSession
-        }
+        this.confirmDialog = new VRMenuConfirmDialog(this.eventManager)
+        this.panelContext = { immersiveSession: this.immersiveSession }
 
         const built = this.build()
         this.container = built.container
@@ -167,6 +165,7 @@ export class VRSettingsMenuShell {
     }
 
     dispose(): void {
+        this.confirmDialog.dispose()
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
         this.eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, this.handleSettingChanged)
         this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)

@@ -20,6 +20,7 @@
  */
 
 import type { ApplicationSettings } from '../../core/AppSettings'
+import type { ConfirmationPrompt } from '../../types/InteractionEvents'
 import type { SettingsActionId } from './SettingsActions'
 
 /** Keys of ApplicationSettings whose value is a number - the only settings a range control can
@@ -121,13 +122,9 @@ export function toggle(setting: BooleanSettingKey, options: ToggleOptions): Togg
     return { kind: 'toggle', setting, id: id ?? kebabCase(setting), ...rest }
 }
 
-/** Asks the user to confirm before an action is carried out. Shown as a modal over the menu on
- *  surfaces that can't use a blocking window.confirm() - which is every immersive session. */
-export interface ActionConfirmation {
-    readonly title: string
-    readonly message: string
-    readonly confirmLabel: string
-}
+/** Asks the user to confirm before an action is carried out; SettingsActionHandler asks for it
+ *  through ConfirmationRequested, so it doesn't matter which surface answers. */
+export type ActionConfirmation = ConfirmationPrompt
 
 /** A button that asks the app to do something other than set a setting. Pressing it raises
  *  UIEventTypes.SettingsActionRequested carrying `action`; nothing about how it's carried out lives

@@ -7,8 +7,8 @@
  */
 
 import { Container, Text } from '@pmndrs/uikit'
-import { Slider, Switch, ToggleGroup, ToggleGroupItem } from '@pmndrs/uikit-default'
-import { computed, signal } from '@preact/signals-core'
+import { Button, Slider, Switch, ToggleGroup, ToggleGroupItem } from '@pmndrs/uikit-default'
+import { computed, signal, type ReadonlySignal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { toUikitSafeText } from './UikitTextSanitizer'
 
@@ -56,6 +56,29 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
             checkedSignal.value = next
         }
     }
+}
+
+export interface UIKitActionButtonOptions {
+    readonly label: string
+    readonly onPress: () => void
+    /** While true the button is not displayed (and takes no layout space). */
+    readonly hidden?: ReadonlySignal<boolean>
+}
+
+/** A button that does something other than set a setting. It holds no state to resync. */
+export function createActionButton(options: UIKitActionButtonOptions): Button {
+    const { label, onPress, hidden } = options
+
+    const button = new Button(
+        {
+            variant: 'secondary',
+            onClick: onPress,
+            ...(hidden && { display: computed<'none' | 'flex'>(() => (hidden.value ? 'none' : 'flex')) })
+        },
+        [MENU_CLASS.action]
+    )
+    button.add(new Text({ text: toUikitSafeText(label) }, [MENU_CLASS.settingLabel]))
+    return button
 }
 
 export interface UIKitSelectRowOptions {

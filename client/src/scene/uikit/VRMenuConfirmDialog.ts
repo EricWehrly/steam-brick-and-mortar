@@ -1,15 +1,16 @@
 /**
- * A modal "are you sure?" over the whole VR menu. Exists because window.confirm() - what the DOM
- * menu uses - is blocked inside an immersive session, so a surface that has to work in a headset
+ * A modal "are you sure?" over the whole VR menu. Exists because window.confirm() is blocked inside
+ * an immersive session and can't be drawn by a headset anyway, so a surface that has to work there
  * needs a confirmation it draws itself.
  *
- * Owned by VRSettingsMenuShell and added to the menu ROOT, not to a panel: uikit's AlertDialog is
- * an absolutely-positioned overlay filling its parent, and a panel lives inside a scrolling content
- * area, where an overlay would scroll away with it. One instance serves every panel; a panel asks
- * through requestConfirmation() and never holds a reference to the dialog.
+ * Event-driven both ways: it opens on UIEventTypes.ConfirmationRequested and answers with
+ * ConfirmationAnswered, so whoever needs a yes/no never holds a reference to it. Owned by
+ * VRSettingsMenuShell and added to the menu ROOT, not to a panel: uikit's AlertDialog is an
+ * absolutely-positioned overlay filling its parent, and a panel lives inside a scrolling content
+ * area, where an overlay would scroll away with it.
  *
  * The overlay, backdrop and "stop pointer events reaching what's underneath" behaviour are
- * uikit-default's own. Its buttons close the dialog themselves; we only add the confirm callback.
+ * uikit-default's own. Its buttons close the dialog themselves; we only add the answer.
  */
 
 import { Text } from '@pmndrs/uikit'
@@ -23,16 +24,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from '@pmndrs/uikit-default'
+import type { EventManager } from '../../core/EventManager'
+import {
+    UIEventTypes,
+    type ConfirmationAnsweredEvent,
+    type ConfirmationRequestedEvent
+} from '../../types/InteractionEvents'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 
 const CANCEL_LABEL = 'Cancel'
-
-export interface ConfirmationRequest {
-    readonly title: string
-    readonly message: string
-    readonly confirmLabel: string
-    readonly onConfirm: () => void
-}
 
 export class VRMenuConfirmDialog {
     readonly container: AlertDialog
@@ -40,9 +40,9 @@ export class VRMenuConfirmDialog {
     private readonly titleText = new Text(undefined, [MENU_CLASS.dialogTitle])
     private readonly messageText = new Text(undefined, [MENU_CLASS.dialogMessage])
     private readonly confirmLabelText = new Text(undefined, [MENU_CLASS.dialogButtonLabel])
-    private request: ConfirmationRequest | null = null
+    private openRequestId: string | null = null
 
-    constructor() {
+    constructor(private readonly eventManager: EventManager) {
         this.container = new AlertDialog()
 
         const content = new AlertDialogContent(undefined, [MENU_CLASS.dialog])
@@ -67,31 +67,51 @@ export class VRMenuConfirmDialog {
 
         content.add(header, footer)
         this.container.add(content)
+
+        this.eventManager.registerEventHandler<ConfirmationRequestedEvent>(
+            UIEventTypes.ConfirmationRequested,
+            this.handleConfirmationRequested
+        )
     }
 
     get isOpen(): boolean {
         return this.container.currentSignal.value === true
     }
 
-    show(request: ConfirmationRequest): void {
-        this.request = request
-        this.titleText.setProperties({ text: request.title })
-        this.messageText.setProperties({ text: request.message })
-        this.confirmLabelText.setProperties({ text: request.confirmLabel })
-        this.container.setOpen(true)
-    }
-
     /** What the Confirm button does. Public so tests can say "the user confirmed" without
      *  synthesizing a pointer-events click through uikit. */
     confirm(): void {
-        const request = this.request
-        this.request = null
-        this.container.setOpen(false)
-        request?.onConfirm()
+        this.close(true)
     }
 
+    /** Also how the shell abandons a pending request (a tab switch): the asker is told "no". */
     cancel(): void {
-        this.request = null
+        this.close(false)
+    }
+
+    dispose(): void {
+        this.eventManager.deregisterEventHandler(UIEventTypes.ConfirmationRequested, this.handleConfirmationRequested)
+    }
+
+    private readonly handleConfirmationRequested = (event: CustomEvent<ConfirmationRequestedEvent>): void => {
+        // One dialog serves one question at a time; the one it replaces is answered "no" so its
+        // asker isn't left waiting.
+        this.cancel()
+
+        const { requestId, title, message, confirmLabel } = event.detail
+        this.openRequestId = requestId
+        this.titleText.setProperties({ text: title })
+        this.messageText.setProperties({ text: message })
+        this.confirmLabelText.setProperties({ text: confirmLabel })
+        this.container.setOpen(true)
+    }
+
+    private close(confirmed: boolean): void {
+        const requestId = this.openRequestId
+        this.openRequestId = null
         this.container.setOpen(false)
+        if (requestId !== null) {
+            this.eventManager.emit<ConfirmationAnsweredEvent>(UIEventTypes.ConfirmationAnswered, { requestId, confirmed })
+        }
     }
 }

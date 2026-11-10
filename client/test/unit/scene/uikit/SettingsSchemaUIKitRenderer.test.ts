@@ -170,23 +170,23 @@ describe('buildSettingsPanel', () => {
             expect(received).toEqual([expect.objectContaining({ actionId: SETTINGS_ACTION.Export })])
         })
 
-        it('asks for confirmation instead of acting when the schema says to', () => {
-            const { press, confirmations } = actionButtons()
+        it('sends the schema\'s confirmation prompt along with the action', () => {
+            const { press } = actionButtons()
 
             press(0)
 
-            expect(received).toEqual([])
-            expect(confirmations).toHaveLength(1)
-            expect(confirmations[0]).toMatchObject({ title: 'Reset all settings?', confirmLabel: 'Reset' })
+            expect(received).toEqual([expect.objectContaining({
+                actionId: SETTINGS_ACTION.ResetAll,
+                confirm: expect.objectContaining({ title: 'Reset all settings?', confirmLabel: 'Reset' })
+            })])
         })
 
-        it('raises the action only once the user confirms', () => {
-            const { press, confirmations } = actionButtons()
+        it('sends no confirmation prompt for an action whose schema declares none', () => {
+            const { press } = actionButtons()
 
-            press(0)
-            confirmations[0].onConfirm()
+            press(1)
 
-            expect(received).toEqual([expect.objectContaining({ actionId: SETTINGS_ACTION.ResetAll })])
+            expect(received[0].confirm).toBeUndefined()
         })
 
         it('hides flatscreen-only actions while an immersive session is presenting, and shows them after', () => {
