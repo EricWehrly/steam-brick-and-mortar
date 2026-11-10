@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { Group } from 'three'
 import type { Container } from '@pmndrs/uikit'
 import { Switch, type ToggleGroupItem } from '@pmndrs/uikit-default'
-import { createSelectRow, createToggleRow } from '../../../../src/scene/uikit/UIKitRowHelpers'
+import { signal } from '@preact/signals-core'
+import { createActionButton, createSelectRow, createToggleRow } from '../../../../src/scene/uikit/UIKitRowHelpers'
 import { MENU_CLASS } from '../../../../src/scene/uikit/VRMenuStyleSheet'
 
 // uikit only resolves a node's properties once it is attached to a parent.
@@ -45,6 +46,41 @@ describe('createToggleRow switch', () => {
     it('styles the thumb', () => {
         const { toggleSwitch } = buildToggle(true)
         expect(toggleSwitch.handle.classList.contains(MENU_CLASS.switchThumb)).toBe(true)
+    })
+})
+
+describe('createActionButton', () => {
+    const displayOf = (button: object) => (button as { properties: { peek(): Record<string, unknown> } }).properties.peek().display
+
+    function build(hidden?: ReturnType<typeof signal<boolean>>) {
+        const onPress = vi.fn()
+        const button = createActionButton({ label: 'Export', onPress, hidden })
+        new Group().add(button)
+        return { button, onPress }
+    }
+
+    it('reports a press', () => {
+        const { button, onPress } = build()
+
+        ;(button.properties.peek().onClick as () => void)()
+
+        expect(onPress).toHaveBeenCalledOnce()
+    })
+
+    it('is always shown when it has no hidden signal', () => {
+        expect(displayOf(build().button)).not.toBe('none')
+    })
+
+    it('follows its hidden signal', () => {
+        const hidden = signal(false)
+        const { button } = build(hidden)
+        expect(displayOf(button)).toBe('flex')
+
+        hidden.value = true
+        expect(displayOf(button)).toBe('none')
+
+        hidden.value = false
+        expect(displayOf(button)).toBe('flex')
     })
 })
 

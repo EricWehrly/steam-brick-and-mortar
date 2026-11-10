@@ -1,11 +1,9 @@
 /**
- * A SettingsPanelContext for tests, with the pieces a test needs to look at: the confirmations a
- * panel asked for, and the immersive-session signal to flip.
+ * A SettingsPanelContext for tests, with the immersive-session signal exposed so a test can flip it.
  */
 
 import { signal } from '@preact/signals-core'
 import type { SettingsPanelContext } from '../../src/scene/uikit/SettingsSchemaUIKitRenderer'
-import type { ConfirmationRequest } from '../../src/scene/uikit/VRMenuConfirmDialog'
 
 /** A uikit node's current property values, with signal-valued properties already unwrapped. Read
  *  via peek(): the `.value` accessor doesn't resolve a signal-valued property such as `display`. */
@@ -14,13 +12,8 @@ export function resolvedProps(node: object): Record<string, unknown> {
 }
 
 export function createTestPanelContext() {
-    const confirmations: ConfirmationRequest[] = []
     const immersiveSession = signal(false)
+    const context: SettingsPanelContext = { immersiveSession }
 
-    const context: SettingsPanelContext = {
-        requestConfirmation: request => { confirmations.push(request) },
-        immersiveSession
-    }
-
-    return { context, confirmations, immersiveSession }
+    return { context, immersiveSession }
 }

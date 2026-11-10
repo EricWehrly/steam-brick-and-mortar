@@ -8,33 +8,29 @@
  * Layout composition lives here; sizes and colors live in styles/vr-menu.css; what the panel says
  * and which settings it binds live in the schema. Nothing in this file names a pixel or a hex.
  *
- * An action button never does its own work: it raises UIEventTypes.SettingsActionRequested (after
- * asking for confirmation first, if its schema says to) and SettingsActionHandler carries it out.
+ * An action button never does its own work: it raises UIEventTypes.SettingsActionRequested (with
+ * its schema's confirmation prompt, if any) and SettingsActionHandler asks and carries it out.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
-import { computed, type ReadonlySignal } from '@preact/signals-core'
+import type { ReadonlySignal } from '@preact/signals-core'
 import type { AppSettings, ApplicationSettings } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
     schemaSettingKeys,
-    type ActionContent,
     type SettingsPanelSchema,
     type SettingsSection
 } from '../../ui/settings/SettingsSchema'
-import { createSelectRow, createSliderRow, createToggleRow } from './UIKitRowHelpers'
+import { createActionButton, createSelectRow, createSliderRow, createToggleRow } from './UIKitRowHelpers'
 import { toUikitSafeText } from './UikitTextSanitizer'
-import type { ConfirmationRequest } from './VRMenuConfirmDialog'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 
 const RESET_LABEL = 'Reset to Defaults'
 
 /** What a panel needs from the surface it's shown on, passed in rather than reached for. */
 export interface SettingsPanelContext {
-    /** Shows a modal and runs `onConfirm` if the user accepts. */
-    readonly requestConfirmation: (request: ConfirmationRequest) => void
     /** True while an immersive session is presenting; flatscreen-only actions hide. */
     readonly immersiveSession: ReadonlySignal<boolean>
 }
@@ -136,36 +132,17 @@ function buildSection(
                 break
             }
             case 'action':
-                container.add(buildAction(content, context))
+                container.add(createActionButton({
+                    label: content.label,
+                    onPress: () => EventManager.getInstance().emit<SettingsActionRequestedEvent>(
+                        UIEventTypes.SettingsActionRequested,
+                        { actionId: content.action, confirm: content.confirm }
+                    ),
+                    hidden: content.flatscreenOnly ? context.immersiveSession : undefined
+                }))
                 break
         }
     }
 
     return container
-}
-
-function buildAction(content: ActionContent, context: SettingsPanelContext): Button {
-    const raise = (): void => {
-        EventManager.getInstance().emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId: content.action })
-    }
-    const press = (): void => {
-        if (content.confirm) {
-            context.requestConfirmation({ ...content.confirm, onConfirm: raise })
-        } else {
-            raise()
-        }
-    }
-
-    const button = new Button(
-        {
-            variant: 'secondary',
-            onClick: press,
-            ...(content.flatscreenOnly && {
-                display: computed<'none' | 'flex'>(() => (context.immersiveSession.value ? 'none' : 'flex'))
-            })
-        },
-        [MENU_CLASS.action]
-    )
-    button.add(new Text({ text: toUikitSafeText(content.label) }, [MENU_CLASS.settingLabel]))
-    return button
 }

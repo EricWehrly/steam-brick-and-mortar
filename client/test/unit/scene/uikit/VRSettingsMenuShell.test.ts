@@ -4,12 +4,19 @@
  * exercises the real tree rather than a stub.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Group } from 'three'
 import { AlertDialog, Tabs, type TabsTrigger } from '@pmndrs/uikit-default'
 import { AppSettings } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
-import { UIEventTypes, WebXREventTypes, type MenuPanelChangedEvent } from '../../../../src/types/InteractionEvents'
+import {
+    UIEventTypes,
+    WebXREventTypes,
+    type ConfirmationAnsweredEvent,
+    type ConfirmationRequestedEvent,
+    type MenuPanelChangedEvent
+} from '../../../../src/types/InteractionEvents'
+import { SettingsActionHandler } from '../../../../src/ui/settings/SettingsActionHandler'
 import { resolvedProps } from '../../../utils/settings-panel-context'
 import { VRSettingsMenuShell } from '../../../../src/scene/uikit/VRSettingsMenuShell'
 import { VR_MENU_SCHEMAS, DEFAULT_VR_MENU_TAB_PANEL_ID } from '../../../../src/scene/uikit/VRMenuTabRegistry'
@@ -149,6 +156,23 @@ describe('VRSettingsMenuShell', () => {
             expect(isHidden(exportButton)).toBe(false)
         })
 
+        // The real chain: button -> SettingsActionHandler -> ConfirmationRequested -> this shell's dialog.
+        let actionHandler: SettingsActionHandler
+        let askedIds: string[]
+        beforeEach(() => {
+            actionHandler = new SettingsActionHandler(eventManager, appSettings)
+            actionHandler.init()
+            askedIds = []
+            eventManager.registerEventHandler<ConfirmationRequestedEvent>(
+                UIEventTypes.ConfirmationRequested,
+                e => { askedIds.push(e.detail.requestId) }
+            )
+        })
+        afterEach(() => {
+            actionHandler.dispose()
+            vi.restoreAllMocks()
+        })
+
         it('opens the confirmation dialog for Reset instead of resetting straight away', () => {
             const shell = new VRSettingsMenuShell(eventManager, appSettings)
             const resetSpy = vi.spyOn(appSettings, 'resetToDefaults')
@@ -159,6 +183,21 @@ describe('VRSettingsMenuShell', () => {
 
             expect(confirmDialog(shell).currentSignal.value).toBe(true)
             expect(resetSpy).not.toHaveBeenCalled()
+        })
+
+        it('resets once the confirmation is answered yes, and not when it is answered no', () => {
+            const shell = new VRSettingsMenuShell(eventManager, appSettings)
+            const resetSpy = vi.spyOn(appSettings, 'resetToDefaults')
+            const answer = (confirmed: boolean) =>
+                eventManager.emit<ConfirmationAnsweredEvent>(UIEventTypes.ConfirmationAnswered, { requestId: askedIds.at(-1)!, confirmed })
+
+            press(actionButtons(shell)[0])
+            answer(false)
+            expect(resetSpy).not.toHaveBeenCalled()
+
+            press(actionButtons(shell)[0])
+            answer(true)
+            expect(resetSpy).toHaveBeenCalledOnce()
         })
 
         it('abandons a pending confirmation when the user switches tabs', () => {
