@@ -20,22 +20,15 @@
 
 import * as THREE from 'three'
 import { forwardHtmlEvents } from '@pmndrs/pointer-events'
-import type { ForwardEventsOptions } from '@pmndrs/pointer-events'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { VRCategoryReferencePanel } from './panels/VRCategoryReferencePanel'
+import type { ForwardEventsFn } from './UikitPointerBridge'
 
 // Matches VRSettingsPanelCoordinator's WORLD_LOCK_DISTANCE - not imported, that constant is
 // module-private, and this panel's own size differs anyway so there's no real value tying them.
 const WORLD_LOCK_DISTANCE = 1.2
-
-type ForwardEventsFn = (
-    fromElement: HTMLElement,
-    getCamera: () => THREE.PerspectiveCamera | THREE.OrthographicCamera,
-    scene: THREE.Object3D,
-    options?: ForwardEventsOptions
-) => { destroy: () => void; update: () => void }
 
 export class VRCategoryReferenceCoordinator {
     private readonly panel = new VRCategoryReferencePanel()
