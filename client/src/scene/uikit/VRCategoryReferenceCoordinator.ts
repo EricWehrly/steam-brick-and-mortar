@@ -13,18 +13,17 @@
  * up front; revisit if a third standalone-panel use case shows up (see
  * docs/plans/vr-uikit-menu-migration-plan.md's "unified menu definition" direction).
  *
- * Only flatscreen mouse interaction is wired (forwardHtmlEvents) - VR controller-ray interaction
- * (VRControllerPointer) is deliberately not, since this panel has no clickable controls yet, only
- * scroll, and this is a first look at how world-locked content reads at all.
+ * Input goes through a UikitPointerBridge with controller rays off: it is mouse-only, because this
+ * panel is always in the scene and a ray-drawing bridge here would stack a second beam on top of
+ * the settings menu's and the game box's.
  */
 
 import * as THREE from 'three'
-import { forwardHtmlEvents } from '@pmndrs/pointer-events'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import { VRCategoryReferencePanel } from './panels/VRCategoryReferencePanel'
-import type { ForwardEventsFn } from './UikitPointerBridge'
+import { UikitPointerBridge } from './UikitPointerBridge'
 
 // Matches VRSettingsPanelCoordinator's WORLD_LOCK_DISTANCE - not imported, that constant is
 // module-private, and this panel's own size differs anyway so there's no real value tying them.
@@ -32,38 +31,30 @@ const WORLD_LOCK_DISTANCE = 1.2
 
 export class VRCategoryReferenceCoordinator {
     private readonly panel = new VRCategoryReferencePanel()
-    private readonly renderLoopRegistry: RenderLoopRegistry
-    private readonly forwardEvents: ForwardEventsFn
+    private readonly renderLoopRegistry = RenderLoopRegistry.getInstance()
+    private readonly pointerBridge = new UikitPointerBridge(this.panel.container, undefined, { controllerRays: false })
 
-    private renderer: THREE.WebGLRenderer | null = null
-    private forwardedEvents: { update: () => void; destroy: () => void } | null = null
     private placed = false
 
-    constructor(forwardEvents: ForwardEventsFn = forwardHtmlEvents) {
-        this.renderLoopRegistry = RenderLoopRegistry.getInstance()
-        this.forwardEvents = forwardEvents
-    }
-
-    init(renderer: THREE.WebGLRenderer): void {
-        this.renderer = renderer
+    init(): void {
         this.renderLoopRegistry.register(this.constructor.name, this.update)
     }
 
     private readonly update = (_now: number, deltaTime: number): void => {
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene) ?? null
         const camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
-        if (!scene || !camera || !this.renderer) {
+        if (!scene || !camera) {
             return
         }
 
         if (!this.placed) {
             this.placeInWorld(this.panel.container, camera, scene)
             this.placed = true
-            // Scoped to this panel's own tree, not the scene - see VRSettingsPanelCoordinator.activate().
-            this.forwardedEvents = this.forwardEvents(this.renderer.domElement, () => camera as THREE.PerspectiveCamera, this.panel.container)
         }
 
-        this.forwardedEvents?.update()
+        // Retries until the renderer exists; a no-op once attached.
+        this.pointerBridge.attach()
+        this.pointerBridge.update()
         this.panel.container.update(deltaTime)
     }
 
@@ -88,9 +79,7 @@ export class VRCategoryReferenceCoordinator {
 
     dispose(): void {
         this.renderLoopRegistry.unregister(this.constructor.name)
-        this.forwardedEvents?.destroy()
-        this.forwardedEvents = null
+        this.pointerBridge.detach()
         this.panel.container.removeFromParent()
-        this.renderer = null
     }
 }

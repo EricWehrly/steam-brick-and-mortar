@@ -37,9 +37,13 @@ export class UikitPointerBridge {
     private forwardedEvents: { update: () => void; destroy: () => void } | null = null
     private attached = false
 
+    /** `controllerRays: false` keeps this root mouse-only. Every bridge with rays on draws its own
+     *  beam per controller, so a root that is always in the scene (the world-locked category
+     *  reference) would stack a second beam on whichever menu is being pointed at. */
     constructor(
         private readonly intersectRoot: THREE.Object3D,
-        private readonly forwardEvents: ForwardEventsFn = forwardHtmlEvents
+        private readonly forwardEvents: ForwardEventsFn = forwardHtmlEvents,
+        private readonly options: { readonly controllerRays?: boolean } = {}
     ) {}
 
     /** Starts routing input at this root. Safe to call repeatedly; a call before the renderer/
@@ -60,7 +64,8 @@ export class UikitPointerBridge {
         renderer.localClippingEnabled = true
         renderer.setTransparentSort(reversePainterSortStable)
 
-        // Scoped to this bridge's own root, not the scene - see VRSettingsPanelCoordinator.activate().
+        // Scoped to this bridge's own root, not the scene: a scene-wide forwarder would route every
+        // canvas event to every uikit surface at once.
         this.forwardedEvents = this.forwardEvents(renderer.domElement, () => camera as THREE.PerspectiveCamera, this.intersectRoot)
         this.attached = true
     }
@@ -71,6 +76,9 @@ export class UikitPointerBridge {
             return
         }
         this.forwardedEvents?.update()
+        if (this.options.controllerRays === false) {
+            return
+        }
 
         const scene = this.getScene()
         const camera = this.getCamera()

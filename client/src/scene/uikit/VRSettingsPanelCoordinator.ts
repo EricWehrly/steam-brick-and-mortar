@@ -61,7 +61,7 @@ import { UIEventTypes, WebXREventTypes, type MenuOpenEvent, type MenuCloseEvent 
 import { RenderLoopRegistry } from '../RenderLoopRegistry'
 import type { XRControllerSource } from '../../webxr/XRControllerManager'
 import { VRSettingsMenuShell } from './VRSettingsMenuShell'
-import { UikitPointerBridge, type ForwardEventsFn } from './UikitPointerBridge'
+import { UikitPointerBridge } from './UikitPointerBridge'
 
 // Same "held in front of the viewer" convention GameBoxFoldCoordinator uses, but further out
 // (was -0.6, matching parity with the game box) - the panel itself grew (see
@@ -106,13 +106,9 @@ export class VRSettingsPanelCoordinator {
     private inImmersiveSession = false
     private showOnFlatscreen = false
 
-    private resolvedScene: THREE.Scene | null = null
-    private resolvedCamera: THREE.Camera | null = null
-
     constructor(
         eventManager: EventManager,
         appSettings: AppSettings,
-        forwardEvents?: ForwardEventsFn,
         anchorMode: VRPanelAnchorMode = DEFAULT_ANCHOR_MODE
     ) {
         this.eventManager = eventManager
@@ -120,7 +116,7 @@ export class VRSettingsPanelCoordinator {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         this.anchorMode = anchorMode
         this.menuShell = new VRSettingsMenuShell(eventManager, appSettings)
-        this.pointerBridge = new UikitPointerBridge(this.menuShell.container, forwardEvents)
+        this.pointerBridge = new UikitPointerBridge(this.menuShell.container)
 
         this.eventManager.registerEventHandler<MenuOpenEvent>(UIEventTypes.MenuOpen, this.handleMenuOpen)
         this.eventManager.registerEventHandler<MenuCloseEvent>(UIEventTypes.MenuClose, this.handleMenuClose)
@@ -176,30 +172,19 @@ export class VRSettingsPanelCoordinator {
         }
     }
 
-    private getScene(): THREE.Scene | null {
-        this.resolvedScene ??= DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene) ?? null
-        return this.resolvedScene
-    }
-
-    private getCamera(): THREE.Camera | null {
-        this.resolvedCamera ??= DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
-        return this.resolvedCamera
-    }
-
     private activate(): void {
         if (this.active) {
             return
         }
 
-        const scene = this.getScene()
-        const camera = this.getCamera()
+        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
+        const camera = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera)
         if (!scene || !camera) {
             console.warn('VRSettingsPanelCoordinator: scene/camera not ready yet, skipping activation')
             return
         }
 
         this.attachToAnchor(this.menuShell.container, camera, scene)
-        this.pointerBridge.attach()
 
         this.active = true
     }
