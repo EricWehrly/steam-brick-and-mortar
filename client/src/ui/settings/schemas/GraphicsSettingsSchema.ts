@@ -14,6 +14,8 @@ import { range, select, toggle, type SettingsPanelSchema } from '../SettingsSche
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`
 const metres = (value: number): string => `${value}m`
+const shadowQualityLabel = (level: number): string => SHADOW_QUALITY_LABELS[level] ?? SHADOW_QUALITY_LABELS[2]
+const ssaoQualityLabel = (level: number): string => SSAO_QUALITY_LEVELS[level]?.label ?? SSAO_QUALITY_LEVELS[0].label
 
 export const GRAPHICS_SETTINGS_SCHEMA: SettingsPanelSchema = {
     id: 'graphics-settings',
@@ -61,7 +63,7 @@ export const GRAPHICS_SETTINGS_SCHEMA: SettingsPanelSchema = {
                     min: 0,
                     max: SHADOW_QUALITY_LABELS.length - 1,
                     step: 1,
-                    formatDisplay: level => SHADOW_QUALITY_LABELS[level] ?? SHADOW_QUALITY_LABELS[2]
+                    formatDisplay: shadowQualityLabel
                 }),
                 range('ssaoQuality', {
                     label: 'Ambient occlusion (SSAO)',
@@ -69,7 +71,7 @@ export const GRAPHICS_SETTINGS_SCHEMA: SettingsPanelSchema = {
                     min: 0,
                     max: SSAO_QUALITY_LEVELS.length - 1,
                     step: 1,
-                    formatDisplay: level => SSAO_QUALITY_LEVELS[level]?.label ?? SSAO_QUALITY_LEVELS[0].label
+                    formatDisplay: ssaoQualityLabel
                 })
             ]
         },

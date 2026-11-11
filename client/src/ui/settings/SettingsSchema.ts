@@ -69,11 +69,16 @@ export interface RangeOptions {
 export function range(setting: NumericSettingKey, options: RangeOptions): RangeSettingControl {
     const { id, unit = '', ...rest } = options
     const decimals = decimalPlaces(options.step)
+
+    function formatWithUnit(value: number): string {
+        return `${value.toFixed(decimals)}${unit}`
+    }
+
     return {
         kind: 'range',
         setting,
         id: id ?? kebabCase(setting),
-        formatDisplay: value => `${value.toFixed(decimals)}${unit}`,
+        formatDisplay: formatWithUnit,
         ...rest
     }
 }

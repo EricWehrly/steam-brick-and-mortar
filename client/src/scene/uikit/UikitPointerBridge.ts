@@ -66,7 +66,7 @@ export class UikitPointerBridge {
 
         // Scoped to this bridge's own root, not the scene: a scene-wide forwarder would route every
         // canvas event to every uikit surface at once.
-        this.forwardedEvents = this.forwardEvents(renderer.domElement, () => camera as THREE.PerspectiveCamera, this.intersectRoot)
+        this.forwardedEvents = this.forwardEvents(renderer.domElement, this.mainCamera, this.intersectRoot)
         this.attached = true
     }
 
@@ -81,11 +81,10 @@ export class UikitPointerBridge {
         }
 
         const scene = this.getScene()
-        const camera = this.getCamera()
-        if (!scene || !camera) {
+        if (!scene || !this.getCamera()) {
             return
         }
-        for (const pointer of this.syncControllerPointers(scene, camera)) {
+        for (const pointer of this.syncControllerPointers(scene)) {
             pointer.update()
         }
     }
@@ -102,7 +101,7 @@ export class UikitPointerBridge {
         this.attached = false
     }
 
-    private syncControllerPointers(scene: THREE.Scene, camera: THREE.Camera): ReadonlyArray<VRControllerPointer> {
+    private syncControllerPointers(scene: THREE.Scene): ReadonlyArray<VRControllerPointer> {
         const controllerSource = DataManager.getInstance().get<XRControllerSource>(DataKey.XRControllerSource) ?? null
         const connected = controllerSource?.getConnectedControllers?.() ?? []
         const connectedIndices = new Set(connected.map(entry => entry.index))
@@ -114,19 +113,21 @@ export class UikitPointerBridge {
             }
         }
 
-        return connected.map(({ index, targetRaySpace }) => {
-            let pointer = this.controllerPointers.get(index)
-            if (!pointer) {
-                pointer = new VRControllerPointer({
-                    raySpace: targetRaySpace,
-                    getCamera: () => camera as THREE.PerspectiveCamera,
-                    intersectRoot: this.intersectRoot,
-                    scene
-                })
-                this.controllerPointers.set(index, pointer)
-            }
-            return pointer
-        })
+        const pointers: VRControllerPointer[] = []
+        for (const { index, targetRaySpace } of connected) {
+            pointers.push(this.pointerFor(index, targetRaySpace, scene))
+        }
+        return pointers
+    }
+
+    /** The pointer already riding this controller, or a new one. */
+    private pointerFor(index: number, raySpace: THREE.XRTargetRaySpace, scene: THREE.Scene): VRControllerPointer {
+        let pointer = this.controllerPointers.get(index)
+        if (!pointer) {
+            pointer = new VRControllerPointer({ raySpace, getCamera: this.mainCamera, intersectRoot: this.intersectRoot, scene })
+            this.controllerPointers.set(index, pointer)
+        }
+        return pointer
     }
 
     private getScene(): THREE.Scene | null {
@@ -136,4 +137,8 @@ export class UikitPointerBridge {
     private getCamera(): THREE.Camera | null {
         return DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera) ?? null
     }
+
+    /** What the forwarder and controller pointers ray from. Only called while attached, and attach()
+     *  and update() both bail out before then if there is no camera. */
+    private readonly mainCamera = (): THREE.PerspectiveCamera => this.getCamera() as THREE.PerspectiveCamera
 }

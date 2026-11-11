@@ -69,12 +69,21 @@ export async function importSettingsFromFile(appSettings: AppSettings): Promise<
 
 /** Resolves with the chosen file, or undefined if the picker was dismissed. */
 function pickJsonFile(): Promise<File | undefined> {
-    return new Promise(resolve => {
+    return new Promise(function openPicker(resolve) {
         const input = document.createElement('input')
         input.type = 'file'
         input.accept = '.json'
-        input.onchange = () => resolve(input.files?.[0])
-        input.oncancel = () => resolve(undefined)
+
+        function resolveWithChoice(): void {
+            resolve(input.files?.[0])
+        }
+
+        function resolveDismissed(): void {
+            resolve(undefined)
+        }
+
+        input.onchange = resolveWithChoice
+        input.oncancel = resolveDismissed
         input.click()
     })
 }
