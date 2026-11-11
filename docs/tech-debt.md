@@ -39,11 +39,11 @@ them. Nothing enforces it, so they come back.
   `:matches(CallExpression, NewExpression):not([callee.property.name=/^(map|flatMap|filter|find|findIndex|some|every|sort|reduce|replace)$/]) > :matches(ArrowFunctionExpression, FunctionExpression[id=null])`,
   plus `Property[method=false] > ...` and `AssignmentExpression > ...` variants.
 
-**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`; the five DOM pause-menu panels excluded): 360 hits. Selectors verified against real code, with two widenings of the allow-list: `forEach`/`traverse` (iteration bodies) and `new Promise` executors. Biggest clusters: `.catch`/`.then`, `setTimeout`/`requestAnimationFrame`, event listeners, `IndexedDbCache`, `pixel-cache.worker`, UI panels.
+**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`): 442 hits, 82 of them in the legacy DOM pause-menu panels. Selectors verified against real code, with two widenings of the allow-list: `forEach`/`traverse` (iteration bodies) and `new Promise` executors. Biggest clusters: `.catch`/`.then`, `setTimeout`/`requestAnimationFrame`, event listeners, `IndexedDbCache`, `pixel-cache.worker`, UI panels.
 
 **Fix**:
 - Promote to `error` once its hits are handled.
-- The legacy DOM pause-menu panels (`ApplicationPanel`, `CameraSettingsPanel`, `DisplayAdvancedPanel`, `GameSettingsPanel`, `GraphicsSettingsPanel`) are excluded in the config; drop the exclusion list when `dom-menu-panel-retirement` lands.
+- The legacy DOM pause-menu panels (`ApplicationPanel`, `CameraSettingsPanel`, `DisplayAdvancedPanel`, `GameSettingsPanel`, `GraphicsSettingsPanel`) just warn; leave them to `dom-menu-panel-retirement`.
 - `SystemUICoordinator` and other pre-#171 code: fix when touched.
 
 **Related files**:
@@ -79,7 +79,7 @@ exists) instead of injecting one. Lint sketch for `no-restricted-syntax`, to ver
   `StorePropsCoordinator`, `LodDistanceManager`, `LodGameArtworkRenderer`, `SpatialPrewarmingManager`
   (each has a `readonly eventManager`/`appSettings` field the parameter grep didn't match).
 
-**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`, DOM pause-menu panels excluded): 35 hits. Verified against real code: it matches every non-DOM hit listed above, plus `WebXREventHandler`.
+**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`): 41 hits, 6 of them in the DOM pause-menu panels. Verified against real code: it matches every non-DOM hit listed above, plus `WebXREventHandler`.
 
 **Fix**: clear the non-DOM hits, then promote to `error`.
 

@@ -13,14 +13,6 @@ const IMPORT_SELECTORS = [
   },
 ]
 
-const LEGACY_DOM_PANELS = [
-  'src/ui/pause/panels/ApplicationPanel.ts',
-  'src/ui/pause/panels/CameraSettingsPanel.ts',
-  'src/ui/pause/panels/DisplayAdvancedPanel.ts',
-  'src/ui/pause/panels/GameSettingsPanel.ts',
-  'src/ui/pause/panels/GraphicsSettingsPanel.ts',
-]
-
 // Pure selectors (map/filter/...) are the one place an inline lambda reads fine.
 const PURE_SELECTOR_CALLEE = '/^(map|flatMap|filter|find|findIndex|some|every|sort|reduce|replace|forEach|traverse)$/'
 const ANONYMOUS_FUNCTION = ':matches(ArrowFunctionExpression, FunctionExpression[id=null])'
@@ -147,11 +139,9 @@ export default [
     },
   },
   {
-    // Review rules from PRs #171/#172. Replaces the block above for src/, so it repeats the import selectors.
-    // Test files are exempt: describe/it callbacks are meant to be anonymous.
-    // Legacy DOM pause-menu panels are exempt until dom-menu-panel-retirement removes them.
+    // Flat config replaces (not merges) a rule set by an earlier block, so this src-only block repeats
+    // IMPORT_SELECTORS. Tests are exempt: describe/it callbacks are meant to be anonymous.
     files: ['src/**/*.ts', 'src/**/*.tsx'],
-    ignores: LEGACY_DOM_PANELS,
     rules: {
       'no-restricted-syntax': ['warn', ...IMPORT_SELECTORS, ...CALLBACK_SELECTORS, ...SINGLETON_PARAM_SELECTORS],
     },
