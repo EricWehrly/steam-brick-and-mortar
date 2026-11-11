@@ -11,31 +11,29 @@ import { setTheme, defaultThemes } from '@pmndrs/uikit-default'
 import { Color } from 'three'
 import { COLOR_TOKENS } from '../../ui/ColorTokens'
 
-const color = (hex: string): Color => new Color(hex)
-
 /** uikit-default role -> app token. Roles the menu never renders keep a sensible neighbour so a
  *  future component doesn't fall back to the library's white-on-white light theme. */
 const VR_MENU_THEME = {
     ...defaultThemes.default,
-    background: color(COLOR_TOKENS.surface3),
-    foreground: color(COLOR_TOKENS.textPrimary),
-    card: color(COLOR_TOKENS.surface2),
-    cardForeground: color(COLOR_TOKENS.textPrimary),
-    popover: color(COLOR_TOKENS.surface2),
-    popoverForeground: color(COLOR_TOKENS.textPrimary),
-    primary: color(COLOR_TOKENS.accent),
-    primaryForeground: color(COLOR_TOKENS.textPrimary),
-    secondary: color(COLOR_TOKENS.surface3),
-    secondaryForeground: color(COLOR_TOKENS.textPrimary),
-    muted: color(COLOR_TOKENS.surface2),
-    mutedForeground: color(COLOR_TOKENS.textSecondary),
-    accent: color(COLOR_TOKENS.accent),
-    accentForeground: color(COLOR_TOKENS.textPrimary),
-    destructive: color(COLOR_TOKENS.error),
-    destructiveForeground: color(COLOR_TOKENS.textPrimary),
-    border: color(COLOR_TOKENS.border),
-    input: color(COLOR_TOKENS.borderBright),
-    ring: color(COLOR_TOKENS.accentBright),
+    background: new Color(COLOR_TOKENS.surface3),
+    foreground: new Color(COLOR_TOKENS.textPrimary),
+    card: new Color(COLOR_TOKENS.surface2),
+    cardForeground: new Color(COLOR_TOKENS.textPrimary),
+    popover: new Color(COLOR_TOKENS.surface2),
+    popoverForeground: new Color(COLOR_TOKENS.textPrimary),
+    primary: new Color(COLOR_TOKENS.accent),
+    primaryForeground: new Color(COLOR_TOKENS.textPrimary),
+    secondary: new Color(COLOR_TOKENS.surface3),
+    secondaryForeground: new Color(COLOR_TOKENS.textPrimary),
+    muted: new Color(COLOR_TOKENS.surface2),
+    mutedForeground: new Color(COLOR_TOKENS.textSecondary),
+    accent: new Color(COLOR_TOKENS.accent),
+    accentForeground: new Color(COLOR_TOKENS.textPrimary),
+    destructive: new Color(COLOR_TOKENS.error),
+    destructiveForeground: new Color(COLOR_TOKENS.textPrimary),
+    border: new Color(COLOR_TOKENS.border),
+    input: new Color(COLOR_TOKENS.borderBright),
+    ring: new Color(COLOR_TOKENS.accentBright),
     dark: undefined
 }
 
