@@ -20,7 +20,8 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import '../../../styles/pause-menu/application-panel.css'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import applicationPanelTemplate from '../../../templates/pause-menu/application-panel.html?raw'
-import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
+import { AppSettings, type ApplicationSettings, type SettingChangedEvent } from '../../../core/AppSettings'
+import { AppSettingsEventTypes } from '../../../types/InteractionEvents'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import { exportSettingsToFile, importSettingsFromFile } from '../../settings/SettingsFileTransfer'
@@ -33,11 +34,13 @@ export class ApplicationPanel extends PauseMenuPanel {
     public readonly icon = '⚙️'
     
     private appSettings: AppSettings
-    private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
+    private readonly eventManager: EventManager
+    private readonly onAppSettingChanged = (): void => this.refreshSettingsDisplay()
 
-    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, _eventManager: EventManager) {
+    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, eventManager: EventManager) {
         super(config)
         this.appSettings = appSettings
+        this.eventManager = eventManager
     }
 
     public render(): string {
@@ -64,9 +67,10 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     public onShow(): void {
         this.refreshSettingsDisplay()
+        this.eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, this.onAppSettingChanged)
     }
     public onHide(): void {
-
+        this.eventManager.deregisterEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, this.onAppSettingChanged)
     }
 
     private updateSetting<K extends keyof ApplicationSettings>(
@@ -74,15 +78,11 @@ export class ApplicationPanel extends PauseMenuPanel {
         value: ApplicationSettings[K]
     ): void {
         this.appSettings.setSetting(key, value, EventSource.UI)
-        this.onSettingsChanged?.({ [key]: value })
     }
 
     private resetSettings(): void {
         if (window.confirm('Are you sure?\n\nReset all settings to defaults. This cannot be undone.')) {
             this.appSettings.resetToDefaults(EventSource.UI)
-            this.refreshSettingsDisplay()
-            const currentSettings = this.appSettings.getAllSettings()
-            this.onSettingsChanged?.(currentSettings)
         }
     }
 
@@ -92,10 +92,7 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     // TODO: Replace alerts with a non-blocking panel-level status affordance.
     private importSettings(): void {
-        importSettingsFromFile(this.appSettings, () => {
-            this.refreshSettingsDisplay()
-            this.onSettingsChanged?.(this.appSettings.getAllSettings())
-        })
+        void importSettingsFromFile(this.appSettings)
     }
 
     private refreshSettingsDisplay(): void {

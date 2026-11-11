@@ -25,35 +25,34 @@ export function exportSettingsToFile(appSettings: AppSettings): void {
     URL.revokeObjectURL(url)
 }
 
-/** Opens the native file picker and imports the chosen file. `onImported` runs only after a file
- *  was read, parsed and accepted - so a caller showing the settings can refresh itself. */
-export function importSettingsFromFile(appSettings: AppSettings, onImported?: () => void): void {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
+/** Opens the native file picker and imports the chosen file. Anything showing the settings learns of
+ *  the import from AppSettings' own change events. Resolves once the import has finished or been
+ *  abandoned (picker dismissed, unreadable file, rejected settings); never rejects. */
+export async function importSettingsFromFile(appSettings: AppSettings): Promise<void> {
+    const file = await pickJsonFile()
+    if (!file) return
 
-    input.onchange = (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0]
-        if (!file) return
+    try {
+        const imported = JSON.parse(await file.text())
 
-        const reader = new FileReader()
-        reader.onload = (loaded) => {
-            try {
-                const imported = JSON.parse(loaded.target?.result as string)
-
-                if (appSettings.importSettings(imported, EventSource.UI)) {
-                    onImported?.()
-                    logger.info('Settings imported successfully')
-                } else {
-                    logger.warn('Invalid settings file format during import')
-                }
-            } catch (error) {
-                logger.error('Failed to import settings. Please check the file format.', error)
-            }
+        if (appSettings.importSettings(imported, EventSource.UI)) {
+            logger.info('Settings imported successfully')
+        } else {
+            logger.warn('Invalid settings file format during import')
         }
-
-        reader.readAsText(file)
+    } catch (error) {
+        logger.error('Failed to import settings. Please check the file format.', error)
     }
+}
 
-    input.click()
+/** Resolves with the chosen file, or undefined if the picker was dismissed. */
+function pickJsonFile(): Promise<File | undefined> {
+    return new Promise(resolve => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.json'
+        input.onchange = () => resolve(input.files?.[0])
+        input.oncancel = () => resolve(undefined)
+        input.click()
+    })
 }
