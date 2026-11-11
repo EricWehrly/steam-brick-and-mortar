@@ -1,21 +1,11 @@
 /**
  * The 'camera-settings' tab - the main camera's field of view and clipping planes, plus one button
- * per named preset. CameraSettingsApplier copies the settings onto the camera and carries out the
- * preset actions.
- *
- * The DOM panel's multi-camera prev/next stepping has no schema form: it navigates between cameras
- * and only one exists today.
+ * per named preset. The DOM panel's multi-camera prev/next stepping has no schema form: it
+ * navigates between cameras and only one exists today.
  */
 
-import { CAMERA_PRESETS, type CameraPresetKey } from '../../../scene/CameraPresets'
-import { cameraPresetActionId } from '../SettingsActions'
-import { action, range, type ActionContent, type SettingsPanelSchema } from '../SettingsSchema'
-
-function presetAction(key: CameraPresetKey): ActionContent {
-    return action(cameraPresetActionId(key), { label: CAMERA_PRESETS[key].name })
-}
-
-const PRESET_KEYS = Object.keys(CAMERA_PRESETS) as CameraPresetKey[]
+import { CAMERA_PRESETS } from '../../../scene/CameraPresets'
+import { preset, range, type SettingsPanelSchema } from '../SettingsSchema'
 
 export const CAMERA_SETTINGS_SCHEMA: SettingsPanelSchema = {
     id: 'camera-settings',
@@ -25,7 +15,9 @@ export const CAMERA_SETTINGS_SCHEMA: SettingsPanelSchema = {
         {
             heading: 'Presets',
             description: 'Sets field of view and clipping planes together.',
-            content: PRESET_KEYS.map(presetAction)
+            content: Object.values(CAMERA_PRESETS).map(({ name, fov, near, far }) =>
+                preset(name, { cameraFov: fov, cameraNear: near, cameraFar: far })
+            )
         },
         {
             heading: 'Projection',
