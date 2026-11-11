@@ -239,8 +239,8 @@ targets, tab order below.** All 8 confirmed live via code survey (no others exis
 |---|---|---|---|
 | `DisplayAdvancedPanel` | `panels/DisplayAdvancedPanel.ts` | Small, schema-driven | ✅ Ported (`display-advanced`) |
 | `DebugPanel` | `panels/DebugPanel.ts` | Substantial (454 lines) | ✅ Ported (`debug`, 2026-08-20) — `VRDebugPanel.ts`. Read-only stats only: console capture/clear and JSON export left out entirely (no VR equivalent worth faking), no auto-refresh interval (`VRMenuTabContent` has no teardown hook yet - see that class's doc comment) |
-| `CacheManagementPanel` | `panels/CacheManagementPanel.ts` | Substantial (482 lines) | Next up — see pivot below |
-| `CameraSettingsPanel` | `panels/CameraSettingsPanel.ts` | Moderate (307 lines) | Planned, settings-shaped |
+| `CacheManagementPanel` | `panels/CacheManagementPanel.ts` | Substantial (482 lines) | ✅ Ported (`cache-management`, 2026-11-11) - see Story 5 |
+| `CameraSettingsPanel` | `panels/CameraSettingsPanel.ts` | Moderate (307 lines) | ✅ Ported (`camera-settings`, 2026-11-11) - see Story 5 |
 | `ApplicationPanel` | `panels/ApplicationPanel.ts` | Moderate (161 lines) | Planned, settings-shaped |
 | `GameSettingsPanel` | `panels/GameSettingsPanel.ts` | Substantial (437 lines) | Planned, settings-shaped |
 | `GraphicsSettingsPanel` | `panels/GraphicsSettingsPanel.ts` | Largest (676 lines) | Planned, settings-shaped, highest escape-hatch risk |
@@ -381,11 +381,19 @@ the settings-shaped ones:
 1. `DebugPanel` — **dropped 2026-09-08**: a first VR port was built, then removed, because it needed
    a live `PerformanceMonitorUI` published through `DataManager`, and the project owner ruled out
    `DataManager` owning UI objects. No VR debug panel is planned for now; the DOM one stays.
-2. `CacheManagementPanel` — pilots inline per-section "to be implemented" placeholders specifically.
-   (A hand-built port exists on `feature/vr-uikit-menu-migration-v2`; it predates the schema +
-   stylesheet model, so it's reference for behavior, not code to merge.)
-3. `CameraSettingsPanel` (sliders + reset — closest in shape to what Story 3 proves) — same
-   situation as Cache.
+2. `CacheManagementPanel` ✅ ported 2026-11-11 (`CacheManagementSchema`). Introduced the `readout`
+   control (read-only text an owner reports via `UIEventTypes.ReadoutsUpdated`) and
+   `CacheActionHandler`, which owns Clear/Refresh and the stats. Not ported, still DOM-only: the
+   cached-users list with per-user Load (no list form in the schema yet), and the auto-download /
+   limit / preload fields and validate / download-missing buttons (the fields write a key nothing
+   reads; the buttons are stubs). Clear raises the same two clear events as the DOM panel, so
+   `cache-clear-domain-unification` remains the place to unify them.
+3. `CameraSettingsPanel` ✅ ported 2026-11-11 (`CameraSettingsSchema`): fov/near/far sliders plus one
+   action per preset. The camera was not AppSettings-bound before; `cameraFov/Near/Far` are now
+   settings (defaults 70 / 0.1 / 1000) applied to the camera by `CameraSettingsApplier`, and the DOM
+   panel writes them too so both menus share state. Side effects: camera values now persist, and fov
+   has no effect in a headset (WebXR owns the projection). The DOM panel's prev/next camera stepping
+   is not ported (one camera exists).
 4. `ApplicationPanel` ✅ ported 2026-10-01 — introduced the `toggle` and `action` schema controls, a
    modal confirmation dialog (`window.confirm()` is blocked in an immersive session), and
    flatscreen-only actions. Its DOM counterpart stays until the flip (Story 7). Export/import are
