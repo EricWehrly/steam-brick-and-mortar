@@ -8,7 +8,7 @@
 
 import { Container, Text } from '@pmndrs/uikit'
 import { Button, Slider, Switch, ToggleGroup, ToggleGroupItem } from '@pmndrs/uikit-default'
-import { computed, signal, type ReadonlySignal } from '@preact/signals-core'
+import { computed, signal, type ReadonlySignal, type Signal } from '@preact/signals-core'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 import { toUikitSafeText } from './UikitTextSanitizer'
 
@@ -40,22 +40,21 @@ export function createToggleRow(options: UIKitToggleRowOptions): UIKitToggleRow 
     // A signal, not a plain boolean, for the same reason as the slider below: a plain value puts
     // the switch in controlled mode with a prop that never changes, so it would visibly snap back.
     const checkedSignal = signal(checked)
-    const toggleSwitch = new Switch({
-        checked: checkedSignal,
-        onCheckedChange: (next: boolean) => {
-            checkedSignal.value = next
-            onChange(next)
-        }
-    })
+
+    function setValue(next: boolean): void {
+        checkedSignal.value = next
+    }
+
+    function toggle(next: boolean): void {
+        setValue(next)
+        onChange(next)
+    }
+
+    const toggleSwitch = new Switch({ checked: checkedSignal, onCheckedChange: toggle })
     toggleSwitch.handle.classList.add(MENU_CLASS.switchThumb)
     row.add(toggleSwitch)
 
-    return {
-        container: row,
-        setValue: (next: boolean) => {
-            checkedSignal.value = next
-        }
-    }
+    return { container: row, setValue }
 }
 
 export interface UIKitActionButtonOptions {
@@ -73,12 +72,19 @@ export function createActionButton(options: UIKitActionButtonOptions): Button {
         {
             variant: 'secondary',
             onClick: onPress,
-            ...(hidden && { display: computed<'none' | 'flex'>(() => (hidden.value ? 'none' : 'flex')) })
+            ...(hidden && { display: computed(displayUnless(hidden)) })
         },
         [MENU_CLASS.action]
     )
     button.add(new Text({ text: toUikitSafeText(label) }, [MENU_CLASS.settingLabel]))
     return button
+}
+
+/** The `display` that takes a node out of layout while `hidden` is true. */
+function displayUnless(hidden: ReadonlySignal<boolean>): () => 'none' | 'flex' {
+    return function display(): 'none' | 'flex' {
+        return hidden.value ? 'none' : 'flex'
+    }
 }
 
 export interface UIKitSelectRowOptions {
@@ -109,32 +115,40 @@ export function createSelectRow(options: UIKitSelectRowOptions): UIKitSelectRow 
     const selectedSignal = signal(value)
     const choices = new ToggleGroup({ variant: 'outline' }, [MENU_CLASS.optionRow])
     for (const option of options.options) {
-        // Controlled by our own signal: clicking the selected item again reports "unchecked", which
-        // is ignored rather than leaving the group with nothing chosen.
-        const item = new ToggleGroupItem(
-            {
-                checked: computed(() => selectedSignal.value === option.value),
-                onCheckedChange: (next: boolean) => {
-                    if (!next || selectedSignal.peek() === option.value) {
-                        return
-                    }
-                    selectedSignal.value = option.value
-                    onChange(option.value)
-                }
-            },
-            [MENU_CLASS.option]
-        )
-        item.add(new Text({ text: toUikitSafeText(option.label) }, [MENU_CLASS.settingLabel]))
-        choices.add(item)
+        choices.add(buildOption(option, selectedSignal, onChange))
     }
     row.add(choices)
 
-    return {
-        container: row,
-        setValue: (next: string) => {
-            selectedSignal.value = next
-        }
+    function setValue(next: string): void {
+        selectedSignal.value = next
     }
+
+    return { container: row, setValue }
+}
+
+/** One choice in a select row, checked while `selected` holds its value. Controlled by that signal:
+ *  clicking the selected item again reports "unchecked", which is ignored rather than leaving the
+ *  group with nothing chosen. */
+function buildOption(
+    option: UIKitSelectRowOptions['options'][number],
+    selected: Signal<string>,
+    onChange: (value: string) => void
+): ToggleGroupItem {
+    function isSelected(): boolean {
+        return selected.value === option.value
+    }
+
+    function choose(next: boolean): void {
+        if (!next || selected.peek() === option.value) {
+            return
+        }
+        selected.value = option.value
+        onChange(option.value)
+    }
+
+    const item = new ToggleGroupItem({ checked: computed(isSelected), onCheckedChange: choose }, [MENU_CLASS.option])
+    item.add(new Text({ text: toUikitSafeText(option.label) }, [MENU_CLASS.settingLabel]))
+    return item
 }
 
 export interface UIKitSliderRowOptions {
@@ -157,7 +171,7 @@ export interface UIKitSliderRow {
 
 export function createSliderRow(options: UIKitSliderRowOptions): UIKitSliderRow {
     const { label, description, min, max, step, value, onChange } = options
-    const formatDisplay = options.formatDisplay ?? ((v: number) => String(v))
+    const formatDisplay = options.formatDisplay ?? String
 
     const row = new Container(undefined, [MENU_CLASS.settingRow])
 
@@ -178,25 +192,18 @@ export function createSliderRow(options: UIKitSliderRowOptions): UIKitSliderRow 
     // controlled (so external setValue()/reset stays a trivial assignment) while actually
     // reflecting drags, since onValueChange below writes back into it.
     const valueSignal = signal(value)
-    const slider = new Slider({
-        value: valueSignal,
-        min,
-        max,
-        step,
-        width: '100%',
-        onValueChange: (next: number) => {
-            valueSignal.value = next
-            valueText.setProperties({ text: formatDisplay(next) })
-            onChange(next)
-        }
-    })
-    row.add(slider)
 
-    return {
-        container: row,
-        setValue: (next: number) => {
-            valueSignal.value = next
-            valueText.setProperties({ text: formatDisplay(next) })
-        }
+    function setValue(next: number): void {
+        valueSignal.value = next
+        valueText.setProperties({ text: formatDisplay(next) })
     }
+
+    function slide(next: number): void {
+        setValue(next)
+        onChange(next)
+    }
+
+    row.add(new Slider({ value: valueSignal, min, max, step, width: '100%', onValueChange: slide }))
+
+    return { container: row, setValue }
 }

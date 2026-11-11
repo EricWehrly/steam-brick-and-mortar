@@ -78,7 +78,7 @@ export class VRSettingsMenuShell {
 
         // Tabs only owns "which trigger is active"; the content below is swapped by showTab, not by
         // TabsContent, because panels are built lazily from schemas.
-        const tabs = new Tabs({ value: this.activePanelIdSignal, onValueChange: (panelId: string) => this.selectTab(panelId) })
+        const tabs = new Tabs({ value: this.activePanelIdSignal, onValueChange: this.selectTab.bind(this) })
         const tabList = new TabsList(undefined, [MENU_CLASS.menuTabRow])
         for (const schema of VR_MENU_SCHEMAS) {
             tabList.add(this.buildTabTrigger(schema))

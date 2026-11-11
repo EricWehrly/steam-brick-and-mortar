@@ -451,9 +451,9 @@ export class AppSettings {
         }
 
         // Emit change events for all changes
-        changes.forEach(change => {
+        for (const change of changes) {
             this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, change)
-        })
+        }
     }
 
     /**

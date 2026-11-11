@@ -10,7 +10,7 @@
 import { RangeControl } from '../components/UIComponent'
 import type { SliderConfig } from '../../utils/UIComponentUtils'
 import type { AppSettings } from '../../core/AppSettings'
-import type { SectionContent, SettingsPanelSchema, SettingsSection } from './SettingsSchema'
+import type { RangeSettingControl, SectionContent, SettingsPanelSchema, SettingsSection } from './SettingsSchema'
 
 export function renderSettingsSchemaSections(schema: SettingsPanelSchema, appSettings: AppSettings): string {
     return schema.sections.map(section => renderSection(section, appSettings)).join('')
@@ -66,14 +66,22 @@ export function schemaSliderConfigs(schema: SettingsPanelSchema, appSettings: Ap
     for (const section of schema.sections) {
         for (const control of section.content) {
             if (control.kind === 'range') {
-                configs.push({
-                    sliderId: control.id,
-                    valueDisplayId: `${control.id}-value`,
-                    formatDisplay: control.formatDisplay,
-                    onInput: value => appSettings.setSetting(control.setting, value)
-                })
+                configs.push(sliderConfig(control, appSettings))
             }
         }
     }
     return configs
+}
+
+function sliderConfig(control: RangeSettingControl, appSettings: AppSettings): SliderConfig {
+    function writeSetting(value: number): void {
+        appSettings.setSetting(control.setting, value)
+    }
+
+    return {
+        sliderId: control.id,
+        valueDisplayId: `${control.id}-value`,
+        formatDisplay: control.formatDisplay,
+        onInput: writeSetting
+    }
 }
