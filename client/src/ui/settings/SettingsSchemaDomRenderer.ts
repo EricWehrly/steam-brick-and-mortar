@@ -10,7 +10,6 @@
 import { RangeControl } from '../components/UIComponent'
 import type { SliderConfig } from '../../utils/UIComponentUtils'
 import type { AppSettings } from '../../core/AppSettings'
-import { assertNever } from '../../utils/assertNever'
 import type { SectionContent, SettingsPanelSchema, SettingsSection } from './SettingsSchema'
 
 export function renderSettingsSchemaSections(schema: SettingsPanelSchema, appSettings: AppSettings): string {
@@ -51,15 +50,11 @@ function renderContent(content: SectionContent, appSettings: AppSettings): strin
                 formatDisplay: content.formatDisplay,
                 trackLabels: content.trackLabels
             }).render()
-        case 'toggle':
-        case 'select':
-        case 'action':
-            // The DOM menu's panels that use these (ApplicationPanel) are still hand-written and
-            // are deleted at the menu flip, so rendering them here would be code built to be thrown
-            // away. Failing loudly beats rendering nothing.
-            throw new Error(`The DOM schema renderer does not render "${content.kind}" controls ("${content.id}")`)
         default:
-            return assertNever(content)
+            // Toggle, select and action are used only by ApplicationPanel, which is still hand-written
+            // in the DOM menu and deleted at the menu flip, so rendering them here would be code built
+            // to be thrown away. Failing loudly beats rendering nothing, and covers any future kind.
+            throw new Error(`The DOM schema renderer does not render "${content.kind}" controls ("${content.id}")`)
     }
 }
 
