@@ -56,6 +56,7 @@ describe('exportSettingsToFile', () => {
     })
 })
 
+
 describe('importSettingsFromFile', () => {
     let picker: HTMLInputElement | undefined
 
@@ -71,70 +72,60 @@ describe('importSettingsFromFile', () => {
     })
 
     /** Delivers a chosen file to the picker the way the browser's change event does. */
-    function choose(file: File | undefined): void {
-        Object.defineProperty(picker, 'files', { value: file ? [file] : [] })
-        picker!.onchange?.({ target: picker } as unknown as Event)
+    function choose(file: File): void {
+        Object.defineProperty(picker, 'files', { value: [file] })
+        picker!.onchange?.(new Event('change'))
+    }
+
+    function dismiss(): void {
+        picker!.oncancel?.(new Event('cancel'))
     }
 
     it('opens a picker that accepts only JSON', () => {
-        importSettingsFromFile(fakeSettings())
+        void importSettingsFromFile(fakeSettings())
 
         expect(picker).toBeDefined()
         expect(picker!.type).toBe('file')
         expect(picker!.accept).toBe('.json')
     })
 
-    it('imports the chosen file and reports success', async () => {
+    it('imports the chosen file', async () => {
         const settings = fakeSettings()
-        const onImported = vi.fn()
-        importSettingsFromFile(settings, onImported)
+        const done = importSettingsFromFile(settings)
 
         choose(new File(['{"autoSave":false}'], 'settings.json'))
+        await done
 
-        await vi.waitFor(() => expect(onImported).toHaveBeenCalledOnce())
         expect(settings.importSettings).toHaveBeenCalledWith({ autoSave: false }, expect.anything())
     })
 
-    it('does not report success when the settings are rejected', async () => {
+    it('resolves without throwing when the settings are rejected', async () => {
         const settings = fakeSettings({ importSettings: vi.fn(() => false) })
-        const onImported = vi.fn()
-        importSettingsFromFile(settings, onImported)
+        const done = importSettingsFromFile(settings)
 
         choose(new File(['{"autoSave":"nope"}'], 'settings.json'))
 
-        await vi.waitFor(() => expect(settings.importSettings).toHaveBeenCalled())
-        expect(onImported).not.toHaveBeenCalled()
+        await expect(done).resolves.toBeUndefined()
+        expect(settings.importSettings).toHaveBeenCalled()
     })
 
     it('survives a file that is not valid JSON, importing nothing', async () => {
         const settings = fakeSettings()
-        const onImported = vi.fn()
-        importSettingsFromFile(settings, onImported)
+        const done = importSettingsFromFile(settings)
 
-        expect(() => choose(new File(['this is not json'], 'settings.json'))).not.toThrow()
+        choose(new File(['this is not json'], 'settings.json'))
 
-        // The read completes on a later tick; give it one, then confirm nothing was imported.
-        await new Promise(resolve => setTimeout(resolve, 20))
-        expect(settings.importSettings).not.toHaveBeenCalled()
-        expect(onImported).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when the picker is dismissed without choosing a file', async () => {
-        const settings = fakeSettings()
-        importSettingsFromFile(settings, vi.fn())
-
-        choose(undefined)
-
-        await new Promise(resolve => setTimeout(resolve, 20))
+        await expect(done).resolves.toBeUndefined()
         expect(settings.importSettings).not.toHaveBeenCalled()
     })
 
-    it('works without a success callback', async () => {
+    it('imports nothing when the picker is dismissed without choosing a file', async () => {
         const settings = fakeSettings()
-        importSettingsFromFile(settings)
+        const done = importSettingsFromFile(settings)
 
-        choose(new File(['{}'], 'settings.json'))
+        dismiss()
 
-        await vi.waitFor(() => expect(settings.importSettings).toHaveBeenCalled())
+        await expect(done).resolves.toBeUndefined()
+        expect(settings.importSettings).not.toHaveBeenCalled()
     })
 })

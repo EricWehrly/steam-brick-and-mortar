@@ -77,7 +77,7 @@ export class SettingsActionHandler {
                 exportSettingsToFile(this.appSettings)
                 break
             case SETTINGS_ACTION.Import:
-                importSettingsFromFile(this.appSettings)
+                void importSettingsFromFile(this.appSettings)
                 break
         }
     }
