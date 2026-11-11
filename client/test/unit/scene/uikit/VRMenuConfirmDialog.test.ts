@@ -1,136 +1,98 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { AlertDialog } from '@pmndrs/uikit-default'
+import { AlertDialogAction, AlertDialogCancel, type AlertDialogContent } from '@pmndrs/uikit-default'
 import { EventManager } from '../../../../src/core/EventManager'
 import {
     UIEventTypes,
-    type ConfirmationAnsweredEvent,
     type ConfirmationRequestedEvent,
     type MenuCloseEvent,
-    type MenuPanelChangedEvent
+    type SettingsActionRequestedEvent
 } from '../../../../src/types/InteractionEvents'
+import { SETTINGS_ACTION } from '../../../../src/ui/settings/SettingsActions'
 import { VRMenuConfirmDialog } from '../../../../src/scene/uikit/VRMenuConfirmDialog'
+import { resolvedProps } from '../../../utils/settings-panel-context'
 
 describe('VRMenuConfirmDialog', () => {
     let eventManager: EventManager
-    let answers: Pick<ConfirmationAnsweredEvent, 'requestId' | 'confirmed'>[]
+    let raised: SettingsActionRequestedEvent['actionId'][]
 
-    const ask = (requestId = 'r1') =>
+    const ask = () =>
         eventManager.emit<ConfirmationRequestedEvent>(UIEventTypes.ConfirmationRequested, {
-            requestId,
+            actionId: SETTINGS_ACTION.ResetAll,
             title: 'Reset all settings?',
             message: 'This cannot be undone.',
             confirmLabel: 'Reset'
         })
 
+    const isOpen = (dialog: VRMenuConfirmDialog) => dialog.currentSignal.value === true
+
+    /** [cancel, confirm] in the footer. */
+    const footerButtons = (dialog: VRMenuConfirmDialog) => {
+        const content = dialog.children[0] as AlertDialogContent
+        const [cancel, confirm] = content.children[1].children
+        return { cancel, confirm }
+    }
+
+    /** What a real click does to a uikit button: its own onClick property, then 'click' listeners. */
+    const click = (button: AlertDialogAction | AlertDialogCancel) => {
+        const event = { type: 'click', stopPropagation: () => {} }
+        ;(resolvedProps(button).onClick as ((e: typeof event) => void) | undefined)?.(event)
+        button.dispatchEvent(event as never)
+    }
+
     beforeEach(() => {
         eventManager = EventManager.getInstance()
         eventManager.removeAllListeners()
-        answers = []
-        // EventManager stamps its own fields onto every detail; only the answer itself is under test.
-        eventManager.registerEventHandler<ConfirmationAnsweredEvent>(UIEventTypes.ConfirmationAnswered, e => {
-            answers.push({ requestId: e.detail.requestId, confirmed: e.detail.confirmed })
+        raised = []
+        eventManager.registerEventHandler<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, e => {
+            raised.push(e.detail.actionId)
         })
     })
 
-    it('builds a real uikit AlertDialog, closed to begin with', () => {
+    it('is closed to begin with, with Cancel and Confirm buttons', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
+        const { cancel, confirm } = footerButtons(dialog)
 
-        expect(dialog.container).toBeInstanceOf(AlertDialog)
-        expect(dialog.isOpen).toBe(false)
+        expect(isOpen(dialog)).toBe(false)
+        expect(cancel).toBeInstanceOf(AlertDialogCancel)
+        expect(confirm).toBeInstanceOf(AlertDialogAction)
     })
 
-    it('opens when a confirmation is requested', () => {
+    it('opens when a confirmation is requested, without raising the action yet', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
 
         ask()
 
-        expect(dialog.isOpen).toBe(true)
+        expect(isOpen(dialog)).toBe(true)
+        expect(raised).toEqual([])
     })
 
-    it('answers yes, under the request\'s id, and closes when confirmed', () => {
-        const dialog = new VRMenuConfirmDialog(eventManager)
-        ask('r7')
-
-        dialog.confirm()
-
-        expect(answers).toEqual([{ requestId: 'r7', confirmed: true }])
-        expect(dialog.isOpen).toBe(false)
-    })
-
-    it('answers no and closes when cancelled', () => {
-        const dialog = new VRMenuConfirmDialog(eventManager)
-        ask('r7')
-
-        dialog.cancel()
-
-        expect(answers).toEqual([{ requestId: 'r7', confirmed: false }])
-        expect(dialog.isOpen).toBe(false)
-    })
-
-    it('answers a request at most once, even if confirmed again', () => {
+    it('raises the guarded action and closes when confirmed', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
         ask()
 
-        dialog.confirm()
-        dialog.confirm()
+        click(footerButtons(dialog).confirm as AlertDialogAction)
 
-        expect(answers).toHaveLength(1)
+        expect(raised).toEqual([SETTINGS_ACTION.ResetAll])
+        expect(isOpen(dialog)).toBe(false)
     })
 
-    it('does not answer yes to a request that was cancelled when a later confirm arrives', () => {
+    it('raises nothing and closes when cancelled', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
         ask()
-        dialog.cancel()
 
-        dialog.confirm()
+        click(footerButtons(dialog).cancel as AlertDialogCancel)
 
-        expect(answers).toEqual([{ requestId: 'r1', confirmed: false }])
+        expect(raised).toEqual([])
+        expect(isOpen(dialog)).toBe(false)
     })
 
-    it('tells the earlier asker "no" when a newer request replaces it, then serves the newer one', () => {
-        const dialog = new VRMenuConfirmDialog(eventManager)
-        ask('first')
-        ask('second')
-
-        expect(answers).toEqual([{ requestId: 'first', confirmed: false }])
-
-        dialog.confirm()
-
-        expect(answers).toEqual([
-            { requestId: 'first', confirmed: false },
-            { requestId: 'second', confirmed: true }
-        ])
-    })
-
-    it('can be reopened after being closed', () => {
+    it('closes when the menu closes', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
         ask()
-        dialog.cancel()
 
-        ask('again')
+        eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'settings' })
 
-        expect(dialog.isOpen).toBe(true)
-    })
-
-    it('cancel() on a dialog that is not open is harmless and answers nothing', () => {
-        const dialog = new VRMenuConfirmDialog(eventManager)
-
-        expect(() => dialog.cancel()).not.toThrow()
-        expect(dialog.isOpen).toBe(false)
-        expect(answers).toEqual([])
-    })
-
-    it.each([
-        ['the active panel changes', () => eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'other' })],
-        ['the menu closes', () => eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'settings' })]
-    ])('answers no and closes when %s', (_what, abandon) => {
-        const dialog = new VRMenuConfirmDialog(eventManager)
-        ask('r9')
-
-        abandon()
-
-        expect(answers).toEqual([{ requestId: 'r9', confirmed: false }])
-        expect(dialog.isOpen).toBe(false)
+        expect(isOpen(dialog)).toBe(false)
     })
 
     it('stops listening once disposed', () => {
@@ -139,6 +101,6 @@ describe('VRMenuConfirmDialog', () => {
 
         ask()
 
-        expect(dialog.isOpen).toBe(false)
+        expect(isOpen(dialog)).toBe(false)
     })
 })

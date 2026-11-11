@@ -10,7 +10,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { AppSettings, Setting, SettingCategory, type ApplicationSettings, type SettingChangedEvent } from '../../../src/core/AppSettings'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
-import { AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
+import { AppSettingsEventTypes, UIEventTypes, type SettingsActionRequestedEvent } from '../../../src/types/InteractionEvents'
+import { SETTINGS_ACTION, type SettingsActionId } from '../../../src/ui/settings/SettingsActions'
 
 describe('AppSettings Reset Functionality', () => {
     let appSettings: AppSettings
@@ -167,6 +168,28 @@ describe('AppSettings Reset Functionality', () => {
             appSettings.resetSettingsToDefaults([Setting.ShadowQuality], EventSource.UI)
             
             expect(saveSpy).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('SettingsActionRequested', () => {
+        const request = (actionId: SettingsActionId) =>
+            eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId })
+
+        it('resets every setting when the reset-all action is requested', () => {
+            appSettings.setSetting('shadowQuality', 4, EventSource.UI)
+
+            request(SETTINGS_ACTION.ResetAll)
+
+            expect(appSettings.getSetting('shadowQuality')).toBe(appSettings.getDefaultSetting('shadowQuality'))
+        })
+
+        it('ignores the actions it does not own', () => {
+            appSettings.setSetting('shadowQuality', 4, EventSource.UI)
+
+            request(SETTINGS_ACTION.Export)
+            request(SETTINGS_ACTION.Import)
+
+            expect(appSettings.getSetting('shadowQuality')).toBe(4)
         })
     })
 })

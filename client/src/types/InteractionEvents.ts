@@ -256,27 +256,17 @@ export interface ConfirmationPrompt {
 }
 
 /**
- * A settings panel's action button was pressed. Says what the user wants - reset everything,
- * export, import - and nothing about how: the panel that raised it doesn't know what carries it
- * out, and SettingsActionHandler decides how each action id is handled. When `confirm` is present
- * the user has not said yes yet; the handler asks (ConfirmationRequested) before acting.
+ * The user wants a settings action carried out - reset everything, export, import - and has already
+ * confirmed it if it needed confirming. Each action's owner subscribes and acts on its own ids.
  */
 export interface SettingsActionRequestedEvent extends BaseInteractionEvent {
     readonly actionId: SettingsActionId
-    readonly confirm?: ConfirmationPrompt
 }
 
-/** Someone needs a yes/no from the user. Whichever surface is showing answers with
- *  ConfirmationAnswered carrying the same requestId. */
+/** Raised instead of SettingsActionRequested for an action that needs a yes first; the confirm
+ *  dialog raises SettingsActionRequested for `actionId` only if the user confirms. */
 export interface ConfirmationRequestedEvent extends BaseInteractionEvent, ConfirmationPrompt {
-    readonly requestId: string
-}
-
-/** The user's answer to a ConfirmationRequested; `confirmed` is false for a cancel or for a
- *  request that was abandoned (the surface closed, a newer request replaced it). */
-export interface ConfirmationAnsweredEvent extends BaseInteractionEvent {
-    readonly requestId: string
-    readonly confirmed: boolean
+    readonly actionId: SettingsActionId
 }
 
 export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
@@ -511,7 +501,6 @@ export const UIEventTypes = {
     MenuPanelChanged: 'ui:menu-panel-changed',
     SettingsActionRequested: 'ui:settings-action-requested',
     ConfirmationRequested: 'ui:confirmation-requested',
-    ConfirmationAnswered: 'ui:confirmation-answered',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
     ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',

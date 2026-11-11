@@ -8,8 +8,8 @@
  * Layout composition lives here; sizes and colors live in styles/vr-menu.css; what the panel says
  * and which settings it binds live in the schema. Nothing in this file names a pixel or a hex.
  *
- * An action button never does its own work: it raises UIEventTypes.SettingsActionRequested (with
- * its schema's confirmation prompt, if any) and SettingsActionHandler asks and carries it out.
+ * An action button never does its own work: it raises UIEventTypes.SettingsActionRequested, or
+ * ConfirmationRequested first when its schema carries a prompt, and the action's owner carries it out.
  */
 
 import { Container, Text } from '@pmndrs/uikit'
@@ -17,7 +17,7 @@ import { Button } from '@pmndrs/uikit-default'
 import type { ReadonlySignal } from '@preact/signals-core'
 import type { AppSettings, ApplicationSettings } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
-import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
+import { UIEventTypes, type ConfirmationRequestedEvent, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
     schemaSettingKeys,
     type SettingsPanelSchema,
@@ -134,10 +134,15 @@ function buildSection(
             case 'action':
                 container.add(createActionButton({
                     label: content.label,
-                    onPress: () => EventManager.getInstance().emit<SettingsActionRequestedEvent>(
-                        UIEventTypes.SettingsActionRequested,
-                        { actionId: content.action, confirm: content.confirm }
-                    ),
+                    onPress: () => content.confirm
+                        ? EventManager.getInstance().emit<ConfirmationRequestedEvent>(
+                            UIEventTypes.ConfirmationRequested,
+                            { actionId: content.action, ...content.confirm }
+                        )
+                        : EventManager.getInstance().emit<SettingsActionRequestedEvent>(
+                            UIEventTypes.SettingsActionRequested,
+                            { actionId: content.action }
+                        ),
                     hidden: content.flatscreenOnly ? context.immersiveSession : undefined
                 }))
                 break

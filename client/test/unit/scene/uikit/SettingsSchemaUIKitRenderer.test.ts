@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Container } from '@pmndrs/uikit'
 import { AppSettings, LIGHTING_QUALITY, Setting } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
-import { UIEventTypes, type SettingsActionRequestedEvent } from '../../../../src/types/InteractionEvents'
+import { UIEventTypes, type ConfirmationRequestedEvent, type SettingsActionRequestedEvent } from '../../../../src/types/InteractionEvents'
 import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayAdvancedSchema'
 import { DISPLAY_UI_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayUISchema'
 import { APPLICATION_SCHEMA } from '../../../../src/ui/settings/schemas/ApplicationSchema'
@@ -170,23 +170,21 @@ describe('buildSettingsPanel', () => {
             expect(received).toEqual([expect.objectContaining({ actionId: SETTINGS_ACTION.Export })])
         })
 
-        it('sends the schema\'s confirmation prompt along with the action', () => {
+        it('asks for confirmation instead of raising the action when the schema declares a prompt', () => {
+            const asked: ConfirmationRequestedEvent[] = []
+            const ask = (event: CustomEvent<ConfirmationRequestedEvent>): void => { asked.push(event.detail) }
+            eventManager.registerEventHandler<ConfirmationRequestedEvent>(UIEventTypes.ConfirmationRequested, ask)
             const { press } = actionButtons()
 
             press(0)
 
-            expect(received).toEqual([expect.objectContaining({
+            eventManager.deregisterEventHandler(UIEventTypes.ConfirmationRequested, ask)
+            expect(received).toEqual([])
+            expect(asked).toEqual([expect.objectContaining({
                 actionId: SETTINGS_ACTION.ResetAll,
-                confirm: expect.objectContaining({ title: 'Reset all settings?', confirmLabel: 'Reset' })
+                title: 'Reset all settings?',
+                confirmLabel: 'Reset'
             })])
-        })
-
-        it('sends no confirmation prompt for an action whose schema declares none', () => {
-            const { press } = actionButtons()
-
-            press(1)
-
-            expect(received[0].confirm).toBeUndefined()
         })
 
         it('hides flatscreen-only actions while an immersive session is presenting, and shows them after', () => {

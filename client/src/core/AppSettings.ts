@@ -13,7 +13,8 @@
  */
 
 import { EventManager, EventSource, type BaseInteractionEvent } from './EventManager'
-import { AppSettingsEventTypes } from '../types/InteractionEvents'
+import { AppSettingsEventTypes, UIEventTypes, type SettingsActionRequestedEvent } from '../types/InteractionEvents'
+import { SETTINGS_ACTION } from '../ui/settings/SettingsActions'
 import { APP_STORAGE_PREFIX } from './StoragePrefix'
 
 // Lighting Quality Constants
@@ -337,6 +338,11 @@ export class AppSettings {
     private constructor() {
         this.eventManager = EventManager.getInstance()
         this.settings = this.loadSettings()
+        this.eventManager.registerEventHandler<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, this.resetOnRequest)
+    }
+
+    private readonly resetOnRequest = (event: CustomEvent<SettingsActionRequestedEvent>): void => {
+        if (event.detail.actionId === SETTINGS_ACTION.ResetAll) this.resetToDefaults(EventSource.UI)
     }
 
     /**
