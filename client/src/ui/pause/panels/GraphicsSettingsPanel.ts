@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, QUALITY_LEVEL, RENDER_QUALITY_PRESETS, resolvePixelRatioScale, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, QUALITY_LEVEL, RENDER_QUALITY_PRESETS, resolvePixelRatioScale, SHADOW_QUALITY_LABELS, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
 import { SSAO_QUALITY_LEVELS } from '../../../scene/RenderPipelineManager'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
@@ -487,14 +487,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private getShadowQualityLabel(quality: number): string {
-        switch (quality) {
-            case 0: return 'Off'
-            case 1: return 'Low'
-            case 2: return 'Medium'
-            case 3: return 'High'
-            case 4: return 'Ultra'
-            default: return 'Medium'
-        }
+        return SHADOW_QUALITY_LABELS[quality] ?? SHADOW_QUALITY_LABELS[2]
     }
 
     private getSsaoQualityLabel(level: number): string {

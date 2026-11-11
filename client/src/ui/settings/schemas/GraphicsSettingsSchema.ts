@@ -8,10 +8,9 @@
  * it lives on the Display UI tab.
  */
 
-import { LIGHTING_QUALITY, QUALITY_LEVEL } from '../../../core/AppSettings'
+import { LIGHTING_QUALITY, QUALITY_LEVEL, SHADOW_QUALITY_LABELS } from '../../../core/AppSettings'
+import { SSAO_QUALITY_LEVELS } from '../../../scene/RenderPipelineManager'
 import { range, select, toggle, type SettingsPanelSchema } from '../SettingsSchema'
-
-const SHADOW_QUALITY_LABELS = ['Off', 'Low', 'Medium', 'High', 'Ultra'] as const
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`
 const metres = (value: number): string => `${value}m`
@@ -66,10 +65,11 @@ export const GRAPHICS_SETTINGS_SCHEMA: SettingsPanelSchema = {
                 }),
                 range('ssaoQuality', {
                     label: 'Ambient occlusion (SSAO)',
-                    description: 'Contact shadows and crevice darkening. 0 is off; higher levels cost more GPU time.',
+                    description: 'Contact shadows and crevice darkening. Off disables it; levels are ordered by measured GPU cost.',
                     min: 0,
-                    max: 4,
-                    step: 1
+                    max: SSAO_QUALITY_LEVELS.length - 1,
+                    step: 1,
+                    formatDisplay: level => SSAO_QUALITY_LEVELS[level]?.label ?? SSAO_QUALITY_LEVELS[0].label
                 })
             ]
         },

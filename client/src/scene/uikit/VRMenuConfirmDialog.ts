@@ -72,6 +72,8 @@ export class VRMenuConfirmDialog {
             UIEventTypes.ConfirmationRequested,
             this.handleConfirmationRequested
         )
+        this.eventManager.registerEventHandler(UIEventTypes.MenuPanelChanged, this.handleQuestionAbandoned)
+        this.eventManager.registerEventHandler(UIEventTypes.MenuClose, this.handleQuestionAbandoned)
     }
 
     get isOpen(): boolean {
@@ -84,13 +86,21 @@ export class VRMenuConfirmDialog {
         this.close(true)
     }
 
-    /** Also how the shell abandons a pending request (a tab switch): the asker is told "no". */
+    /** What the Cancel button does. Public for the same reason as confirm(). */
     cancel(): void {
         this.close(false)
     }
 
     dispose(): void {
         this.eventManager.deregisterEventHandler(UIEventTypes.ConfirmationRequested, this.handleConfirmationRequested)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleQuestionAbandoned)
+        this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.handleQuestionAbandoned)
+    }
+
+    /** A question belongs to the panel that asked it and the menu session it was asked in; once
+     *  either goes away the asker is told "no" rather than left waiting. */
+    private readonly handleQuestionAbandoned = (): void => {
+        this.cancel()
     }
 
     private readonly handleConfirmationRequested = (event: CustomEvent<ConfirmationRequestedEvent>): void => {

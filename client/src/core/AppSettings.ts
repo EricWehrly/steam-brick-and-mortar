@@ -35,6 +35,9 @@ export const QUALITY_LEVEL = {
 
 export type QualityLevel = typeof QUALITY_LEVEL[keyof typeof QUALITY_LEVEL]
 
+/** Display names for the shadowQuality setting, indexed by its value (0 = off). */
+export const SHADOW_QUALITY_LABELS = ['Off', 'Low', 'Medium', 'High', 'Ultra'] as const
+
 /** Setting keys as const for type-safe, refactorable access */
 export const Setting = {
     // Performance
