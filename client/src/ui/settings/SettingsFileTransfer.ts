@@ -2,16 +2,38 @@
  * Moving settings in and out of a JSON file: a download for export, a native file picker for
  * import. Both lean on browser UI (an anchor click, an <input type="file">) that can't be reached
  * from inside an immersive session, so they're flatscreen-only features - see
- * ActionContent.flatscreenOnly. Plain functions rather than a class because there's no state to
- * own; SettingsActionHandler and the DOM ApplicationPanel both call them.
+ * ActionContent.flatscreenOnly. SettingsFileTransfer carries out the Export and Import settings
+ * actions; the DOM ApplicationPanel calls the functions directly.
  */
 
 import type { AppSettings } from '../../core/AppSettings'
-import { EventSource } from '../../core/EventManager'
+import { EventSource, type EventManager } from '../../core/EventManager'
 import { APP_STORAGE_PREFIX } from '../../core/StoragePrefix'
+import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
+import { SETTINGS_ACTION } from './SettingsActions'
 
 const logger = Logger.createLogFunctions('SettingsFileTransfer')
+
+export class SettingsFileTransfer {
+    constructor(
+        private readonly eventManager: EventManager,
+        private readonly appSettings: AppSettings
+    ) {}
+
+    init(): void {
+        this.eventManager.registerEventHandler<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, this.transferOnRequest)
+    }
+
+    dispose(): void {
+        this.eventManager.deregisterEventHandler(UIEventTypes.SettingsActionRequested, this.transferOnRequest)
+    }
+
+    private readonly transferOnRequest = (event: CustomEvent<SettingsActionRequestedEvent>): void => {
+        if (event.detail.actionId === SETTINGS_ACTION.Export) exportSettingsToFile(this.appSettings)
+        if (event.detail.actionId === SETTINGS_ACTION.Import) void importSettingsFromFile(this.appSettings)
+    }
+}
 
 export function exportSettingsToFile(appSettings: AppSettings): void {
     const blob = new Blob([appSettings.exportSettings()], { type: 'application/json' })

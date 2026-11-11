@@ -90,7 +90,7 @@ export class VRSettingsMenuShell {
         container.add(contentArea)
 
         // On the root, last, so the overlay covers the tabs and the scrolling content alike.
-        container.add(this.confirmDialog.container)
+        container.add(this.confirmDialog)
 
         return { container, contentArea }
     }

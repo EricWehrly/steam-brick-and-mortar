@@ -7,7 +7,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { AppSettings } from '../../../../src/core/AppSettings'
-import { exportSettingsToFile, importSettingsFromFile } from '../../../../src/ui/settings/SettingsFileTransfer'
+import { EventManager } from '../../../../src/core/EventManager'
+import { UIEventTypes, type SettingsActionRequestedEvent } from '../../../../src/types/InteractionEvents'
+import { SETTINGS_ACTION, type SettingsActionId } from '../../../../src/ui/settings/SettingsActions'
+import { exportSettingsToFile, importSettingsFromFile, SettingsFileTransfer } from '../../../../src/ui/settings/SettingsFileTransfer'
 
 function fakeSettings(overrides: Partial<Record<'exportSettings' | 'importSettings', unknown>> = {}) {
     return {
@@ -127,5 +130,60 @@ describe('importSettingsFromFile', () => {
 
         await expect(done).resolves.toBeUndefined()
         expect(settings.importSettings).not.toHaveBeenCalled()
+    })
+})
+
+describe('SettingsFileTransfer', () => {
+    const eventManager = EventManager.getInstance()
+    let settings: ReturnType<typeof fakeSettings>
+    let transfer: SettingsFileTransfer
+    let picked: number
+
+    const request = (actionId: SettingsActionId) =>
+        eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId })
+
+    beforeEach(() => {
+        settings = fakeSettings()
+        picked = 0
+        URL.createObjectURL = vi.fn(() => 'blob:settings')
+        URL.revokeObjectURL = vi.fn()
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+        vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => { picked++ })
+        transfer = new SettingsFileTransfer(eventManager, settings)
+        transfer.init()
+    })
+
+    afterEach(() => {
+        transfer.dispose()
+        vi.restoreAllMocks()
+    })
+
+    it('exports when the export action is requested', () => {
+        request(SETTINGS_ACTION.Export)
+
+        expect(settings.exportSettings).toHaveBeenCalledOnce()
+        expect(picked).toBe(0)
+    })
+
+    it('opens the import picker when the import action is requested', () => {
+        request(SETTINGS_ACTION.Import)
+
+        expect(picked).toBe(1)
+        expect(settings.exportSettings).not.toHaveBeenCalled()
+    })
+
+    it('ignores the actions it does not own', () => {
+        request(SETTINGS_ACTION.ResetAll)
+
+        expect(settings.exportSettings).not.toHaveBeenCalled()
+        expect(picked).toBe(0)
+    })
+
+    it('stops listening once disposed', () => {
+        transfer.dispose()
+
+        request(SETTINGS_ACTION.Export)
+
+        expect(settings.exportSettings).not.toHaveBeenCalled()
     })
 })

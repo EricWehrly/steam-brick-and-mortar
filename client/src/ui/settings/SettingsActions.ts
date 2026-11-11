@@ -2,7 +2,8 @@
  * The things a settings panel can ask the app to do that aren't "set this setting": reset every
  * setting, export them to a file, import them from one. A panel's action control names one of these
  * ids and, when pressed, raises UIEventTypes.SettingsActionRequested carrying it - the panel never
- * calls the code that does the work, and SettingsActionHandler decides how each id is carried out.
+ * calls the code that does the work. AppSettings carries out reset; SettingsFileTransfer export and
+ * import.
  */
 
 export const SETTINGS_ACTION = {
