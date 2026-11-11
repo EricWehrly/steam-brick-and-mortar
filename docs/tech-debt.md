@@ -42,6 +42,36 @@ imports from `test/`), so this is a missing guard, not a live violation. Raised 
 - `client/tsconfig.json`
 - `client/test/utils/settings-panel-context.ts`
 
+## id: no-anonymous-callbacks-lint
+**Priority**: High  
+**Effort**: ~0.5 day for the rule; the legacy clean-up is separate and mostly unnecessary (see below)  
+**Depends on**: lint actually running clean enough to gate on - same pass as `src-test-import-boundary`  
+**Context**: Inline lambdas passed as behaviour (`onPress: () => cond ? emitA() : emitB()`,
+`resyncs.push(() => row.setValue(...))`, `input.onchange = () => resolve(...)`) hide what the code
+does behind an unnamed closure, and PR #171 needed a whole review round (2026-11-11) just to name
+them. Nothing enforces it, so they come back.
+
+**Rule** (in `src/**` only - test files' `describe`/`it` callbacks are meant to be anonymous):
+- Flag an arrow function or unnamed `function` expression that is a call/`new` argument, an
+  object-literal property value (not method shorthand) or the right side of an assignment.
+- Allowed: named function declarations, named consts (`const percent = (v: number) => ...`), bound
+  arrow class fields (`private readonly handleX = () => {}`), `this.method.bind(this)`, type
+  positions, and pure one-expression selectors passed to `map`/`flatMap`/`filter`/`find`/`findIndex`/
+  `some`/`every`/`sort`/`reduce`/`replace`.
+- Fits the existing `no-restricted-syntax` block in `client/eslint.config.js`. Sketch, to verify
+  against real code before turning on:
+  `:matches(CallExpression, NewExpression):not([callee.property.name=/^(map|flatMap|filter|find|findIndex|some|every|sort|reduce|replace)$/]) > :matches(ArrowFunctionExpression, FunctionExpression[id=null])`,
+  plus `Property[method=false] > ...` and `AssignmentExpression > ...` variants.
+
+**Fix**:
+- Add the rule as `warn`, scoped to `src/**`; promote to `error` once its hits are handled.
+- Don't fix the hits in the legacy DOM pause-menu panels (`GameSettingsPanel`, `GraphicsSettingsPanel`,
+  `ApplicationPanel`): they go away under `dom-menu-panel-retirement`. Exclude them, or let them warn.
+- `SystemUICoordinator` and other pre-#171 code: fix when touched.
+
+**Related files**:
+- `client/eslint.config.js`
+
 ## id: cache-clear-domain-unification
 **Priority**: Medium  
 **Effort**: ~0.5 day remaining (typed `CacheDomain` set + tests; call-site/dead-wiring fixes done)  
