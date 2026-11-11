@@ -148,6 +148,27 @@ export function action(actionId: SettingsActionId, options: ActionOptions): Acti
     return { kind: 'action', action: actionId, ...options }
 }
 
+/** Values an owner reports to the menu, shown as read-only label/value rows. */
+export const READOUT_ID = {
+    ImageCacheCount: 'image-cache-count',
+    StorageUsage: 'storage-usage'
+} as const
+
+export type ReadoutId = typeof READOUT_ID[keyof typeof READOUT_ID]
+
+/** A live label/value row filled by UIEventTypes.ReadoutsUpdated; shows a placeholder until its
+ *  owner reports. Not bound to a setting. */
+export interface ReadoutContent {
+    readonly kind: 'readout'
+    readonly id: ReadoutId
+    readonly label: string
+}
+
+/** Builds a readout, deriving `kind`. */
+export function readout(id: ReadoutId, label: string): ReadoutContent {
+    return { kind: 'readout', id, label }
+}
+
 /** Keys of ApplicationSettings whose value is a string - what a select can bind to. */
 export type StringSettingKey = {
     [K in keyof ApplicationSettings]: ApplicationSettings[K] extends string ? K : never
@@ -189,7 +210,7 @@ export function select<Key extends StringSettingKey>(
 export type SettingControl = RangeSettingControl | ToggleSettingControl | SelectSettingControl
 
 /** Anything a section can contain, in render order. */
-export type SectionContent = SettingControl | ActionContent | NoteContent
+export type SectionContent = SettingControl | ActionContent | NoteContent | ReadoutContent
 
 export interface SettingsSection {
     /** Omitted for a section that's just a run of controls with no heading of its own - a panel

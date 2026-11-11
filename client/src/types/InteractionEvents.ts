@@ -23,6 +23,7 @@ import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
 import type { LayoutMode } from './LayoutTypes'
 import type { ImportedGame, ImportChannel } from '../steam-integration/Library'
 import type { SettingsActionId } from '../ui/settings/SettingsActions'
+import type { ReadoutId } from '../ui/settings/SettingsSchema'
 
 // =============================================================================
 // STEAM EVENTS
@@ -269,6 +270,12 @@ export interface ConfirmationRequestedEvent extends BaseInteractionEvent, Confir
     readonly actionId: SettingsActionId
 }
 
+/** An owner reporting display text for readout rows (ReadoutContent); a readout absent from
+ *  `values` keeps what it shows. */
+export interface ReadoutsUpdatedEvent extends BaseInteractionEvent {
+    readonly values: Readonly<Partial<Record<ReadoutId, string>>>
+}
+
 export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
     // No additional data needed
 }
@@ -501,6 +508,7 @@ export const UIEventTypes = {
     MenuPanelChanged: 'ui:menu-panel-changed',
     SettingsActionRequested: 'ui:settings-action-requested',
     ConfirmationRequested: 'ui:confirmation-requested',
+    ReadoutsUpdated: 'ui:readouts-updated',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
     ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',

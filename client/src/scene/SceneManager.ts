@@ -29,6 +29,7 @@ import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
 import { ThreeWebGLRendererDebug } from '../debug/ThreeWebGLRendererDebug'
 import { EventManager } from '../core/EventManager'
 import { AppSettings } from '../core/AppSettings'
+import { CameraSettingsApplier } from './CameraSettingsApplier'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
@@ -36,6 +37,7 @@ import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
+    private cameraSettingsApplier: CameraSettingsApplier
     /**
      * The camera's parent - movement/rotation must be applied here, never to the camera
      * directly. Three.js's WebXRManager overwrites camera.position/quaternion from the headset
@@ -87,15 +89,17 @@ export class SceneManager {
         // Far Clipping Plane: Furthest visible distance
         //   - Too small: Objects pop out of view too soon
         //   - Too large (>10000): Reduces depth buffer precision
-        // 70 deg: good flatscreen default. VR headsets use 90-110 but that causes
+        // Defaults live in AppSettings. 70 deg: good flatscreen default. VR headsets use 90-110 but that causes
         // fisheye edge distortion on a flat monitor. When WebXR is active, the
         // headset takes over projection entirely so this value only affects desktop view.
-        const CAMERA_FOV = 70
+        const CAMERA_FOV = AppSettings.get('cameraFov')
         const CAMERA_ASPECT = window.innerWidth / window.innerHeight
-        const CAMERA_NEAR_DIST = 0.1
-        const CAMERA_FAR_DIST = 1000
+        const CAMERA_NEAR_DIST = AppSettings.get('cameraNear')
+        const CAMERA_FAR_DIST = AppSettings.get('cameraFar')
         this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
         DataManager.getInstance().set(DataKey.MainCamera, this.camera, { domain: DataDomain.Scene })
+        this.cameraSettingsApplier = new CameraSettingsApplier(this.camera)
+        this.cameraSettingsApplier.init()
 
         // See this.cameraRig's own doc comment for why the camera is parented here rather than
         // moved/rotated directly.
@@ -292,6 +296,7 @@ export class SceneManager {
     }
 
     public dispose() {
+        this.cameraSettingsApplier.dispose()
         this.renderer.setAnimationLoop(null)
         this.renderLoopCallback = null
         this.skyboxManager.dispose()

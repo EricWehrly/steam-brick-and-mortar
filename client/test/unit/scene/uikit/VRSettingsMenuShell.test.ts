@@ -115,7 +115,7 @@ describe('VRSettingsMenuShell', () => {
     it('ignores a MenuPanelChanged for a panel id with no matching VR tab', () => {
         const shell = new VRSettingsMenuShell(eventManager, appSettings)
 
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'cache-management' })
+        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'not-a-real-panel' })
 
         expect(shell.activeTabPanelId).toBe(DEFAULT_VR_MENU_TAB_PANEL_ID)
     })
