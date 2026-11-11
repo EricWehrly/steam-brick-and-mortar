@@ -19,6 +19,29 @@
 
 ## Fix Now
 
+## id: src-test-import-boundary
+**Priority**: High  
+**Effort**: ~0.5 day (lint rule + clean-up of whatever it flags; a src-only tsconfig is optional extra)  
+**Context**: Nothing stops production code from importing test code. `client/tsconfig.json` type-checks
+`src/**/*` and `test/**/*` as one program, and `eslint.config.js` has no `no-restricted-imports`, so a
+`src/` file that imports a test util (e.g. `test/utils/settings-panel-context.ts`) compiles, lints
+clean and would be bundled by Vite. Today it is clean (verified by grep, 2026-11-10: no `src/` file
+imports from `test/`), so this is a missing guard, not a live violation. Raised in PR #171 review when
+`settings-panel-context` moved from `src/` to `test/utils/`.
+
+**Fix**:
+- Add a `no-restricted-imports` block scoped to `files: ['src/**']` that bans `**/test/**` (the
+  existing `src`+`test` block only has `no-restricted-syntax`).
+- Optional: a `tsconfig.build.json` including only `src/**/*`, used by the build step, so a stray
+  import also fails `tsc`.
+- Fix the lint config's pre-existing `no-undef` errors on XR/browser globals in the same pass (14 at
+  last count) - deferred until after #171 merges, per the owner's request.
+
+**Related files**:
+- `client/eslint.config.js`
+- `client/tsconfig.json`
+- `client/test/utils/settings-panel-context.ts`
+
 ## id: cache-clear-domain-unification
 **Priority**: Medium  
 **Effort**: ~0.5 day remaining (typed `CacheDomain` set + tests; call-site/dead-wiring fixes done)  
