@@ -117,10 +117,6 @@ export function toggle(setting: BooleanSettingKey, options: ToggleOptions): Togg
     return { kind: 'toggle', setting, ...options }
 }
 
-/** Asks the user to confirm before an action is carried out; SettingsActionHandler asks for it
- *  through ConfirmationRequested, so it doesn't matter which surface answers. */
-export type ActionConfirmation = ConfirmationPrompt
-
 /** A button that asks the app to do something other than set a setting. Pressing it raises
  *  UIEventTypes.SettingsActionRequested carrying `action`; nothing about how it's carried out lives
  *  in the schema or the renderer. Not bound to a setting. */
@@ -128,7 +124,9 @@ export interface ActionContent {
     readonly kind: 'action'
     readonly action: SettingsActionId
     readonly label: string
-    readonly confirm?: ActionConfirmation
+    /** Asked through ConfirmationRequested before the action runs, so it doesn't matter which
+     *  surface answers. */
+    readonly confirm?: ConfirmationPrompt
     /** Hidden while an immersive session is presenting - for actions that depend on browser UI
      *  (a file picker, a download) that can't be reached from inside a headset. */
     readonly flatscreenOnly?: boolean
@@ -136,7 +134,7 @@ export interface ActionContent {
 
 export interface ActionOptions {
     readonly label: string
-    readonly confirm?: ActionConfirmation
+    readonly confirm?: ConfirmationPrompt
     readonly flatscreenOnly?: boolean
 }
 
