@@ -15,12 +15,12 @@ import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
-import { APP_STORAGE_PREFIX } from '../../../core/StoragePrefix'
+import { APP_ID } from '../../../core/AppIdentity'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import { StorePropsEventTypes, SteamEventTypes } from '../../../types/InteractionEvents'
 import type { SteamCacheClearEvent } from '../../../types/InteractionEvents'
 
-const GAME_SETTINGS_NAME = `${APP_STORAGE_PREFIX}-game-settings`
+const GAME_SETTINGS_NAME = `${APP_ID}-game-settings`
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)

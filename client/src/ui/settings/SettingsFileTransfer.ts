@@ -8,7 +8,7 @@
 
 import type { AppSettings } from '../../core/AppSettings'
 import { EventSource, type EventManager } from '../../core/EventManager'
-import { APP_STORAGE_PREFIX } from '../../core/StoragePrefix'
+import { APP_ID } from '../../core/AppIdentity'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { SETTINGS_ACTION } from './SettingsActions'
@@ -41,7 +41,7 @@ export function exportSettingsToFile(appSettings: AppSettings): void {
 
     const link = document.createElement('a')
     link.href = url
-    link.download = `${APP_STORAGE_PREFIX}-settings-${Date.now()}.json`
+    link.download = `${APP_ID}-settings-${Date.now()}.json`
     link.click()
 
     URL.revokeObjectURL(url)

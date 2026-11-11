@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { AppSettings } from '../../../../src/core/AppSettings'
+import { APP_ID } from '../../../../src/core/AppIdentity'
 import { EventManager } from '../../../../src/core/EventManager'
 import { UIEventTypes, type SettingsActionRequestedEvent } from '../../../../src/types/InteractionEvents'
 import { SETTINGS_ACTION, type SettingsActionId } from '../../../../src/ui/settings/SettingsActions'
@@ -40,7 +41,7 @@ describe('exportSettingsToFile', () => {
         exportSettingsToFile(fakeSettings())
 
         expect(clicked).toHaveLength(1)
-        expect(clicked[0].download).toMatch(/^steam-brick-mortar-settings-\d+\.json$/)
+        expect(clicked[0].download).toMatch(new RegExp(`^${APP_ID}-settings-\\d+\\.json$`))
         expect(clicked[0].href).toBe('blob:settings')
     })
 

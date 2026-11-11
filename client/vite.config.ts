@@ -1,6 +1,18 @@
-import { defineConfig } from 'vitest/config'
+import { readFileSync } from 'node:fs'
+import { defineConfig, type Plugin } from 'vitest/config'
+
+const packageName: string = JSON.parse(readFileSync('./package.json', 'utf-8')).name
+
+/** Title-cased package name, e.g. "steam-brick-mortar" -> "Steam Brick Mortar". */
+const appTitle = packageName.split('-').map(word => word[0].toUpperCase() + word.slice(1)).join(' ')
+
+const appTitlePlugin: Plugin = {
+  name: 'app-title-from-package-name',
+  transformIndexHtml: { order: 'pre', handler: html => html.replaceAll('%APP_TITLE%', appTitle) }
+}
 
 export default defineConfig({
+  plugins: [appTitlePlugin],
   root: './',
   publicDir: 'public',
   build: {
