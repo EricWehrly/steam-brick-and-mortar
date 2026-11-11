@@ -115,6 +115,5 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     public updateSettings(newSettings: Partial<ApplicationSettings>): void {
         this.appSettings.updateSettings(newSettings, EventSource.UI)
-        this.refreshSettingsDisplay()
     }
 }

@@ -83,24 +83,17 @@ describe('toggle', () => {
         expect(toggle('autoSave', { label: 'Auto-save', description: 'Saves as you go.' })).toEqual({
             kind: 'toggle',
             setting: 'autoSave',
-            id: 'auto-save',
             label: 'Auto-save',
             description: 'Saves as you go.'
         })
     })
-
-    it('derives the id as the kebab-case of the setting key, unless overridden', () => {
-        expect(toggle('showPerformanceStats', { label: 'Stats' }).id).toBe('show-performance-stats')
-        expect(toggle('autoSave', { label: 'Auto-save', id: 'custom-id' }).id).toBe('custom-id')
-    })
 })
 
 describe('action', () => {
-    it('fills in the kind and uses the action id as the control id', () => {
+    it('fills in the kind and carries the action id and label through', () => {
         expect(action(SETTINGS_ACTION.Export, { label: 'Export Settings' })).toEqual({
             kind: 'action',
             action: SETTINGS_ACTION.Export,
-            id: SETTINGS_ACTION.Export,
             label: 'Export Settings'
         })
     })
@@ -112,10 +105,6 @@ describe('action', () => {
             confirm,
             flatscreenOnly: true
         })
-    })
-
-    it('lets a panel that offers the same action twice give each its own id', () => {
-        expect(action(SETTINGS_ACTION.Export, { label: 'Export', id: 'export-again' }).id).toBe('export-again')
     })
 })
 

@@ -43,10 +43,4 @@ describe('APPLICATION_SCHEMA', () => {
         expect(fileActions).toHaveLength(2)
         expect(fileActions.every(entry => entry.flatscreenOnly === true)).toBe(true)
     })
-
-    it('gives every control an id that is unique within the panel', () => {
-        const ids = content.flatMap(entry => (entry.kind === 'note' ? [] : [entry.id]))
-
-        expect(new Set(ids).size).toBe(ids.length)
-    })
 })

@@ -54,7 +54,7 @@ function renderContent(content: SectionContent, appSettings: AppSettings): strin
             // Toggle, select and action are used only by ApplicationPanel, which is still hand-written
             // in the DOM menu and deleted at the menu flip, so rendering them here would be code built
             // to be thrown away. Failing loudly beats rendering nothing, and covers any future kind.
-            throw new Error(`The DOM schema renderer does not render "${content.kind}" controls ("${content.id}")`)
+            throw new Error(`The DOM schema renderer does not render "${content.kind}" controls`)
     }
 }
 
