@@ -25,7 +25,7 @@ interface TextureLoadedEvent { readonly slots: readonly number[] }
 
 ## Patterns
 
-- Prefer `private readonly` for dependencies injected at construction (never a singleton - see root `CLAUDE.md`)
+- Prefer `private readonly` for dependencies injected at construction
 - Name boolean flags positively: `isLoaded`, not `notLoaded`
 
 ---
