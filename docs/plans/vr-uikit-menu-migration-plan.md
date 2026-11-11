@@ -381,15 +381,17 @@ the settings-shaped ones:
 1. `DebugPanel` — **dropped 2026-09-08**: a first VR port was built, then removed, because it needed
    a live `PerformanceMonitorUI` published through `DataManager`, and the project owner ruled out
    `DataManager` owning UI objects. No VR debug panel is planned for now; the DOM one stays.
-2. `CacheManagementPanel` ✅ ported 2026-11-11 (`CacheManagementSchema`). Introduced the `readout`
-   control (read-only text an owner reports via `UIEventTypes.ReadoutsUpdated`) and
-   `CacheActionHandler`, which owns Clear/Refresh and the stats. Not ported, still DOM-only: the
+2. `CacheManagementPanel` ✅ ported 2026-11-11 (`CacheManagementSchema`). Introduced the generic
+   `readout` content kind: the renderer raises `UIEventTypes.ReadoutsRequested` with its readout ids
+   and each owner answers through `UIEventTypes.ReadoutsUpdated` for the ids it owns (cache ids live in
+   `CacheManagementSchema`). `CacheActionHandler` owns Clear/Refresh and the stats. Not ported, still DOM-only: the
    cached-users list with per-user Load (no list form in the schema yet), and the auto-download /
    limit / preload fields and validate / download-missing buttons (the fields write a key nothing
    reads; the buttons are stubs). Clear raises the same two clear events as the DOM panel, so
    `cache-clear-domain-unification` remains the place to unify them.
 3. `CameraSettingsPanel` ✅ ported 2026-11-11 (`CameraSettingsSchema`): fov/near/far sliders plus one
-   action per preset. The camera was not AppSettings-bound before; `cameraFov/Near/Far` are now
+   generic `preset` button per camera preset (writes a `Partial<ApplicationSettings>`; the preset data stays
+   in `CameraPresets`). The camera was not AppSettings-bound before; `cameraFov/Near/Far` are now
    settings (defaults 70 / 0.1 / 1000) applied to the camera by `CameraSettingsApplier`, and the DOM
    panel writes them too so both menus share state. Side effects: camera values now persist, and fov
    has no effect in a headset (WebXR owns the projection). The DOM panel's prev/next camera stepping
