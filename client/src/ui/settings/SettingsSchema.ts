@@ -103,8 +103,6 @@ export type BooleanSettingKey = {
 export interface ToggleSettingControl {
     readonly kind: 'toggle'
     readonly setting: BooleanSettingKey
-    /** DOM element id / uikit row key - must be unique within the panel. */
-    readonly id: string
     readonly label: string
     readonly description?: string
 }
@@ -112,14 +110,11 @@ export interface ToggleSettingControl {
 export interface ToggleOptions {
     readonly label: string
     readonly description?: string
-    /** Only for the rare control whose DOM id shouldn't follow its setting key. */
-    readonly id?: string
 }
 
-/** Builds a toggle, deriving `kind` and an `id` that is the kebab-case of the setting key. */
+/** Builds a toggle, deriving `kind`. */
 export function toggle(setting: BooleanSettingKey, options: ToggleOptions): ToggleSettingControl {
-    const { id, ...rest } = options
-    return { kind: 'toggle', setting, id: id ?? kebabCase(setting), ...rest }
+    return { kind: 'toggle', setting, ...options }
 }
 
 /** Asks the user to confirm before an action is carried out; SettingsActionHandler asks for it
@@ -132,8 +127,6 @@ export type ActionConfirmation = ConfirmationPrompt
 export interface ActionContent {
     readonly kind: 'action'
     readonly action: SettingsActionId
-    /** DOM element id / uikit row key - must be unique within the panel. */
-    readonly id: string
     readonly label: string
     readonly confirm?: ActionConfirmation
     /** Hidden while an immersive session is presenting - for actions that depend on browser UI
@@ -145,14 +138,11 @@ export interface ActionOptions {
     readonly label: string
     readonly confirm?: ActionConfirmation
     readonly flatscreenOnly?: boolean
-    /** Only for a panel that offers the same action twice. */
-    readonly id?: string
 }
 
-/** Builds an action, deriving `kind` and an `id` that is the action's own id. */
+/** Builds an action, deriving `kind`. */
 export function action(actionId: SettingsActionId, options: ActionOptions): ActionContent {
-    const { id, ...rest } = options
-    return { kind: 'action', action: actionId, id: id ?? actionId, ...rest }
+    return { kind: 'action', action: actionId, ...options }
 }
 
 /** Keys of ApplicationSettings whose value is a string - what a select can bind to. */
@@ -170,8 +160,6 @@ export interface SelectOption<Value extends string = string> {
 export interface SelectSettingControl {
     readonly kind: 'select'
     readonly setting: StringSettingKey
-    /** DOM element id / uikit row key - must be unique within the panel. */
-    readonly id: string
     readonly label: string
     readonly description?: string
     readonly options: readonly SelectOption[]
@@ -181,19 +169,16 @@ export interface SelectOptions<Value extends string> {
     readonly label: string
     readonly description?: string
     readonly options: readonly SelectOption<Value>[]
-    /** Only for the rare control whose DOM id shouldn't follow its setting key. */
-    readonly id?: string
 }
 
-/** Builds a select, deriving `kind` and an `id` that is the kebab-case of the setting key. Generic
+/** Builds a select, deriving `kind`. Generic
  *  over the key so each option's value is checked against that setting's own value type - a typo'd
  *  or foreign value is a compile error rather than a setting silently set to something invalid. */
 export function select<Key extends StringSettingKey>(
     setting: Key,
     options: SelectOptions<ApplicationSettings[Key] & string>
 ): SelectSettingControl {
-    const { id, ...rest } = options
-    return { kind: 'select', setting, id: id ?? kebabCase(setting), ...rest }
+    return { kind: 'select', setting, ...options }
 }
 
 /** A control bound to a setting - what schemaSettingKeys() collects and a schema-driven reset

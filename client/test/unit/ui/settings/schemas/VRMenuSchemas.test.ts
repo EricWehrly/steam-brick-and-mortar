@@ -21,8 +21,8 @@ function controlsOf(schema: SettingsPanelSchema): SettingControl[] {
 describe.each([GAME_SETTINGS_SCHEMA, GRAPHICS_SETTINGS_SCHEMA])('$id schema', schema => {
     const controls = controlsOf(schema)
 
-    it('has a unique id per control', () => {
-        const ids = controls.map(control => control.id)
+    it('has a unique id per range control', () => {
+        const ids = controls.flatMap(control => (control.kind === 'range' ? [control.id] : []))
         expect(new Set(ids).size).toBe(ids.length)
     })
 
