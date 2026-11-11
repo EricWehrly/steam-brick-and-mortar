@@ -37,6 +37,7 @@ import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 import { VRSettingsPanelCoordinator } from '../../scene/uikit/VRSettingsPanelCoordinator'
 import { VRCategoryReferenceCoordinator } from '../../scene/uikit/VRCategoryReferenceCoordinator'
+import { CacheActionHandler } from '../settings/CacheActionHandler'
 import { SettingsFileTransfer } from '../settings/SettingsFileTransfer'
 import { UrlUtils } from '../../utils/UrlUtils'
 import '../../styles/gamepad-reticle.css'
@@ -66,6 +67,7 @@ export class SystemUICoordinator {
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private vrSettingsPanelCoordinator: VRSettingsPanelCoordinator
     private settingsFileTransfer: SettingsFileTransfer
+    private readonly cacheActionHandler = new CacheActionHandler()
     private vrCategoryReferenceCoordinator?: VRCategoryReferenceCoordinator
     private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
     private pointerDraggedBeyondThreshold = false
@@ -148,6 +150,7 @@ export class SystemUICoordinator {
 
         this.vrSettingsPanelCoordinator.init()
         this.settingsFileTransfer.init()
+        this.cacheActionHandler.init()
 
         // Which settings surface you get is decided by whether you're in a headset, not by a flag:
         // in an immersive session the VR uikit panel shows, on flatscreen the DOM pause menu does
@@ -512,6 +515,7 @@ export class SystemUICoordinator {
         this.sceneClickGameBoxRaycast = undefined
         this.vrSettingsPanelCoordinator?.dispose()
         this.settingsFileTransfer?.dispose()
+        this.cacheActionHandler.dispose()
         this.vrCategoryReferenceCoordinator?.dispose()
         this.reticleElement?.remove()
         this.reticleElement = null

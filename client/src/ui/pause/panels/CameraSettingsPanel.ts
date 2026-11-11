@@ -17,52 +17,7 @@ import { DataManager } from '../../../core/data'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import { RangeControl } from '../../components/UIComponent'
 import type * as THREE from 'three'
-
-export interface CameraPreset {
-    name: string
-    fov: number
-    near: number
-    far: number
-    description: string
-}
-
-export const CAMERA_PRESETS: { [key: string]: CameraPreset } = {
-    NORMAL: {
-        name: 'Normal',
-        fov: 75,
-        near: 0.1,
-        far: 1000,
-        description: 'Standard perspective, natural look'
-    },
-    WIDE: {
-        name: 'Wide',
-        fov: 90,
-        near: 0.1,
-        far: 1000,
-        description: 'Wider view, better for VR (default)'
-    },
-    ULTRA_WIDE: {
-        name: 'Ultra Wide',
-        fov: 110,
-        near: 0.1,
-        far: 1000,
-        description: 'Maximum awareness, slight distortion'
-    },
-    CINEMATIC: {
-        name: 'Cinematic',
-        fov: 60,
-        near: 0.1,
-        far: 1000,
-        description: 'Narrow FOV, focused view, less distortion'
-    },
-    TELEPHOTO: {
-        name: 'Telephoto',
-        fov: 45,
-        near: 0.5,
-        far: 1000,
-        description: 'Very narrow, compressed perspective'
-    }
-}
+import { CAMERA_PRESETS, type CameraPreset, type CameraPresetKey } from '../../../scene/CameraPresets'
 
 export class CameraSettingsPanel extends PauseMenuPanel {
     readonly id = 'camera-settings'
@@ -209,8 +164,8 @@ export class CameraSettingsPanel extends PauseMenuPanel {
             '[data-camera-preset]',
             'cameraPreset',
             (presetKey: string) => {
-                if (CAMERA_PRESETS[presetKey]) {
-                    this.applyPreset(CAMERA_PRESETS[presetKey])
+                if (presetKey in CAMERA_PRESETS) {
+                    this.applyPreset(CAMERA_PRESETS[presetKey as CameraPresetKey])
                 }
             }
         )
@@ -222,50 +177,29 @@ export class CameraSettingsPanel extends PauseMenuPanel {
                 sliderId: 'camera-fov',
                 valueDisplayId: 'camera-fov-value',
                 formatDisplay: (v) => v.toFixed(0) + '°',
-                onChange: (value) => {
-                    const camera = this.getCurrentCamera()
-                    if (camera) {
-                        camera.fov = value
-                        camera.updateProjectionMatrix()
-                    }
-                }
+                onChange: (value) => this.appSettings.setSetting('cameraFov', value)
             },
             {
                 sliderId: 'camera-near',
                 valueDisplayId: 'camera-near-value',
                 formatDisplay: (v) => v.toFixed(2),
-                onChange: (value) => {
-                    const camera = this.getCurrentCamera()
-                    if (camera) {
-                        camera.near = value
-                        camera.updateProjectionMatrix()
-                    }
-                }
+                onChange: (value) => this.appSettings.setSetting('cameraNear', value)
             },
             {
                 sliderId: 'camera-far',
                 valueDisplayId: 'camera-far-value',
                 formatDisplay: (v) => v.toFixed(0),
-                onChange: (value) => {
-                    const camera = this.getCurrentCamera()
-                    if (camera) {
-                        camera.far = value
-                        camera.updateProjectionMatrix()
-                    }
-                }
+                onChange: (value) => this.appSettings.setSetting('cameraFar', value)
             }
         ])
     }
 
+    // CameraSettingsApplier copies these settings onto the camera.
     private applyPreset(preset: CameraPreset): void {
-        const camera = this.getCurrentCamera()
-        if (!camera) return
-        
-        camera.fov = preset.fov
-        camera.near = preset.near
-        camera.far = preset.far
-        camera.updateProjectionMatrix()
-        
+        this.appSettings.setSetting('cameraFov', preset.fov)
+        this.appSettings.setSetting('cameraNear', preset.near)
+        this.appSettings.setSetting('cameraFar', preset.far)
+
         this.updateCameraDisplay()
     }
     

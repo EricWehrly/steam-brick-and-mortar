@@ -133,6 +133,7 @@ export class VRSettingsMenuShell {
         this.activePanelIdSignal.value = panelId
 
         this.activeContent?.container.removeFromParent()
+        this.activeContent?.dispose()
         this.activeContent = buildSettingsPanel(schema, this.appSettings, this.panelContext)
         this.contentArea.add(this.activeContent.container)
 
@@ -163,6 +164,7 @@ export class VRSettingsMenuShell {
 
     dispose(): void {
         this.confirmDialog.dispose()
+        this.activeContent?.dispose()
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.handleMenuPanelChanged)
         this.eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, this.handleSettingChanged)
         this.eventManager.deregisterEventHandler(WebXREventTypes.SessionStart, this.handleXRSessionStart)

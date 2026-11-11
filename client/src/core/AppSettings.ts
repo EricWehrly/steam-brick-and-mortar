@@ -106,6 +106,9 @@ export const Setting = {
     InputLookInvertGamepad: 'inputLookInvertGamepad',
     InputLookSensitivityMouse: 'inputLookSensitivityMouse',
     InputLookSensitivityGamepad: 'inputLookSensitivityGamepad',
+    CameraFov: 'cameraFov',
+    CameraNear: 'cameraNear',
+    CameraFar: 'cameraFar',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -237,6 +240,10 @@ export interface ApplicationSettings {
     /** Look sensitivity multiplier - set independently per device. */
     inputLookSensitivityMouse: number
     inputLookSensitivityGamepad: number
+    /** Main camera projection - applied by CameraSettingsApplier. */
+    cameraFov: number
+    cameraNear: number
+    cameraFar: number
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -653,7 +660,10 @@ export class AppSettings {
             inputLookInvertMouse: false,
             inputLookInvertGamepad: true,
             inputLookSensitivityMouse: 1,
-            inputLookSensitivityGamepad: 2
+            inputLookSensitivityGamepad: 2,
+            cameraFov: 70,
+            cameraNear: 0.1,
+            cameraFar: 1000
         }
     }
 
@@ -689,7 +699,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'uiFontScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad']
+        const numberFields = ['pixelRatioScale', 'uiFontScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity', 'inputLookSensitivityMouse', 'inputLookSensitivityGamepad', 'cameraFov', 'cameraNear', 'cameraFar']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false

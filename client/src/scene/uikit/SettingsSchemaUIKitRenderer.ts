@@ -15,13 +15,15 @@
 import { Container, Text } from '@pmndrs/uikit'
 import { Button } from '@pmndrs/uikit-default'
 import type { ReadonlySignal } from '@preact/signals-core'
-import type { AppSettings, ApplicationSettings } from '../../core/AppSettings'
+import type { AppSettings, ApplicationSettings, SettingChangedEvent } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
-import { UIEventTypes, type ConfirmationRequestedEvent, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
+import { AppSettingsEventTypes, UIEventTypes, type ConfirmationRequestedEvent, type ReadoutsUpdatedEvent, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
     isSettingControl,
     schemaSettingKeys,
     type ActionContent,
+    type ReadoutContent,
+    type ReadoutId,
     type RangeSettingControl,
     type SelectSettingControl,
     type SettingControl,
@@ -42,6 +44,7 @@ import { toUikitSafeText } from './UikitTextSanitizer'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 
 const RESET_LABEL = 'Reset to Defaults'
+const READOUT_PLACEHOLDER = '...'
 
 /** What a panel needs from the surface it's shown on, passed in rather than reached for. */
 export interface SettingsPanelContext {
@@ -51,6 +54,8 @@ export interface SettingsPanelContext {
 
 export interface SettingsSchemaPanel {
     readonly container: Container
+    /** Stops listening for setting changes and readout reports; call when the panel is replaced. */
+    dispose(): void
     /** Restores every setting this schema binds, then resyncs the displayed rows - the uikit
      *  equivalent of the DOM panel's re-render-after-reset. */
     reset(): void
@@ -70,12 +75,13 @@ export function buildSettingsPanel(
     context: SettingsPanelContext
 ): SettingsSchemaPanel {
     const bindings: SettingRowBinding[] = []
+    const readoutValues = new Map<ReadoutId, Text>()
 
     const root = new Container(undefined, [MENU_CLASS.panelRoot])
     root.add(new Text({ text: toUikitSafeText(schema.title) }, [MENU_CLASS.panelTitle]))
 
     for (const section of schema.sections) {
-        root.add(buildSection(section, appSettings, context, bindings))
+        root.add(buildSection(section, appSettings, context, bindings, readoutValues))
     }
 
     function reset(): void {
@@ -91,14 +97,38 @@ export function buildSettingsPanel(
         root.add(resetButton)
     }
 
-    return { container: root, reset }
+    // A setting changed elsewhere (a camera preset, the DOM menu) moves the matching row.
+    function resyncOnSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
+        for (const { setting, row } of bindings) {
+            if (setting === event.detail.settingName) row.setValue(appSettings.getSetting(setting))
+        }
+    }
+
+    function showReadouts(event: CustomEvent<ReadoutsUpdatedEvent>): void {
+        for (const [id, text] of readoutValues) {
+            const next = event.detail.values[id]
+            if (next !== undefined) text.setProperties({ text: toUikitSafeText(next) })
+        }
+    }
+
+    const eventManager = EventManager.getInstance()
+    eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, resyncOnSettingChanged)
+    eventManager.registerEventHandler<ReadoutsUpdatedEvent>(UIEventTypes.ReadoutsUpdated, showReadouts)
+
+    function dispose(): void {
+        eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, resyncOnSettingChanged)
+        eventManager.deregisterEventHandler(UIEventTypes.ReadoutsUpdated, showReadouts)
+    }
+
+    return { container: root, reset, dispose }
 }
 
 function buildSection(
     section: SettingsSection,
     appSettings: AppSettings,
     context: SettingsPanelContext,
-    bindings: SettingRowBinding[]
+    bindings: SettingRowBinding[],
+    readoutValues: Map<ReadoutId, Text>
 ): Container {
     const container = new Container(undefined, [MENU_CLASS.section])
 
@@ -116,12 +146,23 @@ function buildSection(
             container.add(row.container)
         } else if (content.kind === 'action') {
             container.add(buildActionButton(content, context))
+        } else if (content.kind === 'readout') {
+            container.add(buildReadoutRow(content, readoutValues))
         } else {
             container.add(new Text({ text: toUikitSafeText(content.text) }, [MENU_CLASS.panelNote]))
         }
     }
 
     return container
+}
+
+function buildReadoutRow(content: ReadoutContent, readoutValues: Map<ReadoutId, Text>): Container {
+    const row = new Container(undefined, [MENU_CLASS.settingRowHeader])
+    row.add(new Text({ text: toUikitSafeText(content.label) }, [MENU_CLASS.settingLabel]))
+    const value = new Text({ text: READOUT_PLACEHOLDER }, [MENU_CLASS.settingValue])
+    readoutValues.set(content.id, value)
+    row.add(value)
+    return row
 }
 
 function buildSettingRow(
