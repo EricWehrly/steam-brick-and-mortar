@@ -44,9 +44,6 @@ These rules apply to all production runtime paths. They are not preferences.
 - **Intent-revealing handler names**: `stagePlacementRunFromSections`, not `handleSectionsReady`.
 
 **Known exceptions**: `DataManager`, `EventManager` and `AppSettings` remain singletons (migration TBD).
-Never pass one as a parameter (constructor, parameter property, defaulted or plain function
-parameter): read it with `getInstance()` where it's used, and in tests spy on the real instance.
-Debt and hit list: `no-singleton-parameters` in `docs/tech-debt.md`.
 
 ## Development
 
