@@ -88,6 +88,13 @@ panel model for the settings menu, so **[docs/plans/uikit-component-system-plan.
 now records the design and the remaining work - chiefly migrating the game-box panels onto it, which
 is what the acceptance criteria above still need.
 
+## Settings-menu ports
+
+Application, Game, Graphics, Cache and Camera are on the schema-driven VR menu (the last two
+2026-11-11). Cache added the `readout` content kind (owner-reported text) and Camera moved the camera's
+fov/near/far into AppSettings; details and what stays DOM-only are in Story 5 of
+[the VR menu migration plan](../plans/vr-uikit-menu-migration-plan.md).
+
 ## Notes / Open Questions
 
 - **Why not deferred anymore**: the original wait-for-two-families reasoning is satisfied more
