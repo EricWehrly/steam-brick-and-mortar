@@ -44,9 +44,11 @@ function createFakeRenderer(): THREE.WebGLRenderer {
 // jsdom's canvas doesn't implement Pointer Events capture APIs that the real forwardHtmlEvents
 // depends on - stubbed out here since these tests are about lifecycle/anchoring, not real pointer
 // forwarding (which needs live browser verification, per the plan's testing strategy).
-function createStubForwardEvents(): () => { destroy: () => void; update: () => void } {
-    return () => ({ destroy: () => {}, update: () => {} })
-}
+const forwardEvents = vi.hoisted(() => vi.fn((_el: HTMLElement, _getCamera: unknown, _root: unknown) => ({ destroy: () => {}, update: () => {} })))
+vi.mock('@pmndrs/pointer-events', async importOriginal => ({
+    ...(await importOriginal<typeof import('@pmndrs/pointer-events')>()),
+    forwardHtmlEvents: forwardEvents
+}))
 
 /** This panel only shows inside an immersive session (on flatscreen the DOM pause menu is the
  *  menu), so every test below that expects it to appear puts the app in VR first - called right
@@ -69,6 +71,7 @@ describe('VRSettingsPanelCoordinator', () => {
     let coordinator: VRSettingsPanelCoordinator | undefined
 
     beforeEach(() => {
+        forwardEvents.mockClear()
         EventManager.getInstance().removeAllListeners()
         DataManager.resetInstance()
 
@@ -87,7 +90,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('stays inactive after construction and init() alone', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
 
@@ -95,7 +98,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('activates on the pause menu opening and camera-attaches by default', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
 
@@ -107,11 +110,11 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('forwards canvas events to the menu tree only, never the whole scene', () => {
-        const forwardEvents = vi.fn((_el: HTMLElement, _getCamera: unknown, _root: THREE.Object3D) => ({ destroy: () => {}, update: () => {} }))
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), forwardEvents)
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
+        runUpdate(coordinator)
 
         expect(forwardEvents).toHaveBeenCalledTimes(1)
         expect(forwardEvents.mock.calls[0][2]).toBe(camera.children[0])
@@ -123,7 +126,7 @@ describe('VRSettingsPanelCoordinator', () => {
         camera.rotation.set(0, Math.PI / 2, 0)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'world-lock')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'world-lock')
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -144,7 +147,7 @@ describe('VRSettingsPanelCoordinator', () => {
         camera.rotation.set(Math.PI / 6, Math.PI / 4, 0.3)
         camera.updateWorldMatrix(true, false)
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'world-lock')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'world-lock')
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -157,7 +160,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('ignores MenuOpen events for a different menu type', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
 
@@ -167,7 +170,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('anchors to the camera when grip-attached mode has no grip published', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'grip-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'grip-attached')
         coordinator.init()
         enterVR()
 
@@ -185,7 +188,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'grip-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'grip-attached')
         coordinator.init()
         enterVR()
 
@@ -196,7 +199,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('keeps the same menu shell container (and its selected tab) across a close/reopen cycle', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'camera-attached')
         coordinator.init()
         enterVR()
 
@@ -215,7 +218,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('deactivates on the pause menu closing by hiding the panel, not removing it from its anchor', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'camera-attached')
         coordinator.init()
         enterVR()
 
@@ -230,7 +233,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('re-shows the same container (visible again) on reactivation rather than reparenting', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'camera-attached')
         coordinator.init()
         enterVR()
 
@@ -245,7 +248,7 @@ describe('VRSettingsPanelCoordinator', () => {
     it('does nothing (and does not throw) if no main camera is published yet', () => {
         DataManager.resetInstance()
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
 
@@ -253,7 +256,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('registers and unregisters a render-loop callback across init()/dispose()', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
 
@@ -279,7 +282,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -301,7 +304,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -327,7 +330,7 @@ describe('VRSettingsPanelCoordinator', () => {
         }
         DataManager.getInstance().set(DataKey.XRControllerSource, raySource, { domain: DataDomain.Scene })
 
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents())
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance())
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -340,7 +343,7 @@ describe('VRSettingsPanelCoordinator', () => {
     })
 
     it('dispose() hides the panel and deregisters listeners', () => {
-        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached')
+        coordinator = new VRSettingsPanelCoordinator(EventManager.getInstance(), AppSettings.getInstance(), 'camera-attached')
         coordinator.init()
         enterVR()
         EventManager.getInstance().emit<MenuOpenEvent>(UIEventTypes.MenuOpen, { menuType: 'pause' })
@@ -357,7 +360,7 @@ describe('VRSettingsPanelCoordinator', () => {
     describe('which surface shows', () => {
         function createCoordinator(): VRSettingsPanelCoordinator {
             const created = new VRSettingsPanelCoordinator(
-                EventManager.getInstance(), AppSettings.getInstance(), createStubForwardEvents(), 'camera-attached'
+                EventManager.getInstance(), AppSettings.getInstance(), 'camera-attached'
             )
             created.init()
             return created

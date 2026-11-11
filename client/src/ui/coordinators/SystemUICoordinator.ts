@@ -176,7 +176,7 @@ export class SystemUICoordinator {
             this.pauseMenuManager.setDomVisualsSuppressed(true)
 
             this.vrCategoryReferenceCoordinator = new VRCategoryReferenceCoordinator()
-            this.vrCategoryReferenceCoordinator.init(renderer)
+            this.vrCategoryReferenceCoordinator.init()
         }
 
         // Setup event handlers
