@@ -14,7 +14,7 @@ import type { SteamGameData } from '../game-box/types/GameData'
 import type { Section } from '../../types/LayoutTypes'
 import { GroupModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
-import { KNOWN_GENRES, groupByGenre, primaryGenre } from './GameSortFunctions'
+import { KNOWN_GENRES, groupByGenre } from './GameSortFunctions'
 import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
 // ─── Recency bucket helpers ──────────────────────────────────────────────────

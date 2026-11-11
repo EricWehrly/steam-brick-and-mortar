@@ -157,7 +157,7 @@ export class InputBindingCapture {
             return
         }
 
-        const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
+        const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad?.connected))
         if (gamepads.length === 0) {
             return
         }
