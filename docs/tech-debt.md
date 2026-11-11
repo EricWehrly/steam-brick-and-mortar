@@ -72,6 +72,43 @@ them. Nothing enforces it, so they come back.
 **Related files**:
 - `client/eslint.config.js`
 
+## id: no-singleton-parameters
+**Priority**: High  
+**Effort**: ~0.5 day for the rule; ~1 day to clear the hits outside the DOM panels  
+**Depends on**: lint running clean enough to gate on - same pass as `src-test-import-boundary`  
+**Context**: `EventManager`, `AppSettings` and `DataManager` are singletons, yet code still passes
+them as parameters (`new VRMenuConfirmDialog(eventManager)`, `new SettingsFileTransfer(eventManager,
+settings)`, `buildSliderRow(control, appSettings)`). That threads a global through every signature
+between the composition root and its one real user, and it suggests the instance could differ when
+it can't. Rule in root `CLAUDE.md` (Event-Driven Architecture, Known exceptions).
+
+**Rule** (`src/**`): no parameter, parameter property or defaulted parameter typed `EventManager`,
+`AppSettings` or `DataManager`; read it with `getInstance()` where it's used. Tests use the real
+instance and spy on it (`vi.spyOn(EventManager.getInstance(), 'emit')`; `DataManager.resetInstance()`
+exists) instead of injecting one. Lint sketch for `no-restricted-syntax`, to verify against real code:
+`:function > :matches(Identifier, AssignmentPattern > Identifier, TSParameterProperty Identifier) > TSTypeAnnotation > TSTypeReference[typeName.name=/^(EventManager|AppSettings|DataManager)$/]`.
+
+**Hits** (grep, 2026-11-11):
+- Constructor parameters: `VRMenuConfirmDialog`, `VRSettingsMenuShell`, `VRSettingsPanelCoordinator`,
+  `SettingsFileTransfer`, `SystemUICoordinator`, `PauseMenuManager`, `LightingControlsPanel`,
+  `InputProfileService`, `BatchAppDetailsClient` (optional param).
+- Defaulted to `getInstance()` (a test seam): `InputActionResolver`, `DeviceDetector`,
+  `InputProfileStore`, `VRCategoryReferencePanel`.
+- Function parameters: the `SettingsSchemaUIKitRenderer` builders, `SettingsSchemaDomRenderer`,
+  `exportSettingsToFile`/`importSettingsFromFile`, `resolveMenuPixelSize`,
+  `DefaultBootstrapPath.requestPropsSetup`.
+- DOM pause-menu panels (`ApplicationPanel`, `DisplayAdvancedPanel`, `CameraSettingsPanel`,
+  `GameSettingsPanel`, `GraphicsSettingsPanel`): leave to `dom-menu-panel-retirement`.
+- Check how these store theirs: `InputManager`, `SceneClickGameBoxRaycast`, `GameBoxFoldCoordinator`,
+  `StorePropsCoordinator`, `LodDistanceManager`, `LodGameArtworkRenderer`, `SpatialPrewarmingManager`
+  (each has a `readonly eventManager`/`appSettings` field the parameter grep didn't match).
+
+**Fix**: add the rule as `warn`, clear the non-DOM hits, promote to `error`.
+
+**Related files**:
+- `client/eslint.config.js`
+- `CLAUDE.md`, `client/typescript.md`
+
 ## id: cache-clear-domain-unification
 **Priority**: Medium  
 **Effort**: ~0.5 day remaining (typed `CacheDomain` set + tests; call-site/dead-wiring fixes done)  
