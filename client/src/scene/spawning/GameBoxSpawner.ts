@@ -21,7 +21,6 @@ import type {
     StorePropsLibraryReloadRequestEvent,
 } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
-import type { StockSurface } from '../../types/LayoutTypes'
 import type { ShelfSurface } from '../props/shared/SharedPropsTypes'
 
 interface ShelfPosition {

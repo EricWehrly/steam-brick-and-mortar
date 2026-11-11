@@ -103,7 +103,6 @@ export class GpuMemoryEstimator {
         const instancedDetails: InstancedMeshDetail[] = []
         
         let textureBytes = 0
-        let geometryBytes: number
         let instancedBytes = 0
         
         // Get renderer info for counts
@@ -162,7 +161,7 @@ export class GpuMemoryEstimator {
         
         // Estimate geometry bytes (rough: 100 bytes per vertex average)
         // TODO: Calculate actual buffer sizes from geometry.attributes
-        geometryBytes = geometryCount * 1000 // Very rough estimate
+        const geometryBytes = geometryCount * 1000 // Very rough estimate
         
         const totalBytes = textureBytes + geometryBytes + instancedBytes
         

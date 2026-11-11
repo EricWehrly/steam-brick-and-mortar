@@ -5,14 +5,10 @@ import { EventManager } from '../../core/EventManager'
 import { DataManager, DataKey } from '../../core/data'
 import { StartupEventTracker, StartupPhase } from '../../utils/StartupEventTracker'
 import {
-    GameEventTypes,
-    type BatchReadyForPlacementEvent,
     type StorePropsSetupRequestEvent,
     StorePropsEventTypes,
 } from '../../types/InteractionEvents'
-import type { SteamGameData } from '../game-box/types/GameData'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
-import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { DEFAULT_SHELF_CONFIG } from '../props/shared/SharedPropsTypes'
 
 export type ShowcaseTuningFamily = 'roughness' | 'fresnel' | 'shadowContact'

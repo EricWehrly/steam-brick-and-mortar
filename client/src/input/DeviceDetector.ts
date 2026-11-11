@@ -185,7 +185,7 @@ export class DeviceDetector {
         let changed = false
 
         for (const gamepad of gamepads) {
-            if (!gamepad || !gamepad.connected) {
+            if (!gamepad?.connected) {
                 continue
             }
 

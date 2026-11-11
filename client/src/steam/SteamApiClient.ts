@@ -311,7 +311,7 @@ export class SteamApiClient {
             if (key.startsWith('resolve_')) {
                 const vanityUrl = key.replace('resolve_', '')
                 const resolveData = this.cache.get<SteamResolveResponse>(key)
-                if (resolveData && resolveData.steamid) {
+                if (resolveData?.steamid) {
                     const existing = userMap.get(resolveData.steamid) || {}
                     existing.vanityUrl = vanityUrl
                     existing.resolveData = resolveData
