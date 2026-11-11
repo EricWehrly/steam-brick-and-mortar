@@ -4,7 +4,9 @@ import { EventManager } from '../../../../src/core/EventManager'
 import {
     UIEventTypes,
     type ConfirmationAnsweredEvent,
-    type ConfirmationRequestedEvent
+    type ConfirmationRequestedEvent,
+    type MenuCloseEvent,
+    type MenuPanelChangedEvent
 } from '../../../../src/types/InteractionEvents'
 import { VRMenuConfirmDialog } from '../../../../src/scene/uikit/VRMenuConfirmDialog'
 
@@ -116,6 +118,19 @@ describe('VRMenuConfirmDialog', () => {
         expect(() => dialog.cancel()).not.toThrow()
         expect(dialog.isOpen).toBe(false)
         expect(answers).toEqual([])
+    })
+
+    it.each([
+        ['the active panel changes', () => eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'other' })],
+        ['the menu closes', () => eventManager.emit<MenuCloseEvent>(UIEventTypes.MenuClose, { menuType: 'settings' })]
+    ])('answers no and closes when %s', (_what, abandon) => {
+        const dialog = new VRMenuConfirmDialog(eventManager)
+        ask('r9')
+
+        abandon()
+
+        expect(answers).toEqual([{ requestId: 'r9', confirmed: false }])
+        expect(dialog.isOpen).toBe(false)
     })
 
     it('stops listening once disposed', () => {

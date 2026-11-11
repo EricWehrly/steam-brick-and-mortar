@@ -132,9 +132,6 @@ export class VRSettingsMenuShell {
 
         this.activePanelIdSignal.value = panelId
 
-        // A confirmation belongs to the panel that asked for it; don't leave it hanging over another.
-        this.confirmDialog.cancel()
-
         this.activeContent?.container.removeFromParent()
         this.activeContent = buildSettingsPanel(schema, this.appSettings, this.panelContext)
         this.contentArea.add(this.activeContent.container)
