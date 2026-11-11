@@ -1,5 +1,5 @@
 {
-  "name": "steam-brick-and-mortar-client",
+  "name": "steam-brick-mortar",
   "version": "0.1.0",
   "description": "WebXR VR game launcher with Steam integration",
   "type": "module",

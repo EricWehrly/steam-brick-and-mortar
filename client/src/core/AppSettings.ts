@@ -15,7 +15,7 @@
 import { EventManager, EventSource, type BaseInteractionEvent } from './EventManager'
 import { AppSettingsEventTypes, UIEventTypes, type SettingsActionRequestedEvent } from '../types/InteractionEvents'
 import { SETTINGS_ACTION } from '../ui/settings/SettingsActions'
-import { APP_STORAGE_PREFIX } from './StoragePrefix'
+import { APP_ID } from './AppIdentity'
 
 // Lighting Quality Constants
 export const LIGHTING_QUALITY = {
@@ -333,7 +333,7 @@ export class AppSettings {
     private static instance: AppSettings | null = null
     private settings: ApplicationSettings
     private eventManager: EventManager
-    private readonly STORAGE_KEY = `${APP_STORAGE_PREFIX}-app-settings`
+    private readonly STORAGE_KEY = `${APP_ID}-app-settings`
 
     private constructor() {
         this.eventManager = EventManager.getInstance()
