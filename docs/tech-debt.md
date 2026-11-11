@@ -19,33 +19,9 @@
 
 ## Fix Now
 
-## id: src-test-import-boundary
-**Priority**: High  
-**Effort**: ~0.5 day (lint rule + clean-up of whatever it flags; a src-only tsconfig is optional extra)  
-**Context**: Nothing stops production code from importing test code. `client/tsconfig.json` type-checks
-`src/**/*` and `test/**/*` as one program, and `eslint.config.js` has no `no-restricted-imports`, so a
-`src/` file that imports a test util (e.g. `test/utils/settings-panel-context.ts`) compiles, lints
-clean and would be bundled by Vite. Today it is clean (verified by grep, 2026-11-10: no `src/` file
-imports from `test/`), so this is a missing guard, not a live violation. Raised in PR #171 review when
-`settings-panel-context` moved from `src/` to `test/utils/`.
-
-**Fix**:
-- Add a `no-restricted-imports` block scoped to `files: ['src/**']` that bans `**/test/**` (the
-  existing `src`+`test` block only has `no-restricted-syntax`).
-- Optional: a `tsconfig.build.json` including only `src/**/*`, used by the build step, so a stray
-  import also fails `tsc`.
-- Fix the lint config's pre-existing `no-undef` errors on XR/browser globals in the same pass (14 at
-  last count) - deferred until after #171 merges, per the owner's request.
-
-**Related files**:
-- `client/eslint.config.js`
-- `client/tsconfig.json`
-- `client/test/utils/settings-panel-context.ts`
-
 ## id: no-anonymous-callbacks-lint
 **Priority**: High  
 **Effort**: ~0.5 day for the rule; the legacy clean-up is separate and mostly unnecessary (see below)  
-**Depends on**: lint actually running clean enough to gate on - same pass as `src-test-import-boundary`  
 **Context**: Inline lambdas passed as behaviour (`onPress: () => cond ? emitA() : emitB()`,
 `resyncs.push(() => row.setValue(...))`, `input.onchange = () => resolve(...)`) hide what the code
 does behind an unnamed closure, and PR #171 needed a whole review round (2026-11-11) just to name
@@ -63,10 +39,11 @@ them. Nothing enforces it, so they come back.
   `:matches(CallExpression, NewExpression):not([callee.property.name=/^(map|flatMap|filter|find|findIndex|some|every|sort|reduce|replace)$/]) > :matches(ArrowFunctionExpression, FunctionExpression[id=null])`,
   plus `Property[method=false] > ...` and `AssignmentExpression > ...` variants.
 
+**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`; the five DOM pause-menu panels excluded): 360 hits. Selectors verified against real code, with two widenings of the allow-list: `forEach`/`traverse` (iteration bodies) and `new Promise` executors. Biggest clusters: `.catch`/`.then`, `setTimeout`/`requestAnimationFrame`, event listeners, `IndexedDbCache`, `pixel-cache.worker`, UI panels.
+
 **Fix**:
-- Add the rule as `warn`, scoped to `src/**`; promote to `error` once its hits are handled.
-- Don't fix the hits in the legacy DOM pause-menu panels (`GameSettingsPanel`, `GraphicsSettingsPanel`,
-  `ApplicationPanel`): they go away under `dom-menu-panel-retirement`. Exclude them, or let them warn.
+- Promote to `error` once its hits are handled.
+- The legacy DOM pause-menu panels (`ApplicationPanel`, `CameraSettingsPanel`, `DisplayAdvancedPanel`, `GameSettingsPanel`, `GraphicsSettingsPanel`) are excluded in the config; drop the exclusion list when `dom-menu-panel-retirement` lands.
 - `SystemUICoordinator` and other pre-#171 code: fix when touched.
 
 **Related files**:
@@ -75,7 +52,6 @@ them. Nothing enforces it, so they come back.
 ## id: no-singleton-parameters
 **Priority**: High  
 **Effort**: ~0.5 day for the rule; ~1 day to clear the hits outside the DOM panels  
-**Depends on**: lint running clean enough to gate on - same pass as `src-test-import-boundary`  
 **Context**: `EventManager`, `AppSettings` and `DataManager` are singletons, yet code still passes
 them as parameters (`new VRMenuConfirmDialog(eventManager)`, `new SettingsFileTransfer(eventManager,
 settings)`, `buildSliderRow(control, appSettings)`). That threads a global through every signature
@@ -103,7 +79,9 @@ exists) instead of injecting one. Lint sketch for `no-restricted-syntax`, to ver
   `StorePropsCoordinator`, `LodDistanceManager`, `LodGameArtworkRenderer`, `SpatialPrewarmingManager`
   (each has a `readonly eventManager`/`appSettings` field the parameter grep didn't match).
 
-**Fix**: add the rule as `warn`, clear the non-DOM hits, promote to `error`.
+**Status (2026-11-11)**: live as `warn` in `client/eslint.config.js` (`src/**`, DOM pause-menu panels excluded): 35 hits. Verified against real code: it matches every non-DOM hit listed above, plus `WebXREventHandler`.
+
+**Fix**: clear the non-DOM hits, then promote to `error`.
 
 **Related files**:
 - `client/eslint.config.js`
@@ -1034,3 +1012,6 @@ index 4 does open the menu. `InputProfile.ts`'s VR `OpenMenu` binding was correc
 
 ## id: vitest-config-shared-base
 **Status**: ✅ Resolved 2026-10-01 — the five vitest configs now `mergeConfig` a shared `test/vitest.base.ts` (globals, jsdom, setup files, the `vr-menu.css` opt-in out of Vitest's default `.css` blanking, default timeout) and state only how they differ; `test/vitest.shared.ts` is gone. Not a literal "inherit from `vitest.config.ts`": `mergeConfig` concatenates arrays, so that would have handed the integration config an exclude list naming its own tests. Verified by snapshotting every config's resolved settings before and after - four identical, `performance` differing only by gaining `watch: false`. Also fixed the summary reporter counting a test file that fails to load (or an unhandled error) as nothing: it now counts as a failure, with a unit test for the reporter and an end-to-end check.
+
+## id: src-test-import-boundary
+**Status**: ✅ Resolved 2026-11-11 — `no-restricted-imports` bans `**/test/**` from `src/**` (error). Core `no-undef` is off for TS (tsc owns it), which cleared the 14 XR/DOM-global lint errors. Optional `tsconfig.build.json` not done.

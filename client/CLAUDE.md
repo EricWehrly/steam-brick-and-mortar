@@ -27,14 +27,24 @@ doesn't exist yet (not just the color), add a new `--color-*` token to tokens.cs
 to `ColorTokens.ts` rather than inlining a literal "because this is content/box-art, not app chrome"
 — that reasoning has been wrong before.
 
-Event handler binding:
+Event handler binding - handlers are always named, never an inline lambda (`no-restricted-syntax` warns in `src/`):
 ```typescript
 // Simple call: bind
 onClick: this.handleClick.bind(this)
 
-// Conditional logic: arrow
-onClick: () => { if (this.enabled) this.handleClick() }
+// Conditional logic: a named method or bound arrow field, not an inline arrow
+private readonly handleClick = (): void => { if (this.enabled) this.activate() }
 ```
+Inline lambdas are fine only as pure selectors (`map`/`filter`/`find`/`sort`/`reduce`/`forEach`) and
+`new Promise` executors. A function that returns a Promise doesn't also take a callback.
+
+## Lint
+
+`yarn lint` (from `client/`) is clean of errors and gates new work: don't add warnings in files you touch.
+Mechanically enforced from PR review feedback: no `src/` import of `test/` (error); no anonymous
+behaviour callbacks and no `EventManager`/`AppSettings`/`DataManager` parameters (warn, `src/` only,
+legacy DOM pause-menu panels excluded). Not lintable, so still on you in review: magic strings (use a
+named constant), "why isn't this `default:`", and passing context a class already owns.
 
 ## Type Checking
 
