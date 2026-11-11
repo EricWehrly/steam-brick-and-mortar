@@ -148,25 +148,30 @@ export function action(actionId: SettingsActionId, options: ActionOptions): Acti
     return { kind: 'action', action: actionId, ...options }
 }
 
-/** Values an owner reports to the menu, shown as read-only label/value rows. */
-export const READOUT_ID = {
-    ImageCacheCount: 'image-cache-count',
-    StorageUsage: 'storage-usage'
-} as const
-
-export type ReadoutId = typeof READOUT_ID[keyof typeof READOUT_ID]
-
 /** A live label/value row filled by UIEventTypes.ReadoutsUpdated; shows a placeholder until its
  *  owner reports. Not bound to a setting. */
 export interface ReadoutContent {
     readonly kind: 'readout'
-    readonly id: ReadoutId
+    /** What an owner reports against; unique within the app. */
+    readonly id: string
     readonly label: string
 }
 
 /** Builds a readout, deriving `kind`. */
-export function readout(id: ReadoutId, label: string): ReadoutContent {
+export function readout(id: string, label: string): ReadoutContent {
     return { kind: 'readout', id, label }
+}
+
+/** A button that writes a fixed set of setting values in one press. Not bound to a setting. */
+export interface PresetContent {
+    readonly kind: 'preset'
+    readonly label: string
+    readonly values: Readonly<Partial<ApplicationSettings>>
+}
+
+/** Builds a preset button, deriving `kind`. */
+export function preset(label: string, values: Readonly<Partial<ApplicationSettings>>): PresetContent {
+    return { kind: 'preset', label, values }
 }
 
 /** Keys of ApplicationSettings whose value is a string - what a select can bind to. */
@@ -210,7 +215,7 @@ export function select<Key extends StringSettingKey>(
 export type SettingControl = RangeSettingControl | ToggleSettingControl | SelectSettingControl
 
 /** Anything a section can contain, in render order. */
-export type SectionContent = SettingControl | ActionContent | NoteContent | ReadoutContent
+export type SectionContent = SettingControl | ActionContent | NoteContent | ReadoutContent | PresetContent
 
 export interface SettingsSection {
     /** Omitted for a section that's just a run of controls with no heading of its own - a panel

@@ -17,13 +17,13 @@ import { Button } from '@pmndrs/uikit-default'
 import type { ReadonlySignal } from '@preact/signals-core'
 import type { AppSettings, ApplicationSettings, SettingChangedEvent } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
-import { AppSettingsEventTypes, UIEventTypes, type ConfirmationRequestedEvent, type ReadoutsUpdatedEvent, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
+import { AppSettingsEventTypes, UIEventTypes, type ConfirmationRequestedEvent, type ReadoutsRequestedEvent, type ReadoutsUpdatedEvent, type SettingsActionRequestedEvent } from '../../types/InteractionEvents'
 import {
     isSettingControl,
     schemaSettingKeys,
     type ActionContent,
+    type PresetContent,
     type ReadoutContent,
-    type ReadoutId,
     type RangeSettingControl,
     type SelectSettingControl,
     type SettingControl,
@@ -75,7 +75,7 @@ export function buildSettingsPanel(
     context: SettingsPanelContext
 ): SettingsSchemaPanel {
     const bindings: SettingRowBinding[] = []
-    const readoutValues = new Map<ReadoutId, Text>()
+    const readoutValues = new Map<string, Text>()
 
     const root = new Container(undefined, [MENU_CLASS.panelRoot])
     root.add(new Text({ text: toUikitSafeText(schema.title) }, [MENU_CLASS.panelTitle]))
@@ -114,6 +114,9 @@ export function buildSettingsPanel(
     const eventManager = EventManager.getInstance()
     eventManager.registerEventHandler<SettingChangedEvent>(AppSettingsEventTypes.Changed, resyncOnSettingChanged)
     eventManager.registerEventHandler<ReadoutsUpdatedEvent>(UIEventTypes.ReadoutsUpdated, showReadouts)
+    if (readoutValues.size > 0) {
+        eventManager.emit<ReadoutsRequestedEvent>(UIEventTypes.ReadoutsRequested, { ids: [...readoutValues.keys()] })
+    }
 
     function dispose(): void {
         eventManager.deregisterEventHandler(AppSettingsEventTypes.Changed, resyncOnSettingChanged)
@@ -128,7 +131,7 @@ function buildSection(
     appSettings: AppSettings,
     context: SettingsPanelContext,
     bindings: SettingRowBinding[],
-    readoutValues: Map<ReadoutId, Text>
+    readoutValues: Map<string, Text>
 ): Container {
     const container = new Container(undefined, [MENU_CLASS.section])
 
@@ -146,6 +149,8 @@ function buildSection(
             container.add(row.container)
         } else if (content.kind === 'action') {
             container.add(buildActionButton(content, context))
+        } else if (content.kind === 'preset') {
+            container.add(buildPresetButton(content, appSettings))
         } else if (content.kind === 'readout') {
             container.add(buildReadoutRow(content, readoutValues))
         } else {
@@ -156,7 +161,7 @@ function buildSection(
     return container
 }
 
-function buildReadoutRow(content: ReadoutContent, readoutValues: Map<ReadoutId, Text>): Container {
+function buildReadoutRow(content: ReadoutContent, readoutValues: Map<string, Text>): Container {
     const row = new Container(undefined, [MENU_CLASS.settingRowHeader])
     row.add(new Text({ text: toUikitSafeText(content.label) }, [MENU_CLASS.settingLabel]))
     const value = new Text({ text: READOUT_PLACEHOLDER }, [MENU_CLASS.settingValue])
@@ -222,6 +227,17 @@ function buildSelectRow(control: SelectSettingControl, appSettings: AppSettings)
         value: appSettings.getSetting(control.setting),
         onChange: writeSetting
     })
+}
+
+function buildPresetButton(content: PresetContent, appSettings: AppSettings): Button {
+    function writeValues(): void {
+        // Object.entries erases the key/value pairing; preset() typed each value to its own setting.
+        for (const [setting, value] of Object.entries(content.values)) {
+            appSettings.setSetting(setting as keyof ApplicationSettings, value as never)
+        }
+    }
+
+    return createActionButton({ label: content.label, onPress: writeValues })
 }
 
 function buildActionButton(content: ActionContent, context: SettingsPanelContext): Button {

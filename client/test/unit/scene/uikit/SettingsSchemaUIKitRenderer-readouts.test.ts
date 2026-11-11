@@ -8,9 +8,8 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { AppSettings } from '../../../../src/core/AppSettings'
 import { EventManager } from '../../../../src/core/EventManager'
 import { buildSettingsPanel } from '../../../../src/scene/uikit/SettingsSchemaUIKitRenderer'
-import { UIEventTypes, type ReadoutsUpdatedEvent } from '../../../../src/types/InteractionEvents'
-import { CACHE_MANAGEMENT_SCHEMA } from '../../../../src/ui/settings/schemas/CacheManagementSchema'
-import { READOUT_ID } from '../../../../src/ui/settings/SettingsSchema'
+import { UIEventTypes, type ReadoutsRequestedEvent, type ReadoutsUpdatedEvent } from '../../../../src/types/InteractionEvents'
+import { CACHE_MANAGEMENT_SCHEMA, CACHE_READOUT_ID } from '../../../../src/ui/settings/schemas/CacheManagementSchema'
 import { createTestPanelContext, resolvedProps } from '../../../utils/settings-panel-context'
 
 function reportReadouts(values: ReadoutsUpdatedEvent['values']): void {
@@ -34,10 +33,25 @@ describe('buildSettingsPanel readouts', () => {
         const panel = buildSettingsPanel(CACHE_MANAGEMENT_SCHEMA, appSettings, createTestPanelContext().context)
         expect(readoutText(panel, 1)).toBe('...')
 
-        reportReadouts({ [READOUT_ID.ImageCacheCount]: '12' })
+        reportReadouts({ [CACHE_READOUT_ID.ImageCacheCount]: '12' })
 
         expect(readoutText(panel, 1)).toBe('12')
         expect(readoutText(panel, 2)).toBe('...')
+        panel.dispose()
+    })
+
+    it('asks for its readouts by id when built', () => {
+        const requested: string[][] = []
+        function recordRequest(event: CustomEvent<ReadoutsRequestedEvent>): void {
+            requested.push([...event.detail.ids])
+        }
+        const eventManager = EventManager.getInstance()
+        eventManager.registerEventHandler<ReadoutsRequestedEvent>(UIEventTypes.ReadoutsRequested, recordRequest)
+
+        const panel = buildSettingsPanel(CACHE_MANAGEMENT_SCHEMA, appSettings, createTestPanelContext().context)
+
+        eventManager.deregisterEventHandler(UIEventTypes.ReadoutsRequested, recordRequest)
+        expect(requested).toEqual([[CACHE_READOUT_ID.ImageCacheCount, CACHE_READOUT_ID.StorageUsage]])
         panel.dispose()
     })
 
@@ -45,7 +59,7 @@ describe('buildSettingsPanel readouts', () => {
         const panel = buildSettingsPanel(CACHE_MANAGEMENT_SCHEMA, appSettings, createTestPanelContext().context)
         panel.dispose()
 
-        reportReadouts({ [READOUT_ID.ImageCacheCount]: '99' })
+        reportReadouts({ [CACHE_READOUT_ID.ImageCacheCount]: '99' })
 
         expect(readoutText(panel, 1)).toBe('...')
     })

@@ -9,13 +9,13 @@ import { PixelDataCache } from '../../../../src/scene/game-box/instancing/PixelD
 import {
     SteamEventTypes,
     UIEventTypes,
-    type MenuPanelChangedEvent,
+    type ReadoutsRequestedEvent,
     type ReadoutsUpdatedEvent,
     type SettingsActionRequestedEvent
 } from '../../../../src/types/InteractionEvents'
 import { CacheActionHandler, formatByteCount } from '../../../../src/ui/settings/CacheActionHandler'
 import { SETTINGS_ACTION } from '../../../../src/ui/settings/SettingsActions'
-import { READOUT_ID } from '../../../../src/ui/settings/SettingsSchema'
+import { CACHE_READOUT_ID } from '../../../../src/ui/settings/schemas/CacheManagementSchema'
 
 describe('formatByteCount', () => {
     it('scales to the largest fitting unit', () => {
@@ -64,17 +64,17 @@ describe('CacheActionHandler', () => {
         vi.restoreAllMocks()
     })
 
-    it('reports image count and storage when the cache tab opens', async () => {
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'cache-management' })
+    it('reports image count and storage when a panel asks for its readouts', async () => {
+        eventManager.emit<ReadoutsRequestedEvent>(UIEventTypes.ReadoutsRequested, { ids: [CACHE_READOUT_ID.StorageUsage] })
         await settle()
 
         expect(readouts).toHaveLength(1)
-        expect(readouts[0].values[READOUT_ID.ImageCacheCount]).toBe('7')
-        expect(readouts[0].values[READOUT_ID.StorageUsage]).toBe('2 KB / 1 MB')
+        expect(readouts[0].values[CACHE_READOUT_ID.ImageCacheCount]).toBe('7')
+        expect(readouts[0].values[CACHE_READOUT_ID.StorageUsage]).toBe('2 KB / 1 MB')
     })
 
-    it('stays quiet when another tab opens', async () => {
-        eventManager.emit<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, { panelId: 'application' })
+    it('stays quiet when a panel asks for other readouts', async () => {
+        eventManager.emit<ReadoutsRequestedEvent>(UIEventTypes.ReadoutsRequested, { ids: ['something-else'] })
         await settle()
 
         expect(readouts).toHaveLength(0)
@@ -100,7 +100,7 @@ describe('CacheActionHandler', () => {
         eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId: SETTINGS_ACTION.RefreshCacheStats })
         await settle()
 
-        expect(readouts[0].values[READOUT_ID.StorageUsage]).toBe('Not available')
+        expect(readouts[0].values[CACHE_READOUT_ID.StorageUsage]).toBe('Not available')
     })
 
     it('ignores actions after dispose()', async () => {

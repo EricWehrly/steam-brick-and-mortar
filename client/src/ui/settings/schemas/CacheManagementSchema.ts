@@ -8,7 +8,13 @@
  */
 
 import { SETTINGS_ACTION } from '../SettingsActions'
-import { action, READOUT_ID, readout, type SettingsPanelSchema } from '../SettingsSchema'
+import { action, readout, type SettingsPanelSchema } from '../SettingsSchema'
+
+/** What CacheActionHandler reports against. */
+export const CACHE_READOUT_ID = {
+    ImageCacheCount: 'image-cache-count',
+    StorageUsage: 'storage-usage'
+} as const
 
 export const CACHE_MANAGEMENT_SCHEMA: SettingsPanelSchema = {
     id: 'cache-management',
@@ -18,8 +24,8 @@ export const CACHE_MANAGEMENT_SCHEMA: SettingsPanelSchema = {
         {
             heading: 'Image Cache',
             content: [
-                readout(READOUT_ID.ImageCacheCount, 'Images cached'),
-                readout(READOUT_ID.StorageUsage, 'Browser storage'),
+                readout(CACHE_READOUT_ID.ImageCacheCount, 'Images cached'),
+                readout(CACHE_READOUT_ID.StorageUsage, 'Browser storage'),
                 action(SETTINGS_ACTION.RefreshCacheStats, { label: 'Refresh' }),
                 action(SETTINGS_ACTION.ClearCache, {
                     label: 'Clear Cache',

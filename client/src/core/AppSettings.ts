@@ -240,7 +240,7 @@ export interface ApplicationSettings {
     /** Look sensitivity multiplier - set independently per device. */
     inputLookSensitivityMouse: number
     inputLookSensitivityGamepad: number
-    /** Main camera projection - applied by CameraSettingsApplier. */
+    /** Main camera projection. */
     cameraFov: number
     cameraNear: number
     cameraFar: number

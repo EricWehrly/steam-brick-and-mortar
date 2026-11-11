@@ -1,7 +1,7 @@
 /**
- * Owns the cache tab's behaviour: reports the image-cache and browser-storage readouts when the
- * tab opens or Refresh is pressed, and carries out Clear Cache by raising the same two clear
- * events the DOM CacheManagementPanel does (see cache-clear-domain-unification in
+ * Owns the cache tab's behaviour: reports the image-cache and browser-storage readouts when a
+ * panel asks for them or Refresh is pressed, and carries out Clear Cache by raising the same two
+ * clear events the DOM CacheManagementPanel does (see cache-clear-domain-unification in
  * docs/tech-debt.md) before re-measuring.
  */
 
@@ -10,7 +10,7 @@ import { PixelDataCache } from '../../scene/game-box/instancing/PixelDataCache'
 import {
     SteamEventTypes,
     UIEventTypes,
-    type MenuPanelChangedEvent,
+    type ReadoutsRequestedEvent,
     type ReadoutsUpdatedEvent,
     type SettingsActionRequestedEvent,
     type SteamCacheClearEvent,
@@ -18,14 +18,19 @@ import {
 } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { SETTINGS_ACTION } from './SettingsActions'
-import { READOUT_ID } from './SettingsSchema'
+import { CACHE_READOUT_ID } from './schemas/CacheManagementSchema'
 
 const logger = Logger.createLogFunctions('CacheActionHandler')
 
-const CACHE_PANEL_ID = 'cache-management'
 const BYTES_PER_UNIT = 1024
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 const STORAGE_UNAVAILABLE = 'Not available'
+
+const CACHE_READOUT_IDS: readonly string[] = Object.values(CACHE_READOUT_ID)
+
+function isCacheReadout(id: string): boolean {
+    return CACHE_READOUT_IDS.includes(id)
+}
 
 export function formatByteCount(bytes: number): string {
     if (bytes <= 0) return '0 B'
@@ -38,12 +43,12 @@ export class CacheActionHandler {
 
     init(): void {
         this.eventManager.registerEventHandler<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, this.actOnRequest)
-        this.eventManager.registerEventHandler<MenuPanelChangedEvent>(UIEventTypes.MenuPanelChanged, this.reportOnTabOpened)
+        this.eventManager.registerEventHandler<ReadoutsRequestedEvent>(UIEventTypes.ReadoutsRequested, this.reportOnRequested)
     }
 
     dispose(): void {
         this.eventManager.deregisterEventHandler(UIEventTypes.SettingsActionRequested, this.actOnRequest)
-        this.eventManager.deregisterEventHandler(UIEventTypes.MenuPanelChanged, this.reportOnTabOpened)
+        this.eventManager.deregisterEventHandler(UIEventTypes.ReadoutsRequested, this.reportOnRequested)
     }
 
     private readonly actOnRequest = (event: CustomEvent<SettingsActionRequestedEvent>): void => {
@@ -51,8 +56,8 @@ export class CacheActionHandler {
         if (event.detail.actionId === SETTINGS_ACTION.RefreshCacheStats) void this.reportStats()
     }
 
-    private readonly reportOnTabOpened = (event: CustomEvent<MenuPanelChangedEvent>): void => {
-        if (event.detail.panelId === CACHE_PANEL_ID) void this.reportStats()
+    private readonly reportOnRequested = (event: CustomEvent<ReadoutsRequestedEvent>): void => {
+        if (event.detail.ids.some(isCacheReadout)) void this.reportStats()
     }
 
     private clearCaches(): void {
@@ -66,8 +71,8 @@ export class CacheActionHandler {
             const pixelStats = await PixelDataCache.getInstance().getStorageEstimate()
             this.eventManager.emit<ReadoutsUpdatedEvent>(UIEventTypes.ReadoutsUpdated, {
                 values: {
-                    [READOUT_ID.ImageCacheCount]: String(pixelStats.count),
-                    [READOUT_ID.StorageUsage]: await this.describeStorage()
+                    [CACHE_READOUT_ID.ImageCacheCount]: String(pixelStats.count),
+                    [CACHE_READOUT_ID.StorageUsage]: await this.describeStorage()
                 },
                 source: EventSource.UI
             })
