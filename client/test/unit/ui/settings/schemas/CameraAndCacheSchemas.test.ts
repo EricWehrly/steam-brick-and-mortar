@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { AppSettings } from '../../../../../src/core/AppSettings'
 import { CAMERA_PRESETS } from '../../../../../src/scene/CameraPresets'
+import { CAMERA_PRESET_PAYLOAD_KEY } from '../../../../../src/scene/CameraSettingsApplier'
 import { SETTINGS_ACTION } from '../../../../../src/ui/settings/SettingsActions'
 import { isSettingControl, type SettingsPanelSchema } from '../../../../../src/ui/settings/SettingsSchema'
 import { CACHE_MANAGEMENT_SCHEMA } from '../../../../../src/ui/settings/schemas/CacheManagementSchema'
@@ -26,11 +27,13 @@ describe('CAMERA_SETTINGS_SCHEMA', () => {
         }
     })
 
-    it('offers one preset button per camera preset, writing its three settings', () => {
-        const presets = contentOf(CAMERA_SETTINGS_SCHEMA).flatMap(content => (content.kind === 'preset' ? [content] : []))
+    it('offers one apply-preset action per camera preset, keyed by preset', () => {
+        const presets = contentOf(CAMERA_SETTINGS_SCHEMA).flatMap(content =>
+            content.kind === 'action' && content.action === SETTINGS_ACTION.ApplyCameraPreset ? [content] : []
+        )
 
-        expect(presets.map(p => p.values)).toEqual(
-            Object.values(CAMERA_PRESETS).map(({ fov, near, far }) => ({ cameraFov: fov, cameraNear: near, cameraFar: far }))
+        expect(presets.map(p => p.payload)).toEqual(
+            Object.keys(CAMERA_PRESETS).map(key => ({ [CAMERA_PRESET_PAYLOAD_KEY]: key }))
         )
     })
 })

@@ -76,6 +76,25 @@ describe('VRMenuConfirmDialog', () => {
         expect(isOpen(dialog)).toBe(false)
     })
 
+    it('carries the request payload through to the confirmed action', () => {
+        const payloads: unknown[] = []
+        eventManager.registerEventHandler<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, e => {
+            payloads.push(e.detail.payload)
+        })
+        const dialog = new VRMenuConfirmDialog(eventManager)
+        eventManager.emit<ConfirmationRequestedEvent>(UIEventTypes.ConfirmationRequested, {
+            actionId: SETTINGS_ACTION.ApplyCameraPreset,
+            payload: { preset: 'WIDE' },
+            title: 't',
+            message: 'm',
+            confirmLabel: 'c'
+        })
+
+        click(footerButtons(dialog).confirm as AlertDialogAction)
+
+        expect(payloads).toEqual([{ preset: 'WIDE' }])
+    })
+
     it('raises nothing and closes when cancelled', () => {
         const dialog = new VRMenuConfirmDialog(eventManager)
         ask()
