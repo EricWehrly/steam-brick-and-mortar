@@ -20,7 +20,7 @@
  */
 
 import type { ApplicationSettings } from '../../core/AppSettings'
-import type { ConfirmationPrompt } from '../../types/InteractionEvents'
+import type { ConfirmationPrompt, SettingsActionPayload } from '../../types/InteractionEvents'
 import type { SettingsActionId } from './SettingsActions'
 
 /** Keys of ApplicationSettings whose value is a number - the only settings a range control can
@@ -129,6 +129,9 @@ export interface ActionContent {
     readonly kind: 'action'
     readonly action: SettingsActionId
     readonly label: string
+    /** Travels on the request (and through the confirmation) to tell the owner which use of the
+     *  action this button is. */
+    readonly payload?: SettingsActionPayload
     /** Asked through ConfirmationRequested before the action runs, so it doesn't matter which
      *  surface answers. */
     readonly confirm?: ConfirmationPrompt
@@ -139,6 +142,7 @@ export interface ActionContent {
 
 export interface ActionOptions {
     readonly label: string
+    readonly payload?: SettingsActionPayload
     readonly confirm?: ConfirmationPrompt
     readonly flatscreenOnly?: boolean
 }
@@ -146,6 +150,20 @@ export interface ActionOptions {
 /** Builds an action, deriving `kind`. */
 export function action(actionId: SettingsActionId, options: ActionOptions): ActionContent {
     return { kind: 'action', action: actionId, ...options }
+}
+
+/** A live label/value row filled by UIEventTypes.ReadoutsUpdated; shows a placeholder until its
+ *  owner reports. Not bound to a setting. */
+export interface ReadoutContent {
+    readonly kind: 'readout'
+    /** What an owner reports against; unique within the app. */
+    readonly id: string
+    readonly label: string
+}
+
+/** Builds a readout, deriving `kind`. */
+export function readout(id: string, label: string): ReadoutContent {
+    return { kind: 'readout', id, label }
 }
 
 /** Keys of ApplicationSettings whose value is a string - what a select can bind to. */
@@ -189,7 +207,7 @@ export function select<Key extends StringSettingKey>(
 export type SettingControl = RangeSettingControl | ToggleSettingControl | SelectSettingControl
 
 /** Anything a section can contain, in render order. */
-export type SectionContent = SettingControl | ActionContent | NoteContent
+export type SectionContent = SettingControl | ActionContent | NoteContent | ReadoutContent
 
 export interface SettingsSection {
     /** Omitted for a section that's just a run of controls with no heading of its own - a panel

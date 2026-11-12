@@ -16,13 +16,17 @@ import { DISPLAY_ADVANCED_SCHEMA } from '../../ui/settings/schemas/DisplayAdvanc
 import { DISPLAY_UI_SCHEMA } from '../../ui/settings/schemas/DisplayUISchema'
 import { GAME_SETTINGS_SCHEMA } from '../../ui/settings/schemas/GameSettingsSchema'
 import { GRAPHICS_SETTINGS_SCHEMA } from '../../ui/settings/schemas/GraphicsSettingsSchema'
+import { CAMERA_SETTINGS_SCHEMA } from '../../ui/settings/schemas/CameraSettingsSchema'
+import { CACHE_MANAGEMENT_SCHEMA } from '../../ui/settings/schemas/CacheManagementSchema'
 
 export const VR_MENU_SCHEMAS: readonly SettingsPanelSchema[] = [
     APPLICATION_SCHEMA,
     GAME_SETTINGS_SCHEMA,
     GRAPHICS_SETTINGS_SCHEMA,
     DISPLAY_ADVANCED_SCHEMA,
-    DISPLAY_UI_SCHEMA
+    DISPLAY_UI_SCHEMA,
+    CAMERA_SETTINGS_SCHEMA,
+    CACHE_MANAGEMENT_SCHEMA
 ]
 
 export const DEFAULT_VR_MENU_TAB_PANEL_ID = VR_MENU_SCHEMAS[0].id

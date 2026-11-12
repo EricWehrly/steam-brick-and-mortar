@@ -26,7 +26,6 @@ import {
     type ConfirmationRequestedEvent,
     type SettingsActionRequestedEvent
 } from '../../types/InteractionEvents'
-import type { SettingsActionId } from '../../ui/settings/SettingsActions'
 import { MENU_CLASS } from './VRMenuStyleSheet'
 
 const CANCEL_LABEL = 'Cancel'
@@ -35,7 +34,7 @@ export class VRMenuConfirmDialog extends AlertDialog {
     private readonly titleText = new Text(undefined, [MENU_CLASS.dialogTitle])
     private readonly messageText = new Text(undefined, [MENU_CLASS.dialogMessage])
     private readonly confirmLabelText = new Text(undefined, [MENU_CLASS.dialogButtonLabel])
-    private pendingAction: SettingsActionId | null = null
+    private pendingAction: SettingsActionRequestedEvent | null = null
 
     constructor(private readonly eventManager: EventManager) {
         super()
@@ -70,8 +69,8 @@ export class VRMenuConfirmDialog extends AlertDialog {
     }
 
     private readonly ask = (event: CustomEvent<ConfirmationRequestedEvent>): void => {
-        const { actionId, title, message, confirmLabel } = event.detail
-        this.pendingAction = actionId
+        const { actionId, payload, title, message, confirmLabel } = event.detail
+        this.pendingAction = { actionId, payload }
         this.titleText.setProperties({ text: title })
         this.messageText.setProperties({ text: message })
         this.confirmLabelText.setProperties({ text: confirmLabel })
@@ -85,6 +84,6 @@ export class VRMenuConfirmDialog extends AlertDialog {
 
     private readonly raisePendingAction = (): void => {
         if (this.pendingAction === null) return
-        this.eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, { actionId: this.pendingAction })
+        this.eventManager.emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, this.pendingAction)
     }
 }
