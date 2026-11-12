@@ -390,8 +390,8 @@ the settings-shaped ones:
    reads; the buttons are stubs). Clear raises the same two clear events as the DOM panel, so
    `cache-clear-domain-unification` remains the place to unify them.
 3. `CameraSettingsPanel` ✅ ported 2026-11-11 (`CameraSettingsSchema`): fov/near/far sliders plus one
-   generic `preset` button per camera preset (writes a `Partial<ApplicationSettings>`; the preset data stays
-   in `CameraPresets`). The camera was not AppSettings-bound before; `cameraFov/Near/Far` are now
+   `ApplyCameraPreset` action per camera preset (the preset key travels as the action's payload and
+   `CameraSettingsApplier` validates it and writes the settings; the preset data stays in `CameraPresets`).
    settings (defaults 70 / 0.1 / 1000) applied to the camera by `CameraSettingsApplier`, and the DOM
    panel writes them too so both menus share state. Side effects: camera values now persist, and fov
    has no effect in a headset (WebXR owns the projection). The DOM panel's prev/next camera stepping
