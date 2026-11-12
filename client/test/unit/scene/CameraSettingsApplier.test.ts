@@ -5,7 +5,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { AppSettings } from '../../../src/core/AppSettings'
-import { CameraSettingsApplier } from '../../../src/scene/CameraSettingsApplier'
+import { EventManager } from '../../../src/core/EventManager'
+import { CAMERA_PRESETS } from '../../../src/scene/CameraPresets'
+import { CAMERA_PRESET_PAYLOAD_KEY, CameraSettingsApplier } from '../../../src/scene/CameraSettingsApplier'
+import { UIEventTypes, type SettingsActionRequestedEvent } from '../../../src/types/InteractionEvents'
+import { SETTINGS_ACTION } from '../../../src/ui/settings/SettingsActions'
 
 describe('CameraSettingsApplier', () => {
     const settings = AppSettings.getInstance()
@@ -34,6 +38,40 @@ describe('CameraSettingsApplier', () => {
         settings.setSetting('cameraFov', 95)
 
         expect(camera.fov).toBe(95)
+    })
+
+    function requestPreset(payload: Record<string, string> | undefined): void {
+        EventManager.getInstance().emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, {
+            actionId: SETTINGS_ACTION.ApplyCameraPreset,
+            payload
+        })
+    }
+
+    it('applies the named preset to the settings and camera', () => {
+        requestPreset({ [CAMERA_PRESET_PAYLOAD_KEY]: 'TELEPHOTO' })
+
+        expect(settings.getSetting('cameraFov')).toBe(CAMERA_PRESETS.TELEPHOTO.fov)
+        expect(settings.getSetting('cameraNear')).toBe(CAMERA_PRESETS.TELEPHOTO.near)
+        expect(camera.fov).toBe(CAMERA_PRESETS.TELEPHOTO.fov)
+    })
+
+    it.each([
+        ['no payload', undefined],
+        ['an unknown preset', { [CAMERA_PRESET_PAYLOAD_KEY]: 'NOPE' }],
+        ['an inherited key', { [CAMERA_PRESET_PAYLOAD_KEY]: 'toString' }]
+    ])('ignores a preset request with %s', (_name, payload) => {
+        requestPreset(payload)
+
+        expect(settings.getSetting('cameraFov')).toBe(settings.getDefaultSetting('cameraFov'))
+    })
+
+    it('ignores other actions', () => {
+        EventManager.getInstance().emit<SettingsActionRequestedEvent>(UIEventTypes.SettingsActionRequested, {
+            actionId: SETTINGS_ACTION.ClearCache,
+            payload: { [CAMERA_PRESET_PAYLOAD_KEY]: 'TELEPHOTO' }
+        })
+
+        expect(settings.getSetting('cameraFov')).toBe(settings.getDefaultSetting('cameraFov'))
     })
 
     it('stops following settings after dispose()', () => {

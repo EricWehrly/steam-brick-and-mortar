@@ -14,7 +14,7 @@ import { DISPLAY_ADVANCED_SCHEMA } from '../../../../src/ui/settings/schemas/Dis
 import { DISPLAY_UI_SCHEMA } from '../../../../src/ui/settings/schemas/DisplayUISchema'
 import { APPLICATION_SCHEMA } from '../../../../src/ui/settings/schemas/ApplicationSchema'
 import { SETTINGS_ACTION } from '../../../../src/ui/settings/SettingsActions'
-import { select, type SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
+import { action, select, type SettingsPanelSchema } from '../../../../src/ui/settings/SettingsSchema'
 import { buildSettingsPanel } from '../../../../src/scene/uikit/SettingsSchemaUIKitRenderer'
 import { createTestPanelContext, resolvedProps } from '../../../utils/settings-panel-context'
 
@@ -168,6 +168,20 @@ describe('buildSettingsPanel', () => {
             press(1)
 
             expect(received).toEqual([expect.objectContaining({ actionId: SETTINGS_ACTION.Export })])
+        })
+
+        it('sends the schema-declared payload with the action', () => {
+            const schema: SettingsPanelSchema = {
+                id: 'payload-test',
+                title: 'Payload',
+                icon: 'x',
+                sections: [{ content: [action(SETTINGS_ACTION.ApplyCameraPreset, { label: 'Go', payload: { preset: 'WIDE' } })] }]
+            }
+            const panel = buildSettingsPanel(schema, AppSettings.getInstance(), createTestPanelContext().context)
+
+            ;(resolvedProps(panel.container.children[SECTION].children[0]).onClick as () => void)()
+
+            expect(received).toEqual([expect.objectContaining({ actionId: SETTINGS_ACTION.ApplyCameraPreset, payload: { preset: 'WIDE' } })])
         })
 
         it('asks for confirmation instead of raising the action when the schema declares a prompt', () => {

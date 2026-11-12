@@ -5,7 +5,9 @@
  */
 
 import { CAMERA_PRESETS } from '../../../scene/CameraPresets'
-import { preset, range, type SettingsPanelSchema } from '../SettingsSchema'
+import { CAMERA_PRESET_PAYLOAD_KEY } from '../../../scene/CameraSettingsApplier'
+import { SETTINGS_ACTION } from '../SettingsActions'
+import { action, range, type SettingsPanelSchema } from '../SettingsSchema'
 
 export const CAMERA_SETTINGS_SCHEMA: SettingsPanelSchema = {
     id: 'camera-settings',
@@ -15,8 +17,8 @@ export const CAMERA_SETTINGS_SCHEMA: SettingsPanelSchema = {
         {
             heading: 'Presets',
             description: 'Sets field of view and clipping planes together.',
-            content: Object.values(CAMERA_PRESETS).map(({ name, fov, near, far }) =>
-                preset(name, { cameraFov: fov, cameraNear: near, cameraFar: far })
+            content: Object.entries(CAMERA_PRESETS).map(([key, { name }]) =>
+                action(SETTINGS_ACTION.ApplyCameraPreset, { label: name, payload: { [CAMERA_PRESET_PAYLOAD_KEY]: key } })
             )
         },
         {

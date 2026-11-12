@@ -261,12 +261,18 @@ export interface ConfirmationPrompt {
  */
 export interface SettingsActionRequestedEvent extends BaseInteractionEvent {
     readonly actionId: SettingsActionId
+    readonly payload?: SettingsActionPayload
 }
 
+/** What distinguishes one use of an action id from another (which of several presets); the
+ *  action's owner validates it, since it arrives from a schema. */
+export type SettingsActionPayload = Readonly<Record<string, string | number | boolean>>
+
 /** Raised instead of SettingsActionRequested for an action that needs a yes first; the confirm
- *  dialog raises SettingsActionRequested for `actionId` only if the user confirms. */
+ *  dialog raises SettingsActionRequested for `actionId` and `payload` only if the user confirms. */
 export interface ConfirmationRequestedEvent extends BaseInteractionEvent, ConfirmationPrompt {
     readonly actionId: SettingsActionId
+    readonly payload?: SettingsActionPayload
 }
 
 /** A freshly built panel asking whoever owns these readout ids to report them. */

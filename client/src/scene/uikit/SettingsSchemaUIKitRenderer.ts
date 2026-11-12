@@ -22,7 +22,6 @@ import {
     isSettingControl,
     schemaSettingKeys,
     type ActionContent,
-    type PresetContent,
     type ReadoutContent,
     type RangeSettingControl,
     type SelectSettingControl,
@@ -97,7 +96,7 @@ export function buildSettingsPanel(
         root.add(resetButton)
     }
 
-    // A setting changed elsewhere (a camera preset, the DOM menu) moves the matching row.
+    // A setting changed elsewhere (another surface, a request handler) moves the matching row.
     function resyncOnSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
         for (const { setting, row } of bindings) {
             if (setting === event.detail.settingName) row.setValue(appSettings.getSetting(setting))
@@ -149,8 +148,6 @@ function buildSection(
             container.add(row.container)
         } else if (content.kind === 'action') {
             container.add(buildActionButton(content, context))
-        } else if (content.kind === 'preset') {
-            container.add(buildPresetButton(content, appSettings))
         } else if (content.kind === 'readout') {
             container.add(buildReadoutRow(content, readoutValues))
         } else {
@@ -229,29 +226,18 @@ function buildSelectRow(control: SelectSettingControl, appSettings: AppSettings)
     })
 }
 
-function buildPresetButton(content: PresetContent, appSettings: AppSettings): Button {
-    function writeValues(): void {
-        // Object.entries erases the key/value pairing; preset() typed each value to its own setting.
-        for (const [setting, value] of Object.entries(content.values)) {
-            appSettings.setSetting(setting as keyof ApplicationSettings, value as never)
-        }
-    }
-
-    return createActionButton({ label: content.label, onPress: writeValues })
-}
-
 function buildActionButton(content: ActionContent, context: SettingsPanelContext): Button {
     function requestAction(): void {
         const eventManager = EventManager.getInstance()
         if (content.confirm) {
             eventManager.emit<ConfirmationRequestedEvent>(
                 UIEventTypes.ConfirmationRequested,
-                { actionId: content.action, ...content.confirm }
+                { actionId: content.action, payload: content.payload, ...content.confirm }
             )
         } else {
             eventManager.emit<SettingsActionRequestedEvent>(
                 UIEventTypes.SettingsActionRequested,
-                { actionId: content.action }
+                { actionId: content.action, payload: content.payload }
             )
         }
     }
